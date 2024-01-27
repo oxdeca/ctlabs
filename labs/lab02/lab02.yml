@@ -1,0 +1,75 @@
+---
+
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/lab02/lab02.yml
+# Description : Try Hack me Environment
+# -----------------------------------------------------------------------------
+
+name: TryHackMe
+desc: Environment used for Security Testing
+
+defaults:
+  switch:
+    linux:
+      image: ctlabs/c9/base:0.1
+  host:
+    linux:
+      image: ctlabs/c9/base:0.1
+    kali:
+      image: ctlabs/misc/kali:0.1
+    qemu:
+      image: ctlabs/c9/qemu:0.1
+    zap:
+      image: ctlabs/misc/zap:0.1
+  router:
+    frr:
+      image: ctlabs/c9/frr:0.1
+      caps : [SYS_NICE,NET_RAW,NET_BIND_SERVICE]
+
+topology:
+  - vm:
+    name: thm01
+    nodes:
+      natgw:
+        type : gateway
+        ipv4 : 192.168.15.1/29
+        snat : true
+        dnat : ro1:eth1
+      sw1:
+        type : switch
+        ipv4 : 192.168.10.5/24
+        gw   : 192.168.10.1
+        nics:
+          eth0: 192.168.40.6/24
+      ro1:
+        type : router
+        kind : frr
+        gw   : 192.168.15.1
+        vols : ["$PWD/../vpn/:/root/vpn/:ro"]
+        nics :
+          eth1: 192.168.15.2/29
+          eth2: 192.168.10.1/24
+      h1:
+        type : host
+        kind : kali
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.11/24
+      zap:
+        type  : host
+        kind  : zap
+        gw    : 192.168.10.1
+        vols  : ['/tmp/zap/:/zap/wrk/:rw']
+        nics  :
+          eth1: 192.168.10.14/24
+        dnat  :
+          - [8080, 8080]
+          - [8090, 8090]
+
+    links:
+      - [ "ro1:eth2", "sw1:eth1"  ]
+      - [ "ro1:eth1", "natgw:eth0"  ]
+
+      - [ "sw1:eth2", "h1:eth1"   ]
+      - [ "sw1:eth3", "zap:eth1"   ]
+
