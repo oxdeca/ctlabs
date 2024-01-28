@@ -26,17 +26,17 @@ topology:
   - vm:
     name: lpic207-vm1
     nodes:
-      mgmt:
-        type  : switch
-        ipv4  : 192.168.40.1/24
-        ports : 8
-      ansible :
-        type : host
-        gw   : 192.168.15.1
-        nics :
-          eth0: 192.168.40.3/24
-          eth1: 192.168.15.3/29
-        vols : ['/tmp/ansible/:/root/ansible/:ro']
+#      mgmt:
+#        type  : switch
+#        ipv4  : 192.168.40.1/24
+#        ports : 8
+#      ansible :
+#        type : host
+#        gw   : 192.168.15.1
+#        nics :
+#          eth0: 192.168.40.3/24
+#          eth1: 192.168.15.3/29
+#        vols : ['/tmp/ansible/:/root/ansible/:ro']
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -116,8 +116,8 @@ topology:
       - [ "sw2:eth3", "h2:eth1"   ]
       - [ "sw2:eth4", "www2:eth1"   ]
 
-      - [ "ansible:eth1", "natgw:eth1" ]
-
+#      - [ "ansible:eth1", "natgw:eth1" ]
+#
 #      - [ "mgmt:eth0", "sw1:eth0" ]
 #      - [ "mgmt:eth1", "sw2:eth0" ]
 #      - [ "mgmt:eth2", "ro1:eth0" ]
