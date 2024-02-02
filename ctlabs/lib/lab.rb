@@ -16,9 +16,10 @@ class Lab
     @cfg = YAML.load(File.read(cfg))
     @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},vm=#{vm_name}"
 
-    @name     = @cfg['name']
-    @desc     = @cfg['desc']
-    @defaults = @cfg['defaults']
+    @name     = @cfg['name']     || ''
+    @desc     = @cfg['desc']     || ''
+    @defaults = @cfg['defaults'] || {}
+    @dns      = @cfg['dns']      || []
     @dnatgw   = {}
 
     @nodes = init_nodes(vm_name)
@@ -47,7 +48,7 @@ class Lab
     nodes = []
     cfg = find_vm(vm_name)
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log }.merge( cfg['nodes'][n] ))
+      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dsn' => @dns }.merge( cfg['nodes'][n] ))
     end
     nodes
   end
@@ -101,7 +102,7 @@ class Lab
     vmips  = %x( ip route | grep default | awk '{print $9}' ).split
     natgw = find_node('natgw')
     via   = nil
-p "natgw=#{natgw}"
+    #p "natgw=#{natgw}"
     if( !natgw.nil? && !natgw.dnat.nil? )
       @log.write "#{__method__}(): natgw=#{natgw}"
 

@@ -6,12 +6,13 @@
 # -----------------------------------------------------------------------------
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns
 
   def initialize(args)
     @name      = args['name']
     @defaults  = args['defaults']
     @fqdn      = args['fqdn']
+    @dns       = args['dns']   || []
     @type      = args['type']
     @eos       = args['eos']   || 'linux'
     @kind      = args['kind']  || 'linux'
@@ -73,6 +74,7 @@ class Node
         env   = @env.map  { |e| "-e #{e} "}.join
         priv  = @priv ? '--privileged' : ''
         kvm   = @kvm  ? '--device /dev/kvm --device /dev/net/tun' : ''
+        dns   = @dns.map { |ns| "nameserver #{ns}" }.join("\n")
         image = @image.nil? ? @defaults[@type][@kind]['image'] : @image
 
         #
@@ -102,8 +104,10 @@ class Node
 
         %x( docker run -itd --rm --hostname #{@name} --name #{@name} --net none #{env} #{kvm} #{priv} #{caps} #{vols} #{image} #{@cmd} )
         sleep 1
-        @cid   = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
-        @cpid  = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
+        @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
+        @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
+        @inotify = %x( echo "256" > /proc/sys/fs/inotify/max_user_instances )
+        %s( docker exec -it  #{@name} sh -c 'echo -en "#{dns} > /etc/resollllv.conf" )
         @netns = add_netns
         #add_nics
 
