@@ -143,23 +143,23 @@ class Graph
 
 [switches]
   <%- @nodes.each do |node| -%>
-  <%-   if node.type == 'switch' and !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   if node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
 
 [router]
   <%- @nodes.each do |node| -%>
-  <%-   if node.type == 'router' and !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
 [hosts]
   <%- @nodes.each do |node| -%>
-  <%-   if node.type == 'host' and !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   if node.type == 'host' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
