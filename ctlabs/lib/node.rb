@@ -31,7 +31,7 @@ class Node
     @dnat      = args['dnat']
     @mtu       = args['mtu']  || 1460
     @priv      = args['priv'] || false
-    @caps      = (! args['caps'].nil?) ? args['caps'] + [ 'NET_ADMIN', 'SYS_ADMIN' ]           : [ 'NET_ADMIN', 'SYS_ADMIN' ]
+    @caps      = (! args['caps'].nil?) ? args['caps'] + [ 'NET_ADMIN', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ] : [ 'NET_ADMIN', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     @vols      = (! args['vols'].nil?) ? args['vols'] + [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ] : [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
 
     @log = args['log'] || LabLog.new
