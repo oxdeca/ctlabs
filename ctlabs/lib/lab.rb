@@ -50,7 +50,7 @@ class Lab
     dns = cfg['dns'] || @dns
 
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dsn' => dns }.merge( cfg['nodes'][n] ))
+      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns }.merge( cfg['nodes'][n] ))
     end
     nodes
   end
