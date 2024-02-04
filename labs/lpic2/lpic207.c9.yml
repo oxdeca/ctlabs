@@ -5,7 +5,7 @@
 # Description : DNS Lab ctlabs configuration
 # -----------------------------------------------------------------------------
 
-name: lpic-207
+name: lpic207
 desc: LPIC2 Lab
 
 defaults:
@@ -26,17 +26,19 @@ topology:
   - vm:
     name: lpic207-vm1
     nodes:
-#      mgmt:
-#        type  : switch
-#        ipv4  : 192.168.40.1/24
-#        ports : 8
-#      ansible :
-#        type : host
-#        gw   : 192.168.15.1
-#        nics :
-#          eth0: 192.168.40.3/24
-#          eth1: 192.168.15.3/29
-#        vols : ['/tmp/ansible/:/root/ansible/:ro']
+      mgmt:
+        type  : switch
+        #ipv4  : 192.168.40.1/24
+        ports : 10
+        nics:
+          eth0: 192.168.40.1/24
+      ansible :
+        type : host
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.3/24
+          eth1: 192.168.15.3/29
+        vols : ['/tmp/ansible/:/root/ansible/:ro']
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -44,16 +46,16 @@ topology:
         dnat : ro1:eth3
       sw1:
         type : switch
-        ipv4 : 192.168.10.6/24
+        #ipv4 : 192.168.10.6/24
         gw   : 192.168.10.1
         nics:
           eth0: 192.168.40.5/24
       sw2:
         type : switch
-        ipv4 : 192.168.20.6/24
+        #ipv4 : 192.168.20.6/24
         gw   : 192.168.20.1
         nics:
-          eth0: 192.168.40.5/24
+          eth0: 192.168.40.6/24
       ro1:
         type : router
         kind : frr
@@ -104,9 +106,9 @@ topology:
 
 
     links:
-      - [ "ro1:eth1", "sw1:eth1"  ]
-      - [ "ro1:eth2", "sw2:eth1"  ]
-      - [ "ro1:eth3", "natgw:eth0"  ]
+      - [ "ro1:eth1", "natgw:eth2"  ]
+      - [ "ro1:eth2", "sw1:eth1"  ]
+      - [ "ro1:eth3", "sw2:eth1"  ]
 
       - [ "sw1:eth2", "ns1:eth1"   ]
       - [ "sw1:eth3", "h1:eth1"   ]
@@ -116,16 +118,16 @@ topology:
       - [ "sw2:eth3", "h2:eth1"   ]
       - [ "sw2:eth4", "www2:eth1"   ]
 
-#      - [ "ansible:eth1", "natgw:eth1" ]
-#
-#      - [ "mgmt:eth0", "sw1:eth0" ]
-#      - [ "mgmt:eth1", "sw2:eth0" ]
-#      - [ "mgmt:eth2", "ro1:eth0" ]
-#      - [ "mgmt:eth3", "ns1:eth0"  ]
-#      - [ "mgmt:eth4", "ns2:eth0"  ]
-#      - [ "mgmt:eth5", "h1:eth0"  ]
-#      - [ "mgmt:eth6", "h2:eth0"  ]
-#      - [ "mgmt:eth7", "www1:eth0"  ]
-#      - [ "mgmt:eth8", "www2:eth0"  ]
-#      - [ "mgmt:eth9", "ansible:eth0"  ]
+      - [ "ansible:eth1", "natgw:eth1" ]
+
+      - [ "mgmt:eth1", "ansible:eth0"  ]
+      - [ "mgmt:eth2", "sw1:eth0" ]
+      - [ "mgmt:eth3", "sw2:eth0" ]
+      - [ "mgmt:eth4", "ro1:eth0" ]
+      - [ "mgmt:eth5", "ns1:eth0"  ]
+      - [ "mgmt:eth6", "ns2:eth0"  ]
+      - [ "mgmt:eth7", "h1:eth0"  ]
+      - [ "mgmt:eth8", "h2:eth0"  ]
+      - [ "mgmt:eth9", "www1:eth0"  ]
+      - [ "mgmt:eth10", "www2:eth0"  ]
 

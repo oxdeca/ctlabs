@@ -2,12 +2,14 @@
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/graph.rb
 # Description : graph class; creating visualizations
-# License     : License
+# License     : Licence MIT
 # -----------------------------------------------------------------------------
 #
 # Desc: creates the various graphs by generating graphviz code
 #
 class Graph
+  attr_reader :colors
+
   def initialize(args)
     @log = args[:log] || LabLog.new
     @log.write "== Graph =="
@@ -18,52 +20,83 @@ class Graph
     @links   = args[:links]
     @binding = args[:binding]
     @dotfile = "/tmp/#{@name}.dot"
+    @colors  = ['red', 'grey', 'blue', 'orange', 'magenta', 'black', 'olivedrab3', 'cyan2', 'salmon', 'darkgreen']
   end
 
-  def get_connections
+  def get_cons
     @log.write "#{__method__}():  "
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
-          graph [pad="0.2",nodesep="0.3",ranksep="2",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="beige"]
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="seashell",fontname="Courier New",fontsize="11"]
 
-        <%- @nodes.each do |node| -%>
+        <%- 
+            @nodes.each do |node|
+              # skip management nodes
+              if node.name == "mgmt"
+                next
+              end
+              group   = node.type
+              bgcolor = "darkseagreen2"
+              case node.type
+                when 'host'
+                  bgcolor = "lightsteelblue"
+                when 'router'
+                  bgcolor = "cadetblue"
+                when 'gateway'
+                  bgcolor = 'olivedrab3'
+              end
+        -%>
+
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
-            graph[style="rounded"]
-            node[shape=none,style=""]
+            graph[style="rounded,filled",group="<%= group %>",fillcolor="<%= bgcolor %>"]
+            node[shape=none,style="rounded,filled",fillcolor="<%= bgcolor %>",fontname="Courier New",fontsize="11"]
             <%= node.name.sub(/.-/, "_") %>[label=<
-            <table bgcolor="darkseagreen2" color="slategrey" border="2" cellborder="0">
+            <table bgcolor="<%= bgcolor %>" color="deeppink" border="1" cellborder="0">
+        <%- if group != 'host' -%>
               <tr>
-                <td align="center" colspan="<%= node.nics.size %>"> <%= node.name %> </td>
+                <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
               </tr>
-              <hr/>
+        <%- end -%>
               <tr><td></td></tr>
               <tr>
-                <%- node.nics.each do |nic| -%>
-                <td PORT="<%= nic[0] %>" bgcolor="grey" color="purple" border="1" align="text"><%= nic[0] %></td>
-                <%- end -%>
-                <%- if !node.bonds.nil? -%>
-                  <%- node.bonds.each do |bond| -%>
-                    <%- bond[1]['nics'].each do |nic| -%>
-                <td PORT="<%= nic %>" bgcolor="grey" color="purple" border="1" align="text"><%= nic %></td>
-                    <%- end -%>
-                  <%- end -%>
-                <%- end -%>
-                <%- if ! node.ipv4.nil? -%>
-                <td PORT="ipv4" bgcolor="grey" color="purple" border="1" align="text">default</td>
-                <%- end -%>
+        <%-   node.nics.each do |nic| -%>
+                <td port="<%= nic[0] %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic[0] %></td>
+        <%-   end -%>
+        <%- 
+              if !node.bonds.nil?
+                node.bonds.each do |bond|
+                  bond[1]['nics'].each do |nic|
+        -%>
+                <td port="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td>
+        <%-       end
+                end
+              end
+        -%>
+        <%-   if ! node.ipv4.nil? -%>
+              <!--  <td port="ipv4" bgcolor="grey" color="indigo" border="1" align="text">eth0</td> -->
+        <%-   end -%>
               </tr>
+        <%- if group == 'host' -%>
+              <tr><td></td></tr>
+              <tr>
+                <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
+              </tr>
+        <%- end -%>
             </table> >]
           }
         <%- end -%>
 
           edge[color=red,penwidth=2]
-        <%- colors = ['red', 'grey', 'blue', 'orange', 'magenta', 'black', 'olivedrab3', 'cyan2', 'purple'] -%>
-        <% i = 0 -%>
-        <%- @links.each do |l| -%>
-          edge[color=<%= colors[i] -%>]
-          <%- i = (i + 1) % colors.size -%>
-          <%= l[0].sub(/.-/, "_") %> -- <%= l[1].sub(/.-/, "_") %>
+       
+        <%- i = 0
+            @links.each do |l|
+              if l[0].split(':')[0] != 'mgmt'
+        -%>
+          edge[color=<%= @graph.colors[i] -%>]
+            <%- i = (i + 1) % @graph.colors.size -%>
+            <%= l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n
+          <%- end -%>
         <%- end -%>
 
           fontsize  = "18"
@@ -74,63 +107,252 @@ class Graph
     }
   end
 
+  def get_mgmt_cons
+    @log.write "#{__method__}():  "
+
+    %{
+        graph <%= @name.sub(/.-/, "_") %> {
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+
+        <%- 
+            @nodes.each do |node|
+              if node.name == 'natgw'
+                next
+              end
+              group   = node.type
+              bgcolor = "darkseagreen2"
+              case node.type
+                when 'host'
+                  bgcolor = "lightsteelblue"
+                when 'router'
+                  bgcolor = "cadetblue"
+                when 'gateway'
+                  bgcolor = 'olivedrab3'                  
+              end              
+        -%>
+          subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
+            graph[style="rounded,filled",group="<%= group %>",fillcolor="<%= bgcolor %>"]
+            node[shape=none,style="filled",fillcolor="<%= bgcolor %>",fontname="Courier New",fontsize="11"]
+            <%= node.name.sub(/.-/, "_") %>[label=<
+            <table bgcolor="<%= bgcolor %>" color="deeppink" border="1" cellborder="0">
+        <%- if group != 'host' -%>
+              <tr>
+                <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
+              </tr>
+        <%- end -%>
+              <tr><td></td></tr>
+              <tr>
+        <%-   node.nics.each do |nic| -%>
+                <td PORT="<%= nic[0] %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic[0] %></td>
+        <%-   end -%>
+        <%- 
+              if !node.bonds.nil?
+                node.bonds.each do |bond|
+                  bond[1]['nics'].each do |nic|
+        -%>
+                <td PORT="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td>
+        <%-       end
+                end
+              end
+        -%>
+        <%-   if ! node.ipv4.nil? -%>
+                <td PORT="ipv4" bgcolor="grey" color="indigo" border="1" align="text">default</td>
+        <%-   end -%>
+              </tr>
+        <%- if group == 'host' -%>
+              <tr><td></td></tr>
+              <tr>
+                <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
+              </tr>
+        <%- end -%>
+            </table> >]
+          }
+        <%- end -%>
+
+          edge[color=red,penwidth=2]
+        <%- 
+            i = 0
+            @links.each do |l|
+              if l[0].split(':')[0] == 'mgmt'
+        -%>
+          edge[color=<%= @graph.colors[i] -%>]
+        <%-     i = (i + 1) % @graph.colors.size -%>
+            <%= l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n
+          <%- end -%>
+        <%- end -%>
+
+          fontsize  = "18"
+          label     = "<%= @name %> [<%= @desc %>]"
+          labelloc  = top
+          labeljust = left
+        }
+    }
+  end
+
+
   def get_topology
     %{
-      graph Overview {
+      graph <%= @name.sub(/.-/, "_") %> {
         #layout=twopi
         #layout=neato
         #layout=sfdp
         #layout=circo
-        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi]
-        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato]
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="seashell"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="seashell",fontname="Courier New",fontsize="11"]
 
-        node[shape=rectangle,style="rounded,filled",fillcolor="lemonchiffon3"]
+        node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if node.type == 'host' -%>
-        <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lemonchiffon3" color="lemonchiffon4"><tr><td><%= node.fqdn || node.name %></td></tr><hr/><tr><td><%= node.nics['eth1'] %></td></tr></table> >]
+        <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth1'] %></td></tr></table> >]
         #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth1'] %>"]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
-        node[shape=circle,style="filled",fillcolor="dodgerblue"]
+        node[shape=circle,style="filled",fillcolor="cadetblue"]
         #node[shape=none,style=""]
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if node.type == 'router' -%>
-        <%=       node.name %> [label="<%= node.name %>\\n<%= node.ipv4 %>"]
-        #<%=       node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><br/><%= node.name %></td></tr></table> >,image="./router.png",height="0.7",width="0.7",fixedsize=true]
+        <%=       node.name %> [label=<<b><%= node.name %></b><br/><%= node.ipv4 %>>]
+        #<%=       node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><br/><b><%= node.name %></b></td></tr></table> >,image="./router.png",height="0.7",width="0.7",fixedsize=true]
+        <%-     end -%>
+        <%-   end -%>
+        <%- end -%>
+
+        node[shape=diamond,style="rounded,filled",fillcolor="darkseagreen2"]
+        #node[shape=none,style=""]
+        <%- 
+            @cfg['topology'].each do |vm|
+              nodes = init_nodes(vm['name'])
+              nodes.each do |node|
+                # skip management nodes
+                if node.name == "mgmt"
+                  next
+                end
+        -%>
+        <%-     if node.type == 'switch' && node.snat.nil? -%>
+        <%=       node.name %> [label=<<b><%= node.name %></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         node[shape=diamond,style="rounded,filled",fillcolor="olivedrab3"]
-        #node[shape=none,style=""]
-        <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['name']) -%>
-        <%-   nodes.each do |node| -%>
-        <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [label="<%= node.name %>"]
-        <%-     end -%>
-        <%-   end -%>
-        <%- end -%>
-
-        node[shape=diamond,style="rounded,filled",fillcolor="skyblue2"]
-        <%- @nodes.each do |node| -%>
-        <%-   if node.type == 'switch' && node.snat -%>
-        <%=     node.name %> [label="<%= node.name %>"]
+        <%- 
+            @nodes.each do |node|
+              # skip management nodes
+              if node.name == "mgmt"
+                next
+              end
+        -%>
+        <%-   if node.type == 'gateway' -%>
+                <%= node.name %> [label=<<b><%= node.name %></b>>]
         #<%=     node.name %> [label=< <table border="0"><tr><td><%= node.name %></td></tr><tr><td><%= node.ipv4 %></td></tr></table> >]
         #<%=     node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><%= node.name %></td></tr></table> >,image="./switch.png",height="0.5",width="0.8",fixedsize=true]
         <%-   end -%>
         <%- end -%>
 
         edge[color="lightsteelblue",penwidth=2]
-        <%- @links.each do |l| -%>
-        <%=   l[0].split(':')[0].sub(/.-/, "_") %> -- <%= l[1].split(':')[0].sub(/.-/, "_") %>
+        <%- 
+            @links.each do |l|
+              if l[0].split(':')[0] == "mgmt"
+                next
+              end
+        -%>
+          <%= l[0].split(':')[0].sub(/.-/, "_") %> -- <%= l[1].split(':')[0].sub(/.-/, "_") %>
         <%- end -%>
+
+          fontsize  = "18"
+          label     = "<%= @name %> [<%= @desc %>]"
+          labelloc  = top
+          labeljust = left
+
+      }
+    }
+  end
+
+  def get_mgmt_topo
+    %{
+      graph <%= @name.sub(/.-/, "_") %> {
+        #layout=twopi
+        #layout=neato
+        #layout=sfdp
+        #layout=circo
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="seashell"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+
+        node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
+        <%- @cfg['topology'].each do |vm| -%>
+        <%-   nodes = init_nodes(vm['name']) -%>
+        <%-   nodes.each do |node| -%>
+        <%-     if node.type == 'host' -%>
+        <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth0'] %></td></tr></table> >]
+        #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth0'] %>"]
+        <%-     end -%>
+        <%-   end -%>
+        <%- end -%>
+
+        node[shape=circle,style="filled",fillcolor="cadetblue"]
+        #node[shape=none,style=""]
+        <%- @cfg['topology'].each do |vm| -%>
+        <%-   nodes = init_nodes(vm['name']) -%>
+        <%-   nodes.each do |node| -%>
+        <%-     if node.type == 'router' -%>
+        <%=       node.name %> [label=<<b><%= node.name %></b><br/><%= node.ipv4 %>>]
+        #<%=       node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><br/><%= node.name %></td></tr></table> >,image="./router.png",height="0.7",width="0.7",fixedsize=true]
+        <%-     end -%>
+        <%-   end -%>
+        <%- end -%>
+
+        node[shape=diamond,style="rounded,filled",fillcolor="darkseagreen2"]
+        #node[shape=none,style=""]
+        <%- 
+            @cfg['topology'].each do |vm|
+              nodes = init_nodes(vm['name'])
+              nodes.each do |node|
+                # skip management nodes
+                #if node.name != "mgmt"
+                #  next
+                #end
+        -%>
+        <%-     if node.type == 'switch' && node.snat.nil? -%>        
+        <%=       node.name %> [label=<<b><%= node.name %></b>>]
+        <%-     end -%>
+        <%-   end -%>
+        <%- end -%>
+
+        node[shape=diamond,style="rounded,filled",fillcolor="olivedrab3"]
+        <%- 
+            @nodes.each do |node|
+              # skip management nodes
+              if node.name != "mgmt"
+                next
+              end
+        -%>
+        <%-   if node.type == 'gateway' -%>
+                <%= node.name %> [label=<<b><%= node.name %></b>>]
+        #<%=     node.name %> [label=< <table border="0"><tr><td><%= node.name %></td></tr><tr><td><%= node.ipv4 %></td></tr></table> >]
+        #<%=     node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><%= node.name %></td></tr></table> >,image="./switch.png",height="0.5",width="0.8",fixedsize=true]
+        <%-   end -%>
+        <%- end -%>
+
+        edge[color="lightsteelblue",penwidth=2]
+        <%- 
+            @links.each do |l|
+              if l[0].split(':')[0] != "mgmt"
+                next
+              end
+        -%>
+          <%= l[0].split(':')[0].sub(/.-/, "_") %> -- <%= l[1].split(':')[0].sub(/.-/, "_") %>
+        <%- end -%>
+
+          fontsize  = "18"
+          label     = "<%= @name %> [<%= @desc %>]"
+          labelloc  = top
+          labeljust = left
 
       }
     }

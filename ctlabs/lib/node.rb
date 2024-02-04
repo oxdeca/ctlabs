@@ -52,7 +52,7 @@ class Node
     @log.write "#{__method__}(): ports=#{@ports}"
 
     case
-      when [ 'switch' ].include?(@type)
+      when [ 'switch', 'gateway' ].include?(@type)
         #@nics = {}
         for i in 0..@ports do
           #@nics.merge!( {"p#{i}" => '' } )

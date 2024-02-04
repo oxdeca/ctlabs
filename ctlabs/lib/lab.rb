@@ -71,11 +71,15 @@ class Lab
 
   def visualize
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log)
+    @graph.to_png(@graph.get_mgmt_topo, 'mgmt_topo')
+    @graph.to_png(@graph.get_mgmt_cons, 'mgmt_con')
     @graph.to_png(@graph.get_topology, 'topo')
-    @graph.to_png(@graph.get_connections, 'con')
+    @graph.to_png(@graph.get_cons, 'con')
 
+    @graph.to_svg(@graph.get_mgmt_topo, 'mgmt_topo')
+    @graph.to_svg(@graph.get_mgmt_cons, 'mgmt_con')
     @graph.to_svg(@graph.get_topology, 'topo')
-    @graph.to_svg(@graph.get_connections, 'con')
+    @graph.to_svg(@graph.get_cons, 'con')
   end
 
   def inventory
