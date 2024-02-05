@@ -28,8 +28,10 @@ topology:
     nodes:
       mgmt:
         type  : switch
-        ipv4  : 192.168.40.1/24
+        #ipv4  : 192.168.40.1/24
         ports : 8
+        nics:
+          eth0: 192.168.40.1;24
       natgw:
         type  : gateway
         ipv4  : 192.168.15.1/29
@@ -74,19 +76,19 @@ topology:
           eth1: 192.168.20.12/24
 
     links:
-      - [ "ro1:eth1", "ro2:eth1" ]
 
+      - [ "ro1:eth1", "natgw:eth1"  ]
       - [ "ro1:eth2", "sw1:eth1"  ]
-      - [ "ro1:eth3", "natgw:eth1"  ]
+      - [ "ro1:eth3", "ro2:eth1" ]
 
       - [ "ro2:eth2", "sw2:eth1"  ]
 
       - [ "sw1:eth3", "h1:eth1"   ]
       - [ "sw2:eth3", "h2:eth1"   ]
 
-      - [ "mgmt:eth0", "sw1:eth0" ]
-      - [ "mgmt:eth1", "sw2:eth0" ]
-      - [ "mgmt:eth2", "ro1:eth0" ]
-      - [ "mgmt:eth3", "ro2:eth0" ]
-      - [ "mgmt:eth4", "h1:eth0"  ]
-      - [ "mgmt:eth5", "h2:eth0"  ]
+      - [ "mgmt:eth1", "sw1:eth0" ]
+      - [ "mgmt:eth2", "sw2:eth0" ]
+      - [ "mgmt:eth3", "ro1:eth0" ]
+      - [ "mgmt:eth4", "ro2:eth0" ]
+      - [ "mgmt:eth5", "h1:eth0"  ]
+      - [ "mgmt:eth6", "h2:eth0"  ]

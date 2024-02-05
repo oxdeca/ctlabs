@@ -1,12 +1,12 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/lab01/lab01.yml
+# File        : ctlabs/lpic2/lpic207.c9.yml
 # Description : DNS Lab ctlabs configuration
 # -----------------------------------------------------------------------------
 
 name: lpic207
-desc: LPIC2 Lab
+desc: LAB LPIC2
 
 defaults:
   switch:
@@ -37,7 +37,7 @@ topology:
         gw   : 192.168.15.1
         nics :
           eth0: 192.168.40.3/24
-          eth1: 192.168.15.3/29
+          #eth1: 192.168.15.3/29
         vols : ['/tmp/ansible/:/root/ansible/:ro']
       natgw:
         type : gateway
@@ -118,7 +118,7 @@ topology:
       - [ "sw2:eth3", "h2:eth1"   ]
       - [ "sw2:eth4", "www2:eth1"   ]
 
-      - [ "ansible:eth1", "natgw:eth1" ]
+      #- [ "ansible:eth1", "natgw:eth1" ]
 
       - [ "mgmt:eth1", "ansible:eth0"  ]
       - [ "mgmt:eth2", "sw1:eth0" ]

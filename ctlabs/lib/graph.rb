@@ -33,7 +33,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name == "mgmt"
+              if node.name == "mgmt" || node.nics.size == 1
                 next
               end
               group   = node.type
@@ -201,9 +201,15 @@ class Graph
         graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="seashell",fontname="Courier New",fontsize="11"]
 
         node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
-        <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['name']) -%>
-        <%-   nodes.each do |node| -%>
+        <%- 
+            @cfg['topology'].each do |vm|
+              nodes = init_nodes(vm['name'])
+              nodes.each do |node|
+                # skip management nodes
+                if node.nics.size == 1
+                  next
+                end
+        -%>
         <%-     if node.type == 'host' -%>
         <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth1'] %></td></tr></table> >]
         #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth1'] %>"]
