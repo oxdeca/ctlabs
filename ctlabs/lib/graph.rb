@@ -155,9 +155,6 @@ class Graph
                 end
               end
         -%>
-        <%-   if ! node.ipv4.nil? -%>
-                <td PORT="ipv4" bgcolor="grey" color="indigo" border="1" align="text">default</td>
-        <%-   end -%>
               </tr>
         <%- if group == 'host' -%>
               <tr><td></td></tr>
