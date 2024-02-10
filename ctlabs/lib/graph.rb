@@ -61,14 +61,14 @@ class Graph
               <tr><td></td></tr>
               <tr>
         <%-   node.nics.each do |nic| -%>
-                <td port="<%= nic[0] %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic[0] %></td>
+                <td port="<%= nic[0] %>" bgcolor="lightgrey" color="indigo" border="1" align="text"><%= nic[0] %></td>
         <%-   end -%>
         <%- 
               if !node.bonds.nil?
                 node.bonds.each do |bond|
                   bond[1]['nics'].each do |nic|
         -%>
-                <td port="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td>
+<!--                <td port="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td>  -->
         <%-       end
                 end
               end
@@ -116,7 +116,7 @@ class Graph
 
         <%- 
             @nodes.each do |node|
-              if node.name == 'natgw'
+              if node.type == 'gateway'
                 next
               end
               group   = node.type
@@ -143,14 +143,14 @@ class Graph
               <tr><td></td></tr>
               <tr>
         <%-   node.nics.each do |nic| -%>
-                <td PORT="<%= nic[0] %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic[0] %></td>
+                <td PORT="<%= nic[0] %>" bgcolor="lightgrey" color="indigo" border="1" align="text"><%= nic[0] %></td>
         <%-   end -%>
         <%- 
               if !node.bonds.nil?
                 node.bonds.each do |bond|
                   bond[1]['nics'].each do |nic|
         -%>
-                <td PORT="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td>
+<!--                <td PORT="<%= nic %>" bgcolor="grey" color="indigo" border="1" align="text"><%= nic %></td> -->
         <%-       end
                 end
               end
