@@ -106,8 +106,8 @@ class Node
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
-        @inotify = %x( /usr/bin/echo "256" > /proc/sys/fs/inotify/max_user_instances )
-        %x( docker exec -it  #{@name} sh -c '/usr/bin/echo -en "#{dns}" > /etc/resolv.conf' )
+        @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
+        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "#{dns}" > /etc/resolv.conf' )
         @netns = add_netns
         #add_nics
 
