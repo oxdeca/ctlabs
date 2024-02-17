@@ -9,30 +9,33 @@ class Node
   attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns
 
   def initialize(args)
-    @name      = args['name']
     @defaults  = args['defaults']
-    @fqdn      = args['fqdn']
-    @dns       = args['dns']   || []
-    @type      = args['type']
-    @eos       = args['eos']   || 'linux'
-    @kind      = args['kind']  || 'linux'
-    @kvm       = args['kvm']   || false
+    @name      = args['name' ]
+    @fqdn      = args['fqdn' ]
+    @dns       = args['dns'  ] || []
+    @type      = args['type' ]
+    @eos       = args['eos'  ] || 'linux'
+    @kind      = args['kind' ] || 'linux'
+    @kvm       = args['kvm'  ] || false
     @image     = args['image']
-    @env       = args['env']   || []
-    @cmd       = args['cmd']
-    @nics      = args['nics']  || {}
+    @env       = args['env'  ] || []
+    @cmd       = args['cmd'  ]
+    @nics      = args['nics' ] || {}
     @bonds     = args['bonds']
     @ports     = args['ports'] ||  4
-    @gw        = args['gw']
-    @ipv4      = args['ipv4']
-    @mgmt      = args['mgmt']
-    @snat      = args['snat']
+    @gw        = args['gw'   ]
+    @ipv4      = args['ipv4' ]
+    @mgmt      = args['mgmt' ]
+    @snat      = args['snat' ]
     @vxlan     = args['vxlan']
-    @dnat      = args['dnat']
-    @mtu       = args['mtu']  || 1460
-    @priv      = args['priv'] || false
-    @caps      = (! args['caps'].nil?) ? args['caps'] + [ 'NET_ADMIN', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ] : [ 'NET_ADMIN', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
-    @vols      = (! args['vols'].nil?) ? args['vols'] + [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ] : [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
+    @dnat      = args['dnat' ]
+    @mtu       = args['mtu'  ] || 1460
+    @priv      = args['priv' ] || false
+
+    dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
+    dvols      = [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
+    @caps      = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
+    @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
 
     @log = args['log'] || LabLog.new
     @log.write "== Node =="
@@ -40,8 +43,8 @@ class Node
 
     case @type
       when 'switch', 'router', 'host'
-        @caps  = (!@defaults[@type][@kind]['caps'].nil?)  ? @caps + @defaults[@type][@kind]['caps'] : @caps
-        @ports = (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports']        : @ports
+        @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
+        @ports = (!@defaults[@type][@kind]['ports'].nil?) ?         @defaults[@type][@kind]['ports'] : @ports
     end
 
     switch_ports
