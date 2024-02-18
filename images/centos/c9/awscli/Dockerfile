@@ -6,7 +6,8 @@ RUN        yum -y install vim-enhanced rsync epel-release less git unzip procps 
            echo alias tf='/usr/bin/terraform' >> /root/.bashrc                                   && \
            echo alias packer='/usr/bin/packer' >> /root/.bashrc                                  && \
            echo alias gcloud='/usr/bin/gcloud' >> /root/.bashrc                                  && \
-           echo alias aws='/usr/bin/awscli' >> /root/.bashrc
+           echo alias aws='/usr/bin/awscli' >> /root/.bashrc                                     && \
+           printf "\nset paste\n" >> /etc/vimrc
 
 RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
 COPY       bashrc.kali /etc/bashrc.kali

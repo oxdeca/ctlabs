@@ -6,7 +6,8 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
            dnf -y install yum-utils vim-enhanced iproute epel-release less git unzip procps sshpass && \
            echo alias tf='/usr/bin/terraform' >> /root/.bashrc                                      && \
            echo alias packer='/usr/bin/packer' >> /root/.bashrc                                     && \
-           echo alias gcloud='/usr/bin/gcloud' >> /root/.bashrc
+           echo alias gcloud='/usr/bin/gcloud' >> /root/.bashrc                                     && \
+           printf "\nset paste\n" >> /etc/vimrc
 
 RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
 COPY       bashrc.kali /etc/bashrc.kali
