@@ -78,7 +78,7 @@ HEADER = %q(
       <a href="/"       class="w3-bar-item w3-button">CTLABS</a>
       <a href="/con"    class="w3-bar-item w3-button">Connections</a>
       <a href="/topo"   class="w3-bar-item w3-button">Topology</a>
-      <a href="/upload" class="w3-bar-item w3-button">Upload</a>
+<!--      <a href="/upload" class="w3-bar-item w3-button">Upload</a> -->
     </div>
     <div id="ctlabs"><br></div>
 )
@@ -95,13 +95,13 @@ __END__
 <%= HEADER %>
 <!DOCTYPE html>
     <div id="con" class="w3-panel w3-green">
-      <h2> Connections </h2>
+      <h2> Connections [Core Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="con.svg" class="w3-round" alt="Connections">
     </div>
     <div id="topo" class="w3-panel w3-green">
-      <h2> Topology </h2>
+      <h2> Topology [Core Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="topo.svg" class="w3-round" alt="Topology">
@@ -112,7 +112,7 @@ __END__
 @@con
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
-      <h2> Connections </h2>
+      <h2> Connections [Core Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="con.svg" class="w3-round" alt="Connections">
@@ -129,7 +129,7 @@ __END__
 @@topo
 <%= HEADER %>
     <div id="topo" class="w3-panel w3-green">
-      <h2> Topology </h2>
+      <h2> Topology [Core Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="topo.svg" class="w3-round" alt="Topology">
@@ -141,7 +141,6 @@ __END__
       <img src="mgmt_topo.svg" class="w3-round" alt="Manegement">
     </div>
 <%= FOOTER %>
-
 
 @@upload
 <%= HEADER %>
@@ -167,4 +166,3 @@ __END__
       </ul>
     </div>
 <%= FOOTER %>
-
