@@ -420,7 +420,7 @@ class Graph
   def to_ini(data, name)
     @log.write "#{__method__}(): data=#{data},name=#{name}"
 
-    File.open("#{name}.ini", "w") do |f|
+    File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
       f.write( ERB.new(data, nil, '-').result(@binding))
     end
   end
