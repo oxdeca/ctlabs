@@ -22,7 +22,7 @@ class Node
     @cmd       = args['cmd'  ]
     @nics      = args['nics' ] || {}
     @bonds     = args['bonds']
-    @ports     = args['ports'] ||  4
+    @ports     = args['ports'] ||  @defaults[@type][@kind]['ports'] || 4
     @gw        = args['gw'   ]
     @ipv4      = args['ipv4' ]
     @mgmt      = args['mgmt' ]
@@ -44,7 +44,6 @@ class Node
     case @type
       when 'switch', 'router', 'host'
         @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
-        @ports = (!@defaults[@type][@kind]['ports'].nil?) ?         @defaults[@type][@kind]['ports'] : @ports
     end
 
     switch_ports
