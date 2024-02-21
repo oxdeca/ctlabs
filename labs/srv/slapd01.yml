@@ -12,6 +12,7 @@ defaults:
   switch:
     linux:
       image: ctlabs/c9/base:0.1
+      ports: 2
   host:
     linux:
       image: ctlabs/c9/base:0.1
