@@ -46,7 +46,7 @@ class Node
         @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
         @ports = @ports.nil?  && (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports'] : @ports || 4
       when 'gateway'
-        @ports = 4
+        @ports = @ports.nil? ? 2 : @ports
     end
 
     switch_ports
