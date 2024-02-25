@@ -30,7 +30,7 @@ defaults:
 topology:
   - vm:
     name: lpic210-vm1
-    dns : [192.168.10.11, 192.168.10.12]
+    dns : [192.168.10.11, 192.168.10.12, 169.254.169.254]
     nodes:
       mgmt:
         type  : switch
@@ -101,17 +101,17 @@ topology:
       slapd2:
         type : host
         kind : d11
-        gw   : 192.168.10.1
+        gw   : 192.168.20.1
         nics :
           eth0: 192.168.40.26/24
-          eth1: 192.168.10.14/24
+          eth1: 192.168.20.13/24
       dc1:
         type : host
         kind : smbadc
-        gw   : 192.168.20.1
+        gw   : 192.168.10.1
         nics :
           eth0: 192.168.40.27/24
-          eth1: 192.168.20.13/24
+          eth1: 192.168.10.14/24
       dc2:
         type : host
         kind : smbadc
@@ -129,11 +129,11 @@ topology:
       - [ "sw1:eth2", "ns1:eth1"       ]
       - [ "sw1:eth3", "h1:eth1"        ]
       - [ "sw1:eth4", "slapd1:eth1"    ]
-      - [ "sw1:eth5", "slapd2:eth1"    ]
+      - [ "sw1:eth5", "dc1:eth1"       ]
 
       - [ "sw2:eth2", "ns2:eth1"       ]
       - [ "sw2:eth3", "h2:eth1"        ]
-      - [ "sw2:eth4", "dc1:eth1"       ]
+      - [ "sw2:eth4", "slapd2:eth1"    ]
       - [ "sw2:eth5", "dc2:eth1"       ]
 
       - [ "mgmt:eth1", "ansible:eth0"  ]
