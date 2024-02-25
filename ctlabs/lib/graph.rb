@@ -423,5 +423,8 @@ class Graph
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
       f.write( ERB.new(data, nil, '-').result(@binding))
     end
+    File.open("/tmp/public/inventory.ini", "w") do |f|
+      f.write( ERB.new(data, nil, '-').result(@binding))
+    end
   end
 end

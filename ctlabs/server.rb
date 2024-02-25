@@ -14,6 +14,7 @@ set :bind,           '0.0.0.0'
 set :port,            4567
 set :public_folder,  '/tmp/public'
 
+INVENTORY  = '/tmp/public/inventory.ini'
 UPLOAD_DIR = '/tmp/uploads'
 Dir.mkdir(UPLOAD_DIR) unless Dir.exist?(UPLOAD_DIR)
 
@@ -38,6 +39,10 @@ end
 
 get '/topo' do
   erb :topo
+end
+
+get '/inventory' do
+  erb :inventory
 end
 
 
@@ -75,9 +80,10 @@ HEADER = %q(
   <script src="https://www.w3schools.com/lib/w3.js"></script>
   <body bgcolor="seashell">
     <div class="w3-top w3-bar w3-black">
-      <a href="/"       class="w3-bar-item w3-button">CTLABS</a>
-      <a href="/con"    class="w3-bar-item w3-button">Connections</a>
-      <a href="/topo"   class="w3-bar-item w3-button">Topology</a>
+      <a href="/"          class="w3-bar-item w3-button">CTLABS</a>
+      <a href="/con"       class="w3-bar-item w3-button">Connections</a>
+      <a href="/topo"      class="w3-bar-item w3-button">Topology</a>
+      <a href="/inventory" class="w3-bar-item w3-button">Inventory</a>
 <!--      <a href="/upload" class="w3-bar-item w3-button">Upload</a> -->
     </div>
     <div id="ctlabs"><br></div>
@@ -164,5 +170,17 @@ __END__
         <% end %>
       <% end %>
       </ul>
+    </div>
+<%= FOOTER %>
+
+@@inventory
+<%= HEADER %>
+    <div id="topo" class="w3-panel w3-green">
+      <h2> Inventory [Management Network]</h2>
+    </div>
+    <div class="w3-container">
+      <div class="w3-code w3-card-4" style="max-width: 100%; overflow: auto;">
+        <pre><%= File.read(INVENTORY) %></pre>
+      </div>
     </div>
 <%= FOOTER %>
