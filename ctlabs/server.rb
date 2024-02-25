@@ -77,6 +77,7 @@ HEADER = %q(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+  <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-colors-2021.css">
   <script src="https://www.w3schools.com/lib/w3.js"></script>
   <body bgcolor="seashell">
     <div class="w3-top w3-bar w3-black">
@@ -179,7 +180,7 @@ __END__
       <h2> Inventory [Management Network]</h2>
     </div>
     <div class="w3-container">
-      <div class="w3-code w3-card-4" style="max-width: 100%; overflow: auto;">
+    <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
         <pre><%= File.read(INVENTORY) %></pre>
       </div>
     </div>
