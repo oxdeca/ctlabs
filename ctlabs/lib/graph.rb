@@ -362,14 +362,14 @@ class Graph
   end
 
   def get_inventory
-    %{
+    %{ <%- -%>
 [local]
   localhost
 
 [switches]
   <%- @nodes.each do |node| -%>
-  <%-   if node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
@@ -377,20 +377,20 @@ class Graph
 [router]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
 [hosts]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'host' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
 [all:vars]
-  ansible_user         = root
-  ansible_ssh_password = secret
+  <%= "ansible_user".ljust(24)         + "= root" %>
+  <%= "ansible_ssh_password".ljust(24) + "= secret" %>
 
     }
   end
