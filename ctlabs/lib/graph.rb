@@ -417,7 +417,7 @@ class Graph
     %x( dot -Tsvg #{@dotfile} -o /tmp/public/#{name}.svg )
   end
 
-  def to_ini(data, name)
+  def to_ini(data, name, cfg=nil)
     @log.write "#{__method__}(): data=#{data},name=#{name}"
 
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
@@ -425,6 +425,12 @@ class Graph
     end
     File.open("/tmp/public/inventory.ini", "w") do |f|
       f.write( ERB.new(data, nil, '-').result(@binding))
+    end
+    if !cfg.nil?
+      File.open("/tmp/public/config.yml", "w") do |f|
+        puts YAML.dump(cfg)
+        f.write(YAML.dump(cfg))
+      end
     end
   end
 end

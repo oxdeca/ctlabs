@@ -20,6 +20,7 @@ ENV        ETCD_PASSWORD=
 
 RUN        dnf install -y iproute iptables systemd wireshark-cli tcpdump iputils htop            && \
            ln -sv /var/db2_setup/lib/setup_db2_instance.sh /root/db2_setup.sh                    && \
+           echo "root:secret" | chpasswd                                                         && \
            sed -i 's@^PasswordAuthentication no@PasswordAuthentication yes@' /etc/ssh/sshd_config
 
 ENTRYPOINT /usr/lib/systemd/systemd

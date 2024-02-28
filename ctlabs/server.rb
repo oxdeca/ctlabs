@@ -14,6 +14,7 @@ set :bind,           '0.0.0.0'
 set :port,            4567
 set :public_folder,  '/tmp/public'
 
+CONFIG     = '/tmp/public/config.yml'
 INVENTORY  = '/tmp/public/inventory.ini'
 UPLOAD_DIR = '/tmp/uploads'
 Dir.mkdir(UPLOAD_DIR) unless Dir.exist?(UPLOAD_DIR)
@@ -45,6 +46,9 @@ get '/inventory' do
   erb :inventory
 end
 
+get '/config' do
+  erb :config
+end
 
 post '/upload' do
   uploaded_file = params[:file]
@@ -85,6 +89,7 @@ HEADER = %q(
       <a href="/con"       class="w3-bar-item w3-button">Connections</a>
       <a href="/topo"      class="w3-bar-item w3-button">Topology</a>
       <a href="/inventory" class="w3-bar-item w3-button">Inventory</a>
+      <a href="/config"    class="w3-bar-item w3-button">Configuration</a>
 <!--      <a href="/upload" class="w3-bar-item w3-button">Upload</a> -->
     </div>
     <div id="ctlabs"><br></div>
@@ -176,7 +181,7 @@ __END__
 
 @@inventory
 <%= HEADER %>
-    <div id="topo" class="w3-panel w3-green">
+    <div id="inventory" class="w3-panel w3-green">
       <h2> Inventory [Management Network]</h2>
     </div>
     <div class="w3-container">
@@ -185,3 +190,17 @@ __END__
       </div>
     </div>
 <%= FOOTER %>
+
+@@config
+<%= HEADER %>
+    <div id="config" class="w3-panel w3-green">
+      <h2> Lab Configuration </h2>
+    </div>
+    <div class="w3-container">
+    <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
+        <pre><%= File.read(CONFIG) %></pre>
+      </div>
+    </div>
+<%= FOOTER %>
+
+

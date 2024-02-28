@@ -84,7 +84,7 @@ class Lab
 
   def inventory
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log)
-    @graph.to_ini(@graph.get_inventory, @name)
+    @graph.to_ini(@graph.get_inventory, @name, @cfg)
   end
 
   def find_node(name)
