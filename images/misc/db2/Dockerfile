@@ -23,4 +23,7 @@ RUN        dnf install -y iproute iptables systemd wireshark-cli tcpdump iputils
            echo "root:secret" | chpasswd                                                         && \
            sed -i 's@^PasswordAuthentication no@PasswordAuthentication yes@' /etc/ssh/sshd_config
 
+RUN         echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bash.bashrc
+COPY        bashrc.kali /etc/bashrc.kali
+
 ENTRYPOINT /usr/lib/systemd/systemd

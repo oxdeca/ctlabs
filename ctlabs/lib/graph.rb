@@ -428,7 +428,6 @@ class Graph
     end
     if !cfg.nil?
       File.open("/tmp/public/config.yml", "w") do |f|
-        puts YAML.dump(cfg)
         f.write(YAML.dump(cfg))
       end
     end

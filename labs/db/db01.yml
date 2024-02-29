@@ -136,7 +136,7 @@ topology:
         nics :
           eth0: 192.168.40.29/24
           eth1: 192.168.30.11/24
-      dbadm1:
+      cb1:
         type : host
         kind : cbeaver
         gw   : 192.168.20.1
@@ -160,7 +160,7 @@ topology:
       - [ "sw2:eth3", "h2:eth1"        ]
       - [ "sw2:eth4", "slapd2:eth1"    ]
       - [ "sw2:eth5", "dc2:eth1"       ]
-      - [ "sw2:eth6", "dbadm1:eth1"    ]
+      - [ "sw2:eth6", "cb1:eth1"       ]
 
       - [ "sw3:eth2", "db1:eth1"       ]
 
@@ -178,5 +178,5 @@ topology:
       - [ "mgmt:eth12", "dc1:eth0"     ]
       - [ "mgmt:eth13", "dc2:eth0"     ]
       - [ "mgmt:eth14", "db1:eth0"     ]
-      - [ "mgmt:eth15", "dbadm1:eth0"  ]
+      - [ "mgmt:eth15", "cb1:eth0"     ]
 
