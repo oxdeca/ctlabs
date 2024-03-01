@@ -193,7 +193,9 @@ class Lab
   def up
     @log.write "#{__method__}(): "
 
+    puts "Starting Nodes:"
     @nodes.each { |node| node.run }
+    puts "Starting Links:"
     @links.each { |l| Link.new(@nodes, l, @log) }
     add_dnat
   end
@@ -201,6 +203,7 @@ class Lab
   def down
     @log.write "#{__method__}(): "
 
+    puts "Stopping Nodes:"
     @nodes.each{ |node| node.stop }
     del_dnat
   end

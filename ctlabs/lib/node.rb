@@ -71,7 +71,7 @@ class Node
   def run
     @log.write "#{__method__}(): name=#{@name}"
 
-    puts "running #{@name}..."
+    puts "#{__method__}(): #{@name}"
     case @type
       when 'host', 'router', 'switch'
         caps  = @caps.map { |c| "--cap-add #{c} " }.join
@@ -287,7 +287,7 @@ sleep $SLEEP
   def stop
     @log.write "#{__method__}(): name=#{@name}"
 
-    puts "stopping #{@name}..."
+    puts "#{__method__}(): #{@name}..."
     case @type
       when 'host', 'router', 'switch'
         %x( docker stop #{@name} )
