@@ -96,6 +96,7 @@ HEADER = %q(
 )
 
 FOOTER = %q(
+    <br>
   </body>
 </html>
 )
@@ -185,7 +186,7 @@ __END__
       <h2> Inventory [Management Network]</h2>
     </div>
     <div class="w3-container">
-    <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
+      <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
         <pre><%= File.read(INVENTORY) %></pre>
       </div>
     </div>
@@ -197,7 +198,7 @@ __END__
       <h2> Lab Configuration </h2>
     </div>
     <div class="w3-container">
-    <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
+      <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
         <pre><%= File.read(CONFIG) %></pre>
       </div>
     </div>

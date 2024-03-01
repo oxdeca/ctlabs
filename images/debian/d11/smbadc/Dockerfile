@@ -1,4 +1,4 @@
-FROM        ctlabs/d11/base:0.1
+FROM        ctlabs/d11/base:latest
 
 RUN         apt update && apt -y install krb5-config krb5-user ldap-utils libnss-winbind libpam-krb5 libpam-winbind samba winbind
 RUN         systemctl disable smbd nmbd winbind && systemctl unmask samba-ad-dc && rm -f /etc/samba/smb.conf

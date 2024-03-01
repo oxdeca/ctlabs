@@ -7,20 +7,25 @@
 
 name: lpic207
 desc: LAB LPIC2
+post_provision:
+
 
 defaults:
   switch:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
   host:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
+    d11:
+      image: ctlabs/d11/base
     kali:
-      image: ctlabs/misc/kali:0.1
+      image: ctlabs/misc/kali
   router:
     frr:
-      image: ctlabs/c9/frr:0.1
+      image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
+
 
 topology:
   - vm:
@@ -94,6 +99,7 @@ topology:
           eth1: 192.168.10.13/24
       www2:
         type : host
+        kind : d11
         gw   : 192.168.20.1
         nics :
           eth0: 192.168.40.26/24

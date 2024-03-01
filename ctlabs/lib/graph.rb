@@ -391,7 +391,6 @@ class Graph
 [all:vars]
   <%= "ansible_user".ljust(24)         + "= root" %>
   <%= "ansible_ssh_password".ljust(24) + "= secret" %>
-
     }
   end
 

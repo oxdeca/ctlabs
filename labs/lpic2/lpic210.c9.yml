@@ -11,21 +11,21 @@ desc: LAB LPIC2
 defaults:
   switch:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
       ports: 5
   host:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
     kali:
-      image: ctlabs/misc/kali:0.1
+      image: ctlabs/misc/kali
     smbadc:
-      image: ctlabs/d11/smbadc:0.1
+      image: ctlabs/d11/smbadc
     slapd:
-      image: ctlabs/d11/base:0.1
+      image: ctlabs/d11/base
       caps: [SYS_PTRACE]
   router:
     frr:
-      image: ctlabs/c9/frr:0.1
+      image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
 
 topology:

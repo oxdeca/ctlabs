@@ -28,6 +28,8 @@ class Lab
     @dns      = @cfg['dns']      || []
     @dnatgw   = {}
 
+    # hack, before we start the nodes make sure ip_forwarding is enabled
+    %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
     @nodes = init_nodes(vm_name)
     @links = init_links(vm_name)
   end
@@ -111,7 +113,7 @@ class Lab
 
     chain = "#{@name.upcase}-DNAT"
     vmip  = %x( ip route | grep default | awk '{print $9}' | head -n1 ).rstrip
-    vmips  = %x( ip route | grep default | awk '{print $9}' ).split
+    vmips = %x( ip route | grep default | awk '{print $9}' ).split
     natgw = find_node('natgw')
     via   = nil
     #p "natgw=#{natgw}"

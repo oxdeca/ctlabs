@@ -66,6 +66,8 @@ l1 = Lab.new( options[:config], nil, dlevel=options[:dlevel] )
 puts l1
 
 if( options[:up] )
+  l1.visualize
+  l1.inventory
   l1.up
 end
 if( options[:down] )

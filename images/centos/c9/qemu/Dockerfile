@@ -1,4 +1,4 @@
-FROM       ctlabs/c9/base:0.1
+FROM       ctlabs/c9/base:latest
 ENV        container docker
 ENV        TERM=linux
 

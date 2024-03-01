@@ -3,5 +3,5 @@
 IMG_NAME="ctlabs/misc/kali"
 IMG_VERS=0.1
 
-docker build --rm -t ${IMG_NAME}:${IMG_VERS} .
+docker build --rm -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest .
 

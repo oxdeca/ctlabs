@@ -11,15 +11,15 @@ desc: LPIC2 Lab
 defaults:
   switch:
     linux:
-      image: ctlabs/c8/base:0.3
+      image: ctlabs/c8/base
   host:
     linux:
-      image: ctlabs/c8/base:0.3
+      image: ctlabs/c8/base
     kali:
-      image: ctlabs/misc/kali:0.1
+      image: ctlabs/misc/kali
   router:
     frr:
-      image: ctlabs/c8/frr:0.3
+      image: ctlabs/c8/frr
       caps : [SYS_NICE]
 
 topology:
@@ -95,12 +95,16 @@ topology:
         nics :
           eth0: 192.168.40.25/24
           eth1: 192.168.10.13/24
+        dnat :
+          - [8080, 80]
       www2:
         type : host
         gw   : 192.168.20.1
         nics :
           eth0: 192.168.40.26/24
           eth1: 192.168.20.13/24
+        dnat :
+          - [8080, 80]
 
 
     links:
