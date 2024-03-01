@@ -13,6 +13,12 @@ class Lab
     @log = LabLog.new(level: dlevel)
     @log.write "== Lab =="
 
+    if( File.file?(cfg) )
+      File.open('/tmp/public/config.yml', 'w') do |f|
+        f.write( File.read(cfg) )
+      end
+    end
+
     @cfg = YAML.load(File.read(cfg))
     @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},vm=#{vm_name}"
 
@@ -84,7 +90,7 @@ class Lab
 
   def inventory
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log)
-    @graph.to_ini(@graph.get_inventory, @name, @cfg)
+    @graph.to_ini(@graph.get_inventory, @name)
   end
 
   def find_node(name)
