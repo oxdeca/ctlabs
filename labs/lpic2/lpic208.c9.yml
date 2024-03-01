@@ -1,11 +1,11 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/lpic2/lpic207.c9.yml
-# Description : DNS Lab ctlabs configuration
+# File        : ctlabs/lpic2/lpic208.c9.yml
+# Description : httpd Lab configuration
 # -----------------------------------------------------------------------------
 
-name: lpic207
+name: lpic208 httpd
 desc: LAB LPIC2
 post_provision:
 
@@ -92,6 +92,20 @@ topology:
         nics :
           eth0: 192.168.40.24/24
           eth1: 192.168.20.12/24
+      www1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.25/24
+          eth1: 192.168.10.13/24
+      www2:
+        type : host
+        kind : d11
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.26/24
+          eth1: 192.168.20.13/24
+
 
     links:
       - [ "ro1:eth1", "natgw:eth1"    ]
@@ -100,9 +114,11 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"      ]
       - [ "sw1:eth3", "h1:eth1"       ]
+      - [ "sw1:eth4", "www1:eth1"     ]
 
       - [ "sw2:eth2", "ns2:eth1"      ]
       - [ "sw2:eth3", "h2:eth1"       ]
+      - [ "sw2:eth4", "www2:eth1"     ]
 
       - [ "mgmt:eth1", "ansible:eth0" ]
       - [ "mgmt:eth2", "sw1:eth0"     ]
@@ -112,3 +128,5 @@ topology:
       - [ "mgmt:eth6", "ns2:eth0"     ]
       - [ "mgmt:eth7", "h1:eth0"      ]
       - [ "mgmt:eth8", "h2:eth0"      ]
+      - [ "mgmt:eth9", "www1:eth0"    ]
+      - [ "mgmt:eth10", "www2:eth0"   ]
