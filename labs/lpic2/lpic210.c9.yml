@@ -6,7 +6,8 @@
 # -----------------------------------------------------------------------------
 
 name: lpic210
-desc: LAB LPIC2
+desc: LAB LPIC2 - slapd
+
 
 defaults:
   switch:
@@ -74,6 +75,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
+        kind : d11
         gw   : 192.168.20.1
         nics :
           eth0: 192.168.40.22/24
@@ -120,7 +122,6 @@ topology:
         nics :
           eth0: 192.168.40.28/24
           eth1: 192.168.20.14/24
-
 
     links:
       - [ "ro1:eth1", "natgw:eth1"     ]

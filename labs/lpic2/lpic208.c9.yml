@@ -5,9 +5,8 @@
 # Description : httpd Lab configuration
 # -----------------------------------------------------------------------------
 
-name: lpic208 httpd
-desc: LAB LPIC2
-post_provision:
+name: lpic208
+desc: LAB LPIC2 - httpd
 
 
 defaults:
@@ -98,6 +97,8 @@ topology:
         nics :
           eth0: 192.168.40.25/24
           eth1: 192.168.10.13/24
+        dnat :
+          - [8081, 80]
       www2:
         type : host
         kind : d11
@@ -105,7 +106,8 @@ topology:
         nics :
           eth0: 192.168.40.26/24
           eth1: 192.168.20.13/24
-
+        dnat :
+          - [8082, 80]
 
     links:
       - [ "ro1:eth1", "natgw:eth1"    ]

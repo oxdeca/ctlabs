@@ -6,8 +6,7 @@
 # -----------------------------------------------------------------------------
 
 name: lpic207
-desc: LAB LPIC2
-post_provision:
+desc: LAB LPIC2 - bind
 
 
 defaults:
