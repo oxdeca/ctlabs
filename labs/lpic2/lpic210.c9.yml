@@ -21,6 +21,8 @@ defaults:
       image: ctlabs/misc/kali
     smbadc:
       image: ctlabs/d11/smbadc
+    d11:
+      image: ctlabs/d11/base
     slapd:
       image: ctlabs/d11/base
       caps: [SYS_PTRACE]
