@@ -9,6 +9,7 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
            echo "root:secret" | chpasswd && sed -ri 's@^#(PermitRootLogin) .*@\1 yes@' /etc/ssh/sshd_config  && \
            echo alias vi='vim' >> /root/.bashrc_alias && printf "\nset paste\n" >> /etc/vimrc
 
+#RUN          sed -ri 's@(\[Journal\])@\1\nCompact=no@' /etc/systemd/journald.conf
 
 RUN        systemctl mask systemd-logind systemd-sysusers systemd-tmpfiles-setup dev-hugepages.mount systemd-tmpfiles-clean
 RUN        python3 -m pip install --upgrade pip && python3 -m pip install ansible pywinrm pynetbox pytz pyyaml pre-commit
