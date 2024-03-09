@@ -13,6 +13,9 @@ require 'erb'
 set :bind,           '0.0.0.0'
 set :port,            4567
 set :public_folder,  '/tmp/public'
+set :server_settings, SSLEnable: true,
+                      SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+                      SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
 
 CONFIG     = '/tmp/public/config.yml'
 INVENTORY  = '/tmp/public/inventory.ini'
