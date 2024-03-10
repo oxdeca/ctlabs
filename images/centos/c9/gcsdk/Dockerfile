@@ -16,4 +16,11 @@ COPY       google-cloud-sdk.repo /etc/yum.repos.d/
 RUN        dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo    && \
            dnf -y install terraform packer google-cloud-cli kubectl
 
+RUN        curl -L "https://github.com/Cyclenerd/google-cloud-pricing-cost-calculator/releases/latest/download/gcosts-linux-x86_64" \
+           -o /usr/bin/gcosts && chmod 0755 /usr/bin/gcosts
+
+RUN        mkdir -vp /etc/gcosts && \
+           curl -L "https://github.com/Cyclenerd/google-cloud-pricing-cost-calculator/raw/master/pricing.yml" \
+           -o /etc/gcosts/pricing.yml
+
 #ENTRYPOINT ["/usr/lib/systemd/systemd"]
