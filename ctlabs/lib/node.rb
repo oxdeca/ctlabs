@@ -301,7 +301,7 @@ sleep $SLEEP
         if(@snat)
           ipt_rule('delete', "FORWARD ! -i #{@name}   -o #{@name} -j ACCEPT")
           ipt_rule('delete', "FORWARD   -i #{@name} ! -o #{@name} -j ACCEPT")
-          ipt_rule('delete', "POSTROUTING -tnat ! -o #{@name} -s#{@ipv4} -j MASQUERADE")
+          ipt_rule('delete', "POSTROUTING -tnat ! -o #{@name} -s #{@ipv4} -j MASQUERADE")
         end
         if(@vxlan)
           %x( ip link del vxlan#{@vxlan['id']} )
