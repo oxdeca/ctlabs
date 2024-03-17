@@ -98,7 +98,6 @@ topology:
           eth1: 192.168.20.12/24
       slapd1:
         type : host
-        kind : slapd
         gw   : 192.168.10.1
         nics :
           eth0: 192.168.40.25/24
