@@ -1,0 +1,188 @@
+---
+
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/mon/mon02.yml
+# Description : Grafana Stack Lab
+# -----------------------------------------------------------------------------
+
+name: mon02
+desc: LAB Monitoring - Grafana Lab
+
+defaults:
+  switch:
+    linux:
+      image: ctlabs/c9/base
+      ports: 8
+  host:
+    linux:
+      image: ctlabs/c9/base
+    d11:
+      image: ctlabs/d11/base
+    kali:
+      image: ctlabs/misc/kali
+    smbadc:
+      image: ctlabs/d11/smbadc
+    slapd:
+      image: ctlabs/d11/base
+      caps: [SYS_PTRACE]
+  router:
+    frr:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+
+topology:
+  - vm:
+    name: vm1
+    dns : [192.168.10.11, 192.168.20.11, 169.254.169.254]
+    nodes:
+      mgmt:
+        type  : switch
+        ipv4  : 192.168.40.10/24
+        gw    : 192.168.40.1
+        ports : 16
+      ansible:
+        type  : host
+        gw    : 192.168.40.1
+        nics  :
+          eth0: 192.168.40.3/24
+        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+      natgw:
+        type : gateway
+        ipv4 : 192.168.15.1/29
+        snat : true
+        dnat : ro1:eth1
+      sw1:
+        type : switch
+        ipv4 : 192.168.40.5/24
+        gw   : 192.168.40.1
+      sw2:
+        type : switch
+        ipv4 : 192.168.40.6/24
+        gw   : 192.168.40.1
+      ro1:
+        type  : router
+        kind  : frr
+        gw    : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
+          eth2: 192.168.10.1/24
+          eth3: 192.168.20.1/24
+      ns1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.11/24
+          eth1: 192.168.10.11/24
+      ns2:
+        type : host
+        kind : d11
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.12/24
+          eth1: 192.168.20.11/24
+      h1:
+        type : host
+        kind : kali
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.13/24
+          eth1: 192.168.10.12/24
+      h2:
+        type : host
+        kind : kali
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.14/24
+          eth1: 192.168.20.12/24
+      slapd1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.25/24
+          eth1: 192.168.10.13/24
+      slapd2:
+        type : host
+        kind : slapd
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.26/24
+          eth1: 192.168.20.13/24
+      dc1:
+        type : host
+        kind : smbadc
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.27/24
+          eth1: 192.168.10.14/24
+      dc2:
+        type : host
+        kind : smbadc
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.28/24
+          eth1: 192.168.20.14/24
+      prometheus:
+        type  : host
+        gw    : 192.168.10.1
+        nics  :
+          eth0: 192.168.40.21/24
+          eth1: 192.168.10.21/24
+        dnat  :
+          - [9090, 9090]
+      grafana:
+        type  : host
+        gw    : 192.168.20.1
+        nics :
+          eth0: 192.168.40.22/24
+          eth1: 192.168.20.22/24
+        dnat  :
+          - [3000, 3000]
+      loki:
+        type  : host
+        gw    : 192.168.20.1
+        nics  :
+          eth0: 192.168.40.23/24
+          eth1: 192.168.20.23/24
+      mimir:
+        type  : host
+        gw    : 192.168.20.1
+        nics  :
+          eth0: 192.168.40.24/24
+          eth1: 192.168.20.24/24
+
+    links:
+      - [ "ro1:eth1", "natgw:eth1"        ]
+      - [ "ro1:eth2", "sw1:eth1"          ]
+      - [ "ro1:eth3", "sw2:eth1"          ]
+
+      - [ "sw1:eth2", "ns1:eth1"          ]
+      - [ "sw1:eth3", "h1:eth1"           ]
+      - [ "sw1:eth4", "slapd1:eth1"       ]
+      - [ "sw1:eth5", "dc1:eth1"          ]
+      - [ "sw1:eth6", "prometheus:eth1"   ]
+
+      - [ "sw2:eth2", "ns2:eth1"          ]
+      - [ "sw2:eth3", "h2:eth1"           ]
+      - [ "sw2:eth4", "slapd2:eth1"       ]
+      - [ "sw2:eth5", "dc2:eth1"          ]
+      - [ "sw2:eth6", "grafana:eth1"      ]
+      - [ "sw2:eth7", "loki:eth1"         ]
+      - [ "sw2:eth8", "mimir:eth1"        ]
+
+      - [ "mgmt:eth1", "ansible:eth0"     ]
+      - [ "mgmt:eth2", "sw1:eth0"         ]
+      - [ "mgmt:eth3", "sw2:eth0"         ]
+      - [ "mgmt:eth4", "ro1:eth0"         ]
+      - [ "mgmt:eth5", "ns1:eth0"         ]
+      - [ "mgmt:eth6", "ns2:eth0"         ]
+      - [ "mgmt:eth7", "h1:eth0"          ]
+      - [ "mgmt:eth8", "h2:eth0"          ]
+      - [ "mgmt:eth9", "slapd1:eth0"      ]
+      - [ "mgmt:eth10", "slapd2:eth0"     ]
+      - [ "mgmt:eth11", "dc1:eth0"        ]
+      - [ "mgmt:eth12", "dc2:eth0"        ]
+      - [ "mgmt:eth13", "prometheus:eth0" ]
+      - [ "mgmt:eth14", "grafana:eth0"    ]
+      - [ "mgmt:eth15", "loki:eth0"       ]
+      - [ "mgmt:eth16", "mimir:eth0"      ]
