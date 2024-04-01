@@ -11,16 +11,17 @@ class Node
   def initialize(args)
     @defaults  = args['defaults']
     @name      = args['name' ]
-    @fqdn      = args['fqdn' ]
-    @dns       = args['dns'  ] || []
+    @domain    = args['domain'] || "ctlabs.internal"
+    @fqdn      = args['fqdn' ]  || "#{@name}.#{@domain}"
+    @dns       = args['dns'  ]  || []
     @type      = args['type' ]
-    @eos       = args['eos'  ] || 'linux'
-    @kind      = args['kind' ] || 'linux'
-    @kvm       = args['kvm'  ] || false
+    @eos       = args['eos'  ]  || 'linux'
+    @kind      = args['kind' ]  || 'linux'
+    @kvm       = args['kvm'  ]  || false
     @image     = args['image']
-    @env       = args['env'  ] || []
+    @env       = args['env'  ]  || []
     @cmd       = args['cmd'  ]
-    @nics      = args['nics' ] || {}
+    @nics      = args['nics' ]  || {}
     @bonds     = args['bonds']
     @ports     = args['ports']  # ||  @defaults[@type][@kind]['ports'] || 4
     @gw        = args['gw'   ]
@@ -29,8 +30,8 @@ class Node
     @snat      = args['snat' ]
     @vxlan     = args['vxlan']
     @dnat      = args['dnat' ]
-    @mtu       = args['mtu'  ] || 1460
-    @priv      = args['priv' ] || false
+    @mtu       = args['mtu'  ]  || 1460
+    @priv      = args['priv' ]  || false
 
     dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols      = [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
@@ -107,12 +108,12 @@ class Node
         end
 
 
-        %x( docker run -itd --rm --hostname #{@name} --name #{@name} --net none #{env} #{kvm} #{priv} #{caps} #{vols} #{image} #{@cmd} )
+        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none #{env} #{kvm} #{priv} #{caps} #{vols} #{image} #{@cmd} )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
-        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "#{dns}" > /etc/resolv.conf' )
+        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}" > /etc/resolv.conf' )
         @netns = add_netns
         #add_nics
 

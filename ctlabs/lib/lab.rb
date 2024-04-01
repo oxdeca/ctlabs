@@ -26,6 +26,7 @@ class Lab
     @desc     = @cfg['desc']     || ''
     @defaults = @cfg['defaults'] || {}
     @dns      = @cfg['dns']      || []
+    @domain   = @cfg['domain']   || []
     @dnatgw   = {}
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
@@ -54,11 +55,12 @@ class Lab
     @log.write "#{__method__}(): vm=#{vm_name}"
 
     nodes = []
-    cfg = find_vm(vm_name)
-    dns = cfg['dns'] || @dns
+    cfg    = find_vm(vm_name)
+    dns    = cfg['dns']    || @dns
+    domain = cfg['domain'] || @domain
 
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns }.merge( cfg['nodes'][n] ))
+      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ))
     end
     nodes
   end
