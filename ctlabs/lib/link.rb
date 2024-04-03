@@ -77,10 +77,12 @@ class Link
     move_link(@node1, @nic1)
     add_ip(@node1, @nic1)
     create_bond(@node1)
+    create_mgmt(@node1)
  
     move_link(@node2, @nic2)
     add_ip(@node2, @nic2)
     create_bond(@node2)
+    create_mgmt(@node2)
  
     #
     # NODE1
@@ -177,6 +179,33 @@ class Link
       %x( ip link add #{@node1.name}#{@nic1} type veth peer #{@node2.name}#{@nic2} )
     end
   end
+
+
+  #
+  # create mgmt vrf
+  #
+  def create_mgmt(node)
+    # ignore ansible nodes
+    if node.name == 'ansible'
+      return
+    end
+
+    case node.type
+      when 'host', 'router'
+        @log.write "#{__method__}(): adding mgmt vrf"
+        %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
+        if $?.exitstatus == 0
+          %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
+          if $?.exitstatus > 0
+            @log.write "#{__method__}(): node(host) - adding mgmt vrf"
+            %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 40 )
+            %x( ip netns exec #{node.netns} ip link set mgmt up )
+            %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
+          end
+        end
+    end
+  end
+
  
   #
   # create bond interface

@@ -26,7 +26,7 @@ class Lab
     @desc     = @cfg['desc']     || ''
     @defaults = @cfg['defaults'] || {}
     @dns      = @cfg['dns']      || []
-    @domain   = @cfg['domain']   || []
+    @domain   = @cfg['domain']   || "ctlabs.internal"
     @dnatgw   = {}
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
