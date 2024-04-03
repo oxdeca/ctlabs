@@ -180,7 +180,6 @@ class Link
     end
   end
 
-
   #
   # create mgmt vrf
   #
@@ -205,7 +204,6 @@ class Link
         end
     end
   end
-
  
   #
   # create bond interface
