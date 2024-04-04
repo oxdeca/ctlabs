@@ -9,6 +9,9 @@ name: mon02
 desc: LAB Monitoring - Grafana Lab
 
 defaults:
+  controller:
+    linux:
+      image: ctlabs/c9/base
   switch:
     linux:
       image: ctlabs/c9/base
@@ -34,6 +37,10 @@ topology:
   - vm:
     name: vm1
     dns : [192.168.10.11, 192.168.20.11, 169.254.169.254]
+    mgmt:
+      vrfid : 40
+      net   : 192.168.40.0/24
+      gw    : 192.168.40.1
     nodes:
       mgmt:
         type  : switch
@@ -41,8 +48,7 @@ topology:
         gw    : 192.168.40.1
         ports : 16
       ansible:
-        type  : host
-        gw    : 192.168.40.1
+        type  : controller
         nics  :
           eth0: 192.168.40.3/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
@@ -53,12 +59,12 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        ipv4 : 192.168.40.5/24
-        gw   : 192.168.40.1
+        nics :
+          eth0 : 192.168.40.5/24
       sw2:
         type : switch
-        ipv4 : 192.168.40.6/24
-        gw   : 192.168.40.1
+        nics :
+          eth0 : 192.168.40.6/24
       ro1:
         type  : router
         kind  : frr

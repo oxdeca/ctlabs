@@ -10,6 +10,7 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
 
 RUN         echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bash.bashrc
 COPY        bashrc.kali /etc/bashrc.kali
-COPY        sshd.service.mgmt /etc/systemd/system/ssh.service
+COPY        sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
+RUN         systemctl enable sshd-mgmt.service
 
 ENTRYPOINT  ["/bin/systemd"]

@@ -31,7 +31,7 @@ topology:
 #        ipv4  : 192.168.40.1/24
 #        ports : 8
 #      ansible :
-#        type : host
+#        type : controller
 #        gw   : 192.168.15.1
 #        nics :
 #          eth0: 192.168.40.3/24

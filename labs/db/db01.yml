@@ -8,28 +8,31 @@ name: db01
 desc: LAB DB2
 
 defaults:
+  controller:
+    linux:
+      image: ctlabs/c9/base
   switch:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
       ports: 6
   host:
     linux:
-      image: ctlabs/c9/base:0.1
+      image: ctlabs/c9/base
     db2:
-      image: ctlabs/misc/db2:0.1
+      image: ctlabs/misc/db2
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
     cbeaver:
-      image: ctlabs/misc/cbeaver:0.1
+      image: ctlabs/misc/cbeaver
     kali:
-      image: ctlabs/misc/kali:0.1
+      image: ctlabs/misc/kali
     smbadc:
-      image: ctlabs/d11/smbadc:0.1
+      image: ctlabs/d11/smbadc
     slapd:
-      image: ctlabs/d11/base:0.1
+      image: ctlabs/d11/base
       caps: [SYS_PTRACE]
   router:
     frr:
-      image: ctlabs/c9/frr:0.1
+      image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_RAW,NET_BIND_SERVICE]
 
 topology:
@@ -43,7 +46,7 @@ topology:
         ipv4  : 192.168.40.11/24
         gw    : 192.168.40.1
       ansible :
-        type : host
+        type : controller
         gw   : 192.168.40.1
         nics :
           eth0: 192.168.40.3/24
@@ -55,16 +58,16 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        ipv4 : 192.168.40.5/24
-        gw   : 192.168.40.1
+        nics :
+          eth0 : 192.168.40.5/24
       sw2:
         type : switch
-        ipv4 : 192.168.40.6/24
-        gw   : 192.168.40.1
+        nics :  
+          eth0 : 192.168.40.6/24
       sw3:
         type : switch
-        ipv4 : 192.168.40.7/24
-        gw   : 192.168.40.1
+        nics :
+          eth0 : 192.168.40.7/24
       ro1:
         type : router
         kind : frr

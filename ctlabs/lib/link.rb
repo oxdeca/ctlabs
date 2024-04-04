@@ -11,19 +11,25 @@
 # 
 #
 class Link
-  attr_reader :node1, :node2, :nic1, :nic2
+  attr_reader :node1, :node2, :nic1, :nic2, :mgmt
  
-  def initialize(nodes, links, log)
-    @log = log || LabLog.new
+  def initialize(args) #nodes, links, log)
+    @links  = args['links']
+    @nodes  = args['nodes']
+    @mgmt   = args['mgmt']
+
+
+    #@log = log || LabLog.new
+    @log = args['log'] || LabLog.new
     @log.write "== Link =="
-    @log.write "#{__method__}(): nodes=#{nodes.object_id},links=#{links}", 'info'
-    @log.write "#{__method__}(): nodes=#{nodes},links=#{links}"          , 'debug'
+    @log.write "#{__method__}(): nodes=#{@nodes.object_id},links=#{@links},mgmt=#{@mgmt}", 'info'
+    @log.write "#{__method__}(): nodes=#{@nodes},links=#{@links},mgmt=#{@mgmt}"          , 'debug'
  
-    @links    = links
-    @nodes    = nodes
+    # @links    = links
+    # @nodes    = nodes
  
-    n1, @nic1 = links[0].split(':')
-    n2, @nic2 = links[1].split(':')
+    n1, @nic1 = @links[0].split(':')
+    n2, @nic2 = @links[1].split(':')
  
     @node1    = find_node(n1)
     @node2    = find_node(n2)
@@ -88,7 +94,7 @@ class Link
     # NODE1
     #
     case @node1.type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
  
         #
         # adding default gateway
@@ -113,7 +119,7 @@ class Link
     # NODE2
     #
     case @node2.type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
  
         #
         # adding default gateway
@@ -137,7 +143,7 @@ class Link
   #
   def add_ip(node, nic)
     case node.type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
         if( !node.nics.nil? && !node.nics[nic].to_s.empty? )
           @log.write "#{__method__}(): node(host,router,switch) - adding ip addr #{nic}:#{node.nics[nic]}"
           %x( ip netns exec #{node.netns} ip addr add #{node.nics[nic]} dev #{nic} )
@@ -151,7 +157,7 @@ class Link
   #
   def move_link (node, nic)
     case node.type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
         %x( ip netns exec #{node.netns} ip link ls #{nic} 2> /dev/null )
         if $?.exitstatus > 0
           @log.write "#{__method__}(): node(host,router,switch) - moving veth endpoints into container"
@@ -184,22 +190,19 @@ class Link
   # create mgmt vrf
   #
   def create_mgmt(node)
-    # ignore ansible nodes
-    if node.name == 'ansible'
-      return
-    end
-
     case node.type
-      when 'host', 'router'
+      when 'host', 'switch'
         @log.write "#{__method__}(): adding mgmt vrf"
         %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
         if $?.exitstatus == 0
           %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): node(host) - adding mgmt vrf"
+            @log.write "#{__method__}(): node(host,switch) - adding mgmt vrf"
+            @log.write "#{__method__}(): node=#{node.inspect}"
             %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 40 )
             %x( ip netns exec #{node.netns} ip link set mgmt up )
             %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
+            %x( ip netns exec #{node.netns} ip route add default via #{@mgmt['gw']} vrf mgmt )
           end
         end
     end

@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt
 
   def initialize(args)
     @defaults  = args['defaults']
@@ -14,6 +14,7 @@ class Node
     @domain    = args['domain'] || "ctlabs.internal"
     @fqdn      = args['fqdn' ]  || "#{@name}.#{@domain}"
     @dns       = args['dns'  ]  || []
+    @mgmt      = args['mgmt' ]
     @type      = args['type' ]
     @eos       = args['eos'  ]  || 'linux'
     @kind      = args['kind' ]  || 'linux'
@@ -26,7 +27,6 @@ class Node
     @ports     = args['ports']  # ||  @defaults[@type][@kind]['ports'] || 4
     @gw        = args['gw'   ]
     @ipv4      = args['ipv4' ]
-    @mgmt      = args['mgmt' ]
     @snat      = args['snat' ]
     @vxlan     = args['vxlan']
     @dnat      = args['dnat' ]
@@ -43,7 +43,7 @@ class Node
     @log.write "#{__method__}(): name=#{@name},fqdn=#{@fqdn},eos=#{@eos},kind=#{@kind},kvm=#{@kvm},type=#{@type},image=#{@image},env=#{@env},cmd=#{@cmd},nics=#{@nics},ports=#{@ports},gw=#{@gw},ipv4=#{@ipv4},mgmt=#{@mgmt},snat=#{@snat},vxlan=#{@vxlan},dnat=#{@dnat},mtu=#{@mtu},priv=#{@priv},caps=#{@caps},vols=#{@vols},defaults=#{@defaults}"
 
     case @type
-      when 'switch', 'router', 'host'
+      when 'switch', 'router', 'host', 'controller'
         @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
         @ports = @ports.nil?  && (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports'] : @ports || 4
       when 'gateway'
@@ -74,7 +74,7 @@ class Node
 
     puts "#{__method__}(): #{@name}"
     case @type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
         caps  = @caps.map { |c| "--cap-add #{c} " }.join
         vols  = @vols.map { |v| "-v #{v} "}.join
         env   = @env.map  { |e| "-e #{e} "}.join
@@ -290,7 +290,7 @@ sleep $SLEEP
 
     puts "#{__method__}(): #{@name}..."
     case @type
-      when 'host', 'router', 'switch'
+      when 'host', 'router', 'switch', 'controller'
         %x( docker stop #{@name} )
         del_netns
         if( @mgmt )

@@ -8,6 +8,9 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
             echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config  && \
             printf "set paste\n" >> /etc/vim/vimrc
 
+COPY        sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
 RUN         systemctl enable ssh && systemctl mask systemd-logind dev-hugepages.mount
+COPY        sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
+RUN         systemctl enable sshd-mgmt.service
 
 ENTRYPOINT  ["/usr/lib/systemd/systemd"]

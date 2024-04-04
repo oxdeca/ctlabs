@@ -27,6 +27,7 @@ class Lab
     @defaults = @cfg['defaults'] || {}
     @dns      = @cfg['dns']      || []
     @domain   = @cfg['domain']   || "ctlabs.internal"
+    @mgmt     = @cfg['mgmt']     || {}
     @dnatgw   = {}
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
@@ -58,9 +59,10 @@ class Lab
     cfg    = find_vm(vm_name)
     dns    = cfg['dns']    || @dns
     domain = cfg['domain'] || @domain
+    mgmt   = cfg['mgmt']   || @mgmt
 
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ))
+      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain, 'mgmt' => mgmt }.merge( cfg['nodes'][n] ))
     end
     nodes
   end
@@ -200,7 +202,8 @@ class Lab
     puts "Starting Nodes:"
     @nodes.each { |node| node.run }
     puts "Starting Links:"
-    @links.each { |l| Link.new(@nodes, l, @log) }
+    @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log ) }
+    #@links.each { |l| Link.new(@nodes, l, @log) }
     add_dnat
   end
 
