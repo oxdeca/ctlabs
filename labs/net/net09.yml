@@ -123,11 +123,9 @@ topology:
           eth1: 192.168.30.14/24
       ansible:
         type  : controller
-        dns   : [169.254.169.254]
-        gw    : 192.168.15.1
+        gw    : 192.168.40.1
         nics  :
           eth0: 192.168.40.3/24
-          eth1: 192.168.15.3/24
         vols  :
           - '/root/ctlabs-ansible:/root/ctlabs-ansible:ro'
           - '/root/avd:/root/avd:ro'

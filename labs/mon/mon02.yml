@@ -49,6 +49,7 @@ topology:
         ports : 16
       ansible:
         type  : controller
+        gw    : 192.168.40.1
         nics  :
           eth0: 192.168.40.3/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
