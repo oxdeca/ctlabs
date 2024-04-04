@@ -62,7 +62,7 @@ class Lab
     mgmt   = cfg['mgmt']   || @mgmt
 
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain, 'mgmt' => mgmt }.merge( cfg['nodes'][n] ))
+      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ))
     end
     nodes
   end

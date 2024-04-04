@@ -11,6 +11,6 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
 COPY        sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
 RUN         systemctl enable ssh && systemctl mask systemd-logind dev-hugepages.mount
 COPY        sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
-RUN         systemctl enable sshd-mgmt.service
+RUN         systemctl enable sshd-mgmt.service && systemctl disable ssh.service
 
 ENTRYPOINT  ["/usr/lib/systemd/systemd"]

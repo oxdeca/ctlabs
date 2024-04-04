@@ -20,6 +20,6 @@ RUN        dnf -y module disable ruby && dnf -y module enable ruby:3.1 && dnf -y
 RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
 COPY       bashrc.kali /etc/bashrc.kali
 COPY       sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
-RUN        systemctl enable sshd-mgmt.service
+RUN        systemctl enable sshd-mgmt.service && systemctl disable sshd.service
 
 ENTRYPOINT ["/usr/lib/systemd/systemd"]
