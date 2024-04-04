@@ -72,6 +72,7 @@ class Lab
 
     cfg   = find_vm(vm_name)
     links = cfg['links']
+    @mgmt = cfg['mgmt'] || @mgmt
     links
   end
 
@@ -198,12 +199,11 @@ class Lab
 
   def up
     @log.write "#{__method__}(): "
-    mgmt = cfg['mgmt']   || @mgmt
 
     puts "Starting Nodes:"
     @nodes.each { |node| node.run }
     puts "Starting Links:"
-    @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => mgmt ) }
+    @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
     #@links.each { |l| Link.new(@nodes, l, @log) }
     add_dnat
   end
