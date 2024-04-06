@@ -33,7 +33,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name == "mgmt" || node.nics.size == 1
+              if node.name == "sw0" || node.nics.size == 1
                 next
               end
               group   = node.type
@@ -91,7 +91,7 @@ class Graph
        
         <%- i = 0
             @links.each do |l|
-              if l[0].split(':')[0] != 'mgmt'
+              if l[0].split(':')[0] != 'sw0'
         -%>
           edge[color=<%= @graph.colors[i] -%>]
             <%- i = (i + 1) % @graph.colors.size -%>
@@ -170,7 +170,7 @@ class Graph
         <%- 
             i = 0
             @links.each do |l|
-              if l[0].split(':')[0] == 'mgmt'
+              if l[0].split(':')[0] == 'sw0'
         -%>
           edge[color=<%= @graph.colors[i] -%>]
         <%-     i = (i + 1) % @graph.colors.size -%>
@@ -233,7 +233,7 @@ class Graph
               nodes = init_nodes(vm['name'])
               nodes.each do |node|
                 # skip management nodes
-                if node.name == "mgmt"
+                if node.name == "sw0"
                   next
                 end
         -%>
@@ -247,7 +247,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name == "mgmt"
+              if node.name == "sw0"
                 next
               end
         -%>
@@ -261,7 +261,7 @@ class Graph
         edge[color="lightsteelblue",penwidth=2]
         <%- 
             @links.each do |l|
-              if l[0].split(':')[0] == "mgmt"
+              if l[0].split(':')[0] == "sw0"
                 next
               end
         -%>
@@ -317,7 +317,7 @@ class Graph
               nodes = init_nodes(vm['name'])
               nodes.each do |node|
                 # skip management nodes
-                #if node.name != "mgmt"
+                #if node.name != "sw0"
                 #  next
                 #end
         -%>
@@ -331,7 +331,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name != "mgmt"
+              if node.name != "sw0"
                 next
               end
         -%>
@@ -345,7 +345,7 @@ class Graph
         edge[color="lightsteelblue",penwidth=2]
         <%- 
             @links.each do |l|
-              if l[0].split(':')[0] != "mgmt"
+              if l[0].split(':')[0] != "sw0"
                 next
               end
         -%>
@@ -370,9 +370,10 @@ class Graph
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
+  <%-   elsif node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
-
 
 [router]
   <%- @nodes.each do |node| -%>

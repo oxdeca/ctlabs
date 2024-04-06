@@ -12,7 +12,7 @@ ExecStart=/usr/sbin/ip vrf exec mgmt /usr/sbin/sshd -D $OPTIONS
 ExecReload=/usr/sbin/ip vrf exec mgmt /bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
-RestartSec=30s
+RestartSec=10s
 
 [Install]
 WantedBy=multi-user.target

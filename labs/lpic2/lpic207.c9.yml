@@ -12,8 +12,11 @@ desc: LAB LPIC2 - bind
 defaults:
   controller:
     linux:
-      image: ctlabs/c9/base
+      image: ctlabs/c9/ctrl
   switch:
+    mgmt:
+      image: ctlabs/c9/ctrl
+      port : 10
     linux:
       image: ctlabs/c9/base
   host:
@@ -38,9 +41,9 @@ topology:
       net   : 192.168.40.0/24
       gw    : 192.168.40.1
     nodes:
-      mgmt:
+      sw0:
         type  : switch
-        ports : 10
+        kind  : mgmt
         ipv4  : 192.168.40.11/24
         gw    : 192.168.40.1
       ansible:
@@ -110,11 +113,11 @@ topology:
       - [ "sw2:eth2", "ns2:eth1"      ]
       - [ "sw2:eth3", "h2:eth1"       ]
 
-      - [ "mgmt:eth1", "ansible:eth0" ]
-      - [ "mgmt:eth2", "sw1:eth0"     ]
-      - [ "mgmt:eth3", "sw2:eth0"     ]
-      - [ "mgmt:eth4", "ro1:eth0"     ]
-      - [ "mgmt:eth5", "ns1:eth0"     ]
-      - [ "mgmt:eth6", "ns2:eth0"     ]
-      - [ "mgmt:eth7", "h1:eth0"      ]
-      - [ "mgmt:eth8", "h2:eth0"      ]
+      - [ "sw0:eth1", "ansible:eth0"  ]
+      - [ "sw0:eth2", "sw1:eth0"      ]
+      - [ "sw0:eth3", "sw2:eth0"      ]
+      - [ "sw0:eth4", "ro1:eth0"      ]
+      - [ "sw0:eth5", "ns1:eth0"      ]
+      - [ "sw0:eth6", "ns2:eth0"      ]
+      - [ "sw0:eth7", "h1:eth0"       ]
+      - [ "sw0:eth8", "h2:eth0"       ]

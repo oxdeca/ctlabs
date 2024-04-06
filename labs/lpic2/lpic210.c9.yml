@@ -12,8 +12,11 @@ desc: LAB LPIC2 - slapd
 defaults:
   controller:
     linux:
-      image: ctlabs/c9/base
+      image: ctlabs/c9/ctrl
   switch:
+    mgmt:
+      image: ctlabs/c9/ctrl
+      ports: 12
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -43,7 +46,7 @@ topology:
     nodes:
       mgmt:
         type  : switch
-        ports : 12
+        kind  : mgmt
         ipv4  : 192.168.40.11/24
         gw    : 192.168.40.1
       ansible :
@@ -144,15 +147,15 @@ topology:
       - [ "sw2:eth4", "slapd2:eth1"    ]
       - [ "sw2:eth5", "dc2:eth1"       ]
 
-      - [ "mgmt:eth1", "ansible:eth0"  ]
-      - [ "mgmt:eth2", "sw1:eth0"      ]
-      - [ "mgmt:eth3", "sw2:eth0"      ]
-      - [ "mgmt:eth4", "ro1:eth0"      ]
-      - [ "mgmt:eth5", "ns1:eth0"      ]
-      - [ "mgmt:eth6", "ns2:eth0"      ]
-      - [ "mgmt:eth7", "h1:eth0"       ]
-      - [ "mgmt:eth8", "h2:eth0"       ]
-      - [ "mgmt:eth9", "slapd1:eth0"   ]
-      - [ "mgmt:eth10", "slapd2:eth0"  ]
-      - [ "mgmt:eth11", "dc1:eth0"     ]
-      - [ "mgmt:eth12", "dc2:eth0"     ]
+      - [ "sw0:eth1", "ansible:eth0"   ]
+      - [ "sw0:eth2", "sw1:eth0"       ]
+      - [ "sw0:eth3", "sw2:eth0"       ]
+      - [ "sw0:eth4", "ro1:eth0"       ]
+      - [ "sw0:eth5", "ns1:eth0"       ]
+      - [ "sw0:eth6", "ns2:eth0"       ]
+      - [ "sw0:eth7", "h1:eth0"        ]
+      - [ "sw0:eth8", "h2:eth0"        ]
+      - [ "sw0:eth9", "slapd1:eth0"    ]
+      - [ "sw0:eth10", "slapd2:eth0"   ]
+      - [ "sw0:eth11", "dc1:eth0"      ]
+      - [ "sw0:eth12", "dc2:eth0"      ]

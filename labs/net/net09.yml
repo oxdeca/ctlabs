@@ -11,8 +11,11 @@ desc: Arista Fabric Lab (cgroupv1 needed -> use centos8)
 defaults:
   controller:
     linux:
-      image: ctlabs/c9/base
+      image: ctlabs/c9/ctrl
   switch:
+    mgmt:
+      image: ctlabs/c9/ctrl
+      ports: 12
     linux:
       image: ctlabs/c8/base:0.3
     arista:
@@ -31,11 +34,11 @@ topology:
     mgmt:
       gw: 192.168.40.1    
     nodes:
-      mgmt:
+      sw0:
         type  : switch
+        kind  : mgmt
         ipv4  : 192.168.40.10/24
         gw    : 192.168.40.1
-        ports : 14
       gw1:
         type  : gateway
         ipv4  : 192.168.15.1/29
@@ -154,25 +157,25 @@ topology:
       - [ "lf3:eth7", "lf4:eth7" ]
       - [ "lf3:eth8", "lf4:eth8" ]
 
-      - [ "lf1:eth3", "h1:eth1" ]
-      - [ "lf2:eth3", "h2:eth1" ]
-      - [ "lf3:eth3", "h3:eth1" ]
-      - [ "lf4:eth3", "h4:eth1" ]
+      - [ "lf1:eth3", "h1:eth1"  ]
+      - [ "lf2:eth3", "h2:eth1"  ]
+      - [ "lf3:eth3", "h3:eth1"  ]
+      - [ "lf4:eth3", "h4:eth1"  ]
 
-      - [ "mgmt:eth1", "sp1:eth0" ]
-      - [ "mgmt:eth2", "sp2:eth0" ]
-      - [ "mgmt:eth3", "lf1:eth0" ]
-      - [ "mgmt:eth4", "lf2:eth0" ]
-      - [ "mgmt:eth5", "lf3:eth0" ]
-      - [ "mgmt:eth6", "lf4:eth0" ]
+      - [ "sw0:eth1", "sp1:eth0" ]
+      - [ "sw0:eth2", "sp2:eth0" ]
+      - [ "sw0:eth3", "lf1:eth0" ]
+      - [ "sw0:eth4", "lf2:eth0" ]
+      - [ "sw0:eth5", "lf3:eth0" ]
+      - [ "sw0:eth6", "lf4:eth0" ]
 
-      - [ "mgmt:eth7", "ro1:eth0" ]
-      - [ "mgmt:eth8", "ro2:eth0" ]
+      - [ "sw0:eth7", "ro1:eth0" ]
+      - [ "sw0:eth8", "ro2:eth0" ]
 
-      - [ "mgmt:eth9",  "h1:eth0" ]
-      - [ "mgmt:eth10",  "h2:eth0" ]
-      - [ "mgmt:eth11", "h3:eth0" ]
-      - [ "mgmt:eth12", "h4:eth0" ]
+      - [ "sw0:eth9",  "h1:eth0" ]
+      - [ "sw0:eth10", "h2:eth0" ]
+      - [ "sw0:eth11", "h3:eth0" ]
+      - [ "sw0:eth12", "h4:eth0" ]
 
-      - [ "mgmt:eth13", "ansible:eth0" ]
+      - [ "sw0:eth13", "ansible:eth0" ]
 

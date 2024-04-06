@@ -120,7 +120,7 @@ class Node
         #
         # linux bridge
         #
-        if(@type == 'switch' && @kind == 'linux' )
+        if(@type == 'switch' && [ 'linux', 'mgmt' ].include?(@kind) )
           @log.write "#{__method__}(): (switch) - adding bridge"
 
           %x( ip netns exec #{@netns} ip link ls #{@name} 2> /dev/null )

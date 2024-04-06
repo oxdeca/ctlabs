@@ -11,8 +11,11 @@ desc: BGP Lab
 defaults:
   controller:
     linux:
-      image: ctlabs/c9/base
+      image: ctlabs/c9/ctrl
   switch:
+    mgmt:
+      image: ctlabs/c9/ctrl
+      ports: 8
     linux:
       image: ctlabs/c9/base
       ports: 2
@@ -33,10 +36,11 @@ topology:
     mgmt:
       gw: 192.168.40.1
     nodes:
-      mgmt:
+      sw0:
         type: switch
+        kind: mgmt
         ipv4: 192.168.40.10/24
-        ports: 8
+        gw  : 192.168.40.1
       ansible:
         type  : controller
         gw    : 192.168.40.1
@@ -91,11 +95,11 @@ topology:
       - [ "sw1:eth2", "h1:eth1"       ]
       - [ "sw3:eth2", "h2:eth1"       ]
 
-      - [ "mgmt:eth1", "ansible:eth0" ] 
-      - [ "mgmt:eth2", "sw1:eth0"     ] 
-      - [ "mgmt:eth3", "sw2:eth0"     ] 
-      - [ "mgmt:eth4", "sw3:eth0"     ] 
-      - [ "mgmt:eth5", "ro1:eth0"     ] 
-      - [ "mgmt:eth6", "ro2:eth0"     ] 
-      - [ "mgmt:eth7", "h1:eth0"      ] 
-      - [ "mgmt:eth8", "h2:eth0"      ] 
+      - [ "sw0:eth1", "ansible:eth0"  ] 
+      - [ "sw0:eth2", "sw1:eth0"      ] 
+      - [ "sw0:eth3", "sw2:eth0"      ] 
+      - [ "sw0:eth4", "sw3:eth0"      ] 
+      - [ "sw0:eth5", "ro1:eth0"      ] 
+      - [ "sw0:eth6", "ro2:eth0"      ] 
+      - [ "sw0:eth7", "h1:eth0"       ] 
+      - [ "sw0:eth8", "h2:eth0"       ] 
