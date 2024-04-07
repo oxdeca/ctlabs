@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/graph.rb
 # Description : graph class; creating visualizations
-# License     : Licence MIT
+# License     : MIT License
 # -----------------------------------------------------------------------------
 #
 # Desc: creates the various graphs by generating graphviz code

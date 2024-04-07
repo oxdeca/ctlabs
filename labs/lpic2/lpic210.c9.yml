@@ -44,7 +44,7 @@ topology:
     mgmt:
       gw: 192.168.40.1
     nodes:
-      mgmt:
+      sw0:
         type  : switch
         kind  : mgmt
         ipv4  : 192.168.40.11/24

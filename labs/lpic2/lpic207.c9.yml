@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      port : 10
+      ports: 10
     linux:
       image: ctlabs/c9/base
   host:
