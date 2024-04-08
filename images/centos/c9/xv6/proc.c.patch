@@ -1,0 +1,24 @@
+--- proc.c.bak  2024-04-08 01:28:21.327880517 -0400
++++ proc.c      2024-04-08 01:30:08.775336205 -0400
+@@ -452,6 +452,7 @@
+     // Avoid deadlock by ensuring that devices can interrupt.
+     intr_on();
+ 
++    int found();
+     for(p = proc; p < &proc[NPROC]; p++) {
+       acquire(&p->lock);
+       if(p->state == RUNNABLE) {
+@@ -465,9 +466,14 @@
+         // Process is done running for now.
+         // It should have changed its p->state before coming back.
+         c->proc = 0;
++        found = 1;
+       }
+       release(&p->lock);
+     }
++    if(found == 0){
++      intr_on();
++      asm volatile("wfi");
++    }
+   }
+ }

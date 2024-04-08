@@ -15,7 +15,11 @@ RUN         cd /opt && curl -LO https://toolchains.bootlin.com/downloads/release
             tar xvf riscv64-lp64d--glibc--stable-2022.08-1.tar.bz2 && ln -sv riscv64-lp64d--glibc--stable-2022.08-1 /opt/riscv64
 
 RUN         cd /root/xv6 && git clone https://github.com/mit-pdos/xv6-riscv && cd xv6-riscv && \
-            echo 'LD_LIBRARY_PATH=/opt/riscv64/lib64 PATH=$PATH:/opt/riscv64/bin/:/usr/local/bin TOOLPREFIX=/opt/riscv64/bin/riscv64-buildroot-linux-gnu- make qemu' > /root/xv6/xv6-riscv/start.sh
+            echo 'LD_LIBRARY_PATH=/opt/riscv64/lib64 PATH=$PATH:/opt/riscv64/bin/:/usr/local/bin TOOLPREFIX=/opt/riscv64/bin/riscv64-buildroot-linux-gnu- make qemu' > /root/xv6/xv6-riscv/start.sh && \
+            chmod 0750 start.sh
+
+COPY        proc.c.patch /root/xv6/xv6-riscv/kernel/
+RUN         cd /root/xv6/xv6-riscv/kernel && patch proc.c proc.c.patch
 
 WORKDIR     /root/xv6/xv6-riscv
 
