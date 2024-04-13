@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs
 
   def initialize(args)
     @defaults  = args['defaults']
@@ -32,6 +32,7 @@ class Node
     @dnat      = args['dnat' ]
     @mtu       = args['mtu'  ]  || 1460
     @priv      = args['priv' ]  || false
+    @devs      = args['devs' ]  || []
 
     dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols      = [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
@@ -46,6 +47,7 @@ class Node
       when 'switch', 'router', 'host', 'controller'
         @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
         @ports = @ports.nil?  && (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports'] : @ports || 4
+        @devs  = (!@defaults[@type][@kind]['devs'].nil?)  ? @defaults[@type][@kind]['devs'] : @devs
       when 'gateway'
         @ports = @ports.nil? ? 2 : @ports
     end
@@ -80,6 +82,7 @@ class Node
         env   = @env.map  { |e| "-e #{e} "}.join
         priv  = @priv ? '--privileged' : ''
         kvm   = @kvm  ? '--device /dev/kvm --device /dev/net/tun' : ''
+        devs  = @devs.map{ |d| "--device #{d} " }.join
         dns   = @dns.map { |ns| "nameserver #{ns}" }.join("\n")
         image = @image.nil? ? @defaults[@type][@kind]['image'] : @image
 
@@ -108,7 +111,8 @@ class Node
         end
 
 
-        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none #{env} #{kvm} #{priv} #{caps} #{vols} #{image} #{@cmd} )
+        @log.write "#{__method__}(): name=#{@name}"
+        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip

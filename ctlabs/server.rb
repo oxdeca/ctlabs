@@ -111,13 +111,13 @@ __END__
 <%= HEADER %>
 <!DOCTYPE html>
     <div id="con" class="w3-panel w3-green">
-      <h2> Connections [Core Network]</h2>
+      <h2> Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="con.svg" class="w3-round" alt="Connections">
     </div>
     <div id="topo" class="w3-panel w3-green">
-      <h2> Topology [Core Network]</h2>
+      <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="topo.svg" class="w3-round" alt="Topology">
@@ -128,7 +128,7 @@ __END__
 @@con
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
-      <h2> Connections [Core Network]</h2>
+      <h2> Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="con.svg" class="w3-round" alt="Connections">
@@ -145,7 +145,7 @@ __END__
 @@topo
 <%= HEADER %>
     <div id="topo" class="w3-panel w3-green">
-      <h2> Topology [Core Network]</h2>
+      <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
       <img src="topo.svg" class="w3-round" alt="Topology">
@@ -190,7 +190,7 @@ __END__
     </div>
     <div class="w3-container">
       <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
-        <pre><%= File.read(INVENTORY) %></pre>
+        <pre><%= if File.file?(INVENTORY) ? File.read(INVENTORY) : "Error: No Inventory found!" %></pre>
       </div>
     </div>
 <%= FOOTER %>

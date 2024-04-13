@@ -33,7 +33,8 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name == "sw0" || node.nics.size == 1
+              #if node.name == "sw0" || node.nics.size == 1
+              if node.type == "switch" && node.kind == "mgmt" || node.type == "controller"
                 next
               end
               group   = node.type
@@ -122,6 +123,8 @@ class Graph
               group   = node.type
               bgcolor = "darkseagreen2"
               case node.type
+                when 'controller'
+                  bgcolor = "lightsteelblue"
                 when 'host'
                   bgcolor = "lightsteelblue"
                 when 'router'
@@ -135,7 +138,7 @@ class Graph
             node[shape=none,style="filled",fillcolor="<%= bgcolor %>",fontname="Courier New",fontsize="11"]
             <%= node.name.sub(/.-/, "_") %>[label=<
             <table bgcolor="<%= bgcolor %>" color="deeppink" border="1" cellborder="0">
-        <%- if group != 'host' -%>
+        <%- if ![ 'host', 'controller' ].include?(group) -%>
               <tr>
                 <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
               </tr>
@@ -156,7 +159,7 @@ class Graph
               end
         -%>
               </tr>
-        <%- if group == 'host' -%>
+        <%- if [ 'host', 'controller' ].include?(group) -%>
               <tr><td></td></tr>
               <tr>
                 <td align="center" colspan="<%= node.nics.size %>"> <b><%= node.name %></b> </td>
@@ -171,6 +174,7 @@ class Graph
             i = 0
             @links.each do |l|
               if l[0].split(':')[0] == 'sw0'
+              # if l[0].split(':')[0] in (@node.map{|n| n.type == 'mgmt' })
         -%>
           edge[color=<%= @graph.colors[i] -%>]
         <%-     i = (i + 1) % @graph.colors.size -%>
@@ -203,7 +207,8 @@ class Graph
               nodes = init_nodes(vm['name'])
               nodes.each do |node|
                 # skip management nodes
-                if node.nics.size == 1
+                #if node.nics.size == 1
+                if node.type == "switch" and node.kind == "mgmt" || node.type == "controller"
                   next
                 end
         -%>
@@ -291,7 +296,7 @@ class Graph
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
-        <%-     if node.type == 'host' -%>
+        <%-     if node.type == 'host' || node.type == 'controller' -%>
         <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth0'] %></td></tr></table> >]
         #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth0'] %>"]
         <%-     end -%>
@@ -331,7 +336,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name != "sw0"
+              if !(node.type == "switch" && node.kind == "mgmt") || node.type != "controller"
                 next
               end
         -%>
