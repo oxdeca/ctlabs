@@ -111,7 +111,6 @@ class Node
         end
 
 
-        @log.write "#{__method__}(): name=#{@name}"
         %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
