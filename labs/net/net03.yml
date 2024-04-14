@@ -99,6 +99,7 @@ topology:
       ro3:
         type : router
         kind : frr
+        gw   : 192.168.113.1
         nics :
           eth0: 192.168.40.3/24
           eth1: 192.168.113.2/30
@@ -107,6 +108,7 @@ topology:
       ro4:
         type : router
         kind : frr
+        gw   : 192.168.124.1
         nics :
           eth0: 192.168.40.4/24
           eth1: 192.168.41.1/24
