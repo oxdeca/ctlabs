@@ -15,7 +15,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 20
+      ports: 24
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -56,46 +56,68 @@ topology:
         type : gateway
         ipv4 : 192.168.15.1/29
         snat : true
-        dnat : ro1:eth1
-      sw1:
+        dnat : isp1:eth1
+      sw12:
         type : switch
+        desc : vlan12
         nics :
           eth0: 192.168.40.51/24
-      sw2:
+      sw22:
         type: switch
+        desc: vlan22
         nics :
           eth0: 192.168.40.52/24
-      sw3:
+      sw24:
         type: switch
+        desc: vlan24
         nics :
           eth0: 192.168.40.53/24
-      sw4:
+      sw32:
         type: switch
+        desc: vlan32
         nics :
           eth0: 192.168.40.54/24
-      sw5:
+      sw41:
         type: switch
+        desc: vlan41
         nics :
           eth0: 192.168.40.55/24
+      sw43:
+        type: switch
+        desc: vlan43
+        nics :
+          eth0: 192.168.40.56/24
+      isp1:
+        type : router
+        kind : frr
+        dns  : [169.254.169.254]
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.5/24
+          eth1: 192.168.15.2/29
+          eth2: 192.168.16.1/30
+          eth3: 192.168.17.1/30
       ro1:
         type : router
         kind : frr
-        gw   : 192.168.15.1
+        snat : true
+        gw   : 192.168.16.1
         nics :
           eth0: 192.168.40.1/24
-          eth1: 192.168.15.2/29
-          eth2: 192.168.12.1/24
-          eth3: 192.168.121.2/30
-          eth4: 192.168.113.1/30
+          eth1: 192.168.12.1/24
+          eth2: 192.168.113.1/30
+          eth3: 192.168.16.2/30
       ro2:
         type : router
         kind : frr
+        snat : true
+        gw   : 192.168.17.1
         nics :
           eth0: 192.168.40.2/24
           eth1: 192.168.22.1/24
-          eth2: 192.168.124.1/30
-          eth3: 192.168.121.1/30
-          eth4: 192.168.24.1/24
+          eth2: 192.168.17.2/30
+          eth3: 192.168.24.1/24
+          eth4: 192.168.124.1/30
       ro3:
         type : router
         kind : frr
@@ -172,50 +194,61 @@ topology:
         nics  :
           eth0: 192.168.40.17/24
           eth1: 192.168.43.17/24
+      h6:
+        type  : host
+        gw    : 192.168.24.1
+        nics  :
+          eth0: 192.168.40.18/24
+          eth1: 192.168.24.18/24
 
     links:
       # ---------------------------------
       # Data Network
       # ---------------------------------
-      - [ "ro1:eth1", "natgw:eth1"    ]
-      - [ "ro1:eth2", "sw1:eth1"      ]
-      - [ "ro1:eth3", "ro2:eth3"      ]
-      - [ "ro1:eth4", "ro3:eth1"      ]
-      - [ "ro2:eth1", "sw2:eth1"      ]
-      - [ "ro2:eth2", "ro4:eth2"      ]
-      - [ "ro3:eth2", "sw3:eth1"      ]
-      - [ "ro4:eth1", "sw4:eth1"      ]
-      - [ "ro4:eth3", "sw5:eth1"      ]
-      - [ "sw1:eth2", "dc1:eth1"      ]
-      - [ "sw1:eth3", "dc2:eth1"      ]
-      - [ "sw1:eth4", "ns1:eth1"      ]
-      - [ "sw1:eth5", "ns2:eth1"      ]
-      - [ "sw2:eth2", "slapd1:eth1"   ]
-      - [ "sw2:eth3", "slapd2:eth1"   ]
-      - [ "sw3:eth2", "h3:eth1"       ]
-      - [ "sw4:eth2", "h4:eth1"       ]
-      - [ "sw5:eth2", "h5:eth1"       ]
+      - [ "isp1:eth1", "natgw:eth1"   ]
+      - [ "isp1:eth2", "ro1:eth3"     ]
+      - [ "isp1:eth3", "ro2:eth2"     ]
+      - [ "ro1:eth1", "sw12:eth1"     ]
+      - [ "ro1:eth2", "ro3:eth1"      ]
+      - [ "ro2:eth1", "sw22:eth1"     ]
+      - [ "ro2:eth3", "sw24:eth1"     ]
+      - [ "ro2:eth4", "ro4:eth2"      ]
+      - [ "ro3:eth2", "sw32:eth1"     ]
+      - [ "ro4:eth1", "sw41:eth1"     ]
+      - [ "ro4:eth3", "sw43:eth1"     ]
+      - [ "sw12:eth2", "dc1:eth1"     ]
+      - [ "sw12:eth3", "dc2:eth1"     ]
+      - [ "sw12:eth4", "ns1:eth1"     ]
+      - [ "sw12:eth5", "ns2:eth1"     ]
+      - [ "sw22:eth2", "slapd1:eth1"  ]
+      - [ "sw22:eth3", "slapd2:eth1"  ]
+      - [ "sw24:eth2", "h6:eth1"      ]
+      - [ "sw32:eth2", "h3:eth1"      ]
+      - [ "sw41:eth2", "h4:eth1"      ]
+      - [ "sw43:eth2", "h5:eth1"      ]
 
       # ---------------------------------
       # MGMT Network
       # ---------------------------------
-      - [ "sw0:eth1", "ansible:eth0"  ]
-      - [ "sw0:eth2", "sw1:eth0"      ]
-      - [ "sw0:eth3", "sw2:eth0"      ]
-      - [ "sw0:eth4", "sw3:eth0"      ]
-      - [ "sw0:eth5", "sw4:eth0"      ]
-      - [ "sw0:eth6", "sw5:eth0"      ]
-      - [ "sw0:eth7", "ro1:eth0"      ]
-      - [ "sw0:eth8", "ro2:eth0"      ]
-      - [ "sw0:eth9", "ro3:eth0"      ]
-      - [ "sw0:eth10", "ro4:eth0"     ]
-      - [ "sw0:eth11", "dc1:eth0"     ]
-      - [ "sw0:eth12", "dc2:eth0"     ]
-      - [ "sw0:eth13", "slapd1:eth0"  ]
-      - [ "sw0:eth14", "slapd2:eth0"  ]
-      - [ "sw0:eth15", "ns1:eth0"     ]
-      - [ "sw0:eth16", "ns2:eth0"     ]
-      - [ "sw0:eth17", "h3:eth0"      ]
-      - [ "sw0:eth18", "h4:eth0"      ]
-      - [ "sw0:eth19", "h5:eth0"      ]
-
+      - [ "sw0:eth1",  "ansible:eth0" ]
+      - [ "sw0:eth2",  "sw12:eth0"    ]
+      - [ "sw0:eth3",  "sw22:eth0"    ]
+      - [ "sw0:eth4",  "sw24:eth0"    ]
+      - [ "sw0:eth5",  "sw32:eth0"    ]
+      - [ "sw0:eth6",  "sw41:eth0"    ]
+      - [ "sw0:eth7",  "sw43:eth0"    ]
+      - [ "sw0:eth8",  "isp1:eth0"    ]
+      - [ "sw0:eth9",  "ro1:eth0"     ]
+      - [ "sw0:eth10", "ro2:eth0"     ]
+      - [ "sw0:eth11", "ro3:eth0"     ]
+      - [ "sw0:eth12", "ro4:eth0"     ]
+      - [ "sw0:eth13", "dc1:eth0"     ]
+      - [ "sw0:eth14", "dc2:eth0"     ]
+      - [ "sw0:eth15", "slapd1:eth0"  ]
+      - [ "sw0:eth16", "slapd2:eth0"  ]
+      - [ "sw0:eth17", "ns1:eth0"     ]
+      - [ "sw0:eth18", "ns2:eth0"     ]
+      - [ "sw0:eth19", "h3:eth0"      ]
+      - [ "sw0:eth20", "h4:eth0"      ]
+      - [ "sw0:eth21", "h5:eth0"      ]
+      - [ "sw0:eth22", "h6:eth0"      ]
