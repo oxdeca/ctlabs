@@ -172,47 +172,41 @@ topology:
           eth1: 192.168.43.17/24
 
     links:
-      #
+      # ---------------------------------
       # Data Network
-      #
+      # ---------------------------------
       - [ "ro1:eth1", "natgw:eth1"    ]
       - [ "ro1:eth2", "sw1:eth1"      ]
       - [ "ro1:eth3", "ro2:eth3"      ]
       - [ "ro1:eth4", "ro3:eth1"      ]
-
       - [ "ro2:eth1", "sw2:eth1"      ]
       - [ "ro2:eth2", "ro4:eth2"      ]
-
       - [ "ro3:eth2", "sw3:eth1"      ]
-
       - [ "ro4:eth1", "sw4:eth1"      ]
       - [ "ro4:eth3", "sw5:eth1"      ]
-
       - [ "sw1:eth2", "dc1:eth1"      ]
       - [ "sw1:eth3", "dc2:eth1"      ]
       - [ "sw1:eth4", "ns1:eth1"      ]
       - [ "sw1:eth5", "ns2:eth1"      ]
-
       - [ "sw2:eth2", "slapd1:eth1"   ]
       - [ "sw2:eth3", "slapd2:eth1"   ]
-
       - [ "sw3:eth2", "h3:eth1"       ]
       - [ "sw4:eth2", "h4:eth1"       ]
       - [ "sw5:eth2", "h5:eth1"       ]
 
-      #
+      # ---------------------------------
       # MGMT Network
-      #
-      - [ "sw0:eth1", "sw1:eth0"      ]
-      - [ "sw0:eth2", "sw2:eth0"      ]
-      - [ "sw0:eth3", "sw3:eth0"      ]
-      - [ "sw0:eth4", "sw4:eth0"      ]
-      - [ "sw0:eth5", "sw5:eth0"      ]
-      - [ "sw0:eth6", "ro1:eth0"      ]
-      - [ "sw0:eth7", "ro2:eth0"      ]
-      - [ "sw0:eth8", "ro3:eth0"      ]
-      - [ "sw0:eth9", "ro4:eth0"      ]
-      - [ "sw0:eth10", "ansible:eth0" ]
+      # ---------------------------------
+      - [ "sw0:eth1", "ansible:eth0"  ]
+      - [ "sw0:eth2", "sw1:eth0"      ]
+      - [ "sw0:eth3", "sw2:eth0"      ]
+      - [ "sw0:eth4", "sw3:eth0"      ]
+      - [ "sw0:eth5", "sw4:eth0"      ]
+      - [ "sw0:eth6", "sw5:eth0"      ]
+      - [ "sw0:eth7", "ro1:eth0"      ]
+      - [ "sw0:eth8", "ro2:eth0"      ]
+      - [ "sw0:eth9", "ro3:eth0"      ]
+      - [ "sw0:eth10", "ro4:eth0"     ]
       - [ "sw0:eth11", "dc1:eth0"     ]
       - [ "sw0:eth12", "dc2:eth0"     ]
       - [ "sw0:eth13", "slapd1:eth0"  ]

@@ -190,7 +190,7 @@ __END__
     </div>
     <div class="w3-container">
       <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
-        <pre><%= if File.file?(INVENTORY) ? File.read(INVENTORY) : "Error: No Inventory found!" %></pre>
+        <pre><%= File.file?(INVENTORY) ? File.read(INVENTORY) : "Error: No Inventory found!" %></pre>
       </div>
     </div>
 <%= FOOTER %>
