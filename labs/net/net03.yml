@@ -180,8 +180,8 @@ topology:
       - [ "ro1:eth3", "ro2:eth3"      ]
       - [ "ro1:eth4", "ro3:eth1"      ]
 
-      - [ "ro2:eth1", "sw2:eth2"      ]
-      - [ "ro2:eth2", "ro4:eth1"      ]
+      - [ "ro2:eth1", "sw2:eth1"      ]
+      - [ "ro2:eth2", "ro4:eth2"      ]
 
       - [ "ro3:eth2", "sw3:eth1"      ]
 
