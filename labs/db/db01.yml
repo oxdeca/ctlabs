@@ -27,7 +27,7 @@ defaults:
     cbeaver:
       image: ctlabs/misc/cbeaver
     kali:
-      image: ctlabs/misc/kali
+      image: ctlabs/kali/base
     smbadc:
       image: ctlabs/d11/smbadc
     slapd:

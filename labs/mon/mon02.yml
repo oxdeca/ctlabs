@@ -25,7 +25,7 @@ defaults:
     d11:
       image: ctlabs/d11/base
     kali:
-      image: ctlabs/misc/kali
+      image: ctlabs/kali/base
     smbadc:
       image: ctlabs/d11/smbadc
     slapd:

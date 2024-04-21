@@ -4,8 +4,8 @@ ENV        TERM=linux
 
 RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime                                        && \
            dnf -y install yum-utils vim-enhanced rsync epel-release less git unzip procps crontabs diffutils && \
-           dnf -y install tcpdump nc htop iproute nmap sudo openssh-server openssh-clients openvpn           && \
-           dnf -y install glibc-langpack-en iputils python39 python3-pip passwd iptables sshpass libreswan   && \
+           dnf -y install tcpdump nc htop iproute nmap sudo openssh-server openssh-clients openvpn libreswan && \
+           dnf -y install glibc-langpack-en iputils python39 python3-pip passwd iptables-nft sshpass         && \
            echo "root:secret" | chpasswd && sed -ri 's@^#(PermitRootLogin) .*@\1 yes@' /etc/ssh/sshd_config  && \
            echo alias vi='vim' >> /root/.bashrc_alias && printf "\nset paste\n" >> /etc/vimrc
 

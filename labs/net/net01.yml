@@ -23,7 +23,7 @@ defaults:
     linux:
       image: ctlabs/c9/base
     kali:
-      image: ctlabs/misc/kali
+      image: ctlabs/kali/base
   router:
     frr:
       image: ctlabs/c9/frr
