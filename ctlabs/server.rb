@@ -202,7 +202,7 @@ __END__
     </div>
     <div class="w3-container">
       <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
-        <pre><%= File.read(CONFIG) %></pre>
+        <pre><%= File.file?(CONFIG) ? File.read(CONFIG) : "Error: No Configuration found!" %></pre>
       </div>
     </div>
 <%= FOOTER %>
