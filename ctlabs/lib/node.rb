@@ -6,7 +6,7 @@
 # -----------------------------------------------------------------------------
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play
 
   def initialize(args)
     @defaults  = args['defaults']
@@ -22,6 +22,7 @@ class Node
     @image     = args['image']
     @env       = args['env'  ]  || []
     @cmd       = args['cmd'  ]
+    @play      = args['play' ]
     @nics      = args['nics' ]  || {}
     @bonds     = args['bonds']
     @ports     = args['ports']  # ||  @defaults[@type][@kind]['ports'] || 4

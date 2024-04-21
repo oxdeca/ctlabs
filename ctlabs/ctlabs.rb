@@ -33,7 +33,7 @@ require 'optparse'
 options = {}
 OptionParser.new do |opts|
   ARGV.empty? ? opts.default_argv = ['-h'] :
-  opts.banner = "Usage: ${0} [options]"
+  opts.banner = "Usage: #{File.basename($0)} [options]"
 
   opts.on("-cCFG", "--conf=CFG", "Configuration File") do |c|
     options[:config] = c
@@ -52,8 +52,11 @@ OptionParser.new do |opts|
   opts.on("-i", "--ini", "Create an inventory ini-file") do
     options[:ini] = true
   end
-  opts.on("-p", "--print", "Print inspect output") do
+  opts.on("-t", "--print", "Print inspect output") do
     options[:print] = true
+  end
+  opts.on("-p", "--play [CMD]", "Run playbook") do |cmd|
+    options[:play] = cmd.nil? ? true : cmd
   end
   opts.on("-lLEVEL", "--debug=LEVEL", "Set the debug level") do |l|
     options[:dlevel] = l || 'warn'
@@ -69,6 +72,9 @@ if( options[:up] )
   l1.visualize
   l1.inventory
   l1.up
+end
+if( options[:play] )
+  l1.run_playbook(options[:play])
 end
 if( options[:down] )
   l1.down

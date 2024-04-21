@@ -202,10 +202,33 @@ class Lab
 
     puts "Starting Nodes:"
     @nodes.each { |node| node.run }
+
     puts "Starting Links:"
     @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
     #@links.each { |l| Link.new(@nodes, l, @log) }
+
+    puts "Adding DNAT:"
     add_dnat
+
+    sleep 5
+  end
+
+  def run_playbook(play)
+    @log.write "#{__method__}(): "
+    cmd = nil
+
+    # make sure ctrl and all mgmt-sshd are up and running
+    # TOOD
+
+    ctrl = find_node('ansible')
+    play.class == String ? cmd = play : cmd = ctrl.play
+
+    if cmd.class == String
+      puts "Playbook found: #{cmd}"
+      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd}'")
+    else
+      puts "No Playbook found."
+    end
   end
 
   def down
