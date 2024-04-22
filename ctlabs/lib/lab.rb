@@ -210,7 +210,7 @@ class Lab
     puts "Adding DNAT:"
     add_dnat
 
-    sleep 5
+    sleep 10
   end
 
   def run_playbook(play)
