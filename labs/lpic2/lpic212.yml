@@ -61,7 +61,7 @@ topology:
         type : gateway
         ipv4 : 192.168.15.1/29
         snat : true
-        dnat : ro1:eth1
+        dnat : isp1:eth1
       sw1:
         type : switch
         nics :
