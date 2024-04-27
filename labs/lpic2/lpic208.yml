@@ -53,7 +53,7 @@ topology:
         nics :
           eth0: 192.168.40.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/lpic208.ini ./playbooks/lpic2.yml -tsetup,ca,bind,http
+        play : ansible-playbook -i ./inventories/lpic208.ini ./playbooks/lpic2.yml -tsetup,ca,bind,httpd
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
