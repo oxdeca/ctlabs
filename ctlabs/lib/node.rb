@@ -117,7 +117,7 @@ class Node
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
-        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1 rotate\n" > /etc/resolv.conf' )
+        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
         @netns = add_netns
         #add_nics
 
