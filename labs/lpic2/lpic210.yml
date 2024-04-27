@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 12
+      ports: 14
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -34,6 +34,9 @@ defaults:
       caps: [SYS_PTRACE]
   router:
     frr:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+    mgmt:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
 
@@ -69,13 +72,20 @@ topology:
         type : switch
         nics :
           eth0 : 192.168.40.6/24
+      ro0:
+        type : router
+        kind : mgmt
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
       ro1:
         type : router
         kind : frr
         gw   : 192.168.15.1
         nics :
-          eth0: 192.168.40.1/24
-          eth1: 192.168.15.2/29
+          eth0: 192.168.40.2/24
+          eth1: 192.168.15.3/29
           eth2: 192.168.10.1/24
           eth3: 192.168.20.1/24
       ns1:
@@ -134,7 +144,9 @@ topology:
           eth1: 192.168.20.14/24
 
     links:
-      - [ "ro1:eth1", "natgw:eth1"     ]
+      - [ "ro0:eth1", "natgw:eth1"     ]
+
+      - [ "ro1:eth1", "natgw:eth2"     ]
       - [ "ro1:eth2", "sw1:eth1"       ]
       - [ "ro1:eth3", "sw2:eth1"       ]
 
@@ -151,12 +163,13 @@ topology:
       - [ "sw0:eth1", "ansible:eth0"   ]
       - [ "sw0:eth2", "sw1:eth0"       ]
       - [ "sw0:eth3", "sw2:eth0"       ]
-      - [ "sw0:eth4", "ro1:eth0"       ]
-      - [ "sw0:eth5", "ns1:eth0"       ]
-      - [ "sw0:eth6", "ns2:eth0"       ]
-      - [ "sw0:eth7", "h1:eth0"        ]
-      - [ "sw0:eth8", "h2:eth0"        ]
-      - [ "sw0:eth9", "slapd1:eth0"    ]
-      - [ "sw0:eth10", "slapd2:eth0"   ]
-      - [ "sw0:eth11", "dc1:eth0"      ]
-      - [ "sw0:eth12", "dc2:eth0"      ]
+      - [ "sw0:eth4", "ro0:eth0"       ]
+      - [ "sw0:eth5", "ro1:eth0"       ]
+      - [ "sw0:eth6", "ns1:eth0"       ]
+      - [ "sw0:eth7", "ns2:eth0"       ]
+      - [ "sw0:eth8", "h1:eth0"        ]
+      - [ "sw0:eth9", "h2:eth0"        ]
+      - [ "sw0:eth10", "slapd1:eth0"    ]
+      - [ "sw0:eth11", "slapd2:eth0"   ]
+      - [ "sw0:eth12", "dc1:eth0"      ]
+      - [ "sw0:eth13", "dc2:eth0"      ]
