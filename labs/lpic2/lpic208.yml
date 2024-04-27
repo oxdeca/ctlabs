@@ -1,12 +1,12 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/lpic2/lpic207.c9.yml
-# Description : DNS Lab ctlabs configuration
+# File        : ctlabs/lpic2/lpic208.c9.yml
+# Description : httpd Lab configuration
 # -----------------------------------------------------------------------------
 
-name: lpic207
-desc: LAB LPIC2 - bind
+name: lpic208
+desc: LAB LPIC2 - httpd
 
 
 defaults:
@@ -37,21 +37,20 @@ topology:
     name: lpic207-vm1
     dns : [192.168.10.11, 192.168.20.11, 169.254.169.254]
     mgmt:
-      vrfid : 40
-      net   : 192.168.40.0/24
-      gw    : 192.168.40.1
+      gw: 192.168.40.1
     nodes:
       sw0:
         type  : switch
         kind  : mgmt
         ipv4  : 192.168.40.11/24
         gw    : 192.168.40.1
-      ansible:
-        type  : controller
-        gw    : 192.168.40.1
-        nics  :
+      ansible :
+        type : controller
+        gw   : 192.168.40.1
+        nics :
           eth0: 192.168.40.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        play : ansible-playbook -i ./inventories/lpic208.ini ./playbooks/lpic2.yml --skip-tags sssd
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -60,11 +59,11 @@ topology:
       sw1:
         type : switch
         nics :
-          eth0 : 192.168.40.5/24
+          eth0: 192.168.40.5/24
       sw2:
         type : switch
         nics :
-          eth0 : 192.168.40.6/24
+          eth0: 192.168.40.6/24
       ro1:
         type : router
         kind : frr
@@ -89,7 +88,6 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
-        kind : kali
         gw   : 192.168.10.1
         nics :
           eth0: 192.168.40.23/24
@@ -101,6 +99,23 @@ topology:
         nics :
           eth0: 192.168.40.24/24
           eth1: 192.168.20.12/24
+      www1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.25/24
+          eth1: 192.168.10.13/24
+        dnat :
+          - [8081, 80]
+      www2:
+        type : host
+        kind : d11
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.26/24
+          eth1: 192.168.20.13/24
+        dnat :
+          - [8082, 80]
 
     links:
       - [ "ro1:eth1", "natgw:eth1"    ]
@@ -109,9 +124,11 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"      ]
       - [ "sw1:eth3", "h1:eth1"       ]
+      - [ "sw1:eth4", "www1:eth1"     ]
 
       - [ "sw2:eth2", "ns2:eth1"      ]
       - [ "sw2:eth3", "h2:eth1"       ]
+      - [ "sw2:eth4", "www2:eth1"     ]
 
       - [ "sw0:eth1", "ansible:eth0"  ]
       - [ "sw0:eth2", "sw1:eth0"      ]
@@ -121,3 +138,5 @@ topology:
       - [ "sw0:eth6", "ns2:eth0"      ]
       - [ "sw0:eth7", "h1:eth0"       ]
       - [ "sw0:eth8", "h2:eth0"       ]
+      - [ "sw0:eth9", "www1:eth0"     ]
+      - [ "sw0:eth10", "www2:eth0"    ]
