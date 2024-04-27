@@ -57,7 +57,7 @@ topology:
         nics :
           eth0: 192.168.40.50/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/lpic212.ini ./playbooks/lpic2.yml --skip-tags sssd
+        play : ansible-playbook -i ./inventories/lpic212.ini ./playbooks/lpic2.yml -tsetup,ca,openvpn,frr,bind,smbadc,slapd
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -78,9 +78,16 @@ topology:
         gw   : 192.168.15.1
         nics :
           eth0: 192.168.40.1/24
-          eth1: 192.168.15.2/29
+          eth1: 192.168.15.3/29
           eth2: 192.168.16.1/30
           eth3: 192.168.17.1/30
+      ro0:
+        type : router
+        kind : mgmt
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
       ro1:
         type : router
         kind : frr
@@ -156,6 +163,7 @@ topology:
 
     links:
       - [ "isp1:eth1", "natgw:eth1"    ]
+      - [ "ro0:eth1", "natgw:eth2"     ]
 
       - [ "ro1:eth1", "sw1:eth1"       ]
       - [ "ro1:eth2", "isp1:eth2"      ]
@@ -177,13 +185,14 @@ topology:
       - [ "sw0:eth2", "sw1:eth0"       ]
       - [ "sw0:eth3", "sw2:eth0"       ]
       - [ "sw0:eth4", "isp1:eth0"      ]
-      - [ "sw0:eth5", "ro1:eth0"       ]
-      - [ "sw0:eth6", "ro2:eth0"       ]
-      - [ "sw0:eth7", "ns1:eth0"       ]
-      - [ "sw0:eth8", "ns2:eth0"       ]
-      - [ "sw0:eth9", "h1:eth0"        ]
-      - [ "sw0:eth10", "h2:eth0"       ]
-      - [ "sw0:eth11", "slapd1:eth0"   ]
-      - [ "sw0:eth12", "slapd2:eth0"   ]
-      - [ "sw0:eth13", "dc1:eth0"      ]
-      - [ "sw0:eth14", "dc2:eth0"      ]
+      - [ "sw0:eth5", "ro0:eth0"       ]
+      - [ "sw0:eth6", "ro1:eth0"       ]
+      - [ "sw0:eth7", "ro2:eth0"       ]
+      - [ "sw0:eth8", "ns1:eth0"       ]
+      - [ "sw0:eth9", "ns2:eth0"       ]
+      - [ "sw0:eth10", "h1:eth0"       ]
+      - [ "sw0:eth11", "h2:eth0"       ]
+      - [ "sw0:eth12", "slapd1:eth0"   ]
+      - [ "sw0:eth13", "slapd2:eth0"   ]
+      - [ "sw0:eth14", "dc1:eth0"      ]
+      - [ "sw0:eth15", "dc2:eth0"      ]
