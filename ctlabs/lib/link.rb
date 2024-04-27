@@ -209,13 +209,17 @@ class Link
   #
   def create_mgmt(node)
     case node.type
-      when 'host', 'switch'
+      when 'host', 'switch', 'router'
         @log.write "#{__method__}(): adding mgmt vrf"
+        if node.kind == 'mgmt'
+          @log.write "#{__method__}(): skipping mgmt vrf (node.kind == 'mgmt')"
+          return # skip over as mgmt not needed
+        end
         %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
         if $?.exitstatus == 0
           %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): node(host,switch) - adding mgmt vrf"
+            @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf"
             @log.write "#{__method__}(): node=#{node.inspect}"
             %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 40 )
             %x( ip netns exec #{node.netns} ip link set mgmt up )

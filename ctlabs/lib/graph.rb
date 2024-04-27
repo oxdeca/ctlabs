@@ -34,7 +34,7 @@ class Graph
             @nodes.each do |node|
               # skip management nodes
               #if node.name == "sw0" || node.nics.size == 1
-              if node.type == "switch" && node.kind == "mgmt" || node.type == "controller"
+              if node.kind == "mgmt" || node.type == "controller"
                 next
               end
               group   = node.type
@@ -92,7 +92,8 @@ class Graph
        
         <%- i = 0
             @links.each do |l|
-              if l[0].split(':')[0] != 'sw0'
+              # TODO ugly hack
+              if l[0].split(':')[0] != 'sw0' && l[0].split(':')[0] != 'ro0'
         -%>
           edge[color=<%= @graph.colors[i] -%>]
             <%- i = (i + 1) % @graph.colors.size -%>
@@ -208,7 +209,7 @@ class Graph
               nodes.each do |node|
                 # skip management nodes
                 #if node.nics.size == 1
-                if node.type == "switch" and node.kind == "mgmt" || node.type == "controller"
+                if node.kind == "mgmt" || node.type == "controller"
                   next
                 end
         -%>
@@ -223,7 +224,12 @@ class Graph
         #node[shape=none,style=""]
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
-        <%-   nodes.each do |node| -%>
+        <%-   nodes.each do |node|
+                # skip management nodes
+                if node.kind == 'mgmt'
+                  next
+                end
+        -%>
         <%-     if node.type == 'router' -%>
         <%=       node.name %> [label=<<b><%= node.name %></b><br/><%= node.ipv4 %>>]
         #<%=       node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><br/><b><%= node.name %></b></td></tr></table> >,image="./router.png",height="0.7",width="0.7",fixedsize=true]
@@ -238,7 +244,7 @@ class Graph
               nodes = init_nodes(vm['name'])
               nodes.each do |node|
                 # skip management nodes
-                if node.name == "sw0"
+                if node.kind == 'mgmt'
                   next
                 end
         -%>
@@ -252,7 +258,7 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if node.name == "sw0"
+              if node.kind == 'mgmt'
                 next
               end
         -%>
@@ -266,7 +272,8 @@ class Graph
         edge[color="lightsteelblue",penwidth=2]
         <%- 
             @links.each do |l|
-              if l[0].split(':')[0] == "sw0"
+              # TODO ugly hack
+              if l[0].split(':')[0] == "sw0" || l[0].split(':')[0] == 'ro0'
                 next
               end
         -%>
@@ -370,6 +377,13 @@ class Graph
     %{ <%- -%>
 [local]
   localhost
+
+[controller]
+  <%- @nodes.each do |node| -%>
+  <%-   if node.type == 'controller' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
 
 [switches]
   <%- @nodes.each do |node| -%>
