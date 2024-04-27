@@ -74,8 +74,8 @@ topology:
         kind : mgmt
         gw   : 192.168.15.1
         nics :
-          eth0: 192.168.40.1
-          eth1: 192.168.15.2
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
       ro1:
         type : router
         kind : frr
