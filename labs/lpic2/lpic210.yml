@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 14
+      ports: 16
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -72,6 +72,10 @@ topology:
         type : switch
         nics :
           eth0 : 192.168.40.6/24
+      sw3:
+        type : switch
+        nics :
+          eth0 : 192.168.40.7/24
       ro0:
         type : router
         kind : mgmt
