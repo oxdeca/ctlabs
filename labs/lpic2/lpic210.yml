@@ -142,6 +142,23 @@ topology:
         nics :
           eth0: 192.168.40.28/24
           eth1: 192.168.20.14/24
+      www1:
+        type : host
+        gw   : 192.168.30.1
+        nics :
+          eth0: 192.168.40.29/24
+          eth1: 192.168.30.13/24
+        dnat :
+          - [8081, 80]
+      www2:
+        type : host
+        kind : d11
+        gw   : 192.168.30.1
+        nics :
+          eth0: 192.168.40.30/24
+          eth1: 192.168.30.14/24
+        dnat :
+          - [8082, 80]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"     ]
@@ -160,6 +177,9 @@ topology:
       - [ "sw2:eth4", "slapd2:eth1"    ]
       - [ "sw2:eth5", "dc2:eth1"       ]
 
+      - [ "sw3:eth1", "www1:eth1"      ]
+      - [ "sw3:eth2", "www2:eth1"      ]
+
       - [ "sw0:eth1", "ansible:eth0"   ]
       - [ "sw0:eth2", "sw1:eth0"       ]
       - [ "sw0:eth3", "sw2:eth0"       ]
@@ -169,7 +189,9 @@ topology:
       - [ "sw0:eth7", "ns2:eth0"       ]
       - [ "sw0:eth8", "h1:eth0"        ]
       - [ "sw0:eth9", "h2:eth0"        ]
-      - [ "sw0:eth10", "slapd1:eth0"    ]
+      - [ "sw0:eth10", "slapd1:eth0"   ]
       - [ "sw0:eth11", "slapd2:eth0"   ]
       - [ "sw0:eth12", "dc1:eth0"      ]
       - [ "sw0:eth13", "dc2:eth0"      ]
+      - [ "sw0:eth14", "www1:eth0"     ]
+      - [ "sw0:eth15", "www2:eth0"     ]
