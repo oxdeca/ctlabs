@@ -384,18 +384,18 @@ class Graph
   <%-   end -%>
   <%- end -%>
 
+[router]
+  <%- @nodes.each do |node| -%>
+  <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
 [switches]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
   <%-   elsif node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
-  <%-   end -%>
-  <%- end -%>
-
-[router]
-  <%- @nodes.each do |node| -%>
-  <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
