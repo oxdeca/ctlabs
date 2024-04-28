@@ -34,7 +34,7 @@ class Graph
             @nodes.each do |node|
               # skip management nodes
               #if node.name == "sw0" || node.nics.size == 1
-              if node.kind == "mgmt" || node.type == "controller"
+              if node.kind == "mgmt" || node.type == "controller" || (node.type == 'gateway' && node.dnat.nil?)
                 next
               end
               group   = node.type
@@ -118,9 +118,6 @@ class Graph
 
         <%- 
             @nodes.each do |node|
-              if node.type == 'gateway'
-                next
-              end
               group   = node.type
               bgcolor = "darkseagreen2"
               case node.type
@@ -174,7 +171,8 @@ class Graph
         <%- 
             i = 0
             @links.each do |l|
-              if l[0].split(':')[0] == 'sw0'
+              # TODO ugly hack
+              if l[0].split(':')[0] == 'sw0' || l[0].split(':')[0] == 'ro0'
               # if l[0].split(':')[0] in (@node.map{|n| n.type == 'mgmt' })
         -%>
           edge[color=<%= @graph.colors[i] -%>]
@@ -262,7 +260,11 @@ class Graph
                 next
               end
         -%>
-        <%-   if node.type == 'gateway' -%>
+        <%-   if node.type == 'gateway'
+                if node.dnat.nil?
+                  next
+                end
+        -%>
                 <%= node.name %> [label=<<b><%= node.name %></b>>]
         #<%=     node.name %> [label=< <table border="0"><tr><td><%= node.name %></td></tr><tr><td><%= node.ipv4 %></td></tr></table> >]
         #<%=     node.name %> [label=< <table border="0"><tr><td><br/><br/><br/><br/><%= node.name %></td></tr></table> >,image="./switch.png",height="0.5",width="0.8",fixedsize=true]
@@ -328,10 +330,6 @@ class Graph
             @cfg['topology'].each do |vm|
               nodes = init_nodes(vm['name'])
               nodes.each do |node|
-                # skip management nodes
-                #if node.name != "sw0"
-                #  next
-                #end
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>        
         <%=       node.name %> [label=<<b><%= node.name %></b>>]
@@ -343,9 +341,9 @@ class Graph
         <%- 
             @nodes.each do |node|
               # skip management nodes
-              if !(node.type == "switch" && node.kind == "mgmt") || node.type != "controller"
-                next
-              end
+              #if !(node.type == "switch" && node.kind == "mgmt") || node.type != "controller"
+              #  next
+              #end
         -%>
         <%-   if node.type == 'gateway' -%>
                 <%= node.name %> [label=<<b><%= node.name %></b>>]
@@ -357,7 +355,8 @@ class Graph
         edge[color="lightsteelblue",penwidth=2]
         <%- 
             @links.each do |l|
-              if l[0].split(':')[0] != "sw0"
+              # TODO ugly hack
+              if l[0].split(':')[0] != "sw0" && l[0].split(':')[0] != 'ro0'
                 next
               end
         -%>
