@@ -93,7 +93,7 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth0: 192.168.40.21/24
-          eth1: 192.168.10.11/24
+          eth1: 192.168.10.12/24
       h2:
         type : host
         kind : kali
@@ -101,25 +101,42 @@ topology:
         nics :
           eth0: 192.168.40.22/24
           eth1: 192.168.20.12/24
+      ns1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.23/24
+          eth1: 192.168.10.11/24
+      ns2:
+        type : host
+        kind : d11
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.24/24
+          eth1: 192.168.20.11/24
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"    ]
+      - [ "ro0:eth1",  "natgw:eth1"   ]
 
-      - [ "ro1:eth1", "sw1:eth1"      ]
-      - [ "ro1:eth2", "sw2:eth1"      ]
+      - [ "ro1:eth1",  "sw1:eth1"     ]
+      - [ "ro1:eth2",  "sw2:eth1"     ]
 
-      - [ "ro2:eth1", "sw2:eth2"      ]
-      - [ "ro2:eth2", "sw3:eth1"      ]
+      - [ "ro2:eth1",  "sw2:eth2"     ]
+      - [ "ro2:eth2",  "sw3:eth1"     ]
 
-      - [ "sw1:eth2", "h1:eth1"       ]
-      - [ "sw3:eth2", "h2:eth1"       ]
+      - [ "sw1:eth2",  "h1:eth1"      ]
+      - [ "sw1:eth3",  "ns1:eth1"     ]
+      - [ "sw3:eth2",  "h2:eth1"      ]
+      - [ "sw3:eth3",  "ns2:eth1"     ]
 
-      - [ "sw0:eth1", "ansible:eth0"  ] 
-      - [ "sw0:eth2", "sw1:eth0"      ] 
-      - [ "sw0:eth3", "sw2:eth0"      ] 
-      - [ "sw0:eth4", "sw3:eth0"      ] 
-      - [ "sw0:eth5", "ro0:eth0"      ] 
-      - [ "sw0:eth6", "ro1:eth0"      ] 
-      - [ "sw0:eth7", "ro2:eth0"      ] 
-      - [ "sw0:eth8", "h1:eth0"       ] 
-      - [ "sw0:eth9", "h2:eth0"       ] 
+      - [ "sw0:eth1",  "ansible:eth0" ] 
+      - [ "sw0:eth2",  "sw1:eth0"     ] 
+      - [ "sw0:eth3",  "sw2:eth0"     ] 
+      - [ "sw0:eth4",  "sw3:eth0"     ] 
+      - [ "sw0:eth5",  "ro0:eth0"     ] 
+      - [ "sw0:eth6",  "ro1:eth0"     ] 
+      - [ "sw0:eth7",  "ro2:eth0"     ] 
+      - [ "sw0:eth8",  "h1:eth0"      ] 
+      - [ "sw0:eth9",  "h2:eth0"      ] 
+      - [ "sw0:eth10", "ns1:eth0"     ] 
+      - [ "sw0:eth11", "ns2:eth0"     ] 
