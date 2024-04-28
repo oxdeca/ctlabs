@@ -109,7 +109,6 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
         gw   : 192.168.20.1
         nics :
           eth0: 192.168.40.24/24
