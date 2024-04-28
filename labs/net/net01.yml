@@ -50,7 +50,7 @@ topology:
         nics :
           eth0: 192.168.40.50/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  :
+        play  : ansible-playbook -i ./inventories/net01.ini ./playbooks/ctlabs.yml -tsetup,bind
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
