@@ -47,14 +47,15 @@ topology:
       sw0:
         type : switch
         kind : mgmt
-        ipv4 : 192.168.40.50/24
+        ipv4 : 192.168.40.10/24
         gw   : 192.168.40.1
       ansible:
         type : controller
         gw   : 192.168.40.1
-        vols : ["/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw"]
         nics :
           eth0: 192.168.40.50/24
+        vols : ["/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw"]
+        play : ansible-playbook -i ./inventories/net03.ini ./playbooks/ctlabs.yml -tsetup,ca,openvpn,frr,bind,smbadc,slapd
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -105,7 +106,7 @@ topology:
         kind : mgmt
         gw   : 192.168.15.1
         nics :
-          eth0: 192.168.40.10/24
+          eth0: 192.168.40.1/24
           eth1: 192.168.15.2/29
       ro1:
         type : router
