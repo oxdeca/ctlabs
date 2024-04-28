@@ -219,7 +219,7 @@ topology:
       - [ "isp1:eth1", "natgw:eth2"   ]
       - [ "isp1:eth2", "ro1:eth3"     ]
       - [ "isp1:eth3", "ro2:eth2"     ]
-      - [ "ro1:eth1",  "sw12:rth1"    ]
+      - [ "ro1:eth1",  "sw12:eth1"    ]
       - [ "ro1:eth2",  "ro3:eth1"     ]
       - [ "ro2:eth1",  "sw22:eth1"    ]
       - [ "ro2:eth3",  "sw24:eth1"    ]
