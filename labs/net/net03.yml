@@ -163,7 +163,6 @@ topology:
           eth1: 192.168.12.12/24
       slapd1:
         type  : host
-        kind  : d11
         gw    : 192.168.22.1
         nics :
           eth0: 192.168.40.23/24
@@ -171,6 +170,7 @@ topology:
       slapd2:
         type  : host
         kind  : d11
+        caps  : [SYS_PTRACE]
         gw    : 192.168.22.1
         nics :
           eth0: 192.168.40.24/24
