@@ -22,6 +22,7 @@ class Lab
     @cfg = YAML.load(File.read(cfg))
     @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},vm=#{vm_name}"
 
+    @vm_name  = vm_name
     @name     = @cfg['name']     || ''
     @desc     = @cfg['desc']     || ''
     @defaults = @cfg['defaults'] || {}
@@ -217,17 +218,18 @@ class Lab
 
   def run_playbook(play)
     @log.write "#{__method__}(): "
-    cmd = nil
+    cmd    = nil
 
     # make sure ctrl and all mgmt-sshd are up and running
     # TOOD
 
     ctrl = find_node('ansible')
     play.class == String ? cmd = play : cmd = ctrl.play
+    domain = find_vm(@vm_name)['domain'] || @domain
 
     if cmd.class == String
-      puts "Playbook found: #{cmd}"
-      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd}'")
+      puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain}"
+      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain}'")
     else
       puts "No Playbook found."
     end
