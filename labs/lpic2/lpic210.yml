@@ -76,6 +76,10 @@ topology:
         type : switch
         nics :
           eth0 : 192.168.40.13/24
+      sw4:
+        type : switch
+        nics :
+          eth0 : 192.168.40.14/24
       ro0:
         type : router
         kind : mgmt
@@ -93,6 +97,7 @@ topology:
           eth2: 192.168.10.1/24
           eth3: 192.168.20.1/24
           eth4: 192.168.30.1/24
+          eth5: 192.168.50.1/28
       ns1:
         type : host
         gw   : 192.168.10.1
@@ -164,27 +169,43 @@ topology:
           eth1: 192.168.30.14/24
         dnat :
           - [8082, 80]
+      db1:
+        type : host
+        gw   : 192.168.50.1
+        nics :
+          eth0: 192.168.40.31/24
+          eth1: 192.168.50.5/28
+      db2:
+        type : host
+        gw   : 192.168.50.1
+        nics :
+          eth0: 192.168.40.32/24
+          eth1: 192.168.50.6/28
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"     ]
+      - [ "ro0:eth1",  "natgw:eth1"    ]
 
-      - [ "ro1:eth1", "natgw:eth2"     ]
-      - [ "ro1:eth2", "sw1:eth1"       ]
-      - [ "ro1:eth3", "sw2:eth1"       ]
-      - [ "ro1:eth4", "sw3:eth1"       ]
+      - [ "ro1:eth1",  "natgw:eth2"    ]
+      - [ "ro1:eth2",  "sw1:eth1"      ]
+      - [ "ro1:eth3",  "sw2:eth1"      ]
+      - [ "ro1:eth4",  "sw3:eth1"      ]
+      - [ "ro1:eth5",  "sw4:eth1"      ]
 
-      - [ "sw1:eth2", "ns1:eth1"       ]
-      - [ "sw1:eth3", "h1:eth1"        ]
-      - [ "sw1:eth4", "slapd1:eth1"    ]
-      - [ "sw1:eth5", "dc1:eth1"       ]
+      - [ "sw1:eth2",  "ns1:eth1"      ]
+      - [ "sw1:eth3",  "h1:eth1"       ]
+      - [ "sw1:eth4",  "slapd1:eth1"   ]
+      - [ "sw1:eth5",  "dc1:eth1"      ]
 
-      - [ "sw2:eth2", "ns2:eth1"       ]
-      - [ "sw2:eth3", "h2:eth1"        ]
-      - [ "sw2:eth4", "slapd2:eth1"    ]
-      - [ "sw2:eth5", "dc2:eth1"       ]
+      - [ "sw2:eth2",  "ns2:eth1"      ]
+      - [ "sw2:eth3",  "h2:eth1"       ]
+      - [ "sw2:eth4",  "slapd2:eth1"   ]
+      - [ "sw2:eth5",  "dc2:eth1"      ]
 
-      - [ "sw3:eth2", "www1:eth1"      ]
-      - [ "sw3:eth3", "www2:eth1"      ]
+      - [ "sw3:eth2",  "www1:eth1"     ]
+      - [ "sw3:eth3",  "www2:eth1"     ]
+
+      - [ "sw4:eth2",  "db1:eth1"      ]
+      - [ "sw4:eth3",  "db1:eth1"      ]
 
       - [ "sw0:eth1",  "ansible:eth0"  ]
       - [ "sw0:eth2",  "sw1:eth0"      ]
@@ -202,3 +223,5 @@ topology:
       - [ "sw0:eth14", "dc2:eth0"      ]
       - [ "sw0:eth15", "www1:eth0"     ]
       - [ "sw0:eth16", "www2:eth0"     ]
+      - [ "sw0:eth17", "db1:eth0"      ]
+      - [ "sw0:eth18", "db2:eth0"      ]
