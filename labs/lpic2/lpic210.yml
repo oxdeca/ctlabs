@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 16
+      ports: 18
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -205,7 +205,7 @@ topology:
       - [ "sw3:eth3",  "www2:eth1"     ]
 
       - [ "sw4:eth2",  "db1:eth1"      ]
-      - [ "sw4:eth3",  "db1:eth1"      ]
+      - [ "sw4:eth3",  "db2:eth1"      ]
 
       - [ "sw0:eth1",  "ansible:eth0"  ]
       - [ "sw0:eth2",  "sw1:eth0"      ]
