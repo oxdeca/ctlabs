@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 18
+      ports: 20
     linux:
       image: ctlabs/c9/base
       ports: 5
@@ -211,17 +211,18 @@ topology:
       - [ "sw0:eth2",  "sw1:eth0"      ]
       - [ "sw0:eth3",  "sw2:eth0"      ]
       - [ "sw0:eth4",  "sw3:eth0"      ]
-      - [ "sw0:eth5",  "ro0:eth0"      ]
-      - [ "sw0:eth6",  "ro1:eth0"      ]
-      - [ "sw0:eth7",  "ns1:eth0"      ]
-      - [ "sw0:eth8",  "ns2:eth0"      ]
-      - [ "sw0:eth9",  "h1:eth0"       ]
-      - [ "sw0:eth10", "h2:eth0"       ]
-      - [ "sw0:eth11", "slapd1:eth0"   ]
-      - [ "sw0:eth12", "slapd2:eth0"   ]
-      - [ "sw0:eth13", "dc1:eth0"      ]
-      - [ "sw0:eth14", "dc2:eth0"      ]
-      - [ "sw0:eth15", "www1:eth0"     ]
-      - [ "sw0:eth16", "www2:eth0"     ]
-      - [ "sw0:eth17", "db1:eth0"      ]
-      - [ "sw0:eth18", "db2:eth0"      ]
+      - [ "sw0:eth5",  "sw4:eth0"      ]
+      - [ "sw0:eth6",  "ro0:eth0"      ]
+      - [ "sw0:eth7",  "ro1:eth0"      ]
+      - [ "sw0:eth8",  "ns1:eth0"      ]
+      - [ "sw0:eth9",  "ns2:eth0"      ]
+      - [ "sw0:eth10", "h1:eth0"       ]
+      - [ "sw0:eth11", "h2:eth0"       ]
+      - [ "sw0:eth12", "slapd1:eth0"   ]
+      - [ "sw0:eth13", "slapd2:eth0"   ]
+      - [ "sw0:eth14", "dc1:eth0"      ]
+      - [ "sw0:eth15", "dc2:eth0"      ]
+      - [ "sw0:eth16", "www1:eth0"     ]
+      - [ "sw0:eth17", "www2:eth0"     ]
+      - [ "sw0:eth18", "db1:eth0"      ]
+      - [ "sw0:eth19", "db2:eth0"      ]
