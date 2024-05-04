@@ -72,12 +72,6 @@ class Link
     @log.write "#{__method__}(): #{@links[0]} -- #{@links[1]}"
     puts "#{__method__}(): #{@links[0]} -- #{@links[1]}"
  
-#    @log.write "#{__method__}(): adding veth pair"
-#    %x( ip link ls #{@node1.name}#{@nic1} 2>/dev/null )
-#    if $?.exitstatus > 0
-#      %x( ip link add #{@node1.name}#{@nic1} type veth peer name #{@node2.name}#{@nic2} )
-#    end
- 
     create_veth
  
     move_link(@node1, @nic1)
@@ -90,69 +84,45 @@ class Link
     create_bond(@node2)
     create_mgmt(@node2)
  
-    #
-    # NODE1
-    #
-    case @node1.type
+    set_gateway(@node1, @nic1, @node2, @nic2)
+    set_gateway(@node2, @nic2, @node1, @nic1)
+  end
+
+  #
+  #  add gateway/snat
+  #
+  def set_gateway(node1, nic1, node2, nic2)
+    @log.write "#{__method__}(): #{node1}:#{nic1} -- #{node2}:#{nic2}"
+
+    case node1.type
       when 'host', 'router', 'switch', 'controller'
  
         #
-        # adding default gateway
+        # adding default gateway and snat
         #
-        if( !@node1.gw.nil? )
-          @log.write "#{__method__}(): node1(host,router,switch) - adding default gw #{@node1.gw}"
-          %x( ip netns exec #{@node1.netns} ip route add default via #{@node1.gw} 2>/dev/null )
-          if( @node1.type == 'router' && @node1.snat )
-            snat_nic = %x( ip netns exec #{@node1.netns} ip route get #{@node1.gw} | grep dev | awk '{print $3}' ).rstrip
+        if( !node1.gw.nil? )
+          @log.write "#{__method__}(): node1(host,router,switch) - adding default gw #{node1.gw}"
+          %x( ip netns exec #{node1.netns} ip route add default via #{node1.gw} 2>/dev/null )
+          if( node1.type == 'router' && node1.snat )
+            snat_nic = %x( ip netns exec #{node1.netns} ip route get #{node1.gw} | grep dev | awk '{print $3}' ).rstrip
             if (!snat_nic.empty?)
-              %x( ip netns exec #{@node1.netns} iptables -tnat -C POSTROUTING -o #{snat_nic} -j MASQUERADE 2> /dev/null )
+              %x( ip netns exec #{node1.netns} iptables -tnat -C POSTROUTING -o #{snat_nic} -j MASQUERADE 2> /dev/null )
               if $?.exitstatus > 0
-                %x( ip netns exec #{@node1.netns} iptables -tnat -A POSTROUTING -o #{snat_nic} -j MASQUERADE )
+                %x( ip netns exec #{node1.netns} iptables -tnat -A POSTROUTING -o #{snat_nic} -j MASQUERADE )
               end
             end
           end
-          if(@node2.type == 'gateway')
-            %x( ip netns exec #{@node1.netns} iptables -tnat -A POSTROUTING -o #{@nic1} -j MASQUERADE )
-            if(@node1.type == 'router')
-              @dnatgw = @node1
+          if(node2.type == 'gateway')
+            %x( ip netns exec #{node1.netns} iptables -tnat -A POSTROUTING -o #{nic1} -j MASQUERADE )
+            if(node1.type == 'router')
+              @dnatgw = node1
             end
           end
         end
  
       when 'gateway'
         @log.write "#{__method__}(): node1(gateway) - adding link to bridge"
-        %x( ip link set #{@node1.name}#{@nic1} master #{@node1.name} up )
-    end
- 
-    #
-    # NODE2
-    #
-    case @node2.type
-      when 'host', 'router', 'switch', 'controller'
- 
-        #
-        # adding default gateway
-        #
-        if( !@node2.gw.nil? )
-          @log.write "#{__method__}(): node2(host,router,switch) - adding default gw #{@node2.gw}"
-          %x( ip netns exec #{@node2.netns} ip route add default via  #{@node2.gw} 2>/dev/null )
-          if( @node2.type == 'router' && @node2.snat )
-            snat_nic = %x( ip netns exec #{@node2.netns} ip route get #{@node2.gw} | grep dev | awk '{print $3}' ).rstrip
-            if (!snat_nic.empty?)
-              %x( ip netns exec #{@node2.netns} iptables -tnat -C POSTROUTING -o #{snat_nic} -j MASQUERADE 2> /dev/null )
-              if $?.exitstatus > 0
-                %x( ip netns exec #{@node2.netns} iptables -tnat -A POSTROUTING -o #{snat_nic} -j MASQUERADE )
-              end
-            end
-          end
-          if( @node1.type == 'gateway' )
-            %x( ip netns exec #{@node2.netns} iptables -tnat -A POSTROUTING -o #{@nic2} -j MASQUERADE )
-          end
-        end
- 
-      when 'gateway'
-        @log.write "#{__method__}(): node2(gateway) - adding link to bridge"
-        %x( ip link set #{@node2.name}#{@nic2} master #{@node2.name} up )
+        %x( ip link set #{node1.name}#{nic1} master #{node1.name} up )
     end
   end
  
@@ -168,7 +138,6 @@ class Link
         end
     end
   end
- 
  
   #
   # moving link to namespace and rename nic in new namespace
