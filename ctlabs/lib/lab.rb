@@ -62,7 +62,7 @@ class Lab
     dns    = cfg['dns']    || @dns
     domain = cfg['domain'] || @domain
     mgmt   = cfg['mgmt']   || @mgmt
-    net    = mgmt['net']   || "172.24.40.0/24"
+    net    = mgmt['net']   || "192.168.40.0/24"
 
     # 
     tmp  = net.split('/')
@@ -72,12 +72,11 @@ class Lab
     cnt = 20
     cfg['nodes'].each_key do |n|
       node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
-      if n['kind'] != 'mgmt'
-        node['nics']['eth0'] = "#{net}#{cnt}/#{mask}"
-        count += 1
+      if node.kind != 'mgmt' && node.type != 'controller'
+        node.nics['eth0'] = "#{net}#{cnt}/#{mask}"
+        cnt += 1
       end
       nodes << node
-      #nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
     end
     nodes
   end
@@ -85,23 +84,24 @@ class Lab
   def init_mgmt_links(vm_name)
     @log.write "#{__method__}(): vm=#{vm_name}"
 
-    nodes = []
-    cfg    = find_vm(vm_name)
-    switches, router, hosts = []
-    links = []
-    cnt   = 2
+    cfg      = find_vm(vm_name)
+    switches = []
+    router   = []
+    hosts    = []
+    links    = []
+    cnt      = 2
 
-    cfg['nodes'].each_key do |node|
-      if node['kind'] != 'mgmt'
+    cfg['nodes'].each do |name, node|
+      if !(node['kind'] == 'mgmt' && node['type'] == 'switch' )
         case node['type']
           when 'controller'
-            links << [ "sw0:eth1", "#{node['name']}:eth0" ]
+            links << [ "sw0:eth1", "#{name}:eth0" ]
           when 'switch'
-            switches << node['name']
+            switches << name
           when 'router'
-            router << node['name']
+            router << name
           when 'host'
-            hosts << node['name']
+            hosts << name
         end
       end
     end
@@ -258,7 +258,7 @@ class Lab
     puts "Adding DNAT:"
     add_dnat
 
-    sleep 10
+    sleep 5
   end
 
   def run_playbook(play)

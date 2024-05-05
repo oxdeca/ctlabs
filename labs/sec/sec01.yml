@@ -44,18 +44,26 @@ topology:
       net   : 192.168.40.0/24
       gw    : 192.168.40.1
     nodes:
-      sw0:
-        type  : switch
-        kind  : mgmt
-        ipv4  : 192.168.40.11/24
-        gw    : 192.168.40.1
       ansible:
         type  : controller
         gw    : 192.168.40.1
         play  : ansible-playbook -i ./inventories/sec01.ini ./playbooks/ctlabs.yml -t setup,openvpn
         nics  :
-          eth0: 192.168.40.3/24
+          eth0: 192.168.40.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        play :
+      sw0:
+        type  : switch
+        kind  : mgmt
+        ipv4  : 192.168.40.10/24
+        gw    : 192.168.40.1
+      ro0:
+        type : router
+        kind : mgmt
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
       natgw:
         type : gateway
         ipv4 : 192.168.15.1/29
@@ -63,43 +71,32 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        nics :
-          eth0 : 192.168.40.5/24
       sw2:
         type : switch
-        nics :
-          eth0 : 192.168.40.6/24
       ro1:
         type : router
         kind : frr
         gw   : 192.168.15.1
         nics :
-          eth0: 192.168.40.1/24
-          eth1: 192.168.15.2/29
+          eth1: 192.168.15.3/29
           eth2: 192.168.10.1/24
           eth3: 192.168.20.1/24
-        vpn  :
-          type: openvpn
-
       ns1:
         type : host
         gw   : 192.168.10.1
         nics :
-          eth0: 192.168.40.21/24
           eth1: 192.168.10.11/24
       ns2:
         type : host
         kind : d11
         gw   : 192.168.20.1
         nics :
-          eth0: 192.168.40.22/24
           eth1: 192.168.20.11/24
       h1:
         type : host
         kind : kali
         gw   : 192.168.10.1
         nics :
-          eth0: 192.168.40.23/24
           eth1: 192.168.10.12/24
       h2:
         type : host
@@ -107,7 +104,6 @@ topology:
         gw   : 192.168.20.1
         vols : ['/tmp/zap/:/zap/wrk/:Z,rw']
         nics :
-          eth0: 192.168.40.24/24
           eth1: 192.168.20.12/24
         dnat :
           - [8443, 8443]
@@ -123,12 +119,3 @@ topology:
 
       - [ "sw2:eth2", "ns2:eth1"      ]
       - [ "sw2:eth3", "h2:eth1"       ]
-
-      - [ "sw0:eth1", "ansible:eth0"  ]
-      - [ "sw0:eth2", "sw1:eth0"      ]
-      - [ "sw0:eth3", "sw2:eth0"      ]
-      - [ "sw0:eth4", "ro1:eth0"      ]
-      - [ "sw0:eth5", "ns1:eth0"      ]
-      - [ "sw0:eth6", "ns2:eth0"      ]
-      - [ "sw0:eth7", "h1:eth0"       ]
-      - [ "sw0:eth8", "h2:eth0"       ]
