@@ -72,7 +72,7 @@ class Lab
     cnt = 20
     cfg['nodes'].each_key do |n|
       node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
-      if n.kind != 'mgmt'
+      if n['kind'] != 'mgmt'
         node['nics']['eth0'] = "#{net}#{cnt}/#{mask}"
         count += 1
       end
