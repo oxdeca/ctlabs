@@ -1,6 +1,7 @@
 #!/bin/bash
 
-launcherJar=( server/plugins/org.eclipse.equinox.launcher*.jar )
+#launcherJar=( server/plugins/org.eclipse.equinox.launcher*.jar )
+launcherJar=(  server/plugins/org.jkiss.dbeaver.launcher_*.jar )
 
 echo "Starting Cloudbeaver Server"
 echo "127.0.0.1 localhost ${HOSTNAME}" > /etc/hosts
