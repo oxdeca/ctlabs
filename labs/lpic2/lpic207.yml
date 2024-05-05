@@ -106,6 +106,7 @@ topology:
 
     links:
       - [ "ro0:eth1", "natgw:eth1"    ]
+      
       - [ "ro1:eth1", "natgw:eth2"    ]
       - [ "ro1:eth2", "sw1:eth1"      ]
       - [ "ro1:eth3", "sw2:eth1"      ]
