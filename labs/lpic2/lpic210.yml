@@ -53,7 +53,7 @@ topology:
         type : controller
         gw   : 192.168.40.1
         nics :
-          eth0: 192.168.40.50/24
+          eth0: 192.168.40.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play : ansible-playbook -i ./inventories/lpic210.ini ./playbooks/lpic2.yml -tsetup,ca,bind,smbadc,slapd,haproxy,httpd
       sw0:

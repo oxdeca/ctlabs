@@ -36,7 +36,10 @@ defaults:
   router:
     frr:
       image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_RAW,NET_BIND_SERVICE]
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+    mgmt:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
 
 topology:
   - vm:
