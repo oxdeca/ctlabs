@@ -33,7 +33,9 @@ defaults:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
       devs : ['/dev/net/tun']
-
+    mgmt:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
 
 topology:
   - vm:
