@@ -33,8 +33,9 @@ class Lab
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
-    @nodes = init_nodes(vm_name)
-    @links = init_links(vm_name)
+    @nodes  = init_nodes(vm_name)
+    @links  = init_links(vm_name)
+    @links += init_mgmt_links(vm_name)
   end
 
   def find_vm(name)
@@ -61,11 +62,55 @@ class Lab
     dns    = cfg['dns']    || @dns
     domain = cfg['domain'] || @domain
     mgmt   = cfg['mgmt']   || @mgmt
+    net    = mgmt['net']   || "172.24.40.0/24"
 
+    # 
+    tmp  = net.split('/')
+    mask = tmp[1]
+    net  = tmp[0].split('.')[0..2].join('.') + '.' 
+
+    cnt = 20
     cfg['nodes'].each_key do |n|
-      nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ))
+      node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
+      if n.kind != 'mgmt'
+        node['nics']['eth0'] = "#{net}#{cnt}/#{mask}"
+        count += 1
+      end
+      nodes << node
+      #nodes << Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
     end
     nodes
+  end
+
+  def init_mgmt_links(vm_name)
+    @log.write "#{__method__}(): vm=#{vm_name}"
+
+    nodes = []
+    cfg    = find_vm(vm_name)
+    switches, router, hosts = []
+    links = []
+    cnt   = 2
+
+    cfg['nodes'].each_key do |node|
+      if node['kind'] != 'mgmt'
+        case node['type']
+          when 'controller'
+            links << [ "sw0:eth1", "#{node['name']}:eth0" ]
+          when 'switch'
+            switches << node['name']
+          when 'router'
+            router << node['name']
+          when 'host'
+            hosts << node['name']
+        end
+      end
+    end
+
+    (switches + router + hosts).each do |n|
+      links << [ "sw0:eth#{cnt}", "#{n}:eth0" ]
+      cnt += 1
+    end
+    links
   end
 
   def init_links(vm_name)

@@ -104,7 +104,7 @@ class Link
           @log.write "#{__method__}(): node1(host,router,switch) - adding default gw #{node1.gw}"
           %x( ip netns exec #{node1.netns} ip route add default via #{node1.gw} 2>/dev/null )
           if( node1.type == 'router' && node1.snat )
-            snat_nic = %x( ip netns exec #{node1.netns} ip route get #{node1.gw} | grep dev | awk '{print $3}' ).rstrip
+            snat_nic = %x( ip netns exec #{node1.netns} ip route get #{node1.gw} 2>/dev/null | grep dev | awk '{print $3}' ).rstrip
             if (!snat_nic.empty?)
               %x( ip netns exec #{node1.netns} iptables -tnat -C POSTROUTING -o #{snat_nic} -j MASQUERADE 2> /dev/null )
               if $?.exitstatus > 0

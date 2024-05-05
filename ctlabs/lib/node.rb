@@ -7,6 +7,7 @@
 
 class Node
   attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play
+  attr_writer :nics
 
   def initialize(args)
     @defaults  = args['defaults']
