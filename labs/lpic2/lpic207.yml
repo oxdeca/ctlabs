@@ -45,9 +45,10 @@ topology:
       gw    : 192.168.40.1
     nodes:
       ansible:
-        type  : controller
-        gw    : 192.168.40.1
-        nics  :
+        type : controller
+        gw   : 192.168.40.1
+        dns  : [169.254.169.254]
+        nics :
           eth0: 192.168.40.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play : ansible-playbook -i ./inventories/lpic207.ini ./playbooks/lpic2.yml -tsetup,bind

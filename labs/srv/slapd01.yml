@@ -70,6 +70,7 @@ topology:
       ansible:
         type : controller
         gw   : 192.168.40.1
+        dns  : [169.254.169.254]
         vols : ["/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw"]
         nics :
           eth0: 192.168.40.7/24

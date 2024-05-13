@@ -163,8 +163,8 @@ class Lab
     @log.write "#{__method__}(): "
 
     chain = "#{@name.upcase}-DNAT"
-    vmip  = %x( ip route | grep default | awk '{print $9}' | head -n1 ).rstrip
-    vmips = %x( ip route | grep default | awk '{print $9}' ).split
+    vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
+    vmips = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).split
     natgw = find_node('natgw')
     via   = nil
     #p "natgw=#{natgw}"
