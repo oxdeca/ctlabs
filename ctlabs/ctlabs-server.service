@@ -1,0 +1,14 @@
+[Unit]
+Description=ctlabs-server
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+ExecStart=/root/github/ctlabs/ctlabs/server.rb
+
+[Install]
+WantedBy=multi-user.target

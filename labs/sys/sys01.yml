@@ -1,0 +1,131 @@
+---
+
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/sys/sys01.yml
+# Description : LVM Lab configuration
+# -----------------------------------------------------------------------------
+
+name: sys
+desc: LAB SYS - lvm
+
+defaults:
+  controller:
+    linux:
+      image: ctlabs/c9/ctrl
+  switch:
+    mgmt:
+      image: ctlabs/c9/ctrl
+      port : 10
+    linux:
+      image: ctlabs/c9/base
+  host:
+    linux:
+      image: ctlabs/c9/base
+    d11:
+      image: ctlabs/d11/base
+    kali:
+      image: ctlabs/kali/base
+      caps : [SYS_MKNOD]
+    qemu:
+      image: ctlabs/d11/qemu
+  router:
+    frr:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+
+
+topology:
+  - vm:
+    name: lvm-vm1
+    dns : [192.168.10.11, 192.168.20.11, 169.254.169.254]
+    mgmt:
+      vrfid : 40
+      net   : 192.168.40.0/24
+      gw    : 192.168.40.1
+    nodes:
+      sw0:
+        type  : switch
+        kind  : mgmt
+        ipv4  : 192.168.40.11/24
+        gw    : 192.168.40.1
+      ansible:
+        type : controller
+        gw   : 192.168.40.1
+        dns  : [169.254.169.254]
+        nics :
+          eth0: 192.168.40.3/24
+        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+      natgw:
+        type : gateway
+        ipv4 : 192.168.15.1/29
+        snat : true
+        dnat : ro1:eth1
+      sw1:
+        type : switch
+        nics :
+          eth0 : 192.168.40.5/24
+      sw2:
+        type : switch
+        nics :
+          eth0 : 192.168.40.6/24
+      ro1:
+        type : router
+        kind : frr
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
+          eth2: 192.168.10.1/24
+          eth3: 192.168.20.1/24
+      ns1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.21/24
+          eth1: 192.168.10.11/24
+      ns2:
+        type : host
+        kind : d11
+        gw   : 192.168.20.1
+        nics :
+          eth0: 192.168.40.22/24
+          eth1: 192.168.20.11/24
+      h1:
+        type : host
+        kind : kali
+        gw   : 192.168.10.1
+        nics :
+          eth0: 192.168.40.23/24
+          eth1: 192.168.10.12/24
+      h2:
+        type : host
+        kind : qemu
+        gw   : 192.168.20.1
+        devs : ['/dev/net/tun']
+        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
+        nics :
+          eth1: 192.168.20.12/24
+        dnat :
+          - [5901, 5901]
+          - [8080, 80  ]
+          - [8443, 443 ]
+
+    links:
+      - [ "ro1:eth1", "natgw:eth1"    ]
+      - [ "ro1:eth2", "sw1:eth1"      ]
+      - [ "ro1:eth3", "sw2:eth1"      ]
+
+      - [ "sw1:eth2", "ns1:eth1"      ]
+      - [ "sw1:eth3", "h1:eth1"       ]
+
+      - [ "sw2:eth2", "ns2:eth1"      ]
+      - [ "sw2:eth3", "h2:eth1"       ]
+
+      - [ "sw0:eth1", "ansible:eth0"  ]
+      - [ "sw0:eth2", "sw1:eth0"      ]
+      - [ "sw0:eth3", "sw2:eth0"      ]
+      - [ "sw0:eth4", "ro1:eth0"      ]
+      - [ "sw0:eth5", "ns1:eth0"      ]
+      - [ "sw0:eth6", "ns2:eth0"      ]
+      - [ "sw0:eth7", "h1:eth0"       ]
+      - [ "sw0:eth8", "h2:eth0"       ]
