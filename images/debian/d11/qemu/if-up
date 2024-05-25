@@ -1,0 +1,16 @@
+#!/bin/bash
+
+save_nic_info() {
+  IP=$( ip -br addr ls eth1 | awk '{print $3}' )
+  echo ${IP} > /tmp/eth1.ip
+  DGW=$( ip -br route ls default | awk '{print $3}' )
+  echo ${DGW} > /tmp/eth1.dgw
+}
+
+ip link add net1 type bridge
+ip link set net1 up mtu 1460
+
+save_nic_info
+ip addr del ${IP} dev eth1
+ip link set eth1 master net1
+ip link set ens1 master net1 mtu 1460 up

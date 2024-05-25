@@ -1,0 +1,8 @@
+#!/bin/bash
+
+IP=$( cat /tmp/eth1.ip )
+DGW=$( cat /tmp/eth1.dgw )
+
+ip link del net1
+ip addr add ${IP} dev eth1
+ip route add default via ${DGW}

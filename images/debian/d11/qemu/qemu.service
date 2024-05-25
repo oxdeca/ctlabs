@@ -1,0 +1,13 @@
+[Unit]
+Description=Start QEMU
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/root/qemu_init.sh
+RemainAfterExit=true
+#ExecStop=/root/qemu_init.sh
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
