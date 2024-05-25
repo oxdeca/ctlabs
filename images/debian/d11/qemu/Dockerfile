@@ -7,7 +7,7 @@ COPY        --chmod=0750 if-up   /root/
 COPY        --chmod=0750 if-down /root/
 COPY        --chmod=0750 qemu_init.sh /root/
 COPY        qemu.service /etc/systemd/system/
-RUN         systemctl daemon-reload && systemctl enable qemu.service
+RUN         systemctl enable qemu.service
 
 ENTRYPOINT  ["/bin/systemd"]
 CMD         ["/root/qemu_init.sh"]
