@@ -8,7 +8,7 @@ save_nic_info() {
   local ip=
   local gw=
 
-  if [ "$nic" ==  "eth0" ]; then
+  if [ "${nic}" ==  "eth0" ]; then
     vrf="vrf mgmt"
   fi
 

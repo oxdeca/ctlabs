@@ -6,7 +6,7 @@ ENABLE_KVM=
 
 # loop while nic eth1 isn't ready
 while :; do
-  ip -br link ls eth1
+  ip -br link ls eth0
   if [ $? -eq 0 ]; then
     break
   fi
