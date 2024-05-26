@@ -1,16 +1,59 @@
 #!/bin/bash
 
 save_nic_info() {
-  IP=$( ip -br addr ls eth1 | awk '{print $3}' )
-  echo ${IP} > /tmp/eth1.ip
-  DGW=$( ip -br route ls default | awk '{print $3}' )
-  echo ${DGW} > /tmp/eth1.dgw
+  local nic=$1
+  local vrf=
+
+  if [ "$nic" ==  "eth0" ]; then
+    vrf="vrf mgmt"
+  fi
+
+  IP=$( ip -br addr ls $nic | awk '{print $3}' )
+  echo ${IP} > /tmp/$nic.ip
+  DGW=$( ip -br route ls default $vrf | awk '{print $3}' )
+  echo ${DGW} > /tmp/$nic.dgw
 }
 
+
+# net0
+ip link add net0 type bridge
+ip link set net0 up mtu 1460 master mgmt
+
+save_nic_info eth0
+ip addr del  ${IP} dev eth0
+ip link set eth0 master net0
+ip link set ens0 master net0 mtu 1460 up
+
+# net1
 ip link add net1 type bridge
 ip link set net1 up mtu 1460
 
-save_nic_info
+save_nic_info eth1
 ip addr del ${IP} dev eth1
 ip link set eth1 master net1
 ip link set ens1 master net1 mtu 1460 up
+
+
+create_setup_script() {
+cat > /mnt/setup.sh << EOF
+#!/bin/bash
+
+# mgmt vrf
+ip link add mgmt type vrf table 40
+ip link set mgmt up
+
+# ens3
+ip addr add $(cat /tmp/eth0.ip) dev ens3
+ip link set ens3 master mgmt mtu 1460
+ip route add default via $(cat /tmp/eth0.dgw) vrf mgmt
+
+# ens4
+ip addr add $(cat /tmp/eth1.ip) dev ens4
+ip route add default via $(cat /tmp/eth1.dgw)
+
+echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
+EOF
+
+}
+
+create_setup_script

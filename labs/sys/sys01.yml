@@ -48,10 +48,11 @@ topology:
       ansible:
         type : controller
         gw   : 192.168.40.1
-        dns  : [192.168.100.2]
+        dns  : [169.254.169.254]
         nics :
           eth0: 192.168.40.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']      
+        play : ansible-playbook -i ./inventories/sys01.ini ./playbooks/ctlabs.yml -tsetup,bind
       sw0:
         type  : switch
         kind  : mgmt
@@ -94,26 +95,27 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
-        kind : kali
+        kind : qemu
+        kvm  : true
         gw   : 192.168.10.1
+        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
         nics :
           eth1: 192.168.10.12/24
       h2:
         type : host
         kind : qemu
+        kvm  : true
         gw   : 192.168.20.1
-        devs : ['/dev/net/tun']
         vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
         nics :
           eth1: 192.168.20.12/24
         dnat :
-          - [5901, 5901]
           - [8080, 80  ]
           - [8443, 443 ]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"    ]
-      
+
       - [ "ro1:eth1", "natgw:eth2"    ]
       - [ "ro1:eth2", "sw1:eth1"      ]
       - [ "ro1:eth3", "sw2:eth1"      ]
