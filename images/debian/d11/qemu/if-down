@@ -4,7 +4,7 @@ down() {
   local br=$1
   local nic=$2
   local ip=$( cat /tmp/$nic.ip )
-  local gw=$( cat /tmp/$nic.dgw )
+  local gw=$( cat /tmp/$nic.gw )
   local vrf=
 
   if [ "$nic" == "eth0" ]; then
