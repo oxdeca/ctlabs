@@ -12,6 +12,7 @@ while :; do
   fi
   sleep 1
 done
+sleep 2
 
 if [ -n "${DISK1}" ]; then
   qemu-img create -f qcow2 ${DISK1} 500M
