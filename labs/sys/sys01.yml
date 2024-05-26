@@ -5,7 +5,7 @@
 # Description : LVM Lab configuration
 # -----------------------------------------------------------------------------
 
-name: sys
+name: sys01
 desc: LAB SYS - lvm
 
 defaults:
