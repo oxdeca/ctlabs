@@ -43,11 +43,11 @@ ip link set mgmt up
 # ens3
 ip addr add $(cat /tmp/eth0.ip) dev ens3
 ip link set ens3 master mgmt mtu 1460
-ip route add default via $(cat /tmp/eth0.dgw) vrf mgmt
+ip route add default via $(cat /tmp/eth0.gw) vrf mgmt
 
 # ens4
 ip addr add $(cat /tmp/eth1.ip) dev ens4
-ip route add default via $(cat /tmp/eth1.dgw)
+ip route add default via $(cat /tmp/eth1.gw)
 
 echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
 EOF
