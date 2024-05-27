@@ -12,6 +12,7 @@ create_qemu_img() {
     curl -Lo ${QIMG_NAME} ${QIMG_URL}
   fi
 
+  modprobe nbd
   mkdir -vp ${MNTDIR}                && sleep 1
   qemu-nbd -c /dev/nbd0 ${QIMG_NAME} && sleep 1
   mount /dev/nbd0p1 ${MNTDIR}
