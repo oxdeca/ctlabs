@@ -83,7 +83,7 @@ class Node
         vols  = @vols.map { |v| "-v #{v} "}.join
         env   = @env.map  { |e| "-e #{e} "}.join
         priv  = @priv ? '--privileged' : ''
-        kvm   = @kvm  ? '--device /dev/kvm --device /dev/net/tun' : ''
+        kvm   = @kvm ? File.exists?("/dev/kvm") ? '--device /dev/kvm --device /dev/net/tun' : '--device /dev/net/tun' : ''
         devs  = @devs.map{ |d| "--device #{d} " }.join
         dns   = @dns.map { |ns| "nameserver #{ns}" }.join("\n")
         image = @image.nil? ? @defaults[@type][@kind]['image'] : @image

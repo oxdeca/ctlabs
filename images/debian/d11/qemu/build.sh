@@ -36,3 +36,4 @@ create_qemu_img() {
 
 create_qemu_img
 docker build --rm -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest .
+rm ${QIMG_NAME}
