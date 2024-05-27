@@ -8,7 +8,7 @@ Type=simple
 Restart=always
 RestartSec=5
 User=root
-ExecStart=/root/github/ctlabs/ctlabs/server.rb
+ExecStart=/root/ctlabs/ctlabs/server.rb
 
 [Install]
 WantedBy=multi-user.target
