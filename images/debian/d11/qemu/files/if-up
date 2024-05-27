@@ -33,7 +33,7 @@ save_nic_info() {
 }
 
 create_net_setup_script() {
-  let premac="52:54:00:12:34:"
+  local premac="52:54:00:12:34:"
 cat > /mnt/ctlabs_net_setup.sh << EOF
 #!/bin/bash
 
