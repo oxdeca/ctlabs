@@ -69,14 +69,20 @@ class Lab
     mask = tmp[1]
     net  = tmp[0].split('.')[0..2].join('.') + '.' 
 
+    # start range for mgmt-ip's
     cnt = 20
+
     cfg['nodes'].each_key do |n|
-      node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
-      if node.kind != 'mgmt' && node.type != 'controller'
+      if cfg['nodes'][n]['kind'] == 'mgmt' || cfg['nodes'][n]['type'] == 'controller'
+        node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( cfg['nodes'][n] ) )
+        nodes << node
+      else
+        node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
+        # assign the node a mgmt-ip
         node.nics['eth0'] = "#{net}#{cnt}/#{mask}"
         cnt += 1
+        nodes << node
       end
-      nodes << node
     end
     nodes
   end
