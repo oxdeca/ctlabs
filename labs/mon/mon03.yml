@@ -24,6 +24,9 @@ defaults:
       image: ctlabs/c9/base
     d11:
       image: ctlabs/d11/base
+    vault:
+      image: ctlabs/d11/base
+      caps: [IPC_LOCK]
     kali:
       image: ctlabs/kali/base
     smbadc:
@@ -55,7 +58,7 @@ topology:
         nics :
           eth0: 192.168.40.5/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tsetup,ca,bind,smbadc,slapd,elasticsearch,kibana
+        play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tsetup,ca,bind,smbadc,slapd,elasticsearch,kibana,vault
       sw0:
         type  : switch
         kind  : mgmt
@@ -77,6 +80,8 @@ topology:
         type : switch
       sw2:
         type : switch
+      sw3:
+        type : switch
       ro1:
         type  : router
         kind  : frr
@@ -85,6 +90,7 @@ topology:
           eth1: 192.168.15.3/29
           eth2: 192.168.10.1/24
           eth3: 192.168.20.1/24
+          eth4: 192.168.30.1/24
       ns1:
         type : host
         gw   : 192.168.10.1
@@ -133,6 +139,14 @@ topology:
           eth1: 192.168.20.32/24
         dnat  :
           - [8080, 8080]
+      vdb1:
+        type : host
+        kind : vault
+        gw   : 192.168.30.1
+        nics :
+          eth1: 192.168.30.11/24
+        dnat :
+          - [8200, 8200]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"  ]
@@ -140,6 +154,7 @@ topology:
       - [ "ro1:eth1", "natgw:eth2"  ]
       - [ "ro1:eth2", "sw1:eth1"    ]
       - [ "ro1:eth3", "sw2:eth1"    ]
+      - [ "ro1:eth4", "sw3:eth1"    ]
 
       - [ "sw1:eth2", "ns1:eth1"    ]
       - [ "sw1:eth3", "h1:eth1"     ]
@@ -150,3 +165,5 @@ topology:
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
       - [ "sw2:eth4", "kba1:eth1"   ]
+
+      - [ "sw3:eth2", "vdb1:eth1"   ]
