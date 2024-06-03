@@ -1,12 +1,12 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/labs/mon/mon01.yml
-# Description : Grafana Stack Lab
+# File        : ctlabs/labs/mon/mon03.yml
+# Description : ELK Stack Lab
 # -----------------------------------------------------------------------------
 
-name: mon01
-desc: LAB Monitoring - Grafana Lab
+name: mon03
+desc: LAB Monitoring - ELK Lab
 
 defaults:
   controller:
@@ -15,9 +15,10 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 12
+      ports: 16
     linux:
       image: ctlabs/c9/base
+      ports: 8
   host:
     linux:
       image: ctlabs/c9/base
@@ -25,6 +26,11 @@ defaults:
       image: ctlabs/d11/base
     kali:
       image: ctlabs/kali/base
+    smbadc:
+      image: ctlabs/d11/smbadc
+    slapd:
+      image: ctlabs/d11/base
+      caps: [SYS_PTRACE]
   router:
     frr:
       image: ctlabs/c9/frr
@@ -35,11 +41,11 @@ defaults:
 
 topology:
   - vm:
-    name: mon01-vm1
-    dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
+    name: mon03-vm1
+    dns : [192.168.10.11, 192.168.20.11, 1.1.1.1]
     mgmt:
       vrfid : 40
-      dns   : [1.1.1.1, 8.8.8.8]
+      dns   : [8.8.8.8, 1.1.1.1]
       net   : 192.168.40.0/24
       gw    : 192.168.40.1
     nodes:
@@ -47,8 +53,9 @@ topology:
         type : controller
         gw   : 192.168.40.1
         nics :
-          eth0: 192.168.40.3/24
-        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+          eth0: 192.168.40.5/24
+        vols  : ['/root/github/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tsetup,ca,bind,smbadc,slapd,elasticsearch,kibana
       sw0:
         type  : switch
         kind  : mgmt
@@ -69,8 +76,7 @@ topology:
       sw1:
         type : switch
       sw2:
-        type: switch
-        ports: 6
+        type : switch
       ro1:
         type  : router
         kind  : frr
@@ -102,43 +108,45 @@ topology:
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
-      prometheus:
+      slapd1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.13/24
+      dc1:
+        type : host
+        kind : smbadc
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.14/24
+      es1:
         type  : host
         gw    : 192.168.10.1
         nics  :
-          eth1: 192.168.10.21/24
+          eth1: 192.168.10.31/24
         dnat  :
-          - [9090, 9090]
-      grafana:
+          - [9200, 9200]
+      kba1:
         type  : host
         gw    : 192.168.20.1
         nics :
-          eth1: 192.168.20.22/24
+          eth1: 192.168.20.32/24
         dnat  :
-          - [3000, 3000]
-      loki:
-        type  : host
-        gw    : 192.168.20.1
-        nics  :
-          eth1: 192.168.20.23/24
-      mimir:
-        type  : host
-        gw    : 192.168.20.1
-        nics  :
-          eth1: 192.168.20.24/24
+          - [8080, 8080]
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"       ]
+      - [ "ro0:eth1", "natgw:eth1"  ]
 
-      - [ "ro1:eth1", "natgw:eth2"       ]
-      - [ "ro1:eth2", "sw1:eth1"         ]
-      - [ "ro1:eth3", "sw2:eth1"         ]
+      - [ "ro1:eth1", "natgw:eth2"  ]
+      - [ "ro1:eth2", "sw1:eth1"    ]
+      - [ "ro1:eth3", "sw2:eth1"    ]
 
-      - [ "sw1:eth2", "ns1:eth1"         ]
-      - [ "sw1:eth3", "h1:eth1"          ]
-      - [ "sw1:eth4", "prometheus:eth1"  ]
-      - [ "sw2:eth2", "ns2:eth1"         ]
-      - [ "sw2:eth3", "h2:eth1"          ]
-      - [ "sw2:eth4", "grafana:eth1"     ]
-      - [ "sw2:eth5", "loki:eth1"        ]
-      - [ "sw2:eth6", "mimir:eth1"       ]
+      - [ "sw1:eth2", "ns1:eth1"    ]
+      - [ "sw1:eth3", "h1:eth1"     ]
+      - [ "sw1:eth4", "slapd1:eth1" ]
+      - [ "sw1:eth5", "dc1:eth1"    ]
+      - [ "sw1:eth6", "es1:eth1"    ]
+
+      - [ "sw2:eth2", "ns2:eth1"    ]
+      - [ "sw2:eth3", "h2:eth1"     ]
+      - [ "sw2:eth4", "kb1:eth1"    ]

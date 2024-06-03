@@ -9,7 +9,7 @@ QIMG_URL=https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then
-    curl -Lo ${QIMG_NAME} ${QIMG_URL}
+    curl -sLo ${QIMG_NAME} ${QIMG_URL}
   fi
 
   modprobe nbd

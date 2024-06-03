@@ -35,10 +35,13 @@ defaults:
     frr:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
+    mgmt:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
 
 topology:
   - vm:
-    name: vm1
+    name: mon02-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
     mgmt:
       vrfid : 40
@@ -153,7 +156,9 @@ topology:
           eth1: 192.168.20.24/24
 
     links:
-      - [ "ro1:eth1", "natgw:eth1"        ]
+      - [ "ro0:eth1", "natgw:eth1"        ]
+
+      - [ "ro1:eth1", "natgw:eth2"        ]
       - [ "ro1:eth2", "sw1:eth1"          ]
       - [ "ro1:eth3", "sw2:eth1"          ]
 
