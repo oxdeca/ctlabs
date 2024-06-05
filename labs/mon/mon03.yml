@@ -60,7 +60,6 @@ topology:
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tsetup,ca,bind,smbadc,slapd,elasticsearch,kibana,vault,rundeck
         dnat  :
-          - [8191, 4440]
           - [8192, 4443]
       sw0:
         type  : switch
