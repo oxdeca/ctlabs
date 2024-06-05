@@ -169,6 +169,7 @@ class Lab
     @log.write "#{__method__}(): "
 
     chain = "#{@name.upcase}-DNAT"
+    # find main ipv4 address
     vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
     vmips = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).split
     natgw = find_node('natgw')
@@ -182,6 +183,7 @@ class Lab
       via     = node.nics[nic].split('/')[0]
     end
 
+    # create new chain if it does not exist
     #vmip = %x( ip -4 addr ls eth0 | grep inet | awk '{print $2}' ).rstrip
     %x( iptables -tnat -S #{chain} 2> /dev/null )
     if $?.exitstatus > 0
@@ -235,6 +237,22 @@ class Lab
 
       end
 
+      if( ! node.dnat.nil? and node.type == 'controller' )
+        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}"
+        router = find_node('ro0')
+        via    = router.nics['eth1'].split('/')[0]
+        node.dnat.each do |r|
+          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[1]} 2> /dev/null )
+          if $?.exitstatus > 0
+            @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
+            puts "#{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
+            %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} )
+            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth0'].split('/')[0]}:#{r[1]})
+          end
+        end
+
+      end
+
     end
   end
 
@@ -264,7 +282,7 @@ class Lab
     puts "Adding DNAT:"
     add_dnat
 
-    sleep 5
+    sleep 10
   end
 
   def run_playbook(play)
