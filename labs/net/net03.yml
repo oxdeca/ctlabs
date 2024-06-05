@@ -54,7 +54,7 @@ topology:
         nics :
           eth0: 192.168.40.5/24
         vols : ["/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw"]
-        play : ansible-playbook -i ./inventories/net03.ini ./playbooks/ctlabs.yml -tsetup,ca,openvpn,frr,bind,smbadc,slapd
+        play : ansible-playbook -i ./inventories/net03.ini ./playbooks/ctlabs.yml -tup,setup,ca,openvpn,frr,bind,smbadc,slapd
       sw0:
         type : switch
         kind : mgmt

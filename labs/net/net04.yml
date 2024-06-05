@@ -56,7 +56,7 @@ topology:
         nics :
           eth0: 192.168.40.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/net04.ini ./playbooks/ctlabs.yml -tsetup,ca,bind,smbadc,slapd,httpd,postgresql,redis,netbox
+        play : ansible-playbook -i ./inventories/net04.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,httpd,postgresql,redis,netbox
       sw0:
         type  : switch
         kind  : mgmt
