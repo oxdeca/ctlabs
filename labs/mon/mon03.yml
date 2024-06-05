@@ -167,6 +167,6 @@ topology:
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
-      - [ "sw2:eth4", "kba1:eth1"   ]
+      - [ "sw2:eth4", "kba2:eth1"   ]
 
       - [ "sw3:eth2", "vdb1:eth1"   ]
