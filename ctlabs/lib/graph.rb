@@ -375,7 +375,7 @@ class Graph
   def get_inventory
     %{ <%- -%>
 [local]
-  localhost
+  #localhost
 
 [controller]
   <%- @nodes.each do |node| -%>

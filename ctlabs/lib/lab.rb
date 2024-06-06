@@ -33,6 +33,8 @@ class Lab
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
+    # another hack, elastic search needs more virtual memory areas to start
+    %( echo 262144 > /proc/sys/vm/max_map_count )
     @nodes  = init_nodes(vm_name)
     @links  = init_links(vm_name)
     @links += init_mgmt_links(vm_name)
@@ -239,15 +241,15 @@ class Lab
 
       if( ! node.dnat.nil? and node.type == 'controller' )
         @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}"
-        router = find_node('ro0')
-        via    = router.nics['eth1'].split('/')[0]
+        router   = find_node('ro0')
+        mgmt_via = router.nics['eth1'].split('/')[0]
         node.dnat.each do |r|
-          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[1]} 2> /dev/null )
+          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[1]} 2> /dev/null )
           if $?.exitstatus > 0
             @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
             puts "#{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
-            %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} )
-            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth0'].split('/')[0]}:#{r[1]})
+            %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[0]} )
+            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{mgmt_via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth0'].split('/')[0]}:#{r[1]})
           end
         end
 
