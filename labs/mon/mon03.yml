@@ -58,7 +58,7 @@ topology:
         nics :
           eth0: 192.168.40.5/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,elasticsearch,kibana,vault,rundeck
+        play  : ansible-playbook -i ./inventories/mon03.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,elasticsearch,kibana,filebeat,vault,rundeck
         dnat  :
           - [8192, 4443]
       sw0:
