@@ -1,0 +1,16 @@
+# /etc/systemd/system/zap.service
+[Unit]
+Description=ZAP
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10s
+User=zap
+Group=zap
+Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64"
+ExecStart=/zap/zap-webswing.sh
+
+[Install]
+WantedBy=multi-user.target
