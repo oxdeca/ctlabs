@@ -1,11 +1,10 @@
-# /etc/systemd/system/ctlabs-net.service
 [Unit]
-Description=ctlabs network setup
+Description=Start QEMU
 After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/root/ctlabs_run_setup.sh
+ExecStart=/root/qemu_init.sh
 RemainAfterExit=true
 #ExecStop=/root/qemu_init.sh
 StandardOutput=journal

@@ -36,7 +36,7 @@ class Node
     @priv      = args['priv' ]  || false
     @devs      = args['devs' ]  || []
 
-    dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
+    dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN' ]
     dvols      = [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
     @caps      = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
     @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
@@ -113,7 +113,7 @@ class Node
         end
 
 
-        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} )
+        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroups=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
