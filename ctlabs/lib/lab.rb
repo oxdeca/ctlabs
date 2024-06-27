@@ -12,9 +12,14 @@ class Lab
   def initialize(cfg, vm_name=nil, dlevel="warn")
     @log = LabLog.new(level: dlevel)
     @log.write "== Lab =="
+    @pubdir = "/run/ctlabs-server/public"
+
+    unless File.directory?(@pubdir)
+      FileUtils.mkdir_p(@pubdir)
+    end
 
     if( File.file?(cfg) )
-      File.open('/tmp/public/config.yml', 'w') do |f|
+      File.open("#{@pubdir}/config.yml", 'w') do |f|
         f.write( File.read(cfg) )
       end
     end
@@ -137,7 +142,7 @@ class Lab
   end
 
   def visualize
-    @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log)
+    @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     @graph.to_png(@graph.get_mgmt_topo, 'mgmt_topo')
     @graph.to_png(@graph.get_mgmt_cons, 'mgmt_con')
     @graph.to_png(@graph.get_topology, 'topo')

@@ -16,10 +16,11 @@ class Graph
     @log.write "#{__method__}(): args=#{args}"
 
     @name    = args[:name]
+    @pubdir  = args[:pubdir]
     @nodes   = args[:nodes]
     @links   = args[:links]
     @binding = args[:binding]
-    @dotfile = "/tmp/#{@name}.dot"
+    @dotfile = "#{@pubdir}/../#{@name}.dot"
     @colors  = ['red', 'grey', 'blue', 'orange', 'magenta', 'black', 'olivedrab3', 'cyan2', 'salmon', 'darkgreen']
   end
 
@@ -425,14 +426,14 @@ class Graph
     @log.write "#{__method__}(): data=#{data},name=#{name}"
 
     to_dot(data)
-    %x( dot -Tpng #{@dotfile} -o /tmp/public/#{name}.png )
+    %x( dot -Tpng #{@dotfile} -o #{@pubdir}/#{name}.png )
   end
 
   def to_svg(data, name)
     @log.write "#{__method__}(): data=#{data},name=#{name}"
 
     to_dot(data)
-    %x( dot -Tsvg #{@dotfile} -o /tmp/public/#{name}.svg )
+    %x( dot -Tsvg #{@dotfile} -o #{@pubdir}/#{name}.svg )
   end
 
   def to_ini(data, name)
@@ -441,7 +442,7 @@ class Graph
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
       f.write( ERB.new(data, nil, '-').result(@binding))
     end
-    File.open("/tmp/public/inventory.ini", "w") do |f|
+    File.open("#{@pubdir}/inventory.ini", "w") do |f|
       f.write( ERB.new(data, nil, '-').result(@binding))
     end
   end
