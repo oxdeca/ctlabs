@@ -155,7 +155,7 @@ class Lab
   end
 
   def inventory
-    @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log)
+    @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     @graph.to_ini(@graph.get_inventory, @name)
   end
 
