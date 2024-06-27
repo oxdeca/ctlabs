@@ -12,7 +12,7 @@ class Lab
   def initialize(cfg, vm_name=nil, dlevel="warn")
     @log = LabLog.new(level: dlevel)
     @log.write "== Lab =="
-    @pubdir = "/run/ctlabs-server/public"
+    @pubdir = "/srv/ctlabs-server/public"
 
     unless File.directory?(@pubdir)
       FileUtils.mkdir_p(@pubdir)

@@ -12,14 +12,14 @@ require 'erb'
 # sinatra settings
 set :bind,           '0.0.0.0'
 set :port,            4567
-set :public_folder,  '/run/ctlabs-server/public'
+set :public_folder,  '/srv/ctlabs-server/public'
 set :server_settings, SSLEnable: true,
                       SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
                       SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
 
-CONFIG     = '/run/ctlabs-server/public/config.yml'
-INVENTORY  = '/run/ctlabs-server/public/inventory.ini'
-UPLOAD_DIR = '/run/ctlabs-server/uploads'
+CONFIG     = '/srv/ctlabs-server/public/config.yml'
+INVENTORY  = '/srv/ctlabs-server/public/inventory.ini'
+UPLOAD_DIR = '/srv/ctlabs-server/uploads'
 Dir.mkdir(UPLOAD_DIR) unless Dir.exist?(UPLOAD_DIR)
 
 # add basic authentication
