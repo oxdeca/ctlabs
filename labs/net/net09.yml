@@ -5,40 +5,65 @@
 # Description : Arista Fabric Lab
 # -----------------------------------------------------------------------------
 
-name: net02
-desc: Arista Fabric Lab (cgroupv1 needed -> use centos8)
+name: net09
+desc: Arista Fabric Lab
 
 defaults:
   controller:
     linux:
-      image: ctlabs/c8/ctrl
+      image: ctlabs/c9/ctrl
   switch:
     mgmt:
-      image: ctlabs/c8/ctrl
-      ports: 12
+      image: ctlabs/c9/ctrl
+      ports: 16
     linux:
-      image: ctlabs/c8/base:0.3
+      image: ctlabs/c9/base
     arista:
-      image: ctlabs/misc/ceos:0.1
+      image: ctlabs/misc/ceos
       ports: 8
-  router:
-    frr:
-      image: ctlabs/c8/frr:0.3
   host:
     linux:
-      image: ctlabs/c8/base:0.3
+      image: ctlabs/c9/base
+  router:
+    frr:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+    mgmt:
+      image: ctlabs/c9/frr
+      caps : [SYS_NICE,NET_BIND_SERVICE]
+
 
 topology:
   - vm:
+    name: net09-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
     mgmt:
-      gw: 192.168.40.1    
+      vrfid : 40
+      dns   : [1.1.1.1, 8.8.8.8]
+      net   : 192.168.40.0/24
+      gw    : 192.168.40.1
     nodes:
+      ansible:
+        type : controller
+        gw   : 192.168.40.1
+        nics :
+          eth0: 192.168.40.5/24
+        vols  :
+          - '/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw'
+          - '/root/avd:/root/avd:ro'
+        play :
       sw0:
         type  : switch
         kind  : mgmt
         ipv4  : 192.168.40.10/24
         gw    : 192.168.40.1
+      ro0:
+        type : router
+        kind : mgmt
+        gw   : 192.168.15.1
+        nics :
+          eth0: 192.168.40.1/24
+          eth1: 192.168.15.2/29
       gw1:
         type  : gateway
         ipv4  : 192.168.15.1/29
@@ -46,49 +71,35 @@ topology:
         dnat  : ro1:eth3
       sp1:
         type  : switch
-        ports : 8
         kind  : arista
-        nics  :
-          eth0: 192.168.40.11/24
       sp2:
         type  : switch
-        ports : 8
         kind  : arista
-        nics  :
-          eth0 : 192.168.40.12/24
       lf1:
         type  : switch
         kind  : arista
-        nics  :
-          eth0: 192.168.40.13/24
       lf2:
         type  : switch
         kind  : arista
-        nics  :
-          eth0: 192.168.40.14/24
       lf3:
         type  : switch
         kind  : arista
-        nics  :
-          eth0: 192.168.40.15/24
       lf4:
         type  : switch
         kind  : arista
-        nics  :
-          eth0: 192.168.40.16/24
       ro1:
         type  : router
         kind  : frr
         gw    : 192.168.15.1
         nics  :
           eth0: 192.168.40.1/24
-          eth1:
+          eth1: 192.168.15.3/29
           eth2:
-          eth3: 192.168.15.2/29
+          eth3:
         bonds :
           bond0:
             mode: 802.3ad
-            nics: [eth1, eth2]
+            nics: [eth2, eth3]
             vlan:
               10: 192.168.10.1/24
               20: 192.168.20.1/24
@@ -104,82 +115,51 @@ topology:
         type  : host
         gw    : 192.168.10.1
         nics  :
-          eth0: 192.168.40.21/24
           eth1: 192.168.10.11/24
       h2:
         type  : host
         gw    : 192.168.20.1
         nics :
-          eth0: 192.168.40.22/24
           eth1: 192.168.20.12/24
       h3:
         type  : host
         gw    : 192.168.10.1
         nics  :
-          eth0: 192.168.40.23/24
           eth1: 192.168.10.13/24
       h4:
         type  : host
         gw    : 192.168.30.1
         nics  :
-          eth0: 192.168.40.24/24
           eth1: 192.168.30.14/24
-      ansible:
-        type : controller
-        gw   : 192.168.40.1
-        dns  : [169.254.169.254]
-        nics :
-          eth0: 192.168.40.3/24
-        vols  :
-          - '/root/ctlabs-ansible:/root/ctlabs-ansible:ro'
-          - '/root/avd:/root/avd:ro'
 
     links:
-    # Core Network
-      - [ "ro1:eth1", "sp1:eth5" ]
-      - [ "ro1:eth2", "sp2:eth5" ]
-      - [ "ro1:eth3", "gw1:eth1" ]
+    # Data Network
+      - [ "ro0:eth1", "gw1:eth1" ]
+
+      - [ "ro1:eth1", "gw1:eth2" ]
+      - [ "ro1:eth2", "sp1:eth5" ]
+      - [ "ro1:eth3", "sp2:eth5" ]
 
       - [ "sp1:eth1", "lf1:eth1" ]
       - [ "sp1:eth2", "lf2:eth1" ]
       - [ "sp1:eth3", "lf3:eth1" ]
       - [ "sp1:eth4", "lf4:eth1" ]
+      - [ "sp1:eth7", "sp2:eth7" ]
 
       - [ "sp2:eth1", "lf1:eth2" ]
       - [ "sp2:eth2", "lf2:eth2" ]
       - [ "sp2:eth3", "lf3:eth2" ]
       - [ "sp2:eth4", "lf4:eth2" ]
-
-      - [ "sp1:eth7", "sp2:eth7" ]
-      - [ "sp1:eth8", "sp2:eth8" ]
-
-      - [ "lf1:eth7", "lf2:eth7" ]
-      - [ "lf1:eth8", "lf2:eth8" ]
-
-      - [ "lf3:eth7", "lf4:eth7" ]
-      - [ "lf3:eth8", "lf4:eth8" ]
+      - [ "sp2:eth8", "sp1:eth8" ]
 
       - [ "lf1:eth3", "h1:eth1"  ]
+      - [ "lf1:eth7", "lf2:eth7" ]
+
       - [ "lf2:eth3", "h2:eth1"  ]
+      - [ "lf2:eth8", "lf1:eth8" ]
+
       - [ "lf3:eth3", "h3:eth1"  ]
+      - [ "lf3:eth7", "lf4:eth7" ]
+
       - [ "lf4:eth3", "h4:eth1"  ]
-
-    # Management Network
-      - [ "sw0:eth1", "sp1:eth0" ]
-      - [ "sw0:eth2", "sp2:eth0" ]
-
-      - [ "sw0:eth3", "lf1:eth0" ]
-      - [ "sw0:eth4", "lf2:eth0" ]
-      - [ "sw0:eth5", "lf3:eth0" ]
-      - [ "sw0:eth6", "lf4:eth0" ]
-
-      - [ "sw0:eth7", "ro1:eth0" ]
-      - [ "sw0:eth8", "ro2:eth0" ]
-
-      - [ "sw0:eth9",  "h1:eth0" ]
-      - [ "sw0:eth10", "h2:eth0" ]
-      - [ "sw0:eth11", "h3:eth0" ]
-      - [ "sw0:eth12", "h4:eth0" ]
-
-      - [ "sw0:eth13", "ansible:eth0" ]
-
+      - [ "lf4:eth8", "lf3:eth8" ]

@@ -50,10 +50,10 @@ class Link
     end
   end
  
-  def exists?
+  def nic_exists?(node, nic)
     @log.write "#{__method__}():"
  
-    %x( ip netns exec #{@node1.netns} ip link ls #{@nic1} )
+    %x( ip netns exec #{node.netns} ip link ls #{nic} 2>/dev/null )
     if $?.exitstatus == 0
       true
     else
@@ -134,7 +134,7 @@ class Link
       when 'host', 'router', 'switch', 'controller'
         if( !node.nics.nil? && !node.nics[nic].to_s.empty? )
           @log.write "#{__method__}(): node(host,router,switch) - adding ip addr #{nic}:#{node.nics[nic]}"
-          %x( ip netns exec #{node.netns} ip addr add #{node.nics[nic]} dev #{nic} )
+          %x( ip netns exec #{node.netns} ip addr add #{node.nics[nic]} dev #{nic} 2>/dev/null )
         end
     end
   end
@@ -145,14 +145,15 @@ class Link
   def move_link (node, nic)
     case node.type
       when 'host', 'router', 'switch', 'controller'
-        %x( ip netns exec #{node.netns} ip link ls #{nic} 2> /dev/null )
-        if $?.exitstatus > 0
+        #%x( ip netns exec #{node.netns} ip link ls #{nic} 2> /dev/null )
+        #if $?.exitstatus > 0
+        if( ! nic_exists?(node, nic) )
           @log.write "#{__method__}(): node(host,router,switch) - moving veth endpoints into container"
           %x( ip link set #{node.name}#{nic} netns #{node.netns} )
   
           @log.write "#{__method__}(): node(host,router,switch) - changing name in container"
           %x( ip netns exec #{node.netns} ip link set #{node.name}#{nic} name #{nic} mtu #{node.mtu} up )
-          if(node.type == 'switch' && node.eos == 'linux' )
+          if(node.type == 'switch' && ['linux', 'mgmt'].include?(node.kind) )
             @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to bridge #{node.name}"
             %x( ip netns exec #{node.netns} ip link set #{nic} master #{node.name} )
           end
@@ -166,10 +167,12 @@ class Link
   # create veth pair
   #
   def create_veth
-    @log.write "#{__method__}(): adding veth pair"
-    %x( ip link ls #{@node1.name}#{@nic1} 2>/dev/null )
-    if $?.exitstatus > 0
-      %x( ip link add #{@node1.name}#{@nic1} type veth peer #{@node2.name}#{@nic2} )
+    if( !( nic_exists?(@node1, @nic1) && nic_exists?(@node2, @nic2) ) )
+      @log.write "#{__method__}(): adding veth pair"
+      %x( ip link ls #{@node1.name}#{@nic1} 2>/dev/null )
+      if $?.exitstatus > 0
+        %x( ip link add #{@node1.name}#{@nic1} type veth peer #{@node2.name}#{@nic2} )
+      end
     end
   end
 

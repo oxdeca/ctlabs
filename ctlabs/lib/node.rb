@@ -37,7 +37,7 @@ class Node
     @devs      = args['devs' ]  || []
 
     dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
-    dvols      = [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
+    dvols      = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
     @caps      = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
     @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
 
@@ -91,7 +91,7 @@ class Node
         #
         # Arista Switch
         # 
-        if(@eos == 'arista')
+        if(@kind == 'arista')
           #File.open("/tmp/#{@name}.startup-config", "w" ) do |f|
           File.exists?("/tmp/#{@name}") ? false : Dir.mkdir("/tmp/#{@name}")
           File.exists?("/tmp/#{@name}/flash") ? false : Dir.mkdir("/tmp/#{@name}/flash")
@@ -107,13 +107,13 @@ class Node
           env   = @env.map  { |e| "-e #{e} "}.join
           priv  = '--privileged'
           #vols << "-v /tmp/#{@name}.startup-config:/mnt/flash/startup-config:rw"
-          vols << "-v /tmp/#{@name}/flash:/mnt/flash:rw"
+          vols << "-v /tmp/#{@name}/flash:/mnt/flash:rw,Z"
           @cmd  = "/bin/bash -c '/usr/bin/sleep 20; exec /sbin/init " +  @env.map { |e| "systemd.setenv=#{e} "}.join + "'"
           #@cmd  = "/bin/bash -c '/mnt/flash/if-wait.sh #{@nics.size}; exec /sbin/init " +  @env.map { |e| "systemd.setenv=#{e} "}.join + "'"
         end
 
 
-        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} )
+        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
@@ -128,7 +128,7 @@ class Node
         if(@type == 'switch' && [ 'linux', 'mgmt' ].include?(@kind) )
           @log.write "#{__method__}(): (switch) - adding bridge"
 
-          %x( ip netns exec #{@netns} ip link ls #{@name} 2> /dev/null )
+          %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
           if $?.exitstatus > 0
             %x( ip netns exec #{@netns} ip link add #{@name} type bridge )
             %x( ip netns exec #{@netns} ip link set #{@name} up )
@@ -161,10 +161,13 @@ class Node
 
       when 'gateway'
         @log.write "#{__method__}(): (gateway) - adding gateway"
-        %x( ip link add #{@name} type bridge )
-        %x( ip link set dev #{@name} up )
+        %x( ip link ls #{@name} 2>/dev/null )
+        if $?.exitstatus > 0 
+          %x( ip link add #{@name} type bridge )
+          %x( ip link set dev #{@name} up )
+        end
 
-        @ipv4 ? %x( ip addr add #{@ipv4} dev #{@name} ) : false
+        @ipv4 ? %x( ip addr add #{@ipv4} dev #{@name} 2>/dev/null ) : false
         ipt_rule('append', "FORWARD   -i #{@name} -o #{@name} -j ACCEPT")
         if(@snat)
           @log.write "#{__method__}(): (gateway) - set snat gateway"
@@ -216,10 +219,14 @@ sleep $SLEEP
       vrf instance MGMT
       !
       management api http-commands
-         no shutdown
-         !
+         shutdown
          vrf MGMT
             no shutdown
+      !
+      management ssh
+        shutdown
+        vrf MGMT
+          no shutdown
       !
       !
       no ip routing
@@ -243,20 +250,6 @@ sleep $SLEEP
       <%- end -%>
       !
       ip routing
-      !
-      !ip access-list GNMI
-      !  10 permit tcp any any eq gnmi
-      !
-      !management api gnmi
-      !  transport grpc default
-      !    ip access-group GNMI
-      !  provider eos-native
-      !
-      !management api netconf
-      !  transport ssh default
-      !
-      management api http-command
-        no shutdown
       !
       end
     }
