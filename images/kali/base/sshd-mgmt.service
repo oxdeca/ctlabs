@@ -7,10 +7,10 @@ ConditionPathExists=!/etc/ssh/sshd_not_to_be_run
 
 [Service]
 EnvironmentFile=-/etc/default/ssh
-ExecStartPre=/usr/sbin/ip vrf exec mgmt /usr/sbin/sshd -t
-ExecStart=/usr/sbin/ip vrf exec mgmt /usr/sbin/sshd -D $SSHD_OPTS
-ExecReload=/usr/sbin/ip vrf exec mgmt /usr/sbin/sshd -t
-ExecReload=/usr/sbin/ip vrf exec mgmt /bin/kill -HUP $MAINPID
+ExecStartPre=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -t
+ExecStart=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -D $SSHD_OPTS
+ExecReload=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -t
+ExecReload=/usr/bin/ip vrf exec mgmt /bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
 RestartSec=5s

@@ -267,7 +267,9 @@ class Lab
     @log.write "#{__method__}(): "
 
     chain = "#{@name.upcase}-DNAT"
-    vmips  = %x( ip route | grep default | awk '{print $9}' ).split
+    vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
+    vmips = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).split
+    #vmips  = %x( ip route | grep default | awk '{print $9}' ).split
     #vmip = %x( ip -4 addr ls eth0 | grep inet | awk '{print $2}' ).rstrip
     vmips.each do |ip|
       %x( iptables -tnat -D PREROUTING -d #{ip} -j #{chain} )
