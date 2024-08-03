@@ -1,0 +1,17 @@
+# /etc/systemd/system/juice-shop.service
+[Unit]
+Description=OWASP Juice Shop
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10s
+WorkingDirectory=/opt/juice-shop
+#User=owasp
+#Group=owasp
+#Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64"
+ExecStart=npm start
+
+[Install]
+WantedBy=multi-user.target
