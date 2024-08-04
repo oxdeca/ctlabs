@@ -1,12 +1,12 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/sec/sec01.yml
+# File        : ctlabs/sec/sec02.yml
 # Description : CTF Lab configuration
 # -----------------------------------------------------------------------------
 
-name: sec01
-desc: CTF Lab
+name: sec02
+desc: Juice Shop Lab
 
 
 defaults:
@@ -28,6 +28,8 @@ defaults:
       image: ctlabs/kali/ctf
     zap:
       image: ctlabs/owasp/zap
+    juice:
+      image: ctlabs/owasp/juice
   router:
     frr:
       image: ctlabs/c9/frr
@@ -110,6 +112,12 @@ topology:
         dnat :
           - [8443, 8443]
           - [8090, 8090]
+      juice:
+        type : host
+        kind : juice
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.13/24
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -120,6 +128,7 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"   ]
       - [ "sw1:eth3", "h1:eth1"    ]
+      - [ "sw1:eth4", "juice:eth1" ]
 
       - [ "sw2:eth2", "ns2:eth1"   ]
       - [ "sw2:eth3", "zap1:eth1"  ]
