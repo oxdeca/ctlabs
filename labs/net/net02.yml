@@ -26,10 +26,12 @@ defaults:
       image: ctlabs/d11/base
     kali:
       image: ctlabs/kali/base
+      devs : ['/dev/net/tun']
   router:
     frr:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
+      devs : ['/dev/net/tun']
     mgmt:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
