@@ -5,16 +5,20 @@ IMG_VERS=0.2
 
 MNTDIR=/media/ctlabs_d11_qemu
 QIMG_NAME=debian-11-nocloud-amd64.qcow2
+QIMG_SIZE=4G
 QIMG_URL=https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud-amd64.qcow2
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then
     curl -sLo ${QIMG_NAME} ${QIMG_URL}
+    qemu-img resize ${QIMG_NAME} ${QIMG_SIZE}
   fi
 
   modprobe nbd
   mkdir -vp ${MNTDIR}                && sleep 1
   qemu-nbd -c /dev/nbd0 ${QIMG_NAME} && sleep 1
+  growpart /dev/nbd0 1
+  resize2fs /dev/nbd0p1
   mount /dev/nbd0p1 ${MNTDIR}
 
   echo '' > ${MNTDIR}/etc/network/interfaces
@@ -27,7 +31,7 @@ create_qemu_img() {
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd-mgmt.service
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y remove man-db'
-  chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y install openssh-server lvm2 fdisk nfs-kernel-server'
+  chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y install openssh-server lvm2 fdisk nfs-kernel-server cloud-utils'
   chroot ${MNTDIR} /bin/sh -c 'echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config'
 
   umount ${MNTDIR}
