@@ -30,7 +30,7 @@ create_qemu_img() {
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd-mgmt.service
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y remove man-db'
-  chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y install openssh-server lvm2 fdisk nfs-kernel-server'
+  chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y install openssh-server lvm2 fdisk nfs-kernel-server sshpass'
   chroot ${MNTDIR} /bin/sh -c 'echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config'
 
   umount ${MNTDIR}

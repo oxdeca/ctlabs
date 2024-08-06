@@ -20,6 +20,7 @@ save_nic_info() {
   # net0
   ip link add ${br} type bridge
   if [ "${nic}" == "eth0" ]; then
+    ip addr add 169.254.40.1/30 dev ${br}
     ip link set ${br} up mtu 1460 master mgmt
   else
     ip link set ${br} up mtu 1460
@@ -29,7 +30,6 @@ save_nic_info() {
   ip addr del ${ip} dev ${nic}
   ip link set ${nic}  master ${br}
   ip link set ${nic2} master ${br} mtu 1460 up
-
 }
 
 create_net_setup_script() {
@@ -38,10 +38,6 @@ cat > /mnt/ctlabs_net_setup.sh << EOF
 #!/bin/bash
 
 hostnamectl set-hostname ${HOSTNAME}
-
-# mgmt vrf
-ip link add mgmt type vrf table 40
-ip link set mgmt up
 
 # ens3
 ip addr add $(cat /tmp/eth0.ip) dev ens3

@@ -6,6 +6,7 @@ After=network.target
 Type=oneshot
 ExecStart=/root/qemu_init.sh
 RemainAfterExit=true
+ExecStop=/root/if-down && /bin/kill "$MAINPID"
 #ExecStop=/root/qemu_init.sh
 StandardOutput=journal
 
