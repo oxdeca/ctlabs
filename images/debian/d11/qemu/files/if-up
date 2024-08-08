@@ -58,4 +58,4 @@ EOF
 
 save_nic_info net0 eth0 ens0
 save_nic_info net1 eth1 ens1
-create_net_setup_script
+#create_net_setup_script
