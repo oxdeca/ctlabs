@@ -1,0 +1,16 @@
+[Unit]
+Description=Start QEMU
+After=network.target
+
+[Service]
+Type=forking
+
+ExecStart=sh -c "export $(cat /proc/1/environ | tr '\0' '\n') && /usr/bin/sleep 5 && /run/entry.sh &"
+ExecStop=/bin/kill "$MAINPID"
+#Environment=
+
+RemainAfterExit=true
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
