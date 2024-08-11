@@ -12,8 +12,8 @@ RUN         systemctl enable sshd-mgmt.service && systemctl enable qemu.service 
 
 ENV         RAM_SIZE    "4G"
 ENV         CPU_CORES   "2"
-ENV         DISK_SIZE   "64G"
-ENV         VERSION     "2019"
+ENV         DISK_SIZE   "20G"
+ENV         VERSION     "2022"
 ENV         USER_PORTS  "5985,5986"
 ENV         USERNAME    "ctlabs"
 ENV         PASSWORD    "secret"
