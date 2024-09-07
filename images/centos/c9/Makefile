@@ -12,7 +12,7 @@ ctrl_img:	base_img
 frr_img:	base_img
 	cd frr && sh ./build.sh
 
-base_img:
+base_img: centos
 	cd base && sh ./build.sh
 
 awscli_img:
@@ -20,4 +20,6 @@ awscli_img:
 	
 gcsdk_img:
 	cd gcsdk && sh ./build.sh
-
+	
+centos:
+	docker pull quay.io/centos/centos:stream9

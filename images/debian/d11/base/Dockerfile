@@ -1,6 +1,10 @@
 FROM        debian:11
 ENV         container docker
+
 ENV         DEBIAN_FRONTEND=noninteractive
+ENV         DEBCONF_NONINTERACTIVE_SEEN=true
+ENV         DEBCONF_NOWARNINGS=yes
+
 ENV         TERM=linux
 
 RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpdump netcat htop iputils-ping  && \
