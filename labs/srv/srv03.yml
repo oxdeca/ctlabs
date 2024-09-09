@@ -29,6 +29,8 @@ defaults:
       image: ctlabs/d11/qemu
     win:
       image: ctlabs/qemu/win
+    deb:
+      image: ctlabs/qemu/deb
   router:
     frr:
       image: ctlabs/c9/frr
@@ -54,7 +56,7 @@ topology:
         nics :
           eth0: 192.168.40.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/srv03.ini ./playbooks/ctlabs.yml -tup,setup,bind
+        play : ansible-playbook -i ./inventories/srv03.ini ./playbooks/ctlabs.yml -tup,setup,bind,ca
       sw0:
         type  : switch
         kind  : mgmt
@@ -78,6 +80,7 @@ topology:
         type : switch
       sw3:
         type : switch
+        ports: 8
       ro1:
         type : router
         kind : frr
@@ -111,15 +114,30 @@ topology:
           eth1: 192.168.20.12/24
       dc1:
         type : host
+        kind : deb
+        kvm  : true
+        gw   : 192.168.30.1
+        #env  : ['BOOT=https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.4-x86_64-minimal.iso','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=8G','DHCP=no','VNC=1']
+        env  : ['BOOT=https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.7.0-amd64-netinst.iso','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=8G','DHCP=no','VNC=1']
+        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z', '/media/volumes/srv03/dc1/storage/:/storage/:rw,Z']
+        nics :
+          eth1: 192.168.30.13/24
+          eth2: 192.168.30.14/24
+        dnat :
+          - [1106, 8006]
+
+      dc2:
+        type : host
         kind : win
         kvm  : true
         gw   : 192.168.30.1
-        env  : ['VERSION=2022','USER_PORTS=88,389,464,636,3268,3269,5985,5986']
-        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z']
+        env  : ['VERSION=2022','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
+        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z'] #, '/media/volumes/srv03/dc2/storage/:/storage/:rw,Z']
         nics :
-          eth1: 192.168.30.13/24
+          eth1: 192.168.30.23/24
+          eth2: 192.168.30.24/24
         dnat :
-          - [1106, 8006  ]
+          - [2106, 8006]
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -136,3 +154,8 @@ topology:
       - [ "sw2:eth3", "h2:eth1"    ]
 
       - [ "sw3:eth2", "dc1:eth1"   ]
+      - [ "sw3:eth3", "dc1:eth2"   ]
+
+      - [ "sw3:eth4", "dc2:eth1"   ]
+      - [ "sw3:eth5", "dc2:eth2"   ]
+
