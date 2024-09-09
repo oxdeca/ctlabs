@@ -1,0 +1,42 @@
+#!/bin/bash
+
+save_nic_info() {
+  local br=$1
+  local nic=$2
+  local nic2=$3
+  local vrf=
+  local ip=
+  local gw=
+
+  if [ "${nic}" ==  "eth0" ]; then
+    vrf="vrf mgmt"
+  fi
+
+  ip=$( ip -br addr ls ${nic} | awk '{print $3}' )
+  echo ${ip} > /tmp/${nic}.ip
+  gw=$( ip -br route ls default ${vrf} | awk '{print $3}' )
+  echo ${gw} > /tmp/${nic}.gw
+
+  # net0
+  ip link add ${br} type bridge
+  if [ "${nic}" == "eth0" ]; then
+    ip link set ${br} up mtu 1460 master mgmt
+  else
+    ip link set ${br} up mtu 1460
+  fi
+
+  # net1 / net2
+  ip addr del ${ip} dev ${nic}
+  ip link set ${nic}  master ${br}
+  ip link set ${nic2} master ${br} mtu 1460 up
+  # only add route if it doesn't exist
+  if [ "${nic}" == "eth1" ]; then
+    ip route add default via ${gw}
+  fi
+}
+
+if [ "${VNC}" == "1" ]; then
+  save_nic_info net2 eth2 ens2
+else
+  save_nic_info net1 eth1 ens1
+fi

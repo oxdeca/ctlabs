@@ -1,0 +1,28 @@
+#!/bin/bash
+
+down() {
+  local br=$1
+  local nic=$2
+  local ip=$( cat /tmp/$nic.ip )
+  local gw=$( cat /tmp/$nic.gw )
+  local vrf=
+
+  if [ "$nic" == "eth0" ]; then
+    vrf="vrf mgmt"
+    ip link set eth0 master mgmt
+  fi
+
+  ip link del $br
+  ip addr add ${ip} dev $nic
+  # only add route if it doesn't exist
+  if [ "#{nic}" == "eth1" ]; then
+    ip route add default via ${gw} ${vrf}
+  fi
+}
+
+#save_nic_info net0 eth0 ens0
+if [ "${VNC}" == "1" ]; then
+  down net2 eth2
+else
+  down net1 eth1
+fi
