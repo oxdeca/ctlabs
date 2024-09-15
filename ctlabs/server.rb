@@ -6,6 +6,7 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'fileutils'
 require 'sinatra'
 require 'erb'
 
@@ -24,7 +25,7 @@ Dir.mkdir(UPLOAD_DIR) unless Dir.exist?(UPLOAD_DIR)
 
 # add basic authentication
 use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
-  user == 'ctlabs' && pass == 's3cr3t5!'
+  user == 'ctlabs' && pass == 'secret123!'
 end
 
 # add routes
@@ -65,7 +66,8 @@ post '/upload' do
     return halt erb(:upload), BADREQ
   end
 
-  File.rename(filename, UPLOAD_DIR + '/' + uploaded_file[:filename] )
+  FileUtils.cp(filename, UPLOAD_DIR + '/' + uploaded_file[:filename] )
+  #File.rename(filename, UPLOAD_DIR + '/' + uploaded_file[:filename] )
   #File.unlink(filename)
 
   redirect '/upload'
