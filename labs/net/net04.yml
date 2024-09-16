@@ -56,7 +56,9 @@ topology:
         nics :
           eth0: 192.168.40.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/net04.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,httpd,postgresql,redis,netbox
+        play : ansible-playbook -i ./inventories/net04.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,httpd,postgresql,redis,netbox,guacamole
+        dnat :
+          - [8443, 4443]
       sw0:
         type  : switch
         kind  : mgmt
@@ -133,6 +135,13 @@ topology:
           eth1: 192.168.30.13/24
         dnat :
           - [8081, 80]
+      gua1:
+        type : host
+        gw   : 192.168.30.1
+        nics :
+          eth1: 192.168.30.14/24
+        dnat :
+          - [8082, 8080]
       db1:
         type : host
         gw   : 192.168.50.1
@@ -140,22 +149,23 @@ topology:
           eth1: 192.168.50.5/28
 
     links:
-      - [ "ro0:eth1",  "natgw:eth1"    ]
+      - [ "ro0:eth1",  "natgw:eth1"  ]
 
-      - [ "ro1:eth1",  "natgw:eth2"    ]
-      - [ "ro1:eth2",  "sw1:eth1"      ]
-      - [ "ro1:eth3",  "sw2:eth1"      ]
-      - [ "ro1:eth4",  "sw3:eth1"      ]
-      - [ "ro1:eth5",  "sw4:eth1"      ]
+      - [ "ro1:eth1",  "natgw:eth2"  ]
+      - [ "ro1:eth2",  "sw1:eth1"    ]
+      - [ "ro1:eth3",  "sw2:eth1"    ]
+      - [ "ro1:eth4",  "sw3:eth1"    ]
+      - [ "ro1:eth5",  "sw4:eth1"    ]
 
-      - [ "sw1:eth2",  "ns1:eth1"      ]
-      - [ "sw1:eth3",  "h1:eth1"       ]
-      - [ "sw1:eth4",  "slapd1:eth1"   ]
-      - [ "sw1:eth5",  "dc1:eth1"      ]
+      - [ "sw1:eth2",  "ns1:eth1"    ]
+      - [ "sw1:eth3",  "h1:eth1"     ]
+      - [ "sw1:eth4",  "slapd1:eth1" ]
+      - [ "sw1:eth5",  "dc1:eth1"    ]
 
-      - [ "sw2:eth2",  "ns2:eth1"      ]
-      - [ "sw2:eth3",  "h2:eth1"       ]
+      - [ "sw2:eth2",  "ns2:eth1"    ]
+      - [ "sw2:eth3",  "h2:eth1"     ]
 
-      - [ "sw3:eth2",  "nb1:eth1"      ]
+      - [ "sw3:eth2",  "nb1:eth1"    ]
+      - [ "sw3:eth3",  "gua1:eth1"   ]
 
-      - [ "sw4:eth2",  "db1:eth1"      ]
+      - [ "sw4:eth2",  "db1:eth1"    ]
