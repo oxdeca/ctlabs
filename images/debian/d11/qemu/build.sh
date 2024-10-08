@@ -5,7 +5,7 @@ IMG_VERS=0.2
 
 MNTDIR=/media/ctlabs_d11_qemu
 QIMG_NAME=debian-11-nocloud-amd64.qcow2
-QIMG_SIZE=4G
+QIMG_SIZE=8G
 QIMG_URL=https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud-amd64.qcow2
 
 create_qemu_img() {

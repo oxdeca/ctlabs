@@ -113,7 +113,7 @@ topology:
         kind : qemu
         kvm  : true
         gw   : 192.168.30.1
-        env  : ['QEMU_MEM=1G']
+        env  : ['QEMU_MEM=1G','QEMU_CPU=2']
         vols : ['/media/volumes/k3s01/:/media/vols/:rw,Z']
         nics :
           eth1: 192.168.30.13/24
@@ -125,8 +125,8 @@ topology:
         kind : qemu
         kvm  : true
         gw   : 192.168.30.1
-        env  : ['QEMU_MEM=1G']
-        vols : ['/media/volumes/k3s01/:/media/vols/:rw,Z']
+        env  : ['QEMU_MEM=1G','QEMU_CPU=2']
+        vols : ['/media/volumes/k3s02/:/media/vols/:rw,Z']
         nics :
           eth1: 192.168.30.14/24
         dnat :
