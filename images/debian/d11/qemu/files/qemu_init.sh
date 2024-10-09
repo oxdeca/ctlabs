@@ -84,7 +84,7 @@ tmux new -d -s qemu
 #                        -nic tap,ifname=ens1,br=net1,script=/root/if-up,downscript=/root/if-down,mac=$(gen_mac)" ENTER
 
 tmux send-keys -t qemu "qemu-system-x86_64 -nodefaults -display none -m ${QEMU_MEM} -serial mon:stdio                             \
-                        -smp ${QEMU_CPU},sockets=1,dies=1,cores=1,threads=1                                                       \
+                        -smp ${QEMU_CPU},sockets=1,dies=1,cores=${QEMU_CPU},threads=1                                             \
                         -cpu host,kvm=on,l3-cache=on,+hypervisor,migratable=no                                                    \
                         -machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,hpet=off,accel=kvm                   \
                         ${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet                                                \
