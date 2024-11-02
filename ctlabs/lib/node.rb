@@ -5,6 +5,8 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'fileutils'
+
 class Node
   attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play
   attr_writer :nics
@@ -87,6 +89,7 @@ class Node
         devs  = @devs.map{ |d| "--device #{d} " }.join
         dns   = @dns.map { |ns| "nameserver #{ns}" }.join("\n")
         image = @image.nil? ? @defaults[@type][@kind]['image'] : @image
+        @vols.each { |v| FileUtils.mkdir_p(v.split(':')[0]) }
 
         #
         # Arista Switch
