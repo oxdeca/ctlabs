@@ -7,6 +7,7 @@
 # -----------------------------------------------------------------------------
 
 require 'fileutils'
+require 'webrick'
 require 'sinatra'
 require 'erb'
 
