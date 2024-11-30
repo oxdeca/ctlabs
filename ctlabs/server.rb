@@ -12,12 +12,13 @@ require 'sinatra'
 require 'erb'
 
 # sinatra settings
-set :bind,           '0.0.0.0'
-set :port,            4567
-set :public_folder,  '/srv/ctlabs-server/public'
-set :server_settings, SSLEnable: true,
-                      SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
-                      SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
+set :bind,              '0.0.0.0'
+set :port,               4567
+set :public_folder,     '/srv/ctlabs-server/public'
+set :host_authorization, permitted_hosts: []
+set :server_settings,    SSLEnable: true,
+                         SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+                         SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
 
 CONFIG     = '/srv/ctlabs-server/public/config.yml'
 INVENTORY  = '/srv/ctlabs-server/public/inventory.ini'
