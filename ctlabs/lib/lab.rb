@@ -233,10 +233,11 @@ class Lab
 
         router = find_node(natgw.dnat.split(':')[0])
         node.dnat.each do |r|
+          @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
+          puts "#{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
+          
           %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
-            puts "#{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
             %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} )
             %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth1'].split('/')[0]}:#{r[1]})
           end
