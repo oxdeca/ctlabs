@@ -233,7 +233,7 @@ class Lab
 
         router = find_node(natgw.dnat.split(':')[0])
         node.dnat.each do |r|
-          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[1]} 2> /dev/null )
+          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} 2> /dev/null )
           if $?.exitstatus > 0
             @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
             puts "#{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
@@ -288,7 +288,7 @@ class Lab
     @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
     #@links.each { |l| Link.new(@nodes, l, @log) }
 
-    puts "Adding DNAT:"
+    puts "DNAT:"
     add_dnat
 
     sleep 1
