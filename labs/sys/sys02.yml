@@ -77,8 +77,6 @@ topology:
         type : switch
       sw3:
         type : switch
-      sw4:
-        type : switch
       ro1:
         type : router
         kind : frr
