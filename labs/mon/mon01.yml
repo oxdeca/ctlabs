@@ -160,4 +160,4 @@ topology:
       - [ "sw2:eth4", "grafana:eth1"     ]
       - [ "sw2:eth5", "loki:eth1"        ]
       - [ "sw2:eth6", "mimir:eth1"       ]
-      - [ "sw2:eth6", "mail2:eth1"       ]
+      - [ "sw2:eth7", "mail2:eth1"       ]
