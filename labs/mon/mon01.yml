@@ -140,7 +140,8 @@ topology:
       mail2:
         type  : host
         gw    : 192.168.20.1
-        nics  : 192.168.20.14/24
+        nics  : 
+          eth1: 192.168.20.14/24
 
     links:
       - [ "ro0:eth1", "natgw:eth1"       ]
