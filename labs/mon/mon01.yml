@@ -69,7 +69,7 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        ports: 6
+        ports: 8
       sw2:
         type: switch
         ports: 8
@@ -136,28 +136,28 @@ topology:
         type  : host
         gw    : 192.168.10.1
         nics  :
-          eth1: 192.168.10.14/24
-      mail2:
+          eth1: 192.168.10.15/24
+      opa1:
         type  : host
-        gw    : 192.168.20.1
+        gw    : 192.168.10.1
         nics  : 
-          eth1: 192.168.20.14/24
+          eth1: 192.168.10.16/24
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"       ]
+      - [ "ro0:eth1", "natgw:eth1"      ]
 
-      - [ "ro1:eth1", "natgw:eth2"       ]
-      - [ "ro1:eth2", "sw1:eth1"         ]
-      - [ "ro1:eth3", "sw2:eth1"         ]
+      - [ "ro1:eth1", "natgw:eth2"      ]
+      - [ "ro1:eth2", "sw1:eth1"        ]
+      - [ "ro1:eth3", "sw2:eth1"        ]
 
-      - [ "sw1:eth2", "ns1:eth1"         ]
-      - [ "sw1:eth3", "h1:eth1"          ]
-      - [ "sw1:eth4", "prometheus:eth1"  ]
-      - [ "sw1:eth5", "mail1:eth1"       ]
+      - [ "sw1:eth2", "ns1:eth1"        ]
+      - [ "sw1:eth3", "h1:eth1"         ]
+      - [ "sw1:eth4", "prometheus:eth1" ]
+      - [ "sw1:eth5", "mail1:eth1"      ]
+      - [ "sw1:eth6", "opa1:eth1"       ]
 
-      - [ "sw2:eth2", "ns2:eth1"         ]
-      - [ "sw2:eth3", "h2:eth1"          ]
-      - [ "sw2:eth4", "grafana:eth1"     ]
-      - [ "sw2:eth5", "loki:eth1"        ]
-      - [ "sw2:eth6", "mimir:eth1"       ]
-      - [ "sw2:eth7", "mail2:eth1"       ]
+      - [ "sw2:eth2", "ns2:eth1"        ]
+      - [ "sw2:eth3", "h2:eth1"         ]
+      - [ "sw2:eth4", "grafana:eth1"    ]
+      - [ "sw2:eth5", "loki:eth1"       ]
+      - [ "sw2:eth6", "mimir:eth1"      ]

@@ -43,29 +43,29 @@ topology:
     domain: net03.ctlabs.internal
     dns   : [192.168.10.11, 192.168.20.11, 8.8.8.8]
     mgmt:
-      vrfid : 40
+      vrfid : 99
       dns   : [1.1.1.1, 8.8.8.8]
-      net   : 192.168.40.0/24
-      gw    : 192.168.40.1    
+      net   : 192.168.99.0/24
+      gw    : 192.168.99.1    
     nodes:
       ansible:
         type : controller
-        gw   : 192.168.40.1
+        gw   : 192.168.99.1
         nics :
-          eth0: 192.168.40.5/24
+          eth0: 192.168.99.5/24
         vols : ["/root/ctlabs-ansible:/root/ctlabs-ansible:Z,rw"]
         play : ansible-playbook -i ./inventories/net03.ini ./playbooks/ctlabs.yml -tup,setup,ca,openvpn,frr,bind,smbadc,slapd
       sw0:
         type : switch
         kind : mgmt
-        ipv4 : 192.168.40.10/24
-        gw   : 192.168.40.1
+        ipv4 : 192.168.99.10/24
+        gw   : 192.168.99.1
       ro0:
         type : router
         kind : mgmt
         gw   : 192.168.15.1
         nics :
-          eth0: 192.168.40.1/24
+          eth0: 192.168.99.1/24
           eth1: 192.168.15.2/29
       natgw:
         type : gateway
