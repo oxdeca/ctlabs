@@ -27,14 +27,15 @@ class Lab
     @cfg = YAML.load(File.read(cfg))
     @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},vm=#{vm_name}"
 
-    @vm_name  = vm_name
-    @name     = @cfg['name']     || ''
-    @desc     = @cfg['desc']     || ''
-    @defaults = @cfg['defaults'] || {}
-    @dns      = @cfg['dns']      || []
-    @domain   = @cfg['domain']   || "ctlabs.internal"
-    @mgmt     = @cfg['mgmt']     || {}
-    @dnatgw   = {}
+    @vm_name    = vm_name
+    @name       = @cfg['name']      || ''
+    @ephemeral  = @cfg['ephemeral'] || true
+    @desc       = @cfg['desc']      || ''
+    @defaults   = @cfg['defaults']  || {}
+    @dns        = @cfg['dns']       || []
+    @domain     = @cfg['domain']    || "ctlabs.internal"
+    @mgmt       = @cfg['mgmt']      || {}
+    @dnatgw     = {}
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
@@ -81,10 +82,10 @@ class Lab
 
     cfg['nodes'].each_key do |n|
       if cfg['nodes'][n]['kind'] == 'mgmt' || cfg['nodes'][n]['type'] == 'controller'
-        node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( cfg['nodes'][n] ) )
+        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( cfg['nodes'][n] ) )
         nodes << node
       else
-        node = Node.new( { 'name' => n, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
+        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
         # assign the node a mgmt-ip
         node.nics['eth0'] = "#{net}#{cnt}/#{mask}"
         cnt += 1
@@ -232,14 +233,20 @@ class Lab
         #p node
 
         router = find_node(natgw.dnat.split(':')[0])
+        dnic   = 'eth1'
         node.dnat.each do |r|
-          @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
-          puts "#{vmip}:#{r[0]} -> #{node.nics['eth1'].split('/')[0]}:#{r[1]}"
+          if r[1].include?(':')
+            dnic, dport = r[1].split(':')
+          else
+            dport = r[1]
+          end
+          @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
+          puts "#{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
           
           %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} 2> /dev/null )
           if $?.exitstatus > 0
             %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} )
-            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth1'].split('/')[0]}:#{r[1]})
+            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics[dnic].split('/')[0]}:#{dport})
           end
         end
 
