@@ -113,7 +113,10 @@ class Link
             end
           end
           if(node2.type == 'gateway')
-            %x( ip netns exec #{node1.netns} iptables -tnat -A POSTROUTING -o #{nic1} -j MASQUERADE )
+            %x( ip netns exec #{node1.netns} iptables -tnat -C POSTROUTING -o #{nic1} -j MASQUERADE 2> /dev/null )
+            if $?.exitstatus > 0
+              %x( ip netns exec #{node1.netns} iptables -tnat -A POSTROUTING -o #{nic1} -j MASQUERADE )
+            end
             if(node1.type == 'router')
               @dnatgw = node1
             end
