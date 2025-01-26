@@ -54,7 +54,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/sys03.ini ./playbooks/ctlabs.yml -tup,setup,bind,ca
+        play : ansible-playbook -i ./inventories/sys03.ini ./playbooks/ctlabs.yml -tup,setup,bind,ca,httpd,guacamole
       sw0:
         type  : switch
         kind  : mgmt
