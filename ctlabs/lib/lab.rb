@@ -235,7 +235,7 @@ class Lab
         router = find_node(natgw.dnat.split(':')[0])
         dnic   = 'eth1'
         node.dnat.each do |r|
-          if r[1].include?(':')
+          if r[1].to_s.include?(':')
             dnic, dport = r[1].split(':')
           else
             dport = r[1]
