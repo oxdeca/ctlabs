@@ -15,7 +15,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 12
+      ports: 14
     linux:
       image: ctlabs/c9/base
   host:
@@ -78,7 +78,7 @@ topology:
         type : switch
       sw3:
         type : switch
-        ports: 5
+        ports: 8
       ro1:
         type : router
         kind : frr
@@ -110,31 +110,33 @@ topology:
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
+      gua1:
+        type : host
+        gw   : 192.168.30.1
+        nics :
+          eth1: 192.168.30.16/24
+        dnat :
+          - [8081, 443]
       dc1:
         type : host
         kind : win
         kvm  : true
         gw   : 192.168.30.1
         env  : ['VERSION=2019','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
-        vols : ['/media/volumes/sys03/:/media/vols/:rw,Z']
+        vols : ['/media/volumes/sys03/:/storage/:rw,Z']
         nics :
           eth1: 192.168.30.13/24
           eth2: 192.168.30.14/24
-        dnat :
-          - [1106, 8006 ]
       dc2:
         type : host
         kind : win
         kvm  : true
         gw   : 192.168.30.1
         env  : ['VERSION=2019','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
-        vols : ['/media/volumes/sys03/:/media/vols/:rw,Z']
+        vols : ['/media/volumes/sys03/:/storage/:rw,Z']
         nics :
           eth1: 192.168.30.23/24
           eth2: 192.168.30.24/24
-        dnat :
-          - [2206, 8006 ]
-
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -155,3 +157,4 @@ topology:
 
       - [ "sw3:eth4", "dc2:eth1"   ]
       - [ "sw3:eth5", "dc2:eth2"   ]
+      - [ "sw3:eth6", "gua1:eth1"  ]
