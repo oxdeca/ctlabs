@@ -22,6 +22,10 @@ create_net_setup_script() {
     nic_gw=${eth2_gw}
   fi
 
+if [ ! -d ${SCRIPT_DIR} ]; then
+  mkdir -vp ${SCRIPT_DIR}
+fi
+
 cat > ${SCRIPT_DIR}/ctlabs.ps1 << EOF
 # powershell script to setup ethernet devices
 
@@ -42,15 +46,12 @@ netsh interface ipv4 add dnsserver name="${nic}" address=1.1.1.1 index=1
 netsh interface ipv4 add dnsserver name="${nic}" address=8.8.8.8 index=2
 EOF
 
-}
-
 cat > ${SCRIPT_DIR}/install.bat << EOF
 powershell.exe .\CTLABS.PS1
 EOF
 
-if [ ! -d ${SCRIPT_DIR} ]; then
-  mkdir -vp ${SCRIPT_DIR}
-fi
+}
+
 create_net_setup_script
 mkisofs -r -o ${ISO_FILE} ${SCRIPT_DIR}
 
