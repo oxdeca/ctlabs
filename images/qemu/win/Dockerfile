@@ -14,6 +14,7 @@ RUN         systemctl enable sshd-mgmt.service && systemctl enable qemu.service 
 COPY        --chmod=0750 if-up      /root/if-up
 COPY        --chmod=0750 if-down    /root/if-down
 
+COPY        --chmod=0750 reset.sh   /run/reset.sh
 COPY        --chmod=0750 entry.sh   /run/entry.sh
 COPY        --chmod=0750 network.sh /run/network.sh
 #COPY        --chmod=0750 config.sh  /run/config.sh
@@ -23,7 +24,7 @@ ENV         CPU_CORES   "2"
 ENV         DISK_SIZE   "20G"
 ENV         VERSION     "2022"
 ENV         USERNAME    "ctlabs"
-ENV         PASSWORD    "secret"
+ENV         PASSWORD    "secret123!"
 ENV         DHCP        "no"
 ENV         NETWORK     "n"
 ENV         VNC         "1"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SCRIPT_DIR="/mnt"
+SCRIPT_DIR="/oem"
 ISO_FILE="/tmp/${HOSTNAME}.iso"
 
 gen_mac() {
@@ -44,6 +44,9 @@ EOF
 
 }
 
+if [ ! -d ${SCRIPT_DIR} ]; then
+  mkdir -vp ${SCRIPT_DIR}
+fi
 create_net_setup_script
 mkisofs -r -o ${ISO_FILE} ${SCRIPT_DIR}
 
