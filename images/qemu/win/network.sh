@@ -47,7 +47,7 @@ netsh interface ipv4 add dnsserver name="${nic}" address=8.8.8.8 index=2
 EOF
 
 cat > ${SCRIPT_DIR}/install.bat << EOF
-powershell.exe .\CTLABS.PS1
+powershell.exe E:\CTLABS.PS1
 EOF
 
 }
