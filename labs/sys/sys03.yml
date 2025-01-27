@@ -152,9 +152,10 @@ topology:
       - [ "sw2:eth2", "ns2:eth1"   ]
       - [ "sw2:eth3", "h2:eth1"    ]
 
-      - [ "sw3:eth2", "dc1:eth1"   ]
-      - [ "sw3:eth3", "dc1:eth2"   ]
+      - [ "sw3:eth2", "gua1:eth1"  ]
+      
+      - [ "sw3:eth3", "dc1:eth1"   ]
+      - [ "sw3:eth4", "dc1:eth2"   ]
 
-      - [ "sw3:eth4", "dc2:eth1"   ]
-      - [ "sw3:eth5", "dc2:eth2"   ]
-      - [ "sw3:eth6", "gua1:eth1"  ]
+      - [ "sw3:eth5", "dc2:eth1"   ]
+      - [ "sw3:eth6", "dc2:eth2"   ]
