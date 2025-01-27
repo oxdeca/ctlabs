@@ -44,6 +44,10 @@ EOF
 
 }
 
+cat > ${SCRIPT_DIR}/install.bat << EOF
+powershell.exe .\CTLABS.PS1
+EOF
+
 if [ ! -d ${SCRIPT_DIR} ]; then
   mkdir -vp ${SCRIPT_DIR}
 fi
