@@ -44,6 +44,8 @@ netsh interface ipv4 set address name="${nic}" static ${nic_ip} 255.255.255.0 ${
 # dns
 netsh interface ipv4 add dnsserver name="${nic}" address=1.1.1.1 index=1
 netsh interface ipv4 add dnsserver name="${nic}" address=8.8.8.8 index=2
+
+Rename-Computer -NewName "$( hostname -s )" -Restart
 EOF
 
 cat > ${SCRIPT_DIR}/install.bat << EOF
