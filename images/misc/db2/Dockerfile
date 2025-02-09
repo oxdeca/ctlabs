@@ -25,7 +25,6 @@ RUN        dnf install -y iproute iptables systemd wireshark-cli tcpdump iputils
            sed -i 's@^PasswordAuthentication no@PasswordAuthentication yes@' /etc/ssh/sshd_config && \
            sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config
 
-RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bash.bashrc
 COPY       bashrc.kali /etc/profile.d/kali.sh
 COPY       sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
 RUN        systemctl enable sshd-mgmt.service && systemctl disable sshd.service
