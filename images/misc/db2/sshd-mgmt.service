@@ -1,4 +1,4 @@
-# /etc/systemd/system/sshd.service
+# /etc/systemd/system/sshd-mgmt.service
 [Unit]
 Description=OpenSSH server daemon
 Documentation=man:sshd(8) man:sshd_config(5)
