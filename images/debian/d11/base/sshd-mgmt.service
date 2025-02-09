@@ -6,7 +6,7 @@ After=network.target auditd.service
 ConditionPathExists=!/etc/ssh/sshd_not_to_be_run
 
 [Service]
-EnvironmentFile=-/etc/default/ssh
+#EnvironmentFile=-/etc/default/ssh
 ExecStartPre=/sbin/ip vrf exec mgmt /usr/sbin/sshd -t
 ExecStart=/sbin/ip vrf exec mgmt /usr/sbin/sshd -D $SSHD_OPTS
 ExecReload=/sbin/ip vrf exec mgmt /usr/sbin/sshd -t
