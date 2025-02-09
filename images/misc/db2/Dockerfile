@@ -29,4 +29,4 @@ COPY       bashrc.kali /etc/profile.d/kali.sh
 COPY       sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
 RUN        systemctl enable sshd-mgmt.service && systemctl disable sshd.service
 
-ENTRYPOINT /usr/lib/systemd/systemd
+ENTRYPOINT ["/usr/lib/systemd/systemd"]
