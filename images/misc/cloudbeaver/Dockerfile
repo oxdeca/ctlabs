@@ -13,5 +13,6 @@ COPY       sshd-mgmt.service     /etc/systemd/system/sshd-mgmt.service
 COPY       cloudbeaver.service   /etc/systemd/system/cloudbeaver.service
 COPY       cloudbeaver.sysconfig /etc/sysconfig/cloudbeaver
 RUN        systemctl enable sshd-mgmt.service && systemctl enable cloudbeaver.service && systemctl disable ssh.service
+RUN        echo 'd /run/sshd 0750 root root' > /usr/lib/tmpfiles.d/sshd-mgmt.conf
 
 ENTRYPOINT ["/bin/systemd"]
