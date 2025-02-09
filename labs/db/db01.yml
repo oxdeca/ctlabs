@@ -57,6 +57,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        play : ansible-playbook -i ./inventories/db01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,sssd
       sw0:
         type  : switch
         kind  : mgmt
@@ -116,23 +117,12 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.13/24
-      slapd2:
-        type : host
-        kind : slapd
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.13/24
       dc1:
         type : host
         kind : smbadc
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
-      dc2:
-        type : host
-        kind : smbadc
-        gw   : 192.168.20.1
-        nics :
           eth1: 192.168.20.14/24
       db1:
         type : host
@@ -165,8 +155,6 @@ topology:
 
       - [ "sw2:eth2", "ns2:eth1"       ]
       - [ "sw2:eth3", "h2:eth1"        ]
-      - [ "sw2:eth4", "slapd2:eth1"    ]
-      - [ "sw2:eth5", "dc2:eth1"       ]
       - [ "sw2:eth6", "cb1:eth1"       ]
 
       - [ "sw3:eth2", "db1:eth1"       ]

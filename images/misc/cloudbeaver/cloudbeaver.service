@@ -1,0 +1,16 @@
+# /etc/systemd/system/cloudbeaver.service
+[Unit]
+Description=CloudBeaver
+After=network.target
+
+[Service]
+Type=fork
+EnvironmentFile=-/etc/sysconfig/cloudbeaver
+ExecStart=/bin/sh -c 'cd /opt/cloudbeaver && sh ./run-server.sh'
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
