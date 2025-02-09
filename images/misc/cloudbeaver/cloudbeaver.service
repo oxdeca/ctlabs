@@ -6,7 +6,7 @@ After=network.target
 [Service]
 Type=fork
 EnvironmentFile=-/etc/sysconfig/cloudbeaver
-ExecStart=/bin/sh -c 'cd /opt/cloudbeaver && sh ./run-server.sh'
+ExecStart=sh -c 'cd /opt/cloudbeaver && ./run-server.sh'
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=process
 Restart=on-failure
