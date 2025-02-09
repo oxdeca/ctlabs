@@ -11,6 +11,6 @@ RUN        chmod 0755 /opt/cloudbeaver/run-server.sh
 COPY       sshd-mgmt.service     /etc/systemd/system/sshd-mgmt.service
 COPY       cloudbeaver.service   /etc/systemd/system/cloudbeaver.service
 COPY       cloudbeaver.sysconfig /etc/sysconfig/cloudbeaver
-RUN        systemctl enable sshd-mgmt.service && systemctl enable cloudbeaver.service && systemctl disable sshd.service
+RUN        systemctl enable sshd-mgmt.service && systemctl enable cloudbeaver.service && systemctl disable ssh.service
 
 ENTRYPOINT /usr/lib/systemd/systemd
