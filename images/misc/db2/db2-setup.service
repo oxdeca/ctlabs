@@ -1,0 +1,14 @@
+[Unit]
+Description=Run DB2 Setup Script
+After=network.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/sysconfig/db2-setup
+ExecStart=sh -c /root/db2_setup.sh &
+RemainAfterExit=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

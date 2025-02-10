@@ -1,6 +1,8 @@
 FROM       icr.io/db2_community/db2
 
 ENV        container docker
+ENV        TERM=linux
+
 ENV        LICENSE=accept
 ENV        DB2INSTANCE=db2inst1
 ENV        DB2INST1_PASSWORD=secret
@@ -16,17 +18,19 @@ ENV        HADR_ENABLED=false
 ENV        ETCD_ENDPOINT=
 ENV        ETCD_USERNAME=
 ENV        ETCD_PASSWORD=
-ENV        TERM=linux
 
+RUN        dnf install -y iproute iptables systemd tcpdump iputils htop             && \
+           ln -sv /var/db2_setup/lib/setup_db2_instance.sh /root/db2_setup.sh       && \
+           echo 'export $(cat /proc/1/environ | tr '\0' '\n' | grep QEMU)' 
 
-RUN        dnf install -y iproute iptables systemd wireshark-cli tcpdump iputils htop            && \
-           ln -sv /var/db2_setup/lib/setup_db2_instance.sh /root/db2_setup.sh                    && \
-           echo "root:secret" | chpasswd                                                         && \
-           sed -i 's@^PasswordAuthentication no@PasswordAuthentication yes@' /etc/ssh/sshd_config
+COPY       bashrc.kali /etc/profile.d/kali.sh
+COPY       sshd-mgmt.service   /etc/systemd/system/sshd-mgmt.service
+COPY       db2-setup.service   /etc/systemd/system/db2-setup.service
+COPY       db2-setup.sysconfig /etc/sysconfig/db2-setup
+RUN        systemctl enable sshd-mgmt.service && systemctl enable db2-setup.service && \
+           systemctl disable sshd.service
 
-RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bash.bashrc
-COPY       bashrc.kali /etc/bashrc.kali
-COPY       sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
-RUN        systemctl enable sshd-mgmt.service && systemctl disable sshd.service
+RUN        echo "root:secret" | chpasswd                                            && \
+           sed -ri "s@^(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config
 
-ENTRYPOINT /usr/lib/systemd/systemd
+ENTRYPOINT ["/usr/lib/systemd/systemd"]
