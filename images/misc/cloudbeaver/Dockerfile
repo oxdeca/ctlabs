@@ -4,7 +4,7 @@ ENV        container docker
 ENV        TERM=linux
 
 USER       root
-RUN        apt update && apt -y install iproute2 iptables tcpdump vim openssh-server systemd less nginx httpd-tools
+RUN        apt update && apt -y install iproute2 iptables tcpdump vim openssh-server systemd less nginx apache2-utils
 COPY       --chmod=0755 run-server.sh /opt/cloudbeaver/
 RUN        echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config
 RUN        chmod 0755 /opt/cloudbeaver/run-server.sh
