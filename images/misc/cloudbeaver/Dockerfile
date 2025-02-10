@@ -12,7 +12,7 @@ RUN        chmod 0755 /opt/cloudbeaver/run-server.sh
 COPY       sshd-mgmt.service     /etc/systemd/system/sshd-mgmt.service
 COPY       cloudbeaver.service   /etc/systemd/system/cloudbeaver.service
 COPY       cloudbeaver.sysconfig /etc/sysconfig/cloudbeaver
-COPY       cloudbeaver.nginx     /etc/nginx/conf.d/sites-enabled/cloudbeaver
+COPY       cloudbeaver.nginx     /etc/nginx/sites-enabled/cloudbeaver
 RUN        htpasswd -bc /etc/nginx/.htpasswd ctlabs secret123!
 RUN        systemctl enable sshd-mgmt.service && systemctl enable cloudbeaver.service && systemctl disable ssh.service
 RUN        echo 'd /run/sshd 0750 root root' > /usr/lib/tmpfiles.d/sshd-mgmt.conf

@@ -1,5 +1,5 @@
 # ------------------------------------------------------------------------------
-# File        : /etc/nginx/conf.d/sites-enabled/cloudbeaver
+# File        : /etc/nginx/sites-enabled/cloudbeaver
 # Description : cloudbeaver reverse proxy configurations
 # ------------------------------------------------------------------------------
 
@@ -29,6 +29,10 @@ server {
 
     # Enable HSTS (HTTP Strict Transport Security)
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Basic Authentication
+    auth_basic "Restricted Access";
+    auth_basic_user_file /etc/nginx/.htpasswd;
 
     # Proxy Configuration
     location / {
