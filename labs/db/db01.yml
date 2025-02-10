@@ -138,7 +138,6 @@ topology:
         dnat :
           - [8081, 8978]
 
-
     links:
       - [ "ro0:eth1", "natgw:eth1"     ]
 
