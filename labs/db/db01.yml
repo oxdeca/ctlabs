@@ -102,7 +102,6 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
-        kind : kali
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24

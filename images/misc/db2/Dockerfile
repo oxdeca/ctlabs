@@ -27,6 +27,7 @@ COPY       bashrc.kali /etc/profile.d/kali.sh
 COPY       sshd-mgmt.service   /etc/systemd/system/sshd-mgmt.service
 COPY       db2-setup.service   /etc/systemd/system/db2-setup.service
 COPY       db2-setup.sysconfig /etc/sysconfig/db2-setup
+COPY       db2.pam             /etc/pam.d/db2
 RUN        systemctl enable sshd-mgmt.service && systemctl enable db2-setup.service && \
            systemctl disable sshd.service
 
