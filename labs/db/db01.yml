@@ -102,7 +102,6 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
-        kind : kali
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
@@ -136,7 +135,7 @@ topology:
         nics :
           eth1: 192.168.20.21/24
         dnat :
-          - [8081, 8978]
+          - [8081, 443]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"     ]
