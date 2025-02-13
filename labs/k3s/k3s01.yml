@@ -116,7 +116,7 @@ topology:
         env  : ['QEMU_MEM=2G','QEMU_CPU=2']
         vols : ['/media/volumes/k3s01/k3s1/:/media/vols/:rw,Z']
         nics :
-          eth1: 192.168.30.13/24
+          eth1: 192.168.30.31/24
         dnat :
           - [1080, 80  ]
           - [1443, 443 ]
