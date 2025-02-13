@@ -149,4 +149,4 @@ topology:
       - [ "sw2:eth3", "h2:eth1"    ]
 
       - [ "sw3:eth2", "k3s1:eth1"  ]
-      - [ "sw3:eth3", "k3s1:eth2"  ]
+      - [ "sw3:eth3", "k3s2:eth1"  ]
