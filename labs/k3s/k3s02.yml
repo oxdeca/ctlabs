@@ -1,12 +1,12 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/labs/k3s/k3s01.yml
+# File        : ctlabs/labs/k3s/k3s02.yml
 # Description : K3S Lab configuration
 # -----------------------------------------------------------------------------
 
-name: k3s01
-desc: LAB K3S (1 Node)
+name: k3s02
+desc: LAB K3S (2 Nodes)
 
 defaults:
   controller:
@@ -38,7 +38,7 @@ defaults:
 
 topology:
   - vm:
-    name: k3s01-vm1
+    name: k3s02-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
     mgmt:
       vrfid : 99
@@ -52,7 +52,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/k3s01.ini ./playbooks/ctlabs.yml -tup,setup,bind,k3s
+        play : ansible-playbook -i ./inventories/k3s02.ini ./playbooks/ctlabs.yml -tup,setup,bind,k3s-server,k3s-agent
       sw0:
         type  : switch
         kind  : mgmt
@@ -120,6 +120,18 @@ topology:
         dnat :
           - [1080, 80  ]
           - [1443, 443 ]
+      k3s2:
+        type : host
+        kind : qemu
+        kvm  : true
+        gw   : 192.168.30.1
+        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
+        vols : ['/media/volumes/k3s01/k3s2/:/media/vols/:rw,Z']
+        nics :
+          eth1: 192.168.30.32/24
+        dnat :
+          - [2080, 80  ]
+          - [2443, 443 ]
 
 
     links:
@@ -137,3 +149,4 @@ topology:
       - [ "sw2:eth3", "h2:eth1"    ]
 
       - [ "sw3:eth2", "k3s1:eth1"  ]
+      - [ "sw3:eth3", "k3s2:eth1"  ]
