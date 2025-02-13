@@ -52,7 +52,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/k3s01.ini ./playbooks/ctlabs.yml -tup,setup,bind,k3s
+        play : ansible-playbook -i ./inventories/k3s01.ini ./playbooks/ctlabs.yml -tup,setup,bind,k3s-server,k3s-agent
       sw0:
         type  : switch
         kind  : mgmt
