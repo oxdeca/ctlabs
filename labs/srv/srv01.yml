@@ -107,7 +107,6 @@ topology:
           eth1: 192.168.10.12/24
       h2:
         type : host
-        kind : kali
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
@@ -144,7 +143,6 @@ topology:
           - [8200, 8200]
       vdb2:
         type : host
-        kind : vault
         gw   : 192.168.30.1
         nics :
           eth1: 192.168.30.12/24
