@@ -144,6 +144,7 @@ topology:
       vdb2:
         type : host
         gw   : 192.168.30.1
+        caps : [IPC_LOCK]
         nics :
           eth1: 192.168.30.12/24
         dnat :
