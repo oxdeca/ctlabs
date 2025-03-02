@@ -45,14 +45,13 @@ topology:
     dns : [192.168.10.11, 192.168.10.12, 8.8.8.8]
     mgmt:
       vrfid : 99
-      dns   : [1.1.1.1, 8.8.8.8]
+      dns   : [169.254.169.254, 1.1.1.1, 8.8.8.8]
       net   : 192.168.99.0/24
       gw    : 192.168.99.1
     nodes:
       ansible :
         type : controller
         gw   : 192.168.99.1
-        dns  : [169.254.169.254,1.1.1.1]
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
@@ -125,14 +124,12 @@ topology:
         type : host
         kind : smbadc
         gw   : 192.168.10.1
-        dns  : [192.168.20.14,192.168.10.11,8.8.8.8]
         nics :
           eth1: 192.168.10.14/24
       dc2:
         type : host
         kind : smbadc
         gw   : 192.168.20.1
-        dns  : [192.168.10.14,192.168.10.11,8.8.8.8]
         nics :
           eth1: 192.168.20.14/24
       vdb1:
