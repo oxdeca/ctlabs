@@ -4,7 +4,7 @@ ENV          DEBIAN_FRONTEND=noninteractive
 ENV          TERM=linux
 
 RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpdump netcat-traditional htop  && \
-            apt -y install iptables iputils-ping syslog-ng openssh-server python3-apt curl gpg               && \
+            apt -y install iptables iputils-ping syslog-ng openssh-server python3-apt curl gpg sudo          && \
             echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config && \
             printf "set paste\n" >> /etc/vim/vimrc
 
