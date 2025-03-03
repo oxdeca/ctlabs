@@ -2,10 +2,14 @@
 # File : /etc/pam.d/db2
 # -----------------------------------------------------------------------------
 
-auth      sufficient   pam_unix.so
-auth      required     pam_sss.so use_first_pass
-account   sufficient   pam_unix.so
-account   required     pam_sss.so
-password  sufficient   pam_unix.so use_authtok use_first_pass
-password  required     pam_sss.so use_first_pass
-session   required     pam_unix.so
+#%PAM-1.0
+auth     include system-auth
+
+account  required                                        pam_unix.so
+account  sufficient                                      pam_localuser.so
+account  sufficient                                      pam_usertype.so issystem
+account  [default=ignore success=ok user_unknown=ignore] pam_sss.so
+account  required                                        pam_permit.so
+
+password include system-auth
+session  include system-auth
