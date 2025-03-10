@@ -56,6 +56,10 @@ get '/config' do
   erb :config
 end
 
+get '/demo' do
+  erb :demo
+end
+
 post '/upload' do
   uploaded_file = params[:file]
   return halt erb(:upload), BADREQ unless uploaded_file
@@ -90,6 +94,7 @@ HEADER = %q(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
   <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-colors-2021.css">
+  <link rel="stylesheet" href="/asciinema-player.css" type="text/css" />
   <script src="https://www.w3schools.com/lib/w3.js"></script>
   <body bgcolor="seashell">
     <div class="w3-top w3-bar w3-black">
@@ -98,6 +103,7 @@ HEADER = %q(
       <a href="/topo"      class="w3-bar-item w3-button">Topology</a>
       <a href="/inventory" class="w3-bar-item w3-button">Inventory</a>
       <a href="/config"    class="w3-bar-item w3-button">Configuration</a>
+      <a href="/demo"      class="w3-bar-item w3-button">Demo</a>
 <!--      <a href="/upload" class="w3-bar-item w3-button">Upload</a> -->
     </div>
     <div id="ctlabs"><br></div>
@@ -114,7 +120,6 @@ __END__
 
 @@home
 <%= HEADER %>
-<!DOCTYPE html>
     <div id="con" class="w3-panel w3-green">
       <h2> Connections [Data Network]</h2>
     </div>
@@ -212,4 +217,17 @@ __END__
     </div>
 <%= FOOTER %>
 
-
+@@demo
+<%= HEADER %>
+    <div class="w3-panel w3-green">
+      <h2> Demo </h2>
+    </div>
+    <div id="demo" class="w3-card-4" style="max-width: 100%; overflow: auto;">
+      <div class="w3-round">
+      <script src="/asciinema-player.min.js"></script>
+      <script>
+        AsciinemaPlayer.create('/demo.cast', document.getElementById('demo'));
+      </script>
+      </div>
+    </div>
+<%= FOOTER %>
