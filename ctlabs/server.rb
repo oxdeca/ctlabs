@@ -222,7 +222,7 @@ __END__
     <div class="w3-panel w3-green">
       <h2> Demo </h2>
     </div>
-    <div id="demo" class="w3-card-4" style="max-width: 100%; overflow: auto;">
+    <div id="demo" class="w3-container w3-card-4" style="max-width: 100%; max-height: 100%; overflow: auto;">
       <div class="w3-round">
       <script src="/asciinema-player.min.js"></script>
       <script>
