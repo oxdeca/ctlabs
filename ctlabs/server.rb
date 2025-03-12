@@ -103,7 +103,7 @@ HEADER = %q(
       <a href="/topo"      class="w3-bar-item w3-button">Topology</a>
       <a href="/inventory" class="w3-bar-item w3-button">Inventory</a>
       <a href="/config"    class="w3-bar-item w3-button">Configuration</a>
-      <a href="/demo"      class="w3-bar-item w3-button">Demo</a>
+      <a href="/demo"      class="w3-bar-item w3-button">Walkthrough</a>
 <!--      <a href="/upload" class="w3-bar-item w3-button">Upload</a> -->
     </div>
     <div id="ctlabs"><br></div>
@@ -220,7 +220,7 @@ __END__
 @@demo
 <%= HEADER %>
     <div class="w3-panel w3-green">
-      <h2> Demo </h2>
+      <h2> Walkthrough </h2>
     </div>
     <div id="demo" class="w3-container w3-card-4" style="max-width: 100%; max-height: 100%; overflow: auto;">
       <div class="w3-round">

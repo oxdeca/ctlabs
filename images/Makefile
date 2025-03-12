@@ -1,4 +1,4 @@
-base: centos9_img debian11_img debian12_img
+base: centos9_img debian11_img debian12_img kali_img
 centos9_img:
 	cd centos/c9 && make
 debian11_img:
