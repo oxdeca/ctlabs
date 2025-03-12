@@ -70,7 +70,7 @@ This command uses the `ctlabs.rb` script to create a lab environment defined in 
 
 ```bash
 cd ctlabs/ctlabs
-./ctlabs.rb -c ../labs/lpic2/lpic208.yml
+./ctlabs.rb -c ../labs/lpic2/lpic208.yml -up
 ```
 
 ![img](./lab_setup.gif)
