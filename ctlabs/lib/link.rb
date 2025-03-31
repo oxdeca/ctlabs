@@ -156,9 +156,13 @@ class Link
   
           @log.write "#{__method__}(): node(host,router,switch) - changing name in container"
           %x( ip netns exec #{node.netns} ip link set #{node.name}#{nic} name #{nic} mtu #{node.mtu} up )
+          
           if(node.type == 'switch' && ['linux', 'mgmt'].include?(node.kind) )
             @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to bridge #{node.name}"
             %x( ip netns exec #{node.netns} ip link set #{nic} master #{node.name} )
+          elsif(node.type == 'switch' && ['ovs'].include?(node.kind) && nic != "eth0" )
+            @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to openvswitch #{node.name}"
+            %x( docker exec -it  #{node.name} sh -c '/usr/bin/ovs-vsctl add-port #{node.name} #{nic}' )
           end
         end
     end

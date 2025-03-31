@@ -1,4 +1,4 @@
-c9:	base_img frr_img ctrl_img qemu_img
+c9:	base_img frr_img ovs_img ctrl_img qemu_img
 
 xv6_img:	base_img
 	cd xv6 && sh ./build.sh
@@ -12,7 +12,10 @@ ctrl_img:	base_img
 frr_img:	base_img
 	cd frr && sh ./build.sh
 
-base_img: centos
+ovs_img:	base_img
+	cd ovs && sh ./build.sh
+
+base_img:	centos
 	cd base && sh ./build.sh
 
 awscli_img:

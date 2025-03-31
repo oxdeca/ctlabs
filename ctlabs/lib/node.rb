@@ -8,35 +8,36 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral
   attr_writer :nics
 
   def initialize(args)
     @defaults  = args['defaults']
     @name      = args['name' ]
-    @domain    = args['domain'] || "ctlabs.internal"
-    @fqdn      = args['fqdn' ]  || "#{@name}.#{@domain}"
-    @dns       = args['dns'  ]  || []
+    @ephemeral = args['ephemeral'] || true
+    @domain    = args['domain']    || "ctlabs.internal"
+    @fqdn      = args['fqdn' ]     || "#{@name}.#{@domain}"
+    @dns       = args['dns'  ]     || []
     @mgmt      = args['mgmt' ]
     @type      = args['type' ]
-    @eos       = args['eos'  ]  || 'linux'
-    @kind      = args['kind' ]  || 'linux'
-    @kvm       = args['kvm'  ]  || false
+    @eos       = args['eos'  ]     || 'linux'
+    @kind      = args['kind' ]     || 'linux'
+    @kvm       = args['kvm'  ]     || false
     @image     = args['image']
-    @env       = args['env'  ]  || []
+    @env       = args['env'  ]     || []
     @cmd       = args['cmd'  ]
     @play      = args['play' ]
-    @nics      = args['nics' ]  || {}
+    @nics      = args['nics' ]     || {}
     @bonds     = args['bonds']
-    @ports     = args['ports']  # ||  @defaults[@type][@kind]['ports'] || 4
+    @ports     = args['ports']   # ||  @defaults[@type][@kind]['ports'] || 4
     @gw        = args['gw'   ]
     @ipv4      = args['ipv4' ]
     @snat      = args['snat' ]
     @vxlan     = args['vxlan']
     @dnat      = args['dnat' ]
-    @mtu       = args['mtu'  ]  || 1460
-    @priv      = args['priv' ]  || false
-    @devs      = args['devs' ]  || []
+    @mtu       = args['mtu'  ]     || 1460
+    @priv      = args['priv' ]     || false
+    @devs      = args['devs' ]     || []
 
     dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols      = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
@@ -116,7 +117,8 @@ class Node
         end
 
 
-        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        #{}%x( docker run -itd #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        %x( docker run -itd --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
@@ -160,6 +162,25 @@ class Node
             # this needs to be done in the router container and on the host after 
             #ipt_rule('insert', "PREROUTING -tnat -p udp -d <HOST_IP>   --dport #{dstport} -j DNAT --to-destination <ROUTER_IP>:#{dstport}")
             #ipt_rule('insert', "PREROUTING -tnat -p udp -d <ROUTER_IP> --dport #{dstport} -j DNAT --to-destination <SWITCH_IP>:4789")
+          end
+        end
+
+        #
+        # openvswitch
+        #
+        if(@type == 'switch' && [ 'ovs' ].include?(@kind) )
+          @log.write "#{__method__}(): (switch) - adding openvswitch"
+
+          %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
+          if $?.exitstatus > 0
+            %x( docker exec -it  #{@name} sh -c '/usr/bin/ovs-vsctl add-br #{@name}' )
+           # if(! @ipv4.nil? )
+           #   %x( ip netns exec #{@netns} ip addr add #{@ipv4} dev #{@name} )
+           # end
+
+           # if(! @gw.nil? )
+           #   %x( ip netns exec #{@netns} ip route add default via #{@gw} )
+           # end
           end
         end
 
