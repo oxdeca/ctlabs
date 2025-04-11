@@ -57,7 +57,9 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/db01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,sssd
+        play : ansible-playbook -i ./inventories/db01.ini ./playbooks/ctlabs.yml -tup,setup,ca,jupyter,bind,smbadc,slapd,sssd
+        dnat :
+          - [9988, 8888]
       sw0:
         type  : switch
         kind  : mgmt
