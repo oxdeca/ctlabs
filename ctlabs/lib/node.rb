@@ -100,10 +100,10 @@ class Node
           File.exists?("/tmp/#{@name}") ? false : Dir.mkdir("/tmp/#{@name}")
           File.exists?("/tmp/#{@name}/flash") ? false : Dir.mkdir("/tmp/#{@name}/flash")
           File.open("/tmp/#{@name}/flash/startup-config", "w" ) do |f|
-            f.write( ERB.new(startup_config, nil, '-').result(binding) )
+            f.write( ERB.new(startup_config, trim_mode:'-').result(binding) )
           end
           File.open("/tmp/#{@name}/flash/if-wait.sh", "w") do |f|
-            f.write( ERB.new(if_wait, nil, '-').result(binding) )
+            f.write( ERB.new(if_wait, trim_mode:'-').result(binding) )
           end
 
           caps  = ''

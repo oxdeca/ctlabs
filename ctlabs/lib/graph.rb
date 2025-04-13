@@ -418,7 +418,7 @@ class Graph
     @log.write "#{__method__}(): data=#{data}"
 
     File.open("#{@dotfile}", "w" ) do |f|
-      f.write( ERB.new(data, nil, '-').result(@binding) )
+      f.write( ERB.new(data, trim_mode:'-').result(@binding) )
     end
   end
 
@@ -440,10 +440,10 @@ class Graph
     @log.write "#{__method__}(): data=#{data},name=#{name}"
 
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
-      f.write( ERB.new(data, nil, '-').result(@binding))
+      f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
     File.open("#{@pubdir}/inventory.ini", "w") do |f|
-      f.write( ERB.new(data, nil, '-').result(@binding))
+      f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
   end
 end

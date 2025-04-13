@@ -19,9 +19,9 @@ defaults:
       ports: 10
     linux:
       image: ctlabs/c9/base
-    ovs:                                                                                                                                                                                                                                                                                                                  
-      image: ctlabs/c9/ovs                                                                                                                                                                                                                                                                                           
-      caps : [SYS_NICE,NET_BIND_SERVICE,IPC_LOCK,NET_BROADCAST]  
+    ovs:
+      image: ctlabs/c9/ovs
+      caps : [SYS_NICE,NET_BIND_SERVICE,IPC_LOCK,NET_BROADCAST]
   host:
     linux:
       image: ctlabs/c9/base
