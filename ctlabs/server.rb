@@ -96,7 +96,7 @@ HEADER = %q(
   <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-colors-2021.css">
   <link rel="stylesheet" href="/asciinema-player.css" type="text/css" />
   <script src="https://www.w3schools.com/lib/w3.js"></script>
-  <body bgcolor="seashell">
+  <body bgcolor="#1c1c1c">
     <div class="w3-top w3-bar w3-black">
       <a href="/"          class="w3-bar-item w3-button">CTLABS</a>
       <a href="/con"       class="w3-bar-item w3-button">Connections</a>

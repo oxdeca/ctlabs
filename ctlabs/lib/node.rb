@@ -117,8 +117,8 @@ class Node
         end
 
 
-        #{}%x( docker run -itd #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
-        %x( docker run -itd --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        #%x( docker run -itd #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip

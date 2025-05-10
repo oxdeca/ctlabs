@@ -21,7 +21,7 @@ class Graph
     @links   = args[:links]
     @binding = args[:binding]
     @dotfile = "#{@pubdir}/../#{@name}.dot"
-    @colors  = ['red', 'grey', 'blue', 'orange', 'magenta', 'black', 'olivedrab3', 'cyan2', 'salmon', 'darkgreen']
+    @colors  = ['red', 'grey', 'navy', 'orange', 'magenta', 'black', 'olivedrab3', 'cyan2', 'salmon', 'darkgreen', 'teal', 'sienna', 'royalblue', 'violetred1', 'yellow']
   end
 
   def get_cons
@@ -29,7 +29,7 @@ class Graph
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
-          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="grey11",fontname="Courier New",fontsize="11"]
 
         <%- 
             @nodes.each do |node|
@@ -96,13 +96,13 @@ class Graph
               # TODO ugly hack
               if l[0].split(':')[0] != 'sw0' && l[0].split(':')[0] != 'ro0'
         -%>
-          edge[color=<%= @graph.colors[i] -%>]
-            <%- i = (i + 1) % @graph.colors.size -%>
-            <%= l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n
-          <%- end -%>
+        <%=     l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n [color=<%= @graph.colors[i] -%>]
+        <%-     i = (i + 1) % @graph.colors.size -%>
+        <%-   end -%>
         <%- end -%>
 
           fontsize  = "18"
+          fontcolor = "seashell"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -115,7 +115,7 @@ class Graph
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
-          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="grey11",fontname="Courier New",fontsize="11"]
 
         <%- 
             @nodes.each do |node|
@@ -176,13 +176,13 @@ class Graph
               if l[0].split(':')[0] == 'sw0' || l[0].split(':')[0] == 'ro0'
               # if l[0].split(':')[0] in (@node.map{|n| n.type == 'mgmt' })
         -%>
-          edge[color=<%= @graph.colors[i] -%>]
+        <%=     l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n [color=<%= @graph.colors[i] -%>]
         <%-     i = (i + 1) % @graph.colors.size -%>
-            <%= l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n
-          <%- end -%>
+        <%-   end -%>
         <%- end -%>
 
           fontsize  = "18"
+          fontcolor = "seashell"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -198,8 +198,8 @@ class Graph
         #layout=neato
         #layout=sfdp
         #layout=circo
-        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="seashell"]
-        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="grey11"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="grey11",fontname="Courier New",fontsize="11"]
 
         node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
         <%- 
@@ -284,6 +284,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
+          fontcolor = "seashell"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -299,8 +300,8 @@ class Graph
         #layout=neato
         #layout=sfdp
         #layout=circo
-        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="seashell"]
-        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="seashell",fontname="Courier New",fontsize="11"]
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="grey11"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="grey11",fontname="Courier New",fontsize="11"]
 
         node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
         <%- @cfg['topology'].each do |vm| -%>
@@ -365,6 +366,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
+          fontcolor = "seashell"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
