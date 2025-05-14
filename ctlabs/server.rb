@@ -121,16 +121,16 @@ __END__
 @@home
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
-      <h2> Connections [Data Network]</h2>
+      <h2> Connections [Data Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="con.svg" class="w3-round" alt="Connections">
+      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml">
     </div>
     <div id="topo" class="w3-panel w3-green">
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="topo.svg" class="w3-round" alt="Topology">
+      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml">
     </div>
 <%= FOOTER %>
 
@@ -141,13 +141,13 @@ __END__
       <h2> Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="con.svg" class="w3-round" alt="Connections">
+      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml">
     </div>
     <div id="mgmt_con" class="w3-panel w3-green">
       <h2> Connections [Management Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="mgmt_con.svg" class="w3-round" alt="Manegement">
+      <embed src="mgmt_con.svg" class="w3-round" alt="Management" type="image/svg+xml">
     </div>
 <%= FOOTER %>
 
@@ -158,13 +158,13 @@ __END__
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="topo.svg" class="w3-round" alt="Topology">
+      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml">
     </div>
     <div id="mgmt_topo" class="w3-panel w3-green">
       <h2> Topology [Management Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <img src="mgmt_topo.svg" class="w3-round" alt="Manegement">
+      <embed src="mgmt_topo.svg" class="w3-round" alt="Management" type="image/svg+xml">
     </div>
 <%= FOOTER %>
 
