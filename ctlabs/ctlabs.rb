@@ -19,6 +19,7 @@ $DEBUG = false
 require 'yaml'
 require 'erb'
 require 'fileutils'
+require 'socket'
 
 require './lib/lab'
 require './lib/node'
