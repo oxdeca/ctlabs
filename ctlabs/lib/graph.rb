@@ -132,12 +132,14 @@ class Graph
                   bgcolor = "cadetblue"
                 when 'gateway'
                   bgcolor = 'olivedrab3'                  
-              end              
+              end
+              server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
+              node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
             graph[style="rounded,filled",group="<%= group %>",fillcolor="<%= bgcolor %>"]
             node[shape=none,style="filled",fillcolor="<%= bgcolor %>",fontname="Courier New",fontsize="11"]
-            <%= node.name.sub(/.-/, "_") %>[label=<
+            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=<
             <table bgcolor="<%= bgcolor %>" color="deeppink" border="1" cellborder="0">
         <%- if ![ 'host', 'controller' ].include?(group) -%>
               <tr>
@@ -311,8 +313,11 @@ class Graph
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
-        <%-     if node.type == 'host' || node.type == 'controller' -%>
-        <%=       node.name.sub(/.-/, "_") %> [label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth0'] %></td></tr></table> >]
+        <%-     if node.type == 'host' || node.type == 'controller'
+                  server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
+                  node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+        -%>
+        <%=       node.name.sub(/.-/, "_") %> [href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth0'] %></td></tr></table> >]
         #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth0'] %>"]
         <%-     end -%>
         <%-   end -%>
