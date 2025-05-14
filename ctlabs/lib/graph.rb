@@ -219,7 +219,7 @@ class Graph
                 node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
         <%-     if node.type == 'host' -%>
-        <%=       node.name.sub(/.-/, "_") %> [href="<%= node_link %>",target="_blank",label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth1'] %></td></tr></table> >]
+        <%=       node.name.sub(/.-/, "_") %> [href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=< <table cellborder="0" bgcolor="lightsteelblue" color="deeppink" border="1"><tr><td><b><%= node.fqdn || node.name %></b></td></tr><hr/><tr><td><%= node.nics['eth1'] %></td></tr></table> >]
         #<%=       node.name.sub(/.-/, "_") %> [label="<%= node.fqdn %>\\n<%= node.nics['eth1'] %>"]
         <%-     end -%>
         <%-   end -%>
