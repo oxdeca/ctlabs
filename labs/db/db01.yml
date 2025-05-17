@@ -107,12 +107,16 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        dnat :
+          - [1088, 8888]
       h2:
         type : host
         kind : kali
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
+        dnat :
+          - [2088, 8888]
       slapd1:
         type : host
         gw   : 192.168.10.1
