@@ -302,6 +302,11 @@ class Lab
     sleep 1
   end
 
+  #
+  # runs ansible playbook, given via
+  # 1. command args
+  # 2. defined in lab configuration
+  #
   def run_playbook(play)
     @log.write "#{__method__}(): "
     cmd    = nil

@@ -19,6 +19,9 @@ defaults:
     linux:
       image: ctlabs/c9/base
       ports: 4
+    ovs:
+      image: ctlabs/c9/ovs
+      ports: 4
   host:
     linux:
       image: ctlabs/c9/base
@@ -47,8 +50,10 @@ topology:
         gw   : 192.168.99.1
         nics :
           eth0: 192.168.99.5/24
-        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/net01.ini ./playbooks/ctlabs.yml -tup,setup,bind
+        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        play : ansible-playbook -i ./inventories/net01.ini ./playbooks/ctlabs.yml -tup,setup,bind,jupyter
+        dnat :
+          - [9988, 8888]
       sw0:
         type : switch
         kind : mgmt
@@ -67,10 +72,13 @@ topology:
         snat : true
       sw1:
         type: switch
+        kind: ovs
       sw2:
         type: switch
+        kind: ovs
       sw3:
         type: switch
+        kind: ovs
       ro1:
         type : router
         kind : frr

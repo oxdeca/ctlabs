@@ -171,6 +171,13 @@ class Node
         if(@type == 'switch' && [ 'ovs' ].include?(@kind) )
           @log.write "#{__method__}(): (switch) - adding openvswitch"
 
+          # check if kernel module was loaded
+          res = %x(modprobe openvswitch)
+          if $?.exitstatus > 0
+            puts "ERROR: #{res}"
+            exit(1)
+          end
+
           %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
           if $?.exitstatus > 0
             %x( docker exec -it  #{@name} sh -c '/usr/bin/ovs-vsctl add-br #{@name}' )

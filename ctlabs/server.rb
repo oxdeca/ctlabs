@@ -124,16 +124,15 @@ __END__
       <h2> Connections [Data Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml">
+      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml" width="100%">
     </div>
     <div id="topo" class="w3-panel w3-green">
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml">
+      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml" width="100%">
     </div>
 <%= FOOTER %>
-
 
 @@con
 <%= HEADER %>
@@ -141,16 +140,15 @@ __END__
       <h2> Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml">
+      <embed src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml" width="100%">
     </div>
     <div id="mgmt_con" class="w3-panel w3-green">
       <h2> Connections [Management Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="mgmt_con.svg" class="w3-round" alt="Management" type="image/svg+xml">
+      <embed src="mgmt_con.svg" class="w3-round" alt="Management" type="image/svg+xml" width="100%">
     </div>
 <%= FOOTER %>
-
 
 @@topo
 <%= HEADER %>
@@ -158,13 +156,13 @@ __END__
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml">
+      <embed src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml" width="100%">
     </div>
     <div id="mgmt_topo" class="w3-panel w3-green">
       <h2> Topology [Management Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto;">
-      <embed src="mgmt_topo.svg" class="w3-round" alt="Management" type="image/svg+xml">
+      <embed src="mgmt_topo.svg" class="w3-round" alt="Management" type="image/svg+xml" width="100%">
     </div>
 <%= FOOTER %>
 

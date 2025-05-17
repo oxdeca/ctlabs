@@ -49,7 +49,7 @@ class Graph
                   bgcolor = 'olivedrab3'
               end
               server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
-              node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+              node_link = node.dnat.nil? || node.type == 'gateway' ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
 
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
@@ -134,7 +134,7 @@ class Graph
                   bgcolor = 'olivedrab3'                  
               end
               server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
-              node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+              node_link = node.dnat.nil? || node.type == 'gateway' ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
             graph[style="rounded,filled",group="<%= group %>",fillcolor="<%= bgcolor %>"]

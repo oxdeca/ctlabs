@@ -49,7 +49,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/mon01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,prometheus,node_exporter,grafana,mimir,loki,promtail,postfix
+        play  : ansible-playbook -i ./inventories/mon01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,prometheus,node_exporter,grafana,mimir,loki,alloy,postfix
       sw0:
         type  : switch
         kind  : mgmt
@@ -98,6 +98,8 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        dnat :
+          - [1088, 8888]
       h2:
         type : host
         kind : kali
