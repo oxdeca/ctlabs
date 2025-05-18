@@ -112,7 +112,7 @@ topology:
         nics :
           eth1: 192.168.30.13/24
         dnat :
-          - [8081, 80]
+          - [8081, 443]
       www2:
         type : host
         kind : d11
@@ -120,7 +120,7 @@ topology:
         nics :
           eth1: 192.168.30.14/24
         dnat :
-          - [8082, 80]
+          - [8082, 443]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"    ]
