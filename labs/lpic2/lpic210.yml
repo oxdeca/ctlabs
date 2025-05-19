@@ -160,11 +160,15 @@ topology:
         gw   : 192.168.50.1
         nics :
           eth1: 192.168.50.5/28
+        dnat :
+          - [8021, 8200]
       db2:
         type : host
         gw   : 192.168.50.1
         nics :
           eth1: 192.168.50.6/28
+        dnat :
+          - [8022, 8200]
 
     links:
       - [ "ro0:eth1",  "natgw:eth1"    ]
