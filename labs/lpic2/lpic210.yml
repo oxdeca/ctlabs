@@ -25,6 +25,9 @@ defaults:
       image: ctlabs/c9/base
     kali:
       image: ctlabs/kali/base
+    vault:
+      image: ctlabs/d11/base
+      caps: [IPC_LOCK]
     smbadc:
       image: ctlabs/d11/smbadc
     d11:
@@ -162,6 +165,7 @@ topology:
           eth1: 192.168.50.5/28
       vdb1:
         type : host
+        kind : vault
         gw   : 192.168.50.1
         nics :
           eth1: 192.168.50.6/28
