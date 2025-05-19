@@ -56,7 +56,7 @@ topology:
         nics :
           eth0: 192.168.99.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/lpic210.ini ./playbooks/lpic2.yml -tup,setup,ca,bind,smbadc,slapd,haproxy,httpd -eCTLABS_VAULT_SERVER=true
+        play : ansible-playbook -i ./inventories/lpic210.ini ./playbooks/lpic2.yml -tup,setup,ca,bind,smbadc,slapd,haproxy,vault,httpd,postgresql -eCTLABS_VAULT_SERVER=true
       sw0:
         type  : switch
         kind  : mgmt
@@ -155,42 +155,40 @@ topology:
           eth1: 192.168.30.14/24
         dnat :
           - [8082, 443]
-      db1:
+      vdb1:
         type : host
         gw   : 192.168.50.1
         nics :
           eth1: 192.168.50.5/28
         dnat :
           - [8021, 8200]
-      db2:
+      db1:
         type : host
         gw   : 192.168.50.1
         nics :
           eth1: 192.168.50.6/28
-        dnat :
-          - [8022, 8200]
 
     links:
-      - [ "ro0:eth1",  "natgw:eth1"    ]
+      - [ "ro0:eth1",  "natgw:eth1"  ]
 
-      - [ "ro1:eth1",  "natgw:eth2"    ]
-      - [ "ro1:eth2",  "sw1:eth1"      ]
-      - [ "ro1:eth3",  "sw2:eth1"      ]
-      - [ "ro1:eth4",  "sw3:eth1"      ]
-      - [ "ro1:eth5",  "sw4:eth1"      ]
+      - [ "ro1:eth1",  "natgw:eth2"  ]
+      - [ "ro1:eth2",  "sw1:eth1"    ]
+      - [ "ro1:eth3",  "sw2:eth1"    ]
+      - [ "ro1:eth4",  "sw3:eth1"    ]
+      - [ "ro1:eth5",  "sw4:eth1"    ]
 
-      - [ "sw1:eth2",  "ns1:eth1"      ]
-      - [ "sw1:eth3",  "h1:eth1"       ]
-      - [ "sw1:eth4",  "slapd1:eth1"   ]
-      - [ "sw1:eth5",  "dc1:eth1"      ]
+      - [ "sw1:eth2",  "ns1:eth1"    ]
+      - [ "sw1:eth3",  "h1:eth1"     ]
+      - [ "sw1:eth4",  "slapd1:eth1" ]
+      - [ "sw1:eth5",  "dc1:eth1"    ]
 
-      - [ "sw2:eth2",  "ns2:eth1"      ]
-      - [ "sw2:eth3",  "h2:eth1"       ]
-      - [ "sw2:eth4",  "slapd2:eth1"   ]
-      - [ "sw2:eth5",  "dc2:eth1"      ]
+      - [ "sw2:eth2",  "ns2:eth1"    ]
+      - [ "sw2:eth3",  "h2:eth1"     ]
+      - [ "sw2:eth4",  "slapd2:eth1" ]
+      - [ "sw2:eth5",  "dc2:eth1"    ]
 
-      - [ "sw3:eth2",  "www1:eth1"     ]
-      - [ "sw3:eth3",  "www2:eth1"     ]
+      - [ "sw3:eth2",  "www1:eth1"   ]
+      - [ "sw3:eth3",  "www2:eth1"   ]
 
-      - [ "sw4:eth2",  "db1:eth1"      ]
-      - [ "sw4:eth3",  "db2:eth1"      ]
+      - [ "sw4:eth2",  "vdb1:eth1"   ]
+      - [ "sw4:eth3",  "db1:eth1"    ]
