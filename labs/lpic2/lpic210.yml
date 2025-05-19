@@ -155,18 +155,18 @@ topology:
           eth1: 192.168.30.14/24
         dnat :
           - [8082, 443]
-      vdb1:
-        type : host
-        gw   : 192.168.50.1
-        nics :
-          eth1: 192.168.50.5/28
-        dnat :
-          - [8021, 8200]
       db1:
         type : host
         gw   : 192.168.50.1
         nics :
+          eth1: 192.168.50.5/28
+      vdb1:
+        type : host
+        gw   : 192.168.50.1
+        nics :
           eth1: 192.168.50.6/28
+        dnat :
+          - [8021, 8200]
 
     links:
       - [ "ro0:eth1",  "natgw:eth1"  ]
@@ -190,5 +190,5 @@ topology:
       - [ "sw3:eth2",  "www1:eth1"   ]
       - [ "sw3:eth3",  "www2:eth1"   ]
 
-      - [ "sw4:eth2",  "vdb1:eth1"   ]
-      - [ "sw4:eth3",  "db1:eth1"    ]
+      - [ "sw4:eth2",  "db1:eth1"    ]
+      - [ "sw4:eth3",  "vdb1:eth1"   ]
