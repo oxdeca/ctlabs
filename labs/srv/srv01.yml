@@ -55,7 +55,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/srv01.ini ./playbooks/ctlabs.yml -tup,setup,ca,vault,bind,smbadc-master,smbadc-slave,slapd,sssd -eCTLABS_SSSD_BACKEND=LDAP
+        play : ansible-playbook -i ./inventories/srv01.ini ./playbooks/ctlabs.yml -tup,setup,ca,vault,bind,smbadc-master,smbadc-slave,slapd,sssd -eCTLABS_SSSD_BACKEND=LDAP -eCTLABS_VAULT_SERVER=true
       sw0:
         type  : switch
         kind  : mgmt
