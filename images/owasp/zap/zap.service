@@ -9,7 +9,7 @@ Restart=always
 RestartSec=10s
 User=zap
 Group=zap
-Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64"
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
 ExecStart=/zap/zap-webswing.sh
 
 [Install]
