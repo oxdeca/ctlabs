@@ -93,3 +93,26 @@ ctlabs automatically creates separate Data and Management Networks when starting
       * This network simulates the primary data communication within the lab.
       * Data network links are defined within the lab's YAML configuration.
       * Each node can have multiple data network interfaces.
+
+## `server.rb`
+
+The included `server.rb` app provides a simple overview of the lab, i.e.
+
+* visual representations
+* configuration
+* management network inventory
+
+### Installation
+
+The `server.rb` app can be installed as systemd service by simply copying the provided unit file and reloading systemd.
+
+```bash
+cd ctlabs/ctlabs
+cp ctlabs-server.service /etc/systemd/system/ctlabs-server.service
+systemctl daemon-reload
+systemctl enable --now ctlabs-server.service
+```
+
+By default the interface can be accessed via `https://<your_host>:4567`.
+
+![img](./ctlabs-server_overview.png)
