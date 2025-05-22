@@ -19,7 +19,6 @@ set :host_authorization, permitted_hosts: []
 set :server_settings,    SSLEnable: true,
                          SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
                          SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
-
 CONFIG     = '/srv/ctlabs-server/public/config.yml'
 INVENTORY  = '/srv/ctlabs-server/public/inventory.ini'
 UPLOAD_DIR = '/srv/ctlabs-server/uploads'
@@ -79,12 +78,13 @@ post '/upload' do
   redirect '/upload'
 end
 
+
 # Templates
 BADREQ = %q(
 <div class="w3-panel w3-red">
   <h3>Bad Request</h3>
   <p>Something went wrong! [Hint: Did you choose a file?]</p>
-</div> 
+</div>
 )
 
 HEADER = %q(
@@ -114,14 +114,11 @@ SCRIPT = %q(
 function updateEmbedWidth(embedId, percent) {
   const embed = document.getElementById(embedId);
   if (!embed) return;
-
   // Use current window width as base (or fallback to last known width)
   const baseWidth = parseInt(embed.dataset.baseWidth) || window.innerWidth;
   const newWidth = (baseWidth * percent) / 100;
-
   embed.style.width = `${newWidth}px`;
   embed.style.height = "auto"; // Maintain aspect ratio
-
   const labelId = `zoom-value-${embedId.replace('-embed', '')}`;
   const label = document.getElementById(labelId);
   if (label) label.textContent = percent;
@@ -130,7 +127,6 @@ function updateEmbedWidth(embedId, percent) {
 document.addEventListener('DOMContentLoaded', function () {
   const sliders = document.querySelectorAll('.zoom-slider');
   if (!sliders.length) return;
-
   // Set initial baseWidth for each embed
   sliders.forEach(slider => {
     const embedId = slider.getAttribute('data-embed-id');
@@ -145,7 +141,6 @@ document.addEventListener('DOMContentLoaded', function () {
     slider.addEventListener('touchstart', e => {
       e.preventDefault();
     }, { passive: false });
-
     slider.addEventListener('input', function () {
       const embedId = this.getAttribute('data-embed-id');
       const percent = this.value;
@@ -171,28 +166,27 @@ __END__
       <h2> Connections [Data Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span></br>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
+      </div>
       <div class="svg-container">
         <embed id="con-embed" src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml" width="100%">
-      </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
-        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span>
       </div>
     </div>
     <div id="topo" class="w3-panel w3-green">
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <span> Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span></br>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
+      </div>
       <div class="svg-container">
         <embed id="topo-embed" src="topo.svg" class="w3-round" alt="Management" type="image/svg+xml" width="100%">
       </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
-        <span>Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span>
-      </div>
     </div>
 <%= SCRIPT %>
-
 <%= FOOTER %>
 
 @@con
@@ -201,24 +195,24 @@ __END__
       <h2> Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
+        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span>
+      </div>
       <div class="svg-container">
         <embed id="con-embed" src="con.svg" class="w3-round" alt="Connections" type="image/svg+xml" width="100%">
-      </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
-        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span>
       </div>
     </div>
     <div id="mgmt_con" class="w3-panel w3-green">
       <h2> Connections [Management Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="mgmt-con-embed">
+        <span>Zoom: <strong><span id="zoom-value-mgmt-con">100</span>%</strong></span>
+      </div>
       <div class="svg-container">
         <embed id="mgmt-con-embed" src="mgmt_con.svg" class="w3-round" alt="Management" type="image/svg+xml" width="100%">
-      </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="mgmt-con-embed">
-        <span>Zoom: <strong><span id="zoom-value-mgmt-con">100</span>%</strong></span>
       </div>
     </div>
 <%= SCRIPT %>
@@ -230,25 +224,24 @@ __END__
       <h2> Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
+        <span>Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span>
+      </div>
       <div class="svg-container">
         <embed id="topo-embed" src="topo.svg" class="w3-round" alt="Topology" type="image/svg+xml" width="100%">
       </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
-        <span>Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span>
-      </div>
     </div>
-    
     <div id="mgmt_topo" class="w3-panel w3-green">
       <h2> Topology [Management Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="mgmt-topo-embed">
+        <span>Zoom: <strong><span id="zoom-value-mgmt-topo">100</span>%</strong></span>
+      </div>
       <div class="svg-container">
         <embed id="mgmt-topo-embed" src="mgmt_topo.svg" class="w3-round" alt="Management" type="image/svg+xml" width="100%">
-      </div>
-      <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 10px; align-items: center;">
-        <input type="range" min="20" max="200" value="100" step="5" class="zoom-slider" data-embed-id="mgmt-topo-embed">
-        <span>Zoom: <strong><span id="zoom-value-mgmt-topo">100</span>%</strong></span>
       </div>
     </div>
 <%= SCRIPT %>
