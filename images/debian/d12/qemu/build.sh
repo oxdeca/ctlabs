@@ -29,7 +29,9 @@ create_qemu_img() {
   install -m 0644 files/bashrc.kali            ${MNTDIR}/etc/
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd-mgmt.service
+  chroot ${MNTDIR} /bin/sh -c 'rm /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
+  chroot ${MNTDIR} /bin/sh -c 'mknod -m0666 /dev/null c 1 3'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y remove man-db'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y install openssh-server lvm2 fdisk nfs-kernel-server cloud-utils sshpass xterm gnupg'
   chroot ${MNTDIR} /bin/sh -c 'mv /bin/resize /usr/local/bin/ && apt -y remove xterm && apt -y clean && apt -y autoclean && apt -y autoremove'
