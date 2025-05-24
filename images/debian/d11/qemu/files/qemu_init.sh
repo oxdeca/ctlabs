@@ -13,7 +13,7 @@ QEMU_CPU_CORES=${QEMU_CPU_CORES:-$((QEMU_CPU/QEMU_CPU_THREADS))}
 
 gen_mac() {
   local premac="52:54:00:"
-  echo ${premac}$(openssl rand -hex 3 | awk '{gsub(/.{2}/,"&:")}1' | sed 's@.$@@')
+  echo ${premac}$(openssl rand -hex 3 | gawk '{gsub(/.{2}/,"&:")}1' | sed 's@.$@@')
 }
 
 create_net_setup_script() {
