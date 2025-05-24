@@ -1,12 +1,12 @@
 #!/bin/bash
 
-IMG_NAME=ctlabs/d11/qemu
+IMG_NAME=ctlabs/d12/qemu
 IMG_VERS=0.2
 
-MNTDIR=/media/ctlabs_d11_qemu
-QIMG_NAME=debian-11-nocloud-amd64.qcow2
+MNTDIR=/media/ctlabs_d12_qemu
+QIMG_NAME=debian-12-nocloud-amd64.qcow2
 QIMG_SIZE=8G
-QIMG_URL=https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud-amd64.qcow2
+QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.qcow2
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then

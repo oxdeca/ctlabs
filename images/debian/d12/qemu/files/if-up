@@ -1,0 +1,61 @@
+#!/bin/bash
+
+save_nic_info() {
+  local br=$1
+  local nic=$2
+  local nic2=$3
+  local vrf=
+  local ip=
+  local gw=
+
+  if [ "${nic}" ==  "eth0" ]; then
+    vrf="vrf mgmt"
+  fi
+
+  ip=$( ip -br addr ls ${nic} | awk '{print $3}' )
+  echo ${ip} > /tmp/${nic}.ip
+  gw=$( ip -br route ls default ${vrf} | awk '{print $3}' )
+  echo ${gw} > /tmp/${nic}.gw
+
+  # net0
+  ip link add ${br} type bridge
+  if [ "${nic}" == "eth0" ]; then
+    ip addr add 169.254.40.1/30 dev ${br}
+    ip link set ${br} up mtu 1460 master mgmt
+  else
+    ip link set ${br} up mtu 1460
+  fi
+
+  #save_nic_info eth0
+  ip addr del ${ip} dev ${nic}
+  ip link set ${nic}  master ${br}
+  ip link set ${nic2} master ${br} mtu 1460 up
+}
+
+create_net_setup_script() {
+  local premac="52:54:00:12:34:"
+cat > /mnt/ctlabs_net_setup.sh << EOF
+#!/bin/bash
+
+hostnamectl set-hostname ${HOSTNAME}
+
+# ens3
+ip addr add $(cat /tmp/eth0.ip) dev ens3
+ip link set ens3 master mgmt mtu 1460 up
+ip link set ens3 address "${premac}$(openssl rand -hex 1)"
+ip route add default via $(cat /tmp/eth0.gw) vrf mgmt
+
+# ens4
+ip addr add $(cat /tmp/eth1.ip) dev ens4
+ip link set ens4 mtu 1460 up
+ip link set ens4 address "${premac}$(openssl rand -hex 1)"
+ip route add default via $(cat /tmp/eth1.gw)
+
+echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
+EOF
+
+}
+
+save_nic_info net0 eth0 ens0
+save_nic_info net1 eth1 ens1
+#create_net_setup_script
