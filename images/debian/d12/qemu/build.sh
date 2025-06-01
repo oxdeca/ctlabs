@@ -5,7 +5,7 @@ IMG_VERS=0.2
 
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2
-QIMG_SIZE=10G
+QIMG_SIZE=20G
 QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.qcow2
 
 create_qemu_img() {
