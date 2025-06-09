@@ -53,7 +53,7 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']      
-        play : ansible-playbook -i ./inventories/sys02.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,vault,gitea,atlantis -eCTLABS_VAULT_SERVER=true
+        play : ansible-playbook -i ./inventories/sys02.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,vault,jupyter,gitea,atlantis -eCTLABS_VAULT_SERVER=true
       sw0:
         type  : switch
         kind  : mgmt
@@ -103,12 +103,17 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [1088, 8888]
       h2:
         type : host
-        kind : kali
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
       vdb1:
         type : host
         kind : vault
