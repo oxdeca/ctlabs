@@ -320,7 +320,7 @@ class Lab
     domain = find_vm(@vm_name)['domain'] || @domain
 
     if cmd.class == String
-      puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain}"
+      puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
       system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
     else
       puts "No Playbook found."
