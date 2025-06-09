@@ -36,6 +36,7 @@ class Lab
     @domain     = @cfg['domain']    || "ctlabs.internal"
     @mgmt       = @cfg['mgmt']      || {}
     @dnatgw     = {}
+    @server_ip  = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
@@ -320,7 +321,7 @@ class Lab
 
     if cmd.class == String
       puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain}"
-      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain}'")
+      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
     else
       puts "No Playbook found."
     end
