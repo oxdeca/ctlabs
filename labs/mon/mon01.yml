@@ -48,8 +48,8 @@ topology:
         gw   : 192.168.99.1
         nics :
           eth0: 192.168.99.3/24
-        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/mon01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,prometheus,node_exporter,grafana,mimir,loki,alloy,postfix,jupyter
+        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+        play  : ansible-playbook -i ./inventories/mon01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,prometheus,node_exporter,blackbox_exporter,grafana,mimir,loki,alloy,postfix,jupyter
         dnat  :
           - [9988, 8888]
       sw0:
@@ -100,6 +100,7 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [1088, 8888]
       h2:
@@ -108,6 +109,9 @@ topology:
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
       prometheus:
         type  : host
         gw    : 192.168.10.1
