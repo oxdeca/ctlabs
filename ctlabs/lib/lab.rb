@@ -311,17 +311,26 @@ class Lab
   def run_playbook(play)
     @log.write "#{__method__}(): "
     cmd    = nil
-
-    # make sure ctrl and all mgmt-sshd are up and running
-    # TOOD
-
-    ctrl = find_node('ansible')
-    play.class == String ? cmd = play : cmd = ctrl.play
+    ctrl   = find_node('ansible')
     domain = find_vm(@vm_name)['domain'] || @domain
 
-    if cmd.class == String
-      puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
-      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
+    if play.class == String && !play.empty?
+      play_cmd = "#{play} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
+    elsif ctrl.play.class == String && !ctrl.play.empty?
+      play_cmd = "#{ctrl.play} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
+    elsif ctrl.play['book'].class == String
+      play_inv  = " -i ./inventories/#{ctrl.play['inv'] || @name + ".ini"}" || " -i ./inventories/#{@name}.ini"
+      play_env  = " -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip} #{(ctrl.play['env'] || []).map{|e| " -e#{e}" }.join}"
+      play_book = " ./playbooks/#{ctrl.play['book']}"
+      play_tags = " -t#{ctrl.play['tags'].join(",")}"
+      play_cmd  = "ansible-playbook #{play_inv} #{play_book} #{play_tags} #{play_env} "
+    end
+
+    if play_cmd.class == String
+      #puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
+      #system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
+      puts "Playbook found: #{play_cmd}"
+      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
     else
       puts "No Playbook found."
     end

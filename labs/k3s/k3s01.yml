@@ -51,8 +51,12 @@ topology:
         gw   : 192.168.99.1
         nics :
           eth0: 192.168.99.3/24
-        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/k3s01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,k3s,jupyter
+        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+        play: 
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter]
+        dnat :
+          - [9988, 8888]
       sw0:
         type  : switch
         kind  : mgmt
@@ -124,7 +128,6 @@ topology:
         nics :
           eth1: 192.168.30.31/24
         dnat :
-          - [1080, 80  ]
           - [1443, 443 ]
 
 
