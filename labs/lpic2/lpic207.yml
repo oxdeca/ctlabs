@@ -51,7 +51,9 @@ topology:
         nics :
           eth0: 192.168.99.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/lpic207.ini ./playbooks/lpic2.yml -tup,setup,bind
+        play: #ansible-playbook -i ./inventories/lpic207.ini ./playbooks/lpic2.yml -tup,setup,bind
+          book: lpic2.yml
+          tags: [up, setup, bind]
       sw0:
         type  : switch
         kind  : mgmt

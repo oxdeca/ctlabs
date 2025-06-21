@@ -57,7 +57,10 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/srv02.ini ./playbooks/ctlabs.yml -tup,setup,ca,vault,bind,smbadc,slapd,sssd,rundeck -eCTLABS_VAULT_SERVER=true
+        play:
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, vault, smbadc, slapd, sssd, rundeck]
+          env : ['CTLABS_VAULT_SERVER=true']
         dnat :
           - [8192, 4443]
       sw0:

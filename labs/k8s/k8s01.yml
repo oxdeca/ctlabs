@@ -54,7 +54,9 @@ topology:
         nics :
           eth0: 192.168.99.3/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/k8s01.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,k8s,jupyter
+        play:
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, k8s, jupyter]
       sw0:
         type  : switch
         kind  : mgmt

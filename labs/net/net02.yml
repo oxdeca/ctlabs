@@ -56,7 +56,9 @@ topology:
         nics :
           eth0: 192.168.99.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/net02.ini ./playbooks/ctlabs.yml -tup,setup,ca,jupyter,openvpn,frr,bind
+        play:
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, frr, openvpn, jupyter]
         dnat :
           - [9988, 8888]
       sw0:
