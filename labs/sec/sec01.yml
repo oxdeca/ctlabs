@@ -53,7 +53,9 @@ topology:
         nics :
           eth0: 192.168.99.5/24
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play : ansible-playbook -i ./inventories/sec01.ini ./playbooks/ctlabs.yml -tup,setup,openvpn
+        play:
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, openvpn, jupyter]
       sw0:
         type  : switch
         kind  : mgmt
@@ -100,6 +102,9 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [1088, 8888]
       zap1:
         type : host
         kind : zap

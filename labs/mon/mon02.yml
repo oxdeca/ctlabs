@@ -54,8 +54,12 @@ topology:
         gw   : 192.168.99.1
         nics :
           eth0: 192.168.99.3/24
-        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
-        play  : ansible-playbook -i ./inventories/mon02.ini ./playbooks/ctlabs.yml -tup,setup,ca,bind,smbadc,slapd,prometheus,node_exporter,grafana,mimir,loki,alloy
+        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+        play:
+          book: ctlabs.yml
+          tags: [up, setup, ca, bind, smbadc, slapd, prometheus, node_exporter, grafana, mimir, loki, alloy, blackbox_exporter, jupyter]
+        dnat  :
+          - [9988, 8888]
       sw0:
         type  : switch
         kind  : mgmt
@@ -102,35 +106,29 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [1088, 8888]
       h2:
         type : host
         kind : kali
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
       slapd1:
         type : host
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.13/24
-      slapd2:
-        type : host
-        kind : slapd
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.13/24
       dc1:
         type : host
         kind : smbadc
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
-      dc2:
-        type : host
-        kind : smbadc
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.14/24
       prometheus:
         type  : host
         gw    : 192.168.10.1
@@ -171,9 +169,7 @@ topology:
 
       - [ "sw2:eth2", "ns2:eth1"          ]
       - [ "sw2:eth3", "h2:eth1"           ]
-      - [ "sw2:eth4", "slapd2:eth1"       ]
-      - [ "sw2:eth5", "dc2:eth1"          ]
-      - [ "sw2:eth6", "grafana:eth1"      ]
-      - [ "sw2:eth7", "loki:eth1"         ]
-      - [ "sw2:eth8", "mimir:eth1"        ]
+      - [ "sw2:eth4", "grafana:eth1"      ]
+      - [ "sw2:eth5", "loki:eth1"         ]
+      - [ "sw2:eth6", "mimir:eth1"        ]
 
