@@ -53,7 +53,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
         play:
           book: lpic2.yml
-          tags: [up, setup, bind, jupyter]
+          tags: [up, setup, ca, bind, jupyter]
         dnat  :
           - [9988, 8888]
       sw0:
