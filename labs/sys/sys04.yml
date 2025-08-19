@@ -1,11 +1,12 @@
 ---
+
 # -----------------------------------------------------------------------------
-# File        : ctlabs/labs/srv/srv01.yml
-# Description : Vault Lab configuration
+# File        : ctlabs/labs/sys/sys04.yml
+# Description : Continuous Integration Lab
 # -----------------------------------------------------------------------------
 
-name: srv01
-desc: LAB Vault
+name: sys04
+desc: LAB SYS - CICD
 
 defaults:
   controller:
@@ -14,23 +15,19 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 16
+      ports: 14
     linux:
       image: ctlabs/c9/base
-      ports: 6
   host:
     linux:
       image: ctlabs/c9/base
+    d11:
+      image: ctlabs/d11/base
+    kali:
+      image: ctlabs/kali/base
     vault:
       image: ctlabs/d11/base
       caps: [IPC_LOCK]
-    kali:
-      image: ctlabs/kali/base
-    smbadc:
-      image: ctlabs/d11/smbadc
-    slapd:
-      image: ctlabs/d11/base
-      caps: [SYS_PTRACE]
   router:
     frr:
       image: ctlabs/c9/frr
@@ -39,30 +36,34 @@ defaults:
       image: ctlabs/c9/frr
       caps : [SYS_NICE,NET_BIND_SERVICE]
 
+
 topology:
   - vm:
-    name: srv01-vm1
+    name: lvm-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
     mgmt:
       vrfid : 99
-      dns   : [169.254.169.254, 1.1.1.1, 8.8.8.8]
+      dns   : [1.1.1.1, 8.8.8.8]
       net   : 192.168.99.0/24
       gw    : 192.168.99.1
     nodes:
-      ansible :
+      ansible:
         type : controller
         gw   : 192.168.99.1
         nics :
           eth0: 192.168.99.3/24
-        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
+        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']      
         play:
           book: ctlabs.yml
-          tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd]
-          env : ['CTLABS_SSSD_BACKEND=LDAP', 'CTLABS_VAULT_SERVER=true']
+          tags: [up, setup, ca, bind, vault, opa, jenkins, jupyter]
+          env : ['CTLABS_VAULT_SERVER=true']
+        dnat :
+          - [9988, 8888]
+          - [9980, 8080]
       sw0:
         type  : switch
         kind  : mgmt
-        ipv4  : 192.168.99.11/24
+        ipv4  : 192.168.99.10/24
         gw    : 192.168.99.1
       ro0:
         type : router
@@ -98,6 +99,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
+        kind : d11
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24
@@ -107,36 +109,17 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [1088, 8888]
       h2:
         type : host
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
-      slapd1:
-        type : host
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.13/24
-      slapd2:
-        type : host
-        kind : slapd
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.13/24
-      dc1:
-        type : host
-        kind : smbadc
-        #dns  : [192.168.10.14, 192.168.10.11, 8.8.8.8]
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.14/24
-      dc2:
-        type : host
-        kind : smbadc
-        #dns  : [192.168.10.14, 192.168.20.11, 8.8.8.8]
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.14/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
       vdb1:
         type : host
         kind : vault
@@ -144,35 +127,20 @@ topology:
         nics :
           eth1: 192.168.30.11/24
         dnat :
-          - [8200, 8200]
-      vdb2:
-        type : host
-        gw   : 192.168.30.1
-        caps : [IPC_LOCK]
-        nics :
-          eth1: 192.168.30.12/24
-        dnat :
-          - [8300, 8200]
-
+          - [8081, 8200]
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"  ]
+      - [ "ro0:eth1", "natgw:eth1" ]
 
-      - [ "ro1:eth1", "natgw:eth2"  ]
-      - [ "ro1:eth2", "sw1:eth1"    ]
-      - [ "ro1:eth3", "sw2:eth1"    ]
-      - [ "ro1:eth4", "sw3:eth1"    ]
+      - [ "ro1:eth1", "natgw:eth2" ]
+      - [ "ro1:eth2", "sw1:eth1"   ]
+      - [ "ro1:eth3", "sw2:eth1"   ]
+      - [ "ro1:eth4", "sw3:eth1"   ]
 
-      - [ "sw1:eth2", "ns1:eth1"    ]
-      - [ "sw1:eth3", "h1:eth1"     ]
-      - [ "sw1:eth4", "slapd1:eth1" ]
-      - [ "sw1:eth5", "dc1:eth1"    ]
+      - [ "sw1:eth2", "ns1:eth1"   ]
+      - [ "sw1:eth3", "h1:eth1"    ]
 
-      - [ "sw2:eth2", "ns2:eth1"    ]
-      - [ "sw2:eth3", "h2:eth1"     ]
-      - [ "sw2:eth4", "slapd2:eth1" ]
-      - [ "sw2:eth5", "dc2:eth1"    ]
+      - [ "sw2:eth2", "ns2:eth1"   ]
+      - [ "sw2:eth3", "h2:eth1"    ]
 
-      - [ "sw3:eth2", "vdb1:eth1"   ]
-      - [ "sw3:eth3", "vdb2:eth1"   ]
-
+      - [ "sw3:eth2", "vdb1:eth1"  ]
