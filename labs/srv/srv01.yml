@@ -57,8 +57,10 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: ctlabs.yml
-          tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd]
+          tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd, semaphore]
           env : ['CTLABS_SSSD_BACKEND=LDAP', 'CTLABS_VAULT_SERVER=true']
+        dnat:
+          - [9981, 3010]
       sw0:
         type  : switch
         kind  : mgmt
