@@ -45,7 +45,7 @@ sh# dnf install epel-release htop irb wireshark-cli tcpdump perf bpftrace kernel
 For faster and more consistent setup, you can use Terraform to automate the creation of a CentOS 9 virtual machine.
 * [Terraform configuration](https://github.com/oxdeca/ctlabs-terraform/tree/main/01_lpic2/gcp): 
 	* This Terraform configuration creates a CentOS 9 VM on Google Cloud Platform.
-* [Installation shell script](https://github.com/oxdeca/ctlabs-terraform/blob/main/01_lpic2/ppvm.sh): 
+* [Installation shell script](https://raw.githubusercontent.com/oxdeca/ctlabs-terraform/refs/heads/main/01_lpic2/ppvm.sh): 
 	* This shell script installs all the necessary packages and dependencies on the VM. (used by the terraform code)
 
 ## Container Images
