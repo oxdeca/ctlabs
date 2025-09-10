@@ -26,12 +26,14 @@ defaults:
     kali:
       image: ctlabs/kali/base
     vault:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [IPC_LOCK]
     smbadc:
       image: ctlabs/d11/smbadc
     d11:
       image: ctlabs/d11/base
+    d12:
+      image: ctlabs/d12/base
     slapd:
       image: ctlabs/d11/base
       caps: [SYS_PTRACE]
@@ -61,8 +63,8 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: lpic2.yml
-          tags: [up, setup, ca, bind, smbadc, slapd, haproxy, vault, httpd, postgresql, jupyter]
-          env : ['CTLABS_VAULT_SERVER=true']
+          tags: [up, setup, ca, bind, smbadc-master,smbadc-slave, sssd, slapd, haproxy, vault, httpd, postgresql, jupyter]
+          env : ['CTLABS_SSSD_DOMAIN=ctlabs.internal', 'CTLABS_SSSD_BACKEND=ldap', 'CTLABS_VAULT_SERVER=true']
         dnat  :
           - [9988, 8888]
       sw0:
@@ -107,7 +109,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24

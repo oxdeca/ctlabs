@@ -1,4 +1,4 @@
-d12:  base_img qemu_img
+d12:  base_img qemu_img smbadc_img
 	
 qemu_img: base_img
 	cd qemu && sh ./build.sh
