@@ -29,6 +29,7 @@ create_qemu_img() {
   install -m 0644 files/bashrc.kali            ${MNTDIR}/etc/
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd-mgmt.service
+  chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
   chroot ${MNTDIR} /bin/sh -c 'rm /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'mknod /dev/null c 1 3 && chmod 0666 /dev/null'
