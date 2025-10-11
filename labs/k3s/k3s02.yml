@@ -27,6 +27,8 @@ defaults:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     qemu:
       image: ctlabs/d12/qemu
     vault:
@@ -118,7 +120,7 @@ topology:
           - [1088, 8888]
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24

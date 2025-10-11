@@ -22,11 +22,11 @@ create_net_setup_script() {
     nic_gw=${eth2_gw}
   fi
 
-if [ ! -d ${SCRIPT_DIR} ]; then
-  mkdir -vp ${SCRIPT_DIR}
-fi
+  if [ ! -d ${SCRIPT_DIR} ]; then
+    mkdir -vp ${SCRIPT_DIR}
+  fi
 
-cat > ${SCRIPT_DIR}/ctlabs.ps1 << EOF
+  cat > ${SCRIPT_DIR}/ctlabs.ps1 << EOF
 # powershell script to setup ethernet devices
 
 # disable interfaces
@@ -42,14 +42,21 @@ netsh interface ipv4 set subinterface "${nic}" mtu=1460 store=persistent
 netsh interface ipv4 set address name="${nic}" static ${nic_ip} 255.255.255.0 ${nic_gw}
 
 # dns
-netsh interface ipv4 add dnsserver name="${nic}" address=1.1.1.1 index=1
-netsh interface ipv4 add dnsserver name="${nic}" address=8.8.8.8 index=2
+netsh interface ipv4 add dnsserver name="${nic}" address=192.168.10.11 index=1
+netsh interface ipv4 add dnsserver name="${nic}" address=192.168.20.11 index=2
 
 Rename-Computer -NewName "$( hostname -s )" -Restart
 EOF
 
-cat > ${SCRIPT_DIR}/install.bat << EOF
+  cat > ${SCRIPT_DIR}/domain.ps1 << EOF
+Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+Import-Module ADDSDeployment
+Install-ADDSForest -CreateDnsDelegation:\$false -DatabasePath "C:\\Windows\\NTDS" -DomainMode "WinThreshold" -DomainName "ad.ctlabs.internal" -DomainNetbiosName "CTLABS" -ForestMode "WinThreshold" -InstallDns:\$true -LogPath "C:\\Windows\\NTDS" -NoRebootOnCompletion:\$false -SysvolPath "C:\\Windows\\SYSVOL" -Force:\$true
+EOF
+
+  cat > ${SCRIPT_DIR}/install.bat << EOF
 powershell.exe E:\CTLABS.PS1
+powershell.exe E:\DOMAIN.PS1
 EOF
 
 }

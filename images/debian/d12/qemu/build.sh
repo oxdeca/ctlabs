@@ -1,12 +1,12 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/d12/qemu
-IMG_VERS=0.2
+IMG_VERS=0.3
 
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2
 QIMG_SIZE=20G
-QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.qcow2
+QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/${QIMG_NAME}
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then
@@ -30,6 +30,7 @@ create_qemu_img() {
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd-mgmt.service
   chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
+  chroot ${MNTDIR} /usr/bin/systemctl mask    systemd-networkd.service
   chroot ${MNTDIR} /bin/sh -c 'rm /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'mknod /dev/null c 1 3 && chmod 0666 /dev/null'

@@ -1,8 +1,9 @@
 ---
 
 # -----------------------------------------------------------------------------
-# File        : ctlabs/labs/sys/sys03.yml
-# Description : Lab configuration
+# File         : ctlabs/labs/sys/sys03.yml
+# Description  : Windows AD-DC Lab configuration
+# Requirements : min. 20G storage per dc-instance
 # -----------------------------------------------------------------------------
 
 name: sys03
@@ -21,12 +22,12 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
+    d12:
+      image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
-    qemu:
-      image: ctlabs/d11/qemu
+    parrot:
+      image: ctlabs/parrot/base
     win:
       image: ctlabs/qemu/win
   router:
@@ -97,7 +98,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24
@@ -109,6 +110,7 @@ topology:
           eth1: 192.168.10.12/24
       h2:
         type : host
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
@@ -124,7 +126,7 @@ topology:
         kind : win
         kvm  : true
         gw   : 192.168.30.1
-        env  : ['VERSION=2019','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
+        env  : ['VERSION=2022','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
         vols : ['/media/volumes/sys03/dc1/:/storage/:rw,Z']
         nics :
           eth1: 192.168.30.13/24
@@ -134,7 +136,7 @@ topology:
         kind : win
         kvm  : true
         gw   : 192.168.30.1
-        env  : ['VERSION=2019','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
+        env  : ['VERSION=2022','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
         vols : ['/media/volumes/sys03/dc2/:/storage/:rw,Z']
         nics :
           eth1: 192.168.30.23/24

@@ -63,7 +63,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: lpic2.yml
-          tags: [up, setup, ca, bind, smbadc-master,smbadc-slave, sssd, slapd, haproxy, vault, httpd, postgresql, jupyter]
+          tags: [up, setup, ca, bind, smbadc-master, smbadc-slave, sssd, slapd, haproxy, vault, httpd, postgresql, jupyter]
           env : ['CTLABS_SSSD_DOMAIN=ctlabs.internal', 'CTLABS_SSSD_BACKEND=ldap', 'CTLABS_VAULT_SERVER=true']
         dnat  :
           - [9988, 8888]
