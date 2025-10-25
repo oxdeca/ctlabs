@@ -28,10 +28,12 @@ defaults:
       image: ctlabs/misc/cbeaver
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     smbadc:
-      image: ctlabs/d11/smbadc
+      image: ctlabs/d12/smbadc
     slapd:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [SYS_PTRACE]
   router:
     frr:
@@ -114,7 +116,7 @@ topology:
           - [1088, 8888]
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24

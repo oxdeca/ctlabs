@@ -21,16 +21,16 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
     d12:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     qemu:
       image: ctlabs/d12/qemu
     vault:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [IPC_LOCK]
   router:
     frr:
@@ -117,7 +117,7 @@ topology:
           - [1088, 8888]
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24

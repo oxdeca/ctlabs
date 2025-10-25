@@ -26,11 +26,11 @@ defaults:
     kali:
       image: ctlabs/kali/base
     smbadc:
-      image: ctlabs/d11/smbadc
-    d11:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/smbadc
+    d12:
+      image: ctlabs/d12/base
     slapd:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [SYS_PTRACE]
   router:
     frr:
@@ -103,7 +103,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24

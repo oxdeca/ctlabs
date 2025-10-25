@@ -22,14 +22,14 @@ defaults:
     linux:
       image: ctlabs/c9/base
     vault:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [IPC_LOCK]
     kali:
       image: ctlabs/kali/base
     smbadc:
-      image: ctlabs/d11/smbadc
+      image: ctlabs/d12/smbadc
     slapd:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/base
       caps: [SYS_PTRACE]
   router:
     frr:

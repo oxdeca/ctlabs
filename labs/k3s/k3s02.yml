@@ -21,8 +21,6 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
     d12:
       image: ctlabs/d12/base
     kali:

@@ -22,10 +22,10 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
   router:
     frr:
       image: ctlabs/c9/frr
@@ -92,7 +92,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24
@@ -107,7 +107,7 @@ topology:
           - [1088, 8888]
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24

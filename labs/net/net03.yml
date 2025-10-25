@@ -24,10 +24,12 @@ defaults:
       image: ctlabs/c9/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     adc:
-      image: ctlabs/d11/smbadc
-    d11:
-      image: ctlabs/d11/base
+      image: ctlabs/d12/smbadc
+    d12:
+      image: ctlabs/d12/base
   router:
     frr:
       image: ctlabs/c9/frr
@@ -158,7 +160,7 @@ topology:
           eth1: 192.168.21.21/24
       slapd2:
         type  : host
-        kind  : d11
+        kind  : d12
         caps  : [SYS_PTRACE]
         gw    : 192.168.22.1
         nics :

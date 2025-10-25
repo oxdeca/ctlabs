@@ -24,12 +24,12 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
+    d12:
+      image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
     qemu:
-      image: ctlabs/d11/qemu
+      image: ctlabs/d12/qemu
   router:
     frr:
       image: ctlabs/c9/frr
@@ -109,7 +109,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24

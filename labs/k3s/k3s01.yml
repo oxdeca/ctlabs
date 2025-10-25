@@ -21,14 +21,19 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
     d12:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     qemu:
       image: ctlabs/d12/qemu
+    smbadc:
+      image: ctlabs/d12/smbadc
+    slapd:
+      image: ctlabs/d12/base
+      caps: [SYS_PTRACE]
   router:
     frr:
       image: ctlabs/c9/frr
@@ -120,6 +125,17 @@ topology:
         vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [2088, 8888]
+      slapd1:
+        type : host
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.13/24
+      dc1:
+        type : host
+        kind : smbadc
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.14/24
       k3s1:
         type : host
         kind : qemu
@@ -136,15 +152,17 @@ topology:
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
 
-      - [ "ro1:eth1", "natgw:eth2" ]
-      - [ "ro1:eth2", "sw1:eth1"   ]
-      - [ "ro1:eth3", "sw2:eth1"   ]
-      - [ "ro1:eth4", "sw3:eth1"   ]
+      - [ "ro1:eth1", "natgw:eth2"  ]
+      - [ "ro1:eth2", "sw1:eth1"    ]
+      - [ "ro1:eth3", "sw2:eth1"    ]
+      - [ "ro1:eth4", "sw3:eth1"    ]
 
-      - [ "sw1:eth2", "ns1:eth1"   ]
-      - [ "sw1:eth3", "h1:eth1"    ]
+      - [ "sw1:eth2", "ns1:eth1"    ]
+      - [ "sw1:eth3", "h1:eth1"     ]
+      - [ "sw1:eth4", "slapd1:eth1" ]
+      - [ "sw1:eth5", "dc1:eth1"    ]
 
-      - [ "sw2:eth2", "ns2:eth1"   ]
-      - [ "sw2:eth3", "h2:eth1"    ]
+      - [ "sw2:eth2", "ns2:eth1"    ]
+      - [ "sw2:eth3", "h2:eth1"     ]
 
-      - [ "sw3:eth2", "k3s1:eth1"  ]
+      - [ "sw3:eth2", "k3s1:eth1"   ]
