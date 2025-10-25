@@ -9,6 +9,8 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
            echo alias gcloud='/usr/bin/gcloud' >> /root/.bashrc                                     && \
            printf "\nset paste\n" >> /etc/vimrc
 
+RUN        dnf -y install "https://github.com/open-policy-agent/conftest/releases/download/v0.63.0/conftest_0.63.0_linux_amd64.rpm"
+
 RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
 COPY       bashrc.kali /etc/bashrc.kali
 

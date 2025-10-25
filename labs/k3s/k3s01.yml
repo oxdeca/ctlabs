@@ -62,7 +62,6 @@ topology:
         play: 
           book: ctlabs.yml
           tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter]
-          env : ['CTLABS_SSSD_DOMAIN=ctlabs.internal']
         dnat :
           - [9988, 8888]
       sw0:
