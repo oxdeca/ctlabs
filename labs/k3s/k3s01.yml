@@ -179,7 +179,7 @@ topology:
       - [ "sw1:eth3", "h1:eth1"     ]
       - [ "sw1:eth4", "slapd1:eth1" ]
       - [ "sw1:eth5", "dc1:eth1"    ]
-      - [ "sw1:eth6", "opa:eth1"    ]
+      - [ "sw1:eth6", "opa1:eth1"   ]
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
