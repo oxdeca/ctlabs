@@ -146,6 +146,8 @@ topology:
         gw    : 192.168.10.1
         nics  : 
           eth1: 192.168.10.16/24
+        dnat :
+          - [8181, 8181]
       vdb1:
         type : host
         kind : vault
