@@ -15,7 +15,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 13
+      ports: 16
     linux:
       image: ctlabs/c9/base
   host:
@@ -34,6 +34,9 @@ defaults:
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
+    vault:
+      image: ctlabs/d12/base
+      caps : [IPC_LOCK]
   router:
     frr:
       image: ctlabs/c9/frr
@@ -61,7 +64,8 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
         play: 
           book: ctlabs.yml
-          tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter]
+          tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter, opa, vault]
+          env : ['CTLABS_VAULT_SERVER=true']
         dnat :
           - [9988, 8888]
       sw0:
@@ -83,7 +87,7 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        ports: 6
+        ports: 7
       sw2:
         type : switch
       sw3:
@@ -119,7 +123,7 @@ topology:
           - [1088, 8888]
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
@@ -137,6 +141,11 @@ topology:
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
+      opa1:
+        type  : host
+        gw    : 192.168.10.1
+        nics  : 
+          eth1: 192.168.10.16/24
       k3s1:
         type : host
         kind : qemu
@@ -148,10 +157,18 @@ topology:
           eth1: 192.168.30.31/24
         dnat :
           - [1443, 443 ]
+      vdb1:
+        type : host
+        kind : vault
+        gw   : 192.168.30.1
+        nics :
+          eth1: 192.168.30.11/24
+        dnat :
+          - [8081, 8200]
 
 
     links:
-      - [ "ro0:eth1", "natgw:eth1" ]
+      - [ "ro0:eth1", "natgw:eth1"  ]
 
       - [ "ro1:eth1", "natgw:eth2"  ]
       - [ "ro1:eth2", "sw1:eth1"    ]
@@ -162,8 +179,10 @@ topology:
       - [ "sw1:eth3", "h1:eth1"     ]
       - [ "sw1:eth4", "slapd1:eth1" ]
       - [ "sw1:eth5", "dc1:eth1"    ]
+      - [ "sw1:eth6", "opa:eth1"    ]
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
 
-      - [ "sw3:eth2", "k3s1:eth1"   ]
+      - [ "sw3:eth2", "vdb1:eth1"   ]
+      - [ "sw3:eth3", "k3s1:eth1"   ]
