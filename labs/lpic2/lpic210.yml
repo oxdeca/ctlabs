@@ -30,8 +30,6 @@ defaults:
     vault:
       image: ctlabs/d12/base
       caps: [IPC_LOCK]
-    smbadc:
-      image: ctlabs/d12/smbadc
     d11:
       image: ctlabs/d11/base
     d12:
@@ -146,15 +144,13 @@ topology:
           eth1: 192.168.20.13/24
       dc1:
         type : host
-        kind : smbadc
-        #dns  : [192.168.10.14, 192.168.10.11, 8.8.8.8]
+        kind : d12
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
       dc2:
         type : host
-        kind : smbadc
-        #dns  : [192.168.10.14, 192.168.20.11, 8.8.8.8]
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.14/24

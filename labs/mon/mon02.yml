@@ -26,8 +26,6 @@ defaults:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
-    smbadc:
-      image: ctlabs/d12/smbadc
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
@@ -125,7 +123,7 @@ topology:
           eth1: 192.168.10.13/24
       dc1:
         type : host
-        kind : smbadc
+        kind : d12
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24

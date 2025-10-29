@@ -25,8 +25,6 @@ defaults:
       image: ctlabs/c9/base
     kali:
       image: ctlabs/kali/base
-    smbadc:
-      image: ctlabs/d12/smbadc
     d12:
       image: ctlabs/d12/base
     slapd:
@@ -126,7 +124,7 @@ topology:
           eth1: 192.168.10.13/24
       dc1:
         type : host
-        kind : smbadc
+        kind : d12
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24

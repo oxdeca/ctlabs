@@ -3,6 +3,7 @@
 # -----------------------------------------------------------------------------
 # File        : ctlabs/labs/k3s/k3s01.yml
 # Description : K3S Lab configuration
+# VM-Spec     : 12GB RAM, 6 vCPUs
 # -----------------------------------------------------------------------------
 
 name: k3s01
@@ -15,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 16
+      ports: 18
     linux:
       image: ctlabs/c9/base
   host:
@@ -29,8 +30,6 @@ defaults:
       image: ctlabs/parrot/base
     qemu:
       image: ctlabs/d12/qemu
-    smbadc:
-      image: ctlabs/d12/smbadc
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
@@ -87,7 +86,7 @@ topology:
         dnat : ro1:eth1
       sw1:
         type : switch
-        ports: 7
+        ports: 8
       sw2:
         type : switch
       sw3:
@@ -130,6 +129,22 @@ topology:
         vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [2088, 8888]
+      h3:
+        type : host
+        kind : qemu
+        kvm  : true
+        gw   : 192.168.10.1
+        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
+        nics :
+          eth1: 192.168.10.17/24
+      h4:
+        type : host
+        kind : qemu
+        kvm  : true
+        gw   : 192.168.20.1
+        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
+        nics :
+          eth1: 192.168.20.17/24
       slapd1:
         type : host
         gw   : 192.168.10.1
@@ -137,7 +152,7 @@ topology:
           eth1: 192.168.10.13/24
       dc1:
         type : host
-        kind : smbadc
+        kind : d12
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
@@ -179,12 +194,14 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"    ]
       - [ "sw1:eth3", "h1:eth1"     ]
-      - [ "sw1:eth4", "slapd1:eth1" ]
-      - [ "sw1:eth5", "dc1:eth1"    ]
-      - [ "sw1:eth6", "opa1:eth1"   ]
+      - [ "sw1:eth4", "h3:eth1"     ]
+      - [ "sw1:eth5", "slapd1:eth1" ]
+      - [ "sw1:eth6", "dc1:eth1"    ]
+      - [ "sw1:eth7", "opa1:eth1"   ]
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
+      - [ "sw2:eth4", "h4:eth1"     ]
 
       - [ "sw3:eth2", "vdb1:eth1"   ]
       - [ "sw3:eth3", "k3s1:eth1"   ]

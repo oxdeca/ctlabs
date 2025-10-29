@@ -26,8 +26,6 @@ defaults:
       image: ctlabs/kali/base
     parrot:
       image: ctlabs/parrot/base
-    adc:
-      image: ctlabs/d12/smbadc
     d12:
       image: ctlabs/d12/base
   router:
@@ -143,13 +141,13 @@ topology:
           eth3: 192.168.23.1/24
       dc1:
         type : host
-        kind : adc
+        kind : d12
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.14/24
       dc2:
         type : host
-        kind : adc
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.14/24
