@@ -22,6 +22,8 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
+    d12:
+      image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
     parrot:
@@ -116,14 +118,14 @@ topology:
           - [2088, 8888]
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"    ]
+      - [ "ro0:eth1", "natgw:eth1" ]
       
-      - [ "ro1:eth1", "natgw:eth2"    ]
-      - [ "ro1:eth2", "sw1:eth1"      ]
-      - [ "ro1:eth3", "sw2:eth1"      ]
+      - [ "ro1:eth1", "natgw:eth2" ]
+      - [ "ro1:eth2", "sw1:eth1"   ]
+      - [ "ro1:eth3", "sw2:eth1"   ]
 
-      - [ "sw1:eth2", "ns1:eth1"      ]
-      - [ "sw1:eth3", "h1:eth1"       ]
+      - [ "sw1:eth2", "ns1:eth1"   ]
+      - [ "sw1:eth3", "h1:eth1"    ]
 
-      - [ "sw2:eth2", "ns2:eth1"      ]
-      - [ "sw2:eth3", "h2:eth1"       ]
+      - [ "sw2:eth2", "ns2:eth1"   ]
+      - [ "sw2:eth3", "h2:eth1"    ]
