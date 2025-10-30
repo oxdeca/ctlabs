@@ -28,6 +28,9 @@ defaults:
     kali:
       image: ctlabs/kali/base
       devs : ['/dev/net/tun']
+    parrot:
+      image: ctlabs/kali/base
+      devs : ['/dev/net/tun']
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
