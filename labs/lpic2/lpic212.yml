@@ -23,6 +23,8 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
+    d12:
+      image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
       devs : ['/dev/net/tun']
