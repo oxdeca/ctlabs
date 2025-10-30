@@ -22,8 +22,6 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
     d12:
       image: ctlabs/d12/base
     kali:
@@ -129,7 +127,7 @@ topology:
           - [8081, 443]
       www2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.30.1
         nics :
           eth1: 192.168.30.14/24
