@@ -21,16 +21,14 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
-    d11:
-      image: ctlabs/d11/base
+    d12:
+      image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
-    qemu:
-      image: ctlabs/d11/qemu
+    parrot:
+      image: ctlabs/parrot/base
     win:
       image: ctlabs/qemu/win
-    deb:
-      image: ctlabs/qemu/deb
   router:
     frr:
       image: ctlabs/c9/frr
@@ -58,7 +56,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: ctlabs.yml
-          tags: [up, setup, ca, bind]
+          tags: [up, setup, ca, bind, httpd, guacamole]
       sw0:
         type  : switch
         kind  : mgmt
@@ -99,7 +97,7 @@ topology:
           eth1: 192.168.10.11/24
       ns2:
         type : host
-        kind : d11
+        kind : d12
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.11/24
@@ -111,35 +109,40 @@ topology:
           eth1: 192.168.10.12/24
       h2:
         type : host
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
-      dc1:
+      gua1:
         type : host
-        kind : deb
-        kvm  : true
         gw   : 192.168.30.1
-        #env  : ['BOOT=https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.4-x86_64-minimal.iso','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=8G','DHCP=no','VNC=1']
-        env  : ['BOOT=https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.7.0-amd64-netinst.iso','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=8G','DHCP=no','VNC=1']
-        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z', '/media/volumes/srv03/dc1/storage/:/storage/:rw,Z']
         nics :
-          eth1: 192.168.30.13/24
-          eth2: 192.168.30.14/24
+          eth1: 192.168.30.17/24
         dnat :
-          - [1106, 8006]
-
-      dc2:
+          - [8081, 443]
+      dc1:
         type : host
         kind : win
         kvm  : true
         gw   : 192.168.30.1
         env  : ['VERSION=2022','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
-        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z'] #, '/media/volumes/srv03/dc2/storage/:/storage/:rw,Z']
+        #vols : ['/media/volumes/srv03/:/media/vols/:rw,Z', '/media/volumes/srv03/dc1/storage/:/storage/:rw,Z']
         nics :
-          eth1: 192.168.30.23/24
-          eth2: 192.168.30.24/24
-        dnat :
-          - [2106, 8006]
+          eth1: 192.168.30.13/24
+          eth2: 192.168.30.14/24
+
+#      dc2:
+#        type : host
+#        kind : win
+#        kvm  : true
+#        gw   : 192.168.30.1
+#        env  : ['VERSION=2022','CPU_CORES=2','RAM_SIZE=2G','DISK_SIZE=20G','DHCP=no','NETWORK=n','VNC=1']
+#        vols : ['/media/volumes/srv03/:/media/vols/:rw,Z', '/media/volumes/srv03/dc2/storage/:/storage/:rw,Z']
+#        nics :
+#          eth1: 192.168.30.23/24
+#          eth2: 192.168.30.24/24
+#        dnat :
+#          - [2106, 8006]
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -155,9 +158,11 @@ topology:
       - [ "sw2:eth2", "ns2:eth1"   ]
       - [ "sw2:eth3", "h2:eth1"    ]
 
-      - [ "sw3:eth2", "dc1:eth1"   ]
-      - [ "sw3:eth3", "dc1:eth2"   ]
+      - [ "sw3:eth2", "gua1:eth1"  ]
+      
+      - [ "sw3:eth3", "dc1:eth1"   ]
+      - [ "sw3:eth4", "dc1:eth2"   ]
 
-      - [ "sw3:eth4", "dc2:eth1"   ]
-      - [ "sw3:eth5", "dc2:eth2"   ]
+#      - [ "sw3:eth4", "dc2:eth1"   ]
+#      - [ "sw3:eth5", "dc2:eth2"   ]
 

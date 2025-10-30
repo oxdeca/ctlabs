@@ -7,3 +7,5 @@ debian12_img:
 	cd debian/d12 && make
 kali_img:
 	cd kali && make
+parrot_img:
+	cd parrot && make

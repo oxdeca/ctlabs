@@ -107,6 +107,15 @@ topology:
         vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [1088, 8888]
+      h2:
+        type : host
+        kind : parrot
+        gw   : 192.168.20.1
+        nics :
+          eth1: 192.168.20.12/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
       zap1:
         type : host
         kind : zap
@@ -129,4 +138,5 @@ topology:
       - [ "sw1:eth3", "h1:eth1"    ]
 
       - [ "sw2:eth2", "ns2:eth1"   ]
-      - [ "sw2:eth3", "zap1:eth1"  ]
+      - [ "sw2:eth3", "h2:eth1"    ]
+      - [ "sw2:eth4", "zap1:eth1"  ]

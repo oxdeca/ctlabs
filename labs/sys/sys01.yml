@@ -25,6 +25,8 @@ defaults:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
     qemu:
       image: ctlabs/d12/qemu
   router:
@@ -97,31 +99,50 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
+        kind : kali
+        gw   : 192.168.10.1
+        nics :
+          eth1: 192.168.10.12/24
+        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [1088, 8888]
+      h2:
+        type : host
+        kind : parrot
+        gw   : 192.168.20.1
+        nics :
+          eth1: 192.168.20.12/24
+        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+        dnat :
+          - [2088, 8888]
+      h3:
+        type : host
         kind : qemu
         kvm  : true
         gw   : 192.168.10.1
         vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
         nics :
-          eth1: 192.168.10.12/24
-      h2:
+          eth1: 192.168.10.17/24
+      h4:
         type : host
         kind : qemu
         kvm  : true
         gw   : 192.168.20.1
         vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
         nics :
-          eth1: 192.168.20.12/24
+          eth1: 192.168.20.17/24
 
     links:
-      - [ "ro0:eth1", "natgw:eth1"    ]
+      - [ "ro0:eth1", "natgw:eth1" ]
 
-      - [ "ro1:eth1", "natgw:eth2"    ]
-      - [ "ro1:eth2", "sw1:eth1"      ]
-      - [ "ro1:eth3", "sw2:eth1"      ]
+      - [ "ro1:eth1", "natgw:eth2" ]
+      - [ "ro1:eth2", "sw1:eth1"   ]
+      - [ "ro1:eth3", "sw2:eth1"   ]
 
-      - [ "sw1:eth2", "ns1:eth1"      ]
-      - [ "sw1:eth3", "h1:eth1"       ]
+      - [ "sw1:eth2", "ns1:eth1"   ]
+      - [ "sw1:eth3", "h1:eth1"    ]
+      - [ "sw1:eth4", "h3:eth1"    ]
 
-      - [ "sw2:eth2", "ns2:eth1"      ]
-      - [ "sw2:eth3", "h2:eth1"       ]
-
+      - [ "sw2:eth2", "ns2:eth1"   ]
+      - [ "sw2:eth3", "h2:eth1"    ]
+      - [ "sw2:eth4", "h4:eth1"    ]

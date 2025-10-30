@@ -30,6 +30,9 @@ defaults:
     kali:
       image: ctlabs/kali/base
       devs : ['/dev/net/tun']
+    parrot:
+      image: ctlabs/parrot/base
+      devs : ['/dev/net/tun']
   router:
     frr:
       image: ctlabs/c9/frr
@@ -105,12 +108,13 @@ topology:
           eth1: 192.168.20.11/24
       h1:
         type : host
+        kind : kali
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24

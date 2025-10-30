@@ -28,6 +28,8 @@ defaults:
       image: ctlabs/c9/base
     kali:
       image: ctlabs/kali/base
+    parrot:
+      image: ctlabs/parrot/base
   router:
     frr:
       image: ctlabs/c9/frr
@@ -99,12 +101,13 @@ topology:
           eth3: 192.168.12.2/30
       h1:
         type : host
+        kind : kali
         gw   : 192.168.10.1
         nics :
           eth1: 192.168.10.12/24
       h2:
         type : host
-        kind : kali
+        kind : parrot
         gw   : 192.168.20.1
         nics :
           eth1: 192.168.20.12/24
