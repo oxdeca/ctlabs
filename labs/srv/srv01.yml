@@ -21,6 +21,8 @@ defaults:
   host:
     linux:
       image: ctlabs/c9/base
+    d12:
+      image: ctlabs/d12/base
     vault:
       image: ctlabs/d12/base
       caps: [IPC_LOCK]
