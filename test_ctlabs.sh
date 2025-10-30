@@ -31,7 +31,7 @@ labs=(
   'sys/sys04'
 )
 
-test_config() {
+test_lab_config() {
   for lab in ${labs[@]}; do
     echo "Testing lab $lab ..."
     ./ctlabs.rb -c ../labs/${lab}.yml
