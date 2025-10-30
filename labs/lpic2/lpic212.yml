@@ -166,21 +166,21 @@ topology:
           eth1: 192.168.20.14/24
 
     links:
-      - [ "isp1:eth1", "natgw:eth1"    ]
-      - [ "ro0:eth1", "natgw:eth2"     ]
+      - [ "isp1:eth1", "natgw:eth1" ]
+      - [ "ro0:eth1", "natgw:eth2"  ]
 
-      - [ "ro1:eth1", "sw1:eth1"       ]
-      - [ "ro1:eth2", "isp1:eth2"      ]
+      - [ "ro1:eth1", "sw1:eth1"    ]
+      - [ "ro1:eth2", "isp1:eth2"   ]
 
-      - [ "ro2:eth1", "isp1:eth3"      ]
-      - [ "ro2:eth2", "sw2:eth1"       ]
+      - [ "ro2:eth1", "isp1:eth3"   ]
+      - [ "ro2:eth2", "sw2:eth1"    ]
 
-      - [ "sw1:eth2", "ns1:eth1"       ]
-      - [ "sw1:eth3", "h1:eth1"        ]
-      - [ "sw1:eth4", "slapd1:eth1"    ]
-      - [ "sw1:eth5", "dc1:eth1"       ]
+      - [ "sw1:eth2", "ns1:eth1"    ]
+      - [ "sw1:eth3", "h1:eth1"     ]
+      - [ "sw1:eth4", "slapd1:eth1" ]
+      - [ "sw1:eth5", "dc1:eth1"    ]
 
-      - [ "sw2:eth2", "ns2:eth1"       ]
-      - [ "sw2:eth3", "h2:eth1"        ]
-      - [ "sw2:eth4", "slapd2:eth1"    ]
-      - [ "sw2:eth5", "dc2:eth1"       ]
+      - [ "sw2:eth2", "ns2:eth1"    ]
+      - [ "sw2:eth3", "h2:eth1"     ]
+      - [ "sw2:eth4", "slapd2:eth1" ]
+      - [ "sw2:eth5", "dc2:eth1"    ]

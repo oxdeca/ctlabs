@@ -123,16 +123,16 @@ topology:
           eth1: 192.168.20.11/24
 
     links:
-      - [ "ro0:eth1",  "natgw:eth1"   ]
+      - [ "ro0:eth1",  "natgw:eth1" ]
 
-      - [ "ro1:eth1",  "natgw:eth2"   ]
-      - [ "ro1:eth2",  "sw1:eth1"     ]
-      - [ "ro1:eth3",  "sw2:eth1"     ]
+      - [ "ro1:eth1",  "natgw:eth2" ]
+      - [ "ro1:eth2",  "sw1:eth1"   ]
+      - [ "ro1:eth3",  "sw2:eth1"   ]
 
-      - [ "ro2:eth2",  "sw2:eth2"     ]
-      - [ "ro2:eth3",  "sw3:eth1"     ]
+      - [ "ro2:eth2",  "sw2:eth2"   ]
+      - [ "ro2:eth3",  "sw3:eth1"   ]
 
-      - [ "sw1:eth2",  "h1:eth1"      ]
-      - [ "sw1:eth3",  "ns1:eth1"     ]
-      - [ "sw3:eth2",  "h2:eth1"      ]
-      - [ "sw3:eth3",  "ns2:eth1"     ]
+      - [ "sw1:eth2",  "h1:eth1"    ]
+      - [ "sw1:eth3",  "ns1:eth1"   ]
+      - [ "sw3:eth2",  "h2:eth1"    ]
+      - [ "sw3:eth3",  "ns2:eth1"   ]

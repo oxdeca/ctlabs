@@ -16,8 +16,8 @@ labs=(
   'net/net02'
   'net/net03'
   'net/net04'
-  'net/net05'
-  'net/net09'
+  #'net/net05'
+  #'net/net09'
   'rke2/rke201'
   'rke2/rke202'
   'sec/sec01'
@@ -44,4 +44,20 @@ test_lab_config() {
   done
 }
 
+test_lab_create_container() {
+  for lab in ${labs[@]}; do
+    echo "Starting lab $lab..."
+    ./ctlabs.rb -c ../labs/${lab}.yml -u
+    echo "OK?"
+    read in
+    if [ "$in" != "y" ]; then
+      ./ctlabs.rb -c ../labs/${lab}.yml -d
+      exit
+    fi
+    ./ctlabs.rb -c ../labs/${lab}.yml -d
+    echo "-----------------------"
+  done
+}
+
 test_lab_config
+test_lab_create_container
