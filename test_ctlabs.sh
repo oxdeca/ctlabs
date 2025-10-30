@@ -44,4 +44,4 @@ test_lab_config() {
   done
 }
 
-test_config
+test_lab_config
