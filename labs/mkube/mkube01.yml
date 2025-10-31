@@ -136,6 +136,8 @@ topology:
         env  : ['QEMU_MEM=2G','QEMU_CPU=2']
         nics :
           eth1: 192.168.30.61/24
+        dnat :
+          - [1443, 443]
       mkube2:
         type : host
         kind : qemu
@@ -144,6 +146,8 @@ topology:
         env  : ['QEMU_MEM=2G','QEMU_CPU=2']
         nics :
           eth1: 192.168.30.62/24
+        dnat :
+          - [2443, 443]
       slapd1:
         type : host
         gw   : 192.168.10.1
@@ -189,6 +193,6 @@ topology:
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
 
-      - [ "sw3:eth2", "vdb1:eth1"   ]
-      - [ "sw3:eth3", "mkube1:eth1" ]
-      - [ "sw3:eth4", "mkube2:eth1" ]
+      - [ "sw3:eth2", "mkube1:eth1" ]
+      - [ "sw3:eth3", "mkube2:eth1" ]
+      - [ "sw3:eth4", "vdb1:eth1"   ]
