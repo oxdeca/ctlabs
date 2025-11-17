@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/d12/qemu
-IMG_VERS=0.3
+IMG_VERS=0.4
 
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2

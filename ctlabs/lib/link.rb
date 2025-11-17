@@ -200,7 +200,7 @@ class Link
           if $?.exitstatus > 0
             @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf"
             @log.write "#{__method__}(): node=#{node.inspect}"
-            %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 40 )
+            %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 99 )
             %x( ip netns exec #{node.netns} ip link set mgmt up )
             %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
             %x( ip netns exec #{node.netns} ip route add default via #{@mgmt['gw']} vrf mgmt )

@@ -10,6 +10,7 @@ QEMU_MEM=${QEMU_MEM:-768M}
 QEMU_CPU=${QEMU_CPU:-2}
 QEMU_CPU_THREADS=${QEMU_CPU_THREADS:-2}
 QEMU_CPU_CORES=${QEMU_CPU_CORES:-$((QEMU_CPU/QEMU_CPU_THREADS))}
+QEMU_VGA=${QEMU_VGA:-none}
 
 gen_mac() {
   local premac="52:54:00:"
@@ -46,8 +47,14 @@ EOF
 }
 
 qemu_base_cmd() {
+    local qemu_vga
+  
+  if [ "$QEMU_VGA" != "none" ]; then
+    qemu_vga="-vga $QEMU_VGA"
+  fi
+
   QEMU_BASE_CMD=(
-    "qemu-system-x86_64 -nodefaults -display none -m ${QEMU_MEM} -serial mon:stdio"
+    "qemu-system-x86_64 -nodefaults -display none ${qemu_vga} -m ${QEMU_MEM} -serial mon:stdio"
     "-smp sockets=1,dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
     "-cpu host,hv_passthrough,kvm=on,l3-cache=on,migratable=no"
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm"

@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------------
 # File        : ctlabs/labs/k3s/k3s01.yml
 # Description : K3S Lab configuration
-# VM-Spec     : 12GB RAM, 6 vCPUs
+# VM-Spec     : 8GB RAM, 4 vCPUs
 # -----------------------------------------------------------------------------
 
 name: k3s01
@@ -63,7 +63,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
         play: 
           book: ctlabs.yml
-          tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter, opa, vault]
+          tags: [up, setup, ca, bind, k3s, smbadc, slapd, jupyter, opa, vault, xrdp]
           env : ['CTLABS_VAULT_SERVER=true']
         dnat :
           - [9988, 8888]
@@ -134,17 +134,19 @@ topology:
         kind : qemu
         kvm  : true
         gw   : 192.168.10.1
-        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
+        env  : ['QEMU_MEM=2G','QEMU_CPU=2']  #,'QEMU_VGA=qxl']
         nics :
           eth1: 192.168.10.17/24
-      h4:
-        type : host
-        kind : qemu
-        kvm  : true
-        gw   : 192.168.20.1
-        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
-        nics :
-          eth1: 192.168.20.17/24
+        dnat :
+          - [3089, 3389]
+#      h4:
+#        type : host
+#        kind : qemu
+#        kvm  : true
+#        gw   : 192.168.20.1
+#        env  : ['QEMU_MEM=2G','QEMU_CPU=2']
+#        nics :
+#          eth1: 192.168.20.17/24
       slapd1:
         type : host
         gw   : 192.168.10.1
@@ -201,7 +203,7 @@ topology:
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
-      - [ "sw2:eth4", "h4:eth1"     ]
+#      - [ "sw2:eth4", "h4:eth1"     ]
 
       - [ "sw3:eth2", "vdb1:eth1"   ]
       - [ "sw3:eth3", "k3s1:eth1"   ]

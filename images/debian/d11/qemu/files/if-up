@@ -20,7 +20,7 @@ save_nic_info() {
   # net0
   ip link add ${br} type bridge
   if [ "${nic}" == "eth0" ]; then
-    ip addr add 169.254.40.1/30 dev ${br}
+    #ip addr add 169.254.40.1/30 dev ${br}
     ip link set ${br} up mtu 1460 master mgmt
   else
     ip link set ${br} up mtu 1460

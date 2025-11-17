@@ -6,10 +6,13 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'kramdown'
+require 'kramdown-parser-gfm'
 require 'fileutils'
 require 'webrick'
 require 'sinatra'
 require 'erb'
+require 'net/http'
 
 # sinatra settings
 set :bind,              '0.0.0.0'
@@ -19,6 +22,7 @@ set :host_authorization, permitted_hosts: []
 set :server_settings,    SSLEnable: true,
                          SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
                          SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
+set :markdown, input: 'GFM'
 CONFIG     = '/srv/ctlabs-server/public/config.yml'
 INVENTORY  = '/srv/ctlabs-server/public/inventory.ini'
 UPLOAD_DIR = '/srv/ctlabs-server/uploads'
@@ -58,6 +62,10 @@ end
 
 get '/demo' do
   erb :demo
+end
+
+get '/markdown' do
+  erb :markdown
 end
 
 post '/upload' do
@@ -308,6 +316,27 @@ __END__
       <script>
         AsciinemaPlayer.create('/demo.cast', document.getElementById('demo'));
       </script>
+      </div>
+    </div>
+<%= FOOTER %>
+
+@@markdown
+<%= HEADER %>
+    <div id="config" class="w3-panel w3-green">
+      <h2> Markdown </h2>
+    </div>
+    <div class="w3-container w3-margin">
+      <div class="w3-card-4 w3-bar w3-round-large">
+        <header class="w3-container w3-bar w3-dark-grey w3-padding">
+          <span class="w3-badge w3-red w3-circle w3-small w3-text-red">&nbsp;</span>
+          <span class="w3-text-dark-grey">&nbsp;</span>
+          <span class="w3-badge w3-yellow w3-circle w3-small w3-text-yellow">&nbsp;</span>
+          <span class="w3-text-dark-grey">&nbsp;</span>
+          <span class="w3-badge w3-green w3-circle w3-small w3-text-green">&nbsp;</span>
+        </header>
+        <div class="w3-container w3-bar w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
+        <%= Kramdown::Document.new(File.read("/srv/ctlabs-server/public/ex.md"), input: 'GFM').to_html %>
+        </div>
       </div>
     </div>
 <%= FOOTER %>

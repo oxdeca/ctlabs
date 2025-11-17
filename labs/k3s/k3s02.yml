@@ -7,7 +7,7 @@
 # -----------------------------------------------------------------------------
 
 name: k3s02
-desc: LAB K3S (4 Nodes)
+desc: LAB K3S (4 Nodes: 3 control-plane, 1 worker)
 
 defaults:
   controller:
