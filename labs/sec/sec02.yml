@@ -59,7 +59,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: ctlabs.yml
-          tags: [up, setup, ca, bind, openvpn, jupyter]
+          tags: [up, setup, ca, bind, openvpn, xrdp, burp]
       sw0:
         type  : switch
         kind  : mgmt
