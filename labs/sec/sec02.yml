@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 10
+      ports: 12
     linux:
       image: ctlabs/c9/base
   host:
@@ -144,7 +144,7 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"    ]
       - [ "sw1:eth3", "h1:eth1"     ]
-      - [ "sw1:eth4", "zap1:eth1"   ]
+      - [ "sw1:eth4", "burp1:eth1"  ]
 
       - [ "sw2:eth2", "ns2:eth1"    ]
       - [ "sw2:eth3", "h2:eth1"     ]
