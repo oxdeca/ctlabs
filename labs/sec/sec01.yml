@@ -16,7 +16,7 @@ defaults:
   switch:
     mgmt:
       image: ctlabs/c9/ctrl
-      ports: 10
+      ports: 12
     linux:
       image: ctlabs/c9/base
   host:
@@ -28,8 +28,8 @@ defaults:
       image: ctlabs/kali/ctf
     parrot:
       image: ctlabs/parrot/ctf
-    zap:
-      image: ctlabs/owasp/zap
+    qemu:
+      image: ctlabs/d12/qemu
   router:
     frr:
       image: ctlabs/c9/frr
@@ -57,7 +57,7 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']
         play:
           book: ctlabs.yml
-          tags: [up, setup, ca, bind, openvpn, jupyter]
+          tags: [up, setup, ca, bind, openvpn, xrdp, burp]
       sw0:
         type  : switch
         kind  : mgmt
@@ -116,16 +116,16 @@ topology:
         vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [2088, 8888]
-      zap1:
+      burp1:
         type : host
-        kind : zap
-        gw   : 192.168.20.1
-        vols : ['/tmp/zap/:/zap/wrk/:Z,rw']
+        kind : qemu
+        kvm  : true
+        gw   : 192.168.10.1
+        env  : ['QEMU_MEM=4G', 'QEMU_CPU=2']
         nics :
-          eth1: 192.168.20.12/24
+          eth1: 192.168.10.41/24
         dnat :
-          - [8443, 8443]
-          - [8090, 8090]
+          - [8089, 3389]
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -136,7 +136,7 @@ topology:
 
       - [ "sw1:eth2", "ns1:eth1"   ]
       - [ "sw1:eth3", "h1:eth1"    ]
+      - [ "sw1:eth4", "burp1:eth1" ]
 
       - [ "sw2:eth2", "ns2:eth1"   ]
       - [ "sw2:eth3", "h2:eth1"    ]
-      - [ "sw2:eth4", "zap1:eth1"  ]

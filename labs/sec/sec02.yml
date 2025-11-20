@@ -28,8 +28,8 @@ defaults:
       image: ctlabs/kali/ctf
     parrot:
       image: ctlabs/parrot/ctf
-    zap:
-      image: ctlabs/owasp/zap
+    qemu:
+      image: ctlabs/d12/qemu
     juice:
       image: ctlabs/owasp/juice
   router:
@@ -118,34 +118,34 @@ topology:
         vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
         dnat :
           - [2088, 8888]
-      zap1:
+      burp1:
         type : host
-        kind : zap
-        gw   : 192.168.20.1
-        vols : ['/tmp/zap/:/zap/wrk/:Z,rw']
+        kind : qemu
+        kvm  : true
+        gw   : 192.168.10.1
+        env  : ['QEMU_MEM=4G', 'QEMU_CPU=2']
         nics :
-          eth1: 192.168.20.12/24
+          eth1: 192.168.10.41/24
         dnat :
-          - [8443, 8443]
-          - [8090, 8090]
-      juice:
+          - [8089, 3389]
+      juice2:
         type : host
         kind : juice
-        gw   : 192.168.10.1
+        gw   : 192.168.20.1
         nics :
-          eth1: 192.168.10.13/24
+          eth1: 192.168.20.50/24
 
     links:
-      - [ "ro0:eth1", "natgw:eth1" ]
+      - [ "ro0:eth1", "natgw:eth1"  ]
       
-      - [ "ro1:eth1", "natgw:eth2" ]
-      - [ "ro1:eth2", "sw1:eth1"   ]
-      - [ "ro1:eth3", "sw2:eth1"   ]
+      - [ "ro1:eth1", "natgw:eth2"  ]
+      - [ "ro1:eth2", "sw1:eth1"    ]
+      - [ "ro1:eth3", "sw2:eth1"    ]
 
-      - [ "sw1:eth2", "ns1:eth1"   ]
-      - [ "sw1:eth3", "h1:eth1"    ]
-      - [ "sw1:eth4", "juice:eth1" ]
+      - [ "sw1:eth2", "ns1:eth1"    ]
+      - [ "sw1:eth3", "h1:eth1"     ]
+      - [ "sw1:eth4", "zap1:eth1"   ]
 
-      - [ "sw2:eth2", "ns2:eth1"   ]
-      - [ "sw2:eth3", "h2:eth1"    ]
-      - [ "sw2:eth4", "zap1:eth1"  ]
+      - [ "sw2:eth2", "ns2:eth1"    ]
+      - [ "sw2:eth3", "h2:eth1"     ]
+      - [ "sw2:eth4", "juice2:eth1" ]
