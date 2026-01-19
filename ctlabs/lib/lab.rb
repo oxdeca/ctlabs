@@ -7,7 +7,7 @@
 
 class Lab
   attr_writer :dotfile, :dtype, :diagram
-  attr_reader :name, :desc
+  attr_reader :name, :desc, :nodes, :links, :defaults, :topology
 
   def initialize(cfg, vm_name=nil, dlevel="warn")
     @log = LabLog.new(level: dlevel)
@@ -32,6 +32,7 @@ class Lab
     @ephemeral  = @cfg['ephemeral'] || true
     @desc       = @cfg['desc']      || ''
     @defaults   = @cfg['defaults']  || {}
+    @topology   = @cfg['topology']  || {}
     @dns        = @cfg['dns']       || []
     @domain     = @cfg['domain']    || "ctlabs.internal"
     @mgmt       = @cfg['mgmt']      || {}
@@ -308,7 +309,7 @@ class Lab
   # 1. command args
   # 2. defined in lab configuration
   #
-  def run_playbook(play)
+  def run_playbook(play, output="shell")
     @log.write "#{__method__}(): "
     cmd    = nil
     ctrl   = find_node('ansible')
@@ -330,7 +331,11 @@ class Lab
       #puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
       #system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
       puts "Playbook found: #{play_cmd}"
-      system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
+      if output == "shell"
+        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
+      else
+        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd} 2>&1' >> output &")
+      end
     else
       puts "No Playbook found."
     end

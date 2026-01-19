@@ -14,19 +14,28 @@ require 'sinatra'
 require 'erb'
 require 'net/http'
 require 'shellwords'
+require 'set'
 
+$LOAD_PATH.unshift File.join(File.dirname(__FILE__), 'lib')
+require 'lab'
+require 'node'
+require 'link'
+require 'graph'
+require 'lablog'
 
 # sinatra settings
-enable :sessions
-set    :session_secret, ENV['SESSION_SECRET'] || ["e7c22b994c59d9cf2b48e549b1e24666636045930d3da7c1acb299d1c3b7f931f94aae41edda2c2b207a36e10f8bcb8d45223e54878f5b316e7ce3b6bc019629"].pack("H*")
-set    :bind,              '0.0.0.0'
-set    :port,               4567
-set    :public_folder,     '/srv/ctlabs-server/public'
-set    :host_authorization, permitted_hosts: []
-set    :markdown, input: 'GFM'
-set    :server_settings,    SSLEnable: true,
+disable :logging
+enable  :sessions
+set     :session_secret,     ENV['SESSION_SECRET'] || ["e7c22b994c59d9cf2b48e549b1e24666636045930d3da7c1acb299d1c3b7f931f94aae41edda2c2b207a36e10f8bcb8d45223e54878f5b316e7ce3b6bc019629"].pack("H*")
+set     :bind,              '0.0.0.0'
+set     :port,               4567
+set     :public_folder,     '/srv/ctlabs-server/public'
+set     :host_authorization, permitted_hosts: []
+set     :markdown, input: 'GFM'
+set     :server_settings,    SSLEnable: true,
                             SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
                             SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
+
 CONFIG        = '/srv/ctlabs-server/public/config.yml'
 INVENTORY     = '/srv/ctlabs-server/public/inventory.ini'
 UPLOAD_DIR    = '/srv/ctlabs-server/uploads'
@@ -36,9 +45,10 @@ CTLABS_SCRIPT = './ctlabs.rb'
 LOCK_DIR      = '/var/run/ctlabs'
 LOCK_FILE     = "#{LOCK_DIR}/running_lab"
 LOG_DIR       = '/var/log/ctlabs'
-Dir.mkdir(LOG_DIR, 0755)    unless Dir.exists?(LOG_DIR)
-Dir.mkdir(LOCK_DIR, 0755)   unless Dir.exists?(LOCK_DIR)
+Dir.mkdir(LOG_DIR,    0755) unless Dir.exists?(LOG_DIR)
+Dir.mkdir(LOCK_DIR,   0755) unless Dir.exists?(LOCK_DIR)
 Dir.mkdir(UPLOAD_DIR, 0755) unless Dir.exist?(UPLOAD_DIR)
+
 
 # add basic authentication
 use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
@@ -124,7 +134,68 @@ helpers do
   def clear_running_lab
     File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
   end
+
+  # Inside helpers do ... end block
+  def parse_lab_info(yaml_file_path)
+    require 'yaml'
+    require 'set'
+  
+    begin
+      lab_config = YAML.safe_load(File.read(yaml_file_path), aliases: true)
+    rescue Psych::SyntaxError => e
+      return { error: "Error parsing YAML: #{e.message}" }
+    rescue => e
+      return { error: "Unexpected error: #{e.message}" }
+    end
+  
+    info = {}
+    info[:lab_name] = File.basename(yaml_file_path, '.yml')
+    lab = Lab.new(yaml_file_path)
+  
+    images = Set.new
+    info[:images] = images.to_a.sort
+  
+    nodes = []
+    lab.nodes.each do |node|
+      if node.type != "gateway"
+        #p lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A',
+        node_info = {
+          name: node.name,
+          type: node.type   || 'N/A',
+          kind: node.kind   || 'N/A',
+          image: lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A',
+          cpus: 'N/A',
+          memory: 'N/A',
+        }
+        nodes << node_info
+      end
+    end
+
+    info[:nodes] = nodes
+  
+    ansible_info = {}
+    ctrl = lab.find_node("ansible")
+    #p ctrl
+    ansible_info[:playbook]    = ctrl.play['book']
+    ansible_info[:environment] = ctrl.play['env'] || []
+    ansible_info[:tags]        = ctrl.play['tags']
+    ansible_info[:roles]       = ctrl.play['tags']
+    #p "here"
+    #p ansible_info
+    info[:ansible] = ansible_info
+  
+    exposed_ports = []
+    info[:exposed_ports] = exposed_ports
+  
+    #puts "DEBUG: Generated lab info hash: #{info.inspect}"
+    return info
+  rescue => e
+    #puts "DEBUG: Error processing lab info for #{yaml_file_path}: #{e.message}"
+    #puts e.backtrace.join("\n") # Print the backtrace for more detail
+    { error: "Error processing lab info: #{e.message}" }
+  end
 end
+
 
 # ------------------------------------------------------------------------------
 # ROUTES
@@ -183,7 +254,15 @@ end
 
 get '/labs' do
   @labs = all_labs
-  @selected_lab = session[:selected_lab] || (@labs.first if @labs.any?)
+  @selected_lab = get_running_lab || session[:selected_lab] || (@labs.first if @labs.any?)
+
+  # Parse info for the selected lab
+  @lab_info = nil
+  if @selected_lab && @labs.include?(@selected_lab)
+    lab_file_path = File.join(LABS_DIR, @selected_lab)
+    @lab_info = parse_lab_info(lab_file_path)
+  end
+
   erb :labs
 end
 
@@ -215,23 +294,58 @@ post '/labs/action' do
   erb :lab_action_result
 end
 
+# Add this route *before* the main routes, or wherever appropriate
+# This route catches /labs/ANYTHING/info
+get '/labs/*/info' do
+  content_type :json
+
+  # params[:splat] is an Array containing the matched '*' part(s).
+  # For the URL /labs/k3s/k3s01.yml/info, params[:splat] will be ["k3s/k3s01.yml"]
+  lab_name_parts = params[:splat]
+
+  # Extract the lab name string from the first element of the splat array
+  lab_name = lab_name_parts.first if lab_name_parts && lab_name_parts.length > 0
+
+  # --- Validation ---
+  # Ensure lab_name exists, ends with .yml, and doesn't contain dangerous patterns
+  if !lab_name || !lab_name.end_with?('.yml') || lab_name.include?('..') || lab_name.include?("\0")
+    # Return a JSON error object with a 404 status
+    halt 404, { error: "Invalid lab name." }.to_json
+  end
+
+  # Check if the requested lab name exists in the list of known labs
+  labs_list = all_labs
+  unless labs_list.include?(lab_name)
+    # Return a JSON error object with a 404 status
+    halt 404, { error: "Lab '#{lab_name}' not found." }.to_json
+  end
+
+  lab_file_path = File.join(LABS_DIR, lab_name)
+  lab = Lab.new(lab_file_path, nil)
+  #puts "nodes"
+  #lab.nodes.each do |node|
+  #  p "Node: #{node}"
+  #end
+  #p lab.nodes
+
+  # --- Processing ---
+  # Construct the full path to the lab file
+  lab_file_path = File.join(LABS_DIR, lab_name)
+
+  # Call the helper function to parse the lab's YAML file
+  lab_info = parse_lab_info(lab_file_path)
+
+  # --- Response ---
+  # Send the parsed information back as a JSON string
+  lab_info.to_json
+end
+
 post '/labs/execute' do
   action = params[:action]
   halt 400, "Invalid action" unless %w[up down].include?(action)
 
-  if action == 'down'
-    # Get the running lab
-    running_lab = get_running_lab
-    halt 400, "No lab is currently running." unless running_lab
-
-    lab_name = running_lab
-    labs_list = all_labs
-    halt 500, "Running lab not found in lab list: #{lab_name}" unless labs_list.include?(lab_name)
-
-    # ✅ CLEAR THE LOCK NOW — assume user wants to stop
-    clear_running_lab
-
-  else # action == 'up'
+  if action == 'up'
+    # Validate lab name only for 'up'
     lab_name = params[:lab_name]
     labs_list = all_labs
     halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
@@ -240,29 +354,84 @@ post '/labs/execute' do
       current = get_running_lab
       halt 400, "A lab is already running: #{current}. Stop it first."
     end
-
     set_running_lab(lab_name)
+  else # action == 'down'
+    # Get the running lab name SERVER-SIDE, not from the form parameters for 'down'
+    running_lab_name = get_running_lab
+    halt 400, "No lab is currently running." unless running_lab_name
+
+    lab_name = running_lab_name # Use the server-side determined name
+    labs_list = all_labs
+    halt 500, "Running lab not found in lab list: #{lab_name}" unless labs_list.include?(lab_name)
+
+    # ✅ CLEAR THE LOCK HERE ON THE SERVER SIDE BEFORE STARTING THREAD
+    clear_running_lab
   end
 
-  # Proceed with execution
-  lab_path = File.join(LABS_DIR, lab_name)
-  timestamp = Time.now.to_i
-  safe_lab = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-  log_file = "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
+  # At this point, 'lab_name' holds the correct name for the action (either from form or server state)
+  lab_file_path = File.join(LABS_DIR, lab_name)
+  timestamp     = Time.now.to_i
+  safe_lab      = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+  log_file_path = "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
 
-  cmd_flag = (action == 'up') ? '-up' : '-d'
-  cmd = "cd #{SCRIPT_DIR} && nohup #{CTLABS_SCRIPT} -c #{lab_path.shellescape} #{cmd_flag} > #{log_file.shellescape} 2>&1 </dev/null &"
+  File.write(log_file_path, "Starting '#{action}' for lab: #{lab_name} (File: #{lab_file_path})\n")
 
-  # Run the command
-  success = system(cmd)
+  # --- Start Background Thread (without detach) ---
+  Thread.new do
+    begin
+      File.open(log_file_path, 'a') do |log_file_handle|
+        old_stdout   = $stdout
+        old_stderr   = $stderr
+        $stdout      = log_file_handle
+        $stderr      = log_file_handle
+        $stdout.sync = true
+        $stderr.sync = true
 
-  # Optional: if system() fails, re-set the lock for 'up', or warn for 'down'
-  if !success && action == 'up'
-    clear_running_lab  # undo lock if start failed
-    halt 500, "Failed to start lab process"
+        puts "--- Background Thread Started ---"
+
+        lab_instance = Lab.new(lab_file_path, nil, dlevel='warn')
+
+        if action == 'up'
+          lab_instance.visualize
+          lab_instance.inventory
+          lab_instance.up
+          puts "--- Lab #{lab_name} UP Operation Completed ---"
+          lab_instance.run_playbook(true, log_file_path)
+          puts "--- Lab #{lab_name} Ansible Operation Completed ---"
+        elsif action == 'down'
+          lab_instance.down
+          puts "--- Lab #{lab_name} DOWN Operation Completed ---"
+        end
+
+      ensure
+        $stdout = old_stdout
+        $stderr = old_stderr
+        puts "--- Background Thread Finished ---"
+      end
+    rescue => e
+      error_msg = "Error in background thread executing '#{action}' for lab '#{lab_name}': #{e.message}\n#{e.backtrace.join("\n")}"
+      puts error_msg
+      $stderr.puts error_msg
+
+      if action == 'up'
+        lock_file_for_thread = "#{LOCK_DIR}/running_lab"
+        if File.file?(lock_file_for_thread)
+          current_locked_lab = File.read(lock_file_for_thread).strip
+          if current_locked_lab == lab_name
+            File.delete(lock_file_for_thread)
+            puts "--- Cleared lock for failed 'up' operation for #{lab_name} ---"
+          end
+        end
+      end
+    end
   end
 
-  redirect "/logs?file=#{URI.encode_www_form_component(log_file)}&lab=#{lab_name}&action=#{action}"
+  # Do NOT call detach or join here.
+  # The thread is already running in the background.
+
+  # --- End Background Thread ---
+
+  redirect "/logs?file=#{URI.encode_www_form_component(log_file_path)}&lab=#{lab_name}&action=#{action}"
 end
 
 get '/logs' do
@@ -460,7 +629,6 @@ document.querySelectorAll('.responsive-embed').forEach(embed => {
 )
 
 FOOTER = %q(
-    <br><br>
   </body>
 </html>
 )
@@ -497,6 +665,7 @@ __END__
 <%= SCRIPT %>
 <%= FOOTER %>
 
+
 @@con
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
@@ -525,6 +694,7 @@ __END__
     </div>
 <%= SCRIPT %>
 <%= FOOTER %>
+
 
 @@topo
 <%= HEADER %>
@@ -555,6 +725,7 @@ __END__
 <%= SCRIPT %>
 <%= FOOTER %>
 
+
 @@upload
 <%= HEADER %>
     <div id="upload" class="w3-panel w3-green">
@@ -580,6 +751,7 @@ __END__
     </divc>
 <%= FOOTER %>
 
+
 @@inventory
 <%= HEADER %>
     <div id="inventory" class="w3-panel w3-green">
@@ -591,6 +763,7 @@ __END__
       </div>
     </div>
 <%= FOOTER %>
+
 
 @@config
 <%= HEADER %>
@@ -609,7 +782,57 @@ __END__
     <div class="w3-panel w3-green">
       <h2>📹 Walkthrough </h2>
     </div>
-    <div id="demo" class="w3-container w3-card-4" style="max-width: 100%; max-height: 100%; overflow: auto;">
+    <!-- Constrain total height to viewport, similar to live_log -->
+    <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;"> <!-- Adjust calc value if needed -->
+      <!-- Main card/container for the demo player -->
+      <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px;"> <!-- Added padding -->
+        <!-- Container specifically for the Asciinema player -->
+        <div id="demo-container" style="flex: 1; display: flex; align-items: stretch; justify-content: center; overflow: hidden;"> <!-- New container div -->
+          <div id="demo" style="flex: 1; height: 100%; width: 100%;"> <!-- Target div for Asciinema, fills its container -->
+            <!-- Asciinema player will be injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/asciinema-player.min.js"></script>
+    <script>
+      // Wait for the DOM to be fully loaded before initializing the player
+      document.addEventListener('DOMContentLoaded', function() {
+        // Get the target div
+        const demoDiv = document.getElementById('demo');
+
+        // Create the player, targeting the 'demo' div
+        // Pass configuration options to influence sizing
+        AsciinemaPlayer.create('/demo.cast', demoDiv, {
+          // --- Player Sizing Options ---
+          cols: null, // Let the player determine based on container/recording width
+          rows: null, // Let the player determine based on container/recording height
+          // fit: "width", // Alternative: fit only width, height adapts
+          // fit: "height", // Alternative: fit only height, width adapts (might distort)
+          fit: "both", // Default behavior might be similar, but explicit 'both' can sometimes help
+          // autoFit: true, // Check Asciinema docs - this might be the key option if supported
+          // --- Other Common Options ---
+          // autoplay: true, // Start playing automatically
+          // loop: false,    // Loop the playback
+          // startAt: 0,     // Start time in seconds
+          // poster: "npt:0", // Poster frame (e.g., at start)
+          // fontSize: "small", // Font size ("small", "normal", "big")
+          // theme: "dracula", // Color theme
+          // terminalFontFamily: "Monaco, Courier New", // Custom font
+          // terminalLineHeight: 1.3, // Line height multiplier
+          // terminalPadding: "4px", // Padding around terminal content
+        });
+      });
+    </script>
+<%= FOOTER %>
+
+@@demo_old
+<%= HEADER %>
+    <div class="w3-panel w3-green">
+      <h2>📹 Walkthrough </h2>
+    </div>
+    <div id="demo" class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 95%; overflow: auto;">
       <div class="w3-round">
       <script src="/asciinema-player.min.js"></script>
       <script>
@@ -618,6 +841,7 @@ __END__
       </div>
     </div>
 <%= FOOTER %>
+
 
 @@markdown
 <%= HEADER %>
@@ -668,7 +892,7 @@ __END__
 </div>
 
 <% running = running_lab? %>
-<div class="w3-container w3-card-4 w3-padding">
+<div class="w3-container w3-card-4 w3-padding w3-2021-inkwell">
   <form method="post" action="/labs/execute">
     <label><b>Select Lab:</b></label>
     <select name="lab_name" id="lab-selector" class="w3-select w3-margin-bottom" required <%= 'disabled' if running %>>
@@ -683,9 +907,120 @@ __END__
 
   <% if running %>
     <div class="w3-panel w3-orange w3-margin-top" style="padding:8px;">
-      <strong>⚠️ A lab is already running:</strong> 
+      <strong>⚠️ A lab is already running:</strong>
       <code><%= get_running_lab || 'unknown' %></code>
       <br>Please stop it before starting another.
+    </div>
+  <% end %>
+</div>
+
+<br>
+
+<!-- Lab Info Card Section -->
+<div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round">
+  <% if @lab_info %>
+    <% if @lab_info[:error] %>
+      <div class="w3-panel w3-red">
+        <h4>Error Loading Lab Info</h4>
+        <p><%= @lab_info[:error] %></p>
+      </div>
+    <% else %>
+      <div class="w3-panel w3-card w3-flat-midnight-blue">
+        <h4>Info: <code><%= @lab_info[:lab_name] %></code></h4>
+        <div class="w3-row-padding w3-margin-top">
+          <!-- Images Card -->
+          <div class="w3-col s12 m6 l3">
+            <div class="w3-card w3-white w3-center">
+              <div class="w3-container w3-blue">
+                <h5>Images</h5>
+              </div>
+              <div class="w3-container w3-padding">
+                <ul class="w3-ul">
+                  <% @lab_info[:images].each do |img| %>
+                    <li><%= img.to_s %></li>
+                  <% end %>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nodes Card -->
+          <div class="w3-col s12 m6 l6">
+            <div class="w3-card w3-white w3-center">
+              <div class="w3-container w3-green">
+                <h5>Nodes</h5>
+              </div>
+              <div class="w3-container w3-padding w3-flat-wet-asphalt">
+                <table class="w3-table w3-bordered w3-striped w3-flat-wet-asphalt">
+                  <thead>
+                    <tr><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th>CPUs</th><th>Mem</th></tr>
+                  </thead>
+                  <tbody>
+                    <% @lab_info[:nodes].each do |node| %>
+                      <tr>
+                        <td><code><%= node[:name] %></code></td>
+                        <td><%= node[:type] %></td>
+                        <td><%= node[:kind] %></td>
+                        <td><%= node[:image] %></td>
+                        <td><%= node[:cpus] %></td>
+                        <td><%= node[:memory] %></td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ansible Card -->
+          <div class="w3-col s12 m6 l3">
+            <div class="w3-card w3-white w3-center">
+              <div class="w3-container w3-purple">
+                <h5>Ansible</h5>
+              </div>
+              <div class="w3-container w3-padding">
+                <p><strong>Playbook:</strong> <%= @lab_info[:ansible][:playbook] %></p>
+                <p><strong>Environment:</strong> <%= @lab_info[:ansible][:environment] %></p>
+                <p><strong>Tags:</strong> <%= @lab_info[:ansible][:tags].is_a?(Array) ? @lab_info[:ansible][:tags].join(', ') : @lab_info[:ansible][:tags] %></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Exposed Ports Card -->
+          <div class="w3-col s12 m6 l12 w3-margin-top">
+            <div class="w3-card w3-white w3-center">
+              <div class="w3-container w3-deep-orange">
+                <h5>Exposed Ports (DNAT)</h5>
+              </div>
+              <div class="w3-container w3-padding">
+                <% if @lab_info[:exposed_ports].empty? %>
+                  <p>None Defined</p>
+                <% else %>
+                  <table class="w3-table w3-bordered w3-striped">
+                    <thead>
+                      <tr><th>Service</th><th>External Port</th><th>Internal Port</th><th>Node</th></tr>
+                    </thead>
+                    <tbody>
+                      <% @lab_info[:exposed_ports].each do |port| %>
+                        <tr>
+                          <td><%= port[:service] %></td>
+                          <td><%= port[:external_port] %></td>
+                          <td><%= port[:internal_port] %></td>
+                          <td><%= port[:node] %></td>
+                        </tr>
+                      <% end %>
+                    </tbody>
+                  </table>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% else %>
+    <div id="lab-info-placeholder" class="w3-panel w3-light-grey">
+      <p>Select a lab to view its details.</p>
     </div>
   <% end %>
 </div>
@@ -694,24 +1029,84 @@ __END__
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     const lastLog = localStorage.getItem('ctlabs_last_log');
-    const select = document.getElementById('lab-selector');
+    const selectElement = document.getElementById('lab-selector');
+    const infoSection = document.getElementById('lab-info-section');
 
-    if (lastLog && select) {
+    if (lastLog && selectElement) {
       try {
         const { lab } = JSON.parse(lastLog);
-        // Only auto-select if the lab still exists in the list
-        if (Array.from(select.options).some(opt => opt.value === lab)) {
-          select.value = lab;
-          // Optional: highlight that it was auto-filled
-          // select.style.borderColor = '#4CAF50';
+        if (Array.from(selectElement.options).some(opt => opt.value === lab)) {
+          selectElement.value = lab;
+          // Trigger change event to update info card if needed
+          // This might be redundant if the server already rendered the info,
+          // but ensures client-side update if selection changes externally.
+          selectElement.dispatchEvent(new Event('change'));
         }
       } catch (e) {
         console.warn('Failed to parse last log:', e);
       }
     }
+
+    // Add event listener for the dropdown change
+    selectElement.addEventListener('change', function() {
+      const selectedLab = this.value;
+      if (selectedLab) {
+        // Show a loading message or spinner
+        infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue"><p>Loading lab info...</p></div>';
+
+        // Fetch the new lab info via AJAX
+        fetch(`/labs/${encodeURIComponent(selectedLab)}/info`)
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              infoSection.innerHTML = `<div class="w3-panel w3-red"><h4>Error Loading Lab Info</h4><p>${data.error}</p></div>`;
+            } else {
+              // Build the HTML string for the new info card
+              let html = `<div class="w3-panel w3-card w3-flat-midnight-blue"><h4>Info: <code>${data.lab_name}</code></h4>`;
+              html += `<div class="w3-row-padding w3-margin-top">`;
+
+              // Images Card
+              html += `<div class="w3-col s12 m6 l3"><div class="w3-card w3-white w3-center"><div class="w3-container w3-blue"><h5>Images</h5></div><div class="w3-container w3-padding"><ul class="w3-ul">`;
+              data.images.forEach(img => { html += `<li>${img}</li>` });
+              html += `</ul></div></div></div>`;
+
+              // Nodes Card
+              html += `<div class="w3-col s12 m6 l6"><div class="w3-card w3-white w3-center"><div class="w3-container w3-green"><h5>Nodes</h5></div><div class="w3-container w3-padding"><table class="w3-table w3-bordered w3-striped"><thead><tr><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th>CPUs</th><th>Mem</th></tr></thead><tbody>`;
+              data.nodes.forEach(node => {
+                  html += `<tr><td><code>${node.name}</code></td><td>${node.type}</td><td>${node.kind}</td><td>${node.image}</td><td>${node.cpus}</td><td>${node.memory}</td></tr>`;
+              });
+              html += `</tbody></table></div></div></div>`;
+
+              // Ansible Card
+              html += `<div class="w3-col s12 m6 l3"><div class="w3-card w3-white w3-center"><div class="w3-container w3-purple"><h5>Ansible</h5></div><div class="w3-container w3-padding"><p><strong>Playbook:</strong> ${data.ansible.playbook}</p><p><strong>Environment:</strong> ${data.ansible.environment}</p><p><strong>Tags:</strong> ${Array.isArray(data.ansible.tags) ? data.ansible.tags.join(', ') : data.ansible.tags}</p></div></div></div>`;
+
+              // Exposed Ports Card
+              html += `<div class="w3-col s12 m6 l12 w3-margin-top"><div class="w3-card w3-white w3-center"><div class="w3-container w3-deep-orange"><h5>Exposed Ports (DNAT)</h5></div><div class="w3-container w3-padding">`;
+              if (data.exposed_ports.length === 0) {
+                  html += `<p>None Defined</p>`;
+              } else {
+                  html += `<table class="w3-table w3-bordered w3-striped"><thead><tr><th>Service</th><th>External Port</th><th>Internal Port</th><th>Node</th></tr></thead><tbody>`;
+                  data.exposed_ports.forEach(port => {
+                      html += `<tr><td>${port.service}</td><td>${port.external_port}</td><td>${port.internal_port}</td><td>${port.node}</td></tr>`;
+                  });
+                  html += `</tbody></table>`;
+              }
+              html += `</div></div></div>`;
+
+              html += `</div></div>`;
+              infoSection.innerHTML = html;
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching lab info:', error);
+            infoSection.innerHTML = '<div class="w3-panel w3-red"><h4>Error</h4><p>Could not load lab info.</p></div>';
+          });
+      }
+    });
   });
 </script>
 <%= FOOTER %>
+
 
 @@lab_action_result
 <%= HEADER %>
@@ -724,6 +1119,7 @@ __END__
 <br>
 <%= FOOTER %>
 
+
 @@live_log
 <%= HEADER %>
 <div class="w3-panel w3-<%= @action == 'up' ? 'green' : 'red' %>">
@@ -734,7 +1130,7 @@ __END__
 </div>
 
 <!-- Constrain total height to viewport -->
-<div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column;">
+<div class="w3-container" style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
   <div class="w3-container w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
     <br>
     <pre id="log-content" style="flex: 1; resize: vertical; overflow: auto; min-height: 150px; background: #1e1e1e; color: #f0f0f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: none;"></pre>
@@ -785,12 +1181,13 @@ __END__
 </script>
 <%= FOOTER %>
 
+
 @@logs_home
 <%= HEADER %>
 <div class="w3-panel w3-green">
   <h2>🧾 Lab Logs</h2>
 </div>
-<div class="w3-container">
+<div class="w3-container w3-2021-inkwell">
   <p id="status">Checking for active log session...</p>
 </div>
 
@@ -833,13 +1230,15 @@ __END__
 </script>
 <%= FOOTER %>
 
+
 @@logs_index
 <%= HEADER %>
 <div class="w3-panel w3-green">
   <h2>🧾 Lab Logs</h2>
 </div>
 
-<div class="w3-container">
+<div class="w3-container w3-2021-inkwell">
+
 
   <% if @running_lab %>
     <div class="w3-panel w3-green">
@@ -869,76 +1268,7 @@ __END__
   <% if @log_files.empty? %>
     <p>No logs found.</p>
   <% else %>
-    <ul class="w3-ul w3-card-4">
-      <% @log_files.each do |log| %>
-        <%
-          basename = File.basename(log, '.log')
-          parts = basename.split('_')
-          timestamp = parts[1].to_i rescue 0
-          lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
-          action = parts.last == 'up' ? 'Start' : 'Stop'
-          time_str = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
-        %>
-        <li>
-          <strong><%= lab_name %></strong> 
-          (<%= action %>) — <%= time_str %><br>
-          <a href="/logs?file=<%= URI.encode_www_form_component(log) %>" class="w3-button w3-tiny w3-blue w3-round">View</a>
-        </li>
-      <% end %>
-    </ul>
-  <% end %>
-
-  <br>
-</div>
-<%= FOOTER %>
-
-@@logs_index
-<%= HEADER %>
-<div class="w3-panel w3-blue">
-  <h2>Lab Logs</h2>
-</div>
-
-<div class="w3-container">
-
-  <!-- Delete All Button -->
-  <% if @log_files.any? %>
-    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;" 
-          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
-      <button type="submit" class="w3-button w3-red w3-tiny w3-round">
-        🗑️ Delete All Logs
-      </button>
-    </form>
-  <% end %>
-
-  <% if @running_lab %>
-    <div class="w3-panel w3-green">
-      <strong>Currently running:</strong> <code><%= @running_lab %></code>
-      <a href="#" onclick="window.location.href = findLatestLog(); return false;"
-         class="w3-button w3-small w3-white w3-margin-left">
-        ▶ View Live Log
-      </a>
-    </div>
-    <script>
-      const logs = <%= JSON.generate(@log_files.map { |f| { file: f, mtime: File.mtime(f).to_i } }) %>;
-      const runningLab = <%= JSON.generate(@running_lab) %>;
-      
-      function findLatestLog() {
-        if (!runningLab) return '/logs';
-        const filtered = logs.filter(l => l.file.includes(runningLab.replace(/\//g, '_')));
-        if (filtered.length > 0) {
-          filtered.sort((a, b) => b.mtime - a.mtime);
-          return '/logs?file=' + encodeURIComponent(filtered[0].file);
-        }
-        return '/logs';
-      }
-    </script>
-  <% end %>
-
-  <h3>Recent Logs</h3>
-  <% if @log_files.empty? %>
-    <p>No logs found.</p>
-  <% else %>
-    <ul class="w3-ul w3-card-4">
+    <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
       <% @log_files.each do |log| %>
         <%
           basename = File.basename(log, '.log')
@@ -966,7 +1296,18 @@ __END__
       <% end %>
     </ul>
   <% end %>
+  <br>
+  <!-- Delete All Button -->
+  <% if @log_files.any? %>
+    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;" 
+          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
+      <button type="submit" class="w3-button w3-red w3-tiny w3-round w3-right">
+        🗑️ Delete All Logs
+      </button>
+    </form>
+  <% end %>
 
   <br>
 </div>
 <%= FOOTER %>
+
