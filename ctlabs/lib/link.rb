@@ -162,7 +162,7 @@ class Link
             %x( ip netns exec #{node.netns} ip link set #{nic} master #{node.name} )
           elsif(node.type == 'switch' && ['ovs'].include?(node.kind) && nic != "eth0" )
             @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to openvswitch #{node.name}"
-            %x( docker exec -it  #{node.name} sh -c '/usr/bin/ovs-vsctl add-port #{node.name} #{nic}' )
+            %x( docker exec #{node.name} sh -c '/usr/bin/ovs-vsctl add-port #{node.name} #{nic}' )
           end
         end
     end

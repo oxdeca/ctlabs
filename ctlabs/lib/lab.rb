@@ -5,6 +5,9 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'open3'
+require 'shellwords'
+
 class Lab
   attr_writer :dotfile, :dtype, :diagram
   attr_reader :name, :desc, :nodes, :links, :defaults, :topology
@@ -329,17 +332,55 @@ class Lab
 
     if play_cmd.class == String
       #puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
-      #system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
+      #system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
       puts "Playbook found: #{play_cmd}"
       if output == "shell"
-        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
+        system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
       else
-        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd} 2>&1' >> output")
+        stream_docker_exec(ctrl.name, play_cmd, output)
       end
     else
       puts "No Playbook found."
     end
   end
+
+  def stream_docker_exec(container_name, play_cmd, log_file_path = nil)
+    inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
+    cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
+  
+    Open3.popen3(*cmd) do |stdin, stdout, stderr, wait_thr|
+      stdin.close
+  
+      # Optional: write to log file
+      log_file = log_file_path ? File.open(log_file_path, 'a') : nil
+  
+      # Stream both stdout and stderr as they arrive
+      begin
+        while (line = stdout.gets)
+          # Yield or process line in real time
+          yield line if block_given?
+          log_file&.write(line)
+          log_file&.flush
+        end
+  
+        # Drain any remaining stderr (in case of late errors)
+        while (err_line = stderr.gets)
+          yield err_line if block_given?
+          log_file&.write(err_line)
+          log_file&.flush
+        end
+      rescue => e
+        error_msg = "Error during streaming: #{e.message}\n"
+        yield error_msg if block_given?
+        log_file&.write(error_msg)
+      ensure
+        log_file&.close
+        exit_status = wait_thr.value.exitstatus
+        yield "[Command exited with status: #{exit_status}]\n" if block_given?
+      end
+    end
+  end
+
 
   def down
     @log.write "#{__method__}(): "

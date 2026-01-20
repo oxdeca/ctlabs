@@ -117,14 +117,14 @@ class Node
         end
 
 
-        #%x( docker run -itd #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
-        %x( docker run -itd --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        #%x( docker run -d #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        %x( docker run -d --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
         @vmem    = %x( /usr/bin/printf "262144" > /proc/sys/vm/max_map_count )
-        %x( docker exec -it  #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+        %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
         @netns = add_netns
         #add_nics
 
@@ -180,7 +180,7 @@ class Node
 
           %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
           if $?.exitstatus > 0
-            %x( docker exec -it  #{@name} sh -c '/usr/bin/ovs-vsctl add-br #{@name}' )
+            %x( docker exec #{@name} sh -c '/usr/bin/ovs-vsctl add-br #{@name}' )
            # if(! @ipv4.nil? )
            #   %x( ip netns exec #{@netns} ip addr add #{@ipv4} dev #{@name} )
            # end
