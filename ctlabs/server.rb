@@ -784,7 +784,7 @@ HEADER = %q(
     <div class="w3-top w3-bar w3-black">
       <a href="/"          class="w3-bar-item w3-button">🔬 CTLABS</a>
 <!--      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a> -->
-      <a href="/topo"      class="w3-bar-item w3-button">🏠 Topology</a>
+      <a href="/topo"      class="w3-bar-item w3-button">🗺️ Topology</a>
       <a href="/con"       class="w3-bar-item w3-button">🕸 Connections</a>
       <a href="/inventory" class="w3-bar-item w3-button">🗂️ Inventory</a>
       <a href="/config"    class="w3-bar-item w3-button">⚙️  Configuration</a>
@@ -875,7 +875,7 @@ __END__
       </div>
     </div>
     <div id="topo" class="w3-panel w3-green">
-      <h2>🏠 Topology [Data Network]</h2>
+      <h2>🗺️ Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
@@ -923,7 +923,7 @@ __END__
 @@topo
 <%= HEADER %>
     <div id="topo" class="w3-panel w3-green">
-      <h2>🏠 Topology [Data Network]</h2>
+      <h2>🗺️ Topology [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
@@ -931,11 +931,11 @@ __END__
         <span>Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span>
       </div>
       <div class="svg-container">
-        <embed id="topo-embed" src="topo.svg" class="w3-round responsive-embed" alt="🏠 Topology" type="image/svg+xml" width="100%">
+        <embed id="topo-embed" src="topo.svg" class="w3-round responsive-embed" alt="🗺 Topology" type="image/svg+xml" width="100%">
       </div>
     </div>
     <div id="mgmt_topo" class="w3-panel w3-green">
-      <h2>🏠 Topology [Management Network]</h2>
+      <h2>🗺️ Topology [Management Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
