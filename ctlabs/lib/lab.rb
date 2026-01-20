@@ -334,7 +334,7 @@ class Lab
       if output == "shell"
         system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
       else
-        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd} 2>&1' >> output &")
+        system("docker exec -it #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd} 2>&1' >> output")
       end
     else
       puts "No Playbook found."
