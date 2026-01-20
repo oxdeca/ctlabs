@@ -15,6 +15,7 @@ require 'erb'
 require 'net/http'
 require 'shellwords'
 require 'set'
+require 'securerandom'
 
 $LOAD_PATH.unshift File.join(File.dirname(__FILE__), 'lib')
 require 'lab'
@@ -26,7 +27,7 @@ require 'lablog'
 # sinatra settings
 disable :logging
 enable  :sessions
-set     :session_secret,     ENV['SESSION_SECRET'] || ["e7c22b994c59d9cf2b48e549b1e24666636045930d3da7c1acb299d1c3b7f931f94aae41edda2c2b207a36e10f8bcb8d45223e54878f5b316e7ce3b6bc019629"].pack("H*")
+set     :session_secret,     SecureRandom.hex(64)
 set     :bind,              '0.0.0.0'
 set     :port,               4567
 set     :public_folder,     '/srv/ctlabs-server/public'
@@ -56,6 +57,10 @@ use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
   user == 'ctlabs' && pass.crypt("$6$#{salt}$") == "$6$GGV78Ib5vVRkTc$cRAo9wl36SQPkh/UFzgEIOO1rBuju7/h5Lu8fJMDUNDG0HUcL3AhBNEqcYT1UUZkmBHa9.8r/5eh5qXwA8zcr."
 end
 
+
+#
+# HELPERS
+#
 helpers do
   def ansi_to_html(text)
     color_map = {
@@ -148,12 +153,18 @@ helpers do
       return { error: "Unexpected error: #{e.message}" }
     end
   
+    lab = Lab.new(yaml_file_path)
     info = {}
     info[:lab_name] = File.basename(yaml_file_path, '.yml')
-    lab = Lab.new(yaml_file_path)
+    info[:desc]     = lab.desc || ''
   
-    images = Set.new
-    info[:images] = images.to_a.sort
+    images = []
+    lab.defaults.each do |tk, tv|
+      tv.each do |kk, kv|
+        images << {type: tk, kind: kk, image: kv['image']}
+      end
+    end
+    info[:images] = images
   
     nodes = []
     lab.nodes.each do |node|
@@ -176,15 +187,37 @@ helpers do
     ansible_info = {}
     ctrl = lab.find_node("ansible")
     #p ctrl
-    ansible_info[:playbook]    = ctrl.play['book']
-    ansible_info[:environment] = ctrl.play['env'] || []
-    ansible_info[:tags]        = ctrl.play['tags']
-    ansible_info[:roles]       = ctrl.play['tags']
+    if ! ctrl.play.nil?
+      ansible_info[:playbook]    = ctrl.play['book']
+      ansible_info[:environment] = ctrl.play['env'] || []
+      ansible_info[:tags]        = ctrl.play['tags']
+      ansible_info[:roles]       = ctrl.play['tags']
+    end
     #p "here"
     #p ansible_info
     info[:ansible] = ansible_info
   
+    vip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
     exposed_ports = []
+    lab.nodes.each do |node|
+      if (defined? node.dnat) && ! node.dnat.nil? && (node.type.include?('host') || node.type.include?('controller'))
+        node.dnat.each do |p|
+          rip = ""
+          if node.type == 'controller'
+            rip = node.nics['eth0'].split('/').first
+          else
+            rip = node.nics['eth1'].split('/').first
+          end
+          node_info = {
+            node: node.name,
+            type: node.type,
+            external_port: "#{vip}:#{p[0]}",
+            internal_port: "#{rip}:#{p[1]}",
+          }
+          exposed_ports << node_info
+        end
+      end
+    end
     info[:exposed_ports] = exposed_ports
   
     #puts "DEBUG: Generated lab info hash: #{info.inspect}"
@@ -193,6 +226,165 @@ helpers do
     #puts "DEBUG: Error processing lab info for #{yaml_file_path}: #{e.message}"
     #puts e.backtrace.join("\n") # Print the backtrace for more detail
     { error: "Error processing lab info: #{e.message}" }
+  end
+
+  # Inside helpers do ... end block
+  def render_lab_info_card(info_hash)
+    # This is a simplified example using ERB directly within Ruby code.
+    # A more robust approach might involve separate .erb partials.
+    template = %q(
+<% if info_hash[:error] %>
+  <div class="w3-panel w3-red">
+    <h4>Error Loading Lab Info</h4>
+    <p><%= info_hash[:error] %></p>
+  </div>
+<% else %>
+  <div class="w3-panel w3-card w3-flat-midnight-blue">
+    <h4>Info: <code><%= info_hash[:lab_name] %></code></h4>
+    <div><%= info_hash[:desc] %></div>
+
+    <!-- Two-column layout -->
+    <div class="w3-row-padding w3-margin-top">
+      <!-- LEFT COLUMN: Nodes + Ansible -->
+      <div class="w3-col s12 m6 l6">
+        <!-- Nodes Card -->
+        <div class="w3-card w3-white w3-margin-bottom">
+          <div class="w3-container w3-green">
+            <h5>Nodes</h5>
+          </div>
+          <div class="w3-container w3-padding w3-flat-wet-asphalt">
+            <table class="w3-table w3-bordered w3-striped">
+              <thead>
+                <tr><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th>CPUs</th><th>Mem</th></tr>
+              </thead>
+              <tbody>
+                <% info_hash[:nodes].each do |node| %>
+                  <tr>
+                    <td><code><%= node[:name] %></code></td>
+                    <td><%= node[:type] %></td>
+                    <td><%= node[:kind] %></td>
+                    <td><%= node[:image] %></td>
+                    <td><%= node[:cpus] %></td>
+                    <td><%= node[:memory] %></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Ansible Card -->
+        <div class="w3-card w3-white">
+          <div class="w3-container w3-purple">
+            <h5>Ansible</h5>
+          </div>
+          <div class="w3-container w3-padding">
+            <table class="w3-table w3-bordered w3-striped">
+              <tr>
+                <th>Playbook:</th>
+                <td><%= info_hash[:ansible][:playbook] %></td>
+              </tr>
+              <tr>
+                <th>Environment:</th>
+                <td>
+                  <% info_hash[:ansible][:environment].each do |e| %>
+                    <%= e %><br>
+                  <% end %>
+                </td>
+              </tr>
+              <tr>
+                <th>Tags:</th>
+                <td>
+                  <% info_hash[:ansible][:tags].each do |t| %>
+                    <%= t %><br>
+                  <% end %>
+                </td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Images + Exposed Ports -->
+      <div class="w3-col s12 m6 l6">
+        <!-- Images Card -->
+        <div class="w3-card w3-white w3-margin-bottom">
+          <div class="w3-container w3-blue">
+            <h5>Images</h5>
+          </div>
+          <div class="w3-container w3-padding">
+            <% if info_hash[:images].empty? %>
+              <p>No images defined</p>
+            <% else %>
+              <table class="w3-table w3-bordered w3-striped">
+                <thead>
+                  <tr><th>Type</th><th>Kind</th><th>Image</th></tr>
+                </thead>
+                <tbody>
+                  <% info_hash[:images].each do |img| %>
+                    <tr>
+                      <td><%= img[:type] %></td>
+                      <td><%= img[:kind] %></td>
+                      <td><%= img[:image] %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          </div>
+        </div>
+
+        <!-- Exposed Ports Card -->
+        <div class="w3-card w3-white">
+          <div class="w3-container w3-deep-orange">
+            <h5>Exposed Ports (DNAT)</h5>
+          </div>
+          <div class="w3-container w3-padding">
+            <% if info_hash[:exposed_ports].empty? %>
+              <p>None Defined</p>
+            <% else %>
+              <table class="w3-table w3-bordered w3-striped">
+                <thead>
+                  <tr><th>Node</th><th>Type</th><th>Rule</th></tr>
+                </thead>
+                <tbody>
+                  <% info_hash[:exposed_ports].each do |port| %>
+                    <tr>
+                      <td><%= port[:node] %></td>
+                      <td><%= port[:type] %></td>
+                      <td><%= port[:external_port] %> ➡ <%= port[:internal_port] %></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>)
+  
+    # Use ERB to render the template with the provided hash
+    erb_template = ERB.new(template)
+    # Bind the local variable 'info_hash' within the ERB context
+    # We need to pass the info_hash into the binding somehow.
+    # A common way is to use instance variables or a more complex binding setup.
+    # For simplicity here, let's assume the template is self-contained regarding variables.
+    # A better way might be to pass it as a local variable using :locals
+    # But ERB.new doesn't directly support :locals like Sinatra's erb() does.
+    # We can use a binding trick or use a method like Sinatra's internal rendering.
+    # Let's use the instance variable approach by setting it temporarily.
+    old_info_hash = instance_variable_get("@info_hash")
+    instance_variable_set("@info_hash", info_hash)
+    result = erb_template.result(binding)
+    # Restore the old value if it existed
+    if old_info_hash
+      instance_variable_set("@info_hash", old_info_hash)
+    else
+      remove_instance_variable("@info_hash") if instance_variable_defined?("@info_hash")
+    end
+    result
   end
 end
 
@@ -292,6 +484,37 @@ post '/labs/action' do
   @selected_lab = lab_name
 
   erb :lab_action_result
+end
+
+# Add this route *before* the main routes, and importantly, BEFORE the '/labs/*/info' route
+get '/labs/*/info_card' do # <-- NEW: Wildcard for info_card
+  content_type 'text/html' # Return HTML fragment
+
+  # params[:splat] is an Array containing the matched '*' part(s).
+  # For the URL /labs/lpic2/lpic210.yml/info_card, params[:splat] will be ["lpic2/lpic210.yml"]
+  lab_name_parts = params[:splat]
+
+  # Extract the lab name string from the first element of the splat array
+  lab_name = lab_name_parts.first if lab_name_parts && lab_name_parts.length > 0
+
+  # --- Validation (same as before) ---
+  # Ensure lab_name exists, ends with .yml, and doesn't contain dangerous patterns
+  if !lab_name || !lab_name.end_with?('.yml') || lab_name.include?('..') || lab_name.include?("\0")
+    halt 404, "Invalid lab name."
+  end
+
+  labs_list = all_labs
+  unless labs_list.include?(lab_name)
+    halt 404, "Lab '#{lab_name}' not found."
+  end
+
+  # --- Processing (same as before) ---
+  lab_file_path = File.join(LABS_DIR, lab_name)
+  lab_info = parse_lab_info(lab_file_path)
+
+  # --- Response (same as before) ---
+  # Use the helper method to render the card HTML
+  render_lab_info_card(lab_info)
 end
 
 # Add this route *before* the main routes, or wherever appropriate
@@ -777,6 +1000,7 @@ __END__
     </div>
 <%= FOOTER %>
 
+
 @@demo
 <%= HEADER %>
     <div class="w3-panel w3-green">
@@ -919,105 +1143,7 @@ __END__
 <!-- Lab Info Card Section -->
 <div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round">
   <% if @lab_info %>
-    <% if @lab_info[:error] %>
-      <div class="w3-panel w3-red">
-        <h4>Error Loading Lab Info</h4>
-        <p><%= @lab_info[:error] %></p>
-      </div>
-    <% else %>
-      <div class="w3-panel w3-card w3-flat-midnight-blue">
-        <h4>Info: <code><%= @lab_info[:lab_name] %></code></h4>
-        <div class="w3-row-padding w3-margin-top">
-          <!-- Images Card -->
-          <div class="w3-col s12 m6 l3">
-            <div class="w3-card w3-white w3-center">
-              <div class="w3-container w3-blue">
-                <h5>Images</h5>
-              </div>
-              <div class="w3-container w3-padding">
-                <ul class="w3-ul">
-                  <% @lab_info[:images].each do |img| %>
-                    <li><%= img.to_s %></li>
-                  <% end %>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <!-- Nodes Card -->
-          <div class="w3-col s12 m6 l6">
-            <div class="w3-card w3-white w3-center">
-              <div class="w3-container w3-green">
-                <h5>Nodes</h5>
-              </div>
-              <div class="w3-container w3-padding w3-flat-wet-asphalt">
-                <table class="w3-table w3-bordered w3-striped w3-flat-wet-asphalt">
-                  <thead>
-                    <tr><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th>CPUs</th><th>Mem</th></tr>
-                  </thead>
-                  <tbody>
-                    <% @lab_info[:nodes].each do |node| %>
-                      <tr>
-                        <td><code><%= node[:name] %></code></td>
-                        <td><%= node[:type] %></td>
-                        <td><%= node[:kind] %></td>
-                        <td><%= node[:image] %></td>
-                        <td><%= node[:cpus] %></td>
-                        <td><%= node[:memory] %></td>
-                      </tr>
-                    <% end %>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- Ansible Card -->
-          <div class="w3-col s12 m6 l3">
-            <div class="w3-card w3-white w3-center">
-              <div class="w3-container w3-purple">
-                <h5>Ansible</h5>
-              </div>
-              <div class="w3-container w3-padding">
-                <p><strong>Playbook:</strong> <%= @lab_info[:ansible][:playbook] %></p>
-                <p><strong>Environment:</strong> <%= @lab_info[:ansible][:environment] %></p>
-                <p><strong>Tags:</strong> <%= @lab_info[:ansible][:tags].is_a?(Array) ? @lab_info[:ansible][:tags].join(', ') : @lab_info[:ansible][:tags] %></p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Exposed Ports Card -->
-          <div class="w3-col s12 m6 l12 w3-margin-top">
-            <div class="w3-card w3-white w3-center">
-              <div class="w3-container w3-deep-orange">
-                <h5>Exposed Ports (DNAT)</h5>
-              </div>
-              <div class="w3-container w3-padding">
-                <% if @lab_info[:exposed_ports].empty? %>
-                  <p>None Defined</p>
-                <% else %>
-                  <table class="w3-table w3-bordered w3-striped">
-                    <thead>
-                      <tr><th>Service</th><th>External Port</th><th>Internal Port</th><th>Node</th></tr>
-                    </thead>
-                    <tbody>
-                      <% @lab_info[:exposed_ports].each do |port| %>
-                        <tr>
-                          <td><%= port[:service] %></td>
-                          <td><%= port[:external_port] %></td>
-                          <td><%= port[:internal_port] %></td>
-                          <td><%= port[:node] %></td>
-                        </tr>
-                      <% end %>
-                    </tbody>
-                  </table>
-                <% end %>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    <% end %>
+    <%= render_lab_info_card(@lab_info) %> <!-- Use the helper -->
   <% else %>
     <div id="lab-info-placeholder" class="w3-panel w3-light-grey">
       <p>Select a lab to view its details.</p>
@@ -1046,63 +1172,30 @@ __END__
         console.warn('Failed to parse last log:', e);
       }
     }
-
-    // Add event listener for the dropdown change
     selectElement.addEventListener('change', function() {
       const selectedLab = this.value;
       if (selectedLab) {
         // Show a loading message or spinner
         infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue"><p>Loading lab info...</p></div>';
-
-        // Fetch the new lab info via AJAX
-        fetch(`/labs/${encodeURIComponent(selectedLab)}/info`)
-          .then(response => response.json())
-          .then(data => {
-            if (data.error) {
-              infoSection.innerHTML = `<div class="w3-panel w3-red"><h4>Error Loading Lab Info</h4><p>${data.error}</p></div>`;
-            } else {
-              // Build the HTML string for the new info card
-              let html = `<div class="w3-panel w3-card w3-flat-midnight-blue"><h4>Info: <code>${data.lab_name}</code></h4>`;
-              html += `<div class="w3-row-padding w3-margin-top">`;
-
-              // Images Card
-              html += `<div class="w3-col s12 m6 l3"><div class="w3-card w3-white w3-center"><div class="w3-container w3-blue"><h5>Images</h5></div><div class="w3-container w3-padding"><ul class="w3-ul">`;
-              data.images.forEach(img => { html += `<li>${img}</li>` });
-              html += `</ul></div></div></div>`;
-
-              // Nodes Card
-              html += `<div class="w3-col s12 m6 l6"><div class="w3-card w3-white w3-center"><div class="w3-container w3-green"><h5>Nodes</h5></div><div class="w3-container w3-padding"><table class="w3-table w3-bordered w3-striped"><thead><tr><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th>CPUs</th><th>Mem</th></tr></thead><tbody>`;
-              data.nodes.forEach(node => {
-                  html += `<tr><td><code>${node.name}</code></td><td>${node.type}</td><td>${node.kind}</td><td>${node.image}</td><td>${node.cpus}</td><td>${node.memory}</td></tr>`;
-              });
-              html += `</tbody></table></div></div></div>`;
-
-              // Ansible Card
-              html += `<div class="w3-col s12 m6 l3"><div class="w3-card w3-white w3-center"><div class="w3-container w3-purple"><h5>Ansible</h5></div><div class="w3-container w3-padding"><p><strong>Playbook:</strong> ${data.ansible.playbook}</p><p><strong>Environment:</strong> ${data.ansible.environment}</p><p><strong>Tags:</strong> ${Array.isArray(data.ansible.tags) ? data.ansible.tags.join(', ') : data.ansible.tags}</p></div></div></div>`;
-
-              // Exposed Ports Card
-              html += `<div class="w3-col s12 m6 l12 w3-margin-top"><div class="w3-card w3-white w3-center"><div class="w3-container w3-deep-orange"><h5>Exposed Ports (DNAT)</h5></div><div class="w3-container w3-padding">`;
-              if (data.exposed_ports.length === 0) {
-                  html += `<p>None Defined</p>`;
-              } else {
-                  html += `<table class="w3-table w3-bordered w3-striped"><thead><tr><th>Service</th><th>External Port</th><th>Internal Port</th><th>Node</th></tr></thead><tbody>`;
-                  data.exposed_ports.forEach(port => {
-                      html += `<tr><td>${port.service}</td><td>${port.external_port}</td><td>${port.internal_port}</td><td>${port.node}</td></tr>`;
-                  });
-                  html += `</tbody></table>`;
+    
+        // Fetch the new lab info card HTML via AJAX
+        fetch(`/labs/${encodeURIComponent(selectedLab)}/info_card`) // New route
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
               }
-              html += `</div></div></div>`;
-
-              html += `</div></div>`;
-              infoSection.innerHTML = html;
-            }
+              return response.text(); // Get the HTML string
+          })
+          .then(htmlFragment => {
+              // Directly inject the rendered HTML
+              infoSection.innerHTML = htmlFragment;
           })
           .catch(error => {
-            console.error('Error fetching lab info:', error);
-            infoSection.innerHTML = '<div class="w3-panel w3-red"><h4>Error</h4><p>Could not load lab info.</p></div>';
+              console.error('Error fetching lab info card:', error);
+              infoSection.innerHTML = '<div class="w3-panel w3-red"><h4>Error</h4><p>Could not load lab info.</p></div>';
           });
       }
-    });
+    })
   });
 </script>
 <%= FOOTER %>
