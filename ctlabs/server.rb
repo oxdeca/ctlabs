@@ -394,7 +394,8 @@ end
 # ------------------------------------------------------------------------------
 get "/" do
   #ERB.new(home).result(binding)
-  erb :home
+  #erb :home
+  redirect('/labs')
 end
 
 get '/upload' do
@@ -782,9 +783,9 @@ HEADER = %q(
   <body bgcolor="#1c1c1c">
     <div class="w3-top w3-bar w3-black">
       <a href="/"          class="w3-bar-item w3-button">🔬 CTLABS</a>
-      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a>
-      <a href="/con"       class="w3-bar-item w3-button">🖧  Connections</a>
+<!--      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a> -->
       <a href="/topo"      class="w3-bar-item w3-button">🏠 Topology</a>
+      <a href="/con"       class="w3-bar-item w3-button">🕸 Connections</a>
       <a href="/inventory" class="w3-bar-item w3-button">🗂️ Inventory</a>
       <a href="/config"    class="w3-bar-item w3-button">⚙️  Configuration</a>
       <a href="/logs"      class="w3-bar-item w3-button">🧾 Logs</a>
@@ -862,7 +863,7 @@ __END__
 @@home
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
-      <h2>🖧  Connections [Data Network] </h2>
+      <h2>🕸 Connections [Data Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
@@ -870,7 +871,7 @@ __END__
         <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
       </div>
       <div class="svg-container">
-        <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="🖧  Connections" type="image/svg+xml" width="100%">
+        <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="🕸 Connections" type="image/svg+xml" width="100%">
       </div>
     </div>
     <div id="topo" class="w3-panel w3-green">
@@ -892,7 +893,7 @@ __END__
 @@con
 <%= HEADER %>
     <div id="con" class="w3-panel w3-green">
-      <h2>🖧  Connections [Data Network]</h2>
+      <h2>🕸 Connections [Data Network]</h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
@@ -900,11 +901,11 @@ __END__
         <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span>
       </div>
       <div class="svg-container">
-        <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="Connections" type="image/svg+xml" width="100%">
+        <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="🕸 Connections" type="image/svg+xml" width="100%">
       </div>
     </div>
     <div id="mgmt_con" class="w3-panel w3-green">
-      <h2>🖧  Connections [Management Network] </h2>
+      <h2>🕸 Connections [Management Network] </h2>
     </div>
     <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
