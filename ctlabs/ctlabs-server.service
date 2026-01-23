@@ -8,6 +8,7 @@ Type=simple
 Restart=always
 RestartSec=5
 User=root
+WorkingDirectory=/root/ctlabs/ctlabs
 ExecStart=/root/ctlabs/ctlabs/server.rb
 
 [Install]
