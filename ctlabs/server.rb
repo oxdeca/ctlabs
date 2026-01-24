@@ -141,7 +141,7 @@ helpers do
   end
 
   # Inside helpers do ... end block
-  def parse_lab_info(yaml_file_path)
+  def parse_lab_info(yaml_file_path, dynamic_rules_by_lab = {})
     require 'yaml'
     require 'set'
   
@@ -218,6 +218,16 @@ helpers do
         end
       end
     end
+    dynamic_rules = []
+    if session && session[:dynamic_dnat_rules]
+      current_lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
+      dynamic_rules = session[:dynamic_dnat_rules][current_lab_name] || []
+    end
+    # Mark them as dynamic and merge
+    dynamic_rules.each do |dr|
+      exposed_ports << dr.merge(dynamic: true)
+    end
+
     info[:exposed_ports] = exposed_ports
   
     #puts "DEBUG: Generated lab info hash: #{info.inspect}"
@@ -343,26 +353,120 @@ helpers do
             <% if info_hash[:exposed_ports].empty? %>
               <p>None Defined</p>
             <% else %>
-              <table class="w3-table w3-bordered w3-striped">
+              <table id="dnat_table" class="w3-table w3-bordered w3-striped">
                 <thead>
                   <tr><th>Node</th><th>Type</th><th>Rule</th></tr>
                 </thead>
                 <tbody>
                   <% info_hash[:exposed_ports].each do |port| %>
-                    <tr>
+                    <tr style="<%= 'background-color:#f0f8ff;' if port[:dynamic] %>">
                       <td><%= port[:node] %></td>
                       <td><%= port[:type] %></td>
-                      <td><%= port[:external_port] %> ➡ <%= port[:internal_port] %></td>
+                      <td>
+                        <%= port[:external_port] %> ➡ <%= port[:internal_port] %>
+                        <% if port[:dynamic] %>
+                          <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(dynamic)</span>
+                        <% end %>
+                      </td>
                     </tr>
                   <% end %>
                 </tbody>
               </table>
             <% end %>
           </div>
+          <div id="me" class="w3-container w3-padding">
+            <!-- Dynamic DNAT Form -->
+            <% if @selected_lab && running_lab? && @selected_lab == get_running_lab %>
+              <h6>Add Dynamic DNAT Rule</h6>
+              <form id="dynamic-dnat-form" method="POST" action="/labs/<%= URI.encode_www_form_component(@selected_lab) %>/dnat" class="w3-row-padding">
+                <!-- hidden input for lab name is not needed since it's in URL -->
+                <input type="hidden" name="lab_name" value="<%= @selected_lab %>"> <!-- optional, for validation -->
+                <div class="w3-col s12 m4 l4 w3-margin-bottom">
+                  <select name="node" class="w3-select w3-border" required>
+                    <option value="">-- Select Node --</option>
+                    <% info_hash[:nodes].each do |n| %>
+                      <% if n[:type] == 'host' || n[:type] == 'controller' %>
+                        <option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option>
+                      <% end %>
+                    <% end %>
+                  </select>
+                </div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom">
+                  <input type="number" name="external_port" placeholder="Ext Port" min="1" max="65535" class="w3-input w3-border" required>
+                </div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom">
+                  <input type="number" name="internal_port" placeholder="Int Port" min="1" max="65535" class="w3-input w3-border" required>
+                </div>
+                <div class="w3-col s6 m2 l1 w3-margin-bottom">
+                  <select name="protocol" class="w3-select w3-border">
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                  </select>
+                </div>
+                <div class="w3-col s6 m2 l1 w3-margin-bottom">
+                  <button type="submit" class="w3-button w3-blue w3-round">➕ Add</button>
+                </div>
+              </form>
+              <div id="dynamic-dnat-result" class="w3-panel" style="display:none;"></div>
+            <% end %>
+          </div>
         </div>
       </div>
     </div>
   </div>
+<% end %>
+  
+  <% if @selected_lab && running_lab? && @selected_lab == get_running_lab %>
+  <script>
+  document.getElementById('dynamic-dnat-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const labName = formData.get('lab_name');
+    const url = `/labs/${encodeURIComponent(labName)}/dnat`;
+  
+    // Send as application/x-www-form-urlencoded
+    const params = new URLSearchParams(formData).toString();
+  
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+  
+    const resultDiv = document.getElementById('dynamic-dnat-result');
+    const dnatTableBody = document.querySelector('#dnat_table tbody');
+
+    if (res.ok) {
+      const data = await res.json(); // ← still return JSON *response*, but send form data
+      resultDiv.className = 'w3-panel w3-green';
+      resultDiv.textContent = '✅ ' + data.message;
+      
+      // If rule data is returned, add it to the table
+      if (data.rule && dnatTableBody) {
+        const row = document.createElement('tr');
+        
+        // Optional: add a subtle style to indicate it's dynamic
+        row.style.backgroundColor = '#f0f8ff'; // light blue tint
+        // Or add a class: row.classList.add('dynamic-rule');
+  
+        row.innerHTML = `
+          <td>${data.rule.node}</td>
+          <td>${data.rule.type}</td>
+          <td>
+            ${data.rule.external_port} ➡ ${data.rule.internal_port}
+            <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(dynamic)</span>
+          </td>
+        `;
+        dnatTableBody.appendChild(row);
+      }
+    } else {
+      const err = await res.json().catch(() => ({error: 'Unknown error'}));
+      resultDiv.className = 'w3-panel w3-red';
+      resultDiv.textContent = '❌ ' + (err.error || 'Failed');
+    }
+    resultDiv.style.display = 'block';
+  });
+  </script>
 <% end %>)
   
     # Use ERB to render the template with the provided hash
@@ -448,6 +552,7 @@ end
 get '/labs' do
   @labs = all_labs
   @selected_lab = get_running_lab || session[:selected_lab] || (@labs.first if @labs.any?)
+  session[:dynamic_dnat_rules] ||= {}
 
   # Parse info for the selected lab
   @lab_info = nil
@@ -457,6 +562,58 @@ get '/labs' do
   end
 
   erb :labs
+end
+
+# In server.rb, inside ROUTES section
+
+post '/labs/*/dnat' do
+  lab_name = params[:splat].first
+
+
+  # --- Validation ---
+  halt 400, "Invalid lab name" unless lab_name
+  halt 400, "Lab must be a .yml file" unless lab_name.end_with?('.yml')
+  halt 400, "Path traversal detected" if lab_name.include?('..') || lab_name.include?("\0")
+
+  labs_list = all_labs
+  halt 400, "Lab not found" unless labs_list.include?(lab_name)
+
+  running = get_running_lab
+  halt 400, "No lab is running" unless running
+  halt 400, "Dynamic DNAT only allowed on the running lab" unless running == lab_name
+
+  node     = params[:node]
+  ext_port = params[:external_port]&.to_i
+  int_port = params[:internal_port]&.to_i
+  proto    = (params[:protocol] || 'tcp').downcase
+
+  halt 400, "Missing node" unless node
+  halt 400, "Invalid external port" unless ext_port >= 1 && ext_port <= 65535
+  halt 400, "Invalid internal port" unless int_port >= 1 && int_port <= 65535
+  halt 400, "Protocol must be tcp or udp" unless %w[tcp udp].include?(proto)
+
+  begin
+    lab_file_path = File.join(LABS_DIR, lab_name)
+    lab = Lab.new(lab_file_path, nil, 'warn')
+    rule = lab.add_dynamic_dnat(node, ext_port, int_port, proto)
+
+    # Optional: log it
+    timestamp = Time.now.strftime('%Y-%m-%d %H:%M:%S')
+    log_entry = "[#{timestamp}] Dynamic DNAT: #{lab_name} → #{node} #{ext_port}->#{int_port}/#{proto}\n"
+    File.open("#{LOG_DIR}/ctlabs_dynamic_dnat.log", 'a') { |f| f.write(log_entry) }
+
+    session[:dynamic_dnat_rules] ||= {}
+    session[:dynamic_dnat_rules][lab_name] ||= []
+    session[:dynamic_dnat_rules][lab_name] << rule
+
+    # Return success as plain text or redirect — but since we're using AJAX, return JSON *response*
+    content_type :json 
+      { success: true, message: "Dynamic DNAT rule added", rule: rule }.to_json
+  rescue => e
+    content_type :json
+    status 400
+    { success: false, error: e.message }.to_json
+  end
 end
 
 post '/labs/action' do
@@ -590,6 +747,9 @@ post '/labs/execute' do
 
     # ✅ CLEAR THE LOCK HERE ON THE SERVER SIDE BEFORE STARTING THREAD
     clear_running_lab
+    if session[:dynamic_dnat_rules] && session[:dynamic_dnat_rules].key?(lab_name)
+      session[:dynamic_dnat_rules].delete(lab_name)
+    end
   end
 
   # At this point, 'lab_name' holds the correct name for the action (either from form or server state)
@@ -1404,4 +1564,3 @@ __END__
   <br>
 </div>
 <%= FOOTER %>
-
