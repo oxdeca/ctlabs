@@ -141,7 +141,7 @@ helpers do
   end
 
   # Inside helpers do ... end block
-  def parse_lab_info(yaml_file_path, dynamic_rules_by_lab = {})
+  def parse_lab_info(yaml_file_path, adhoc_rules_by_lab = {})
     require 'yaml'
     require 'set'
   
@@ -218,14 +218,14 @@ helpers do
         end
       end
     end
-    dynamic_rules = []
-    if session && session[:dynamic_dnat_rules]
+    adhoc_rules = []
+    if session && session[:adhoc_dnat_rules]
       current_lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
-      dynamic_rules = session[:dynamic_dnat_rules][current_lab_name] || []
+      adhoc_rules = session[:adhoc_dnat_rules][current_lab_name] || []
     end
-    # Mark them as dynamic and merge
-    dynamic_rules.each do |dr|
-      exposed_ports << dr.merge(dynamic: true)
+    # Mark them as adhoc and merge
+    adhoc_rules.each do |dr|
+      exposed_ports << dr.merge(adhoc: true)
     end
 
     info[:exposed_ports] = exposed_ports
@@ -359,13 +359,13 @@ helpers do
                 </thead>
                 <tbody>
                   <% info_hash[:exposed_ports].each do |port| %>
-                    <tr style="<%= 'background-color:#f0f8ff;' if port[:dynamic] %>">
+                    <tr style="<%= 'background-color:#f0f8ff;' if port[:adhoc] %>">
                       <td><%= port[:node] %></td>
                       <td><%= port[:type] %></td>
                       <td>
                         <%= port[:external_port] %> ➡ <%= port[:internal_port] %>
-                        <% if port[:dynamic] %>
-                          <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(dynamic)</span>
+                        <% if port[:adhoc] %>
+                          <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(adhoc)</span>
                         <% end %>
                       </td>
                     </tr>
@@ -375,10 +375,10 @@ helpers do
             <% end %>
           </div>
           <div id="me" class="w3-container w3-padding">
-            <!-- Dynamic DNAT Form -->
+            <!-- AdHoc DNAT Form -->
             <% if @selected_lab && running_lab? && @selected_lab == get_running_lab %>
-              <h6>Add Dynamic DNAT Rule</h6>
-              <form id="dynamic-dnat-form" method="POST" action="/labs/<%= URI.encode_www_form_component(@selected_lab) %>/dnat" class="w3-row-padding">
+              <h6>Add AdHoc DNAT Rule</h6>
+              <form id="adhoc-dnat-form" method="POST" action="/labs/<%= URI.encode_www_form_component(@selected_lab) %>/dnat" class="w3-row-padding">
                 <!-- hidden input for lab name is not needed since it's in URL -->
                 <input type="hidden" name="lab_name" value="<%= @selected_lab %>"> <!-- optional, for validation -->
                 <div class="w3-col s12 m4 l4 w3-margin-bottom">
@@ -407,7 +407,7 @@ helpers do
                   <button type="submit" class="w3-button w3-blue w3-round">➕ Add</button>
                 </div>
               </form>
-              <div id="dynamic-dnat-result" class="w3-panel" style="display:none;"></div>
+              <div id="adhoc-dnat-result" class="w3-panel" style="display:none;"></div>
             <% end %>
           </div>
         </div>
@@ -418,7 +418,7 @@ helpers do
   
   <% if @selected_lab && running_lab? && @selected_lab == get_running_lab %>
   <script>
-  document.getElementById('dynamic-dnat-form')?.addEventListener('submit', async (e) => {
+  document.getElementById('adhoc-dnat-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const labName = formData.get('lab_name');
@@ -433,7 +433,7 @@ helpers do
       body: params
     });
   
-    const resultDiv = document.getElementById('dynamic-dnat-result');
+    const resultDiv = document.getElementById('adhoc-dnat-result');
     const dnatTableBody = document.querySelector('#dnat_table tbody');
 
     if (res.ok) {
@@ -445,16 +445,16 @@ helpers do
       if (data.rule && dnatTableBody) {
         const row = document.createElement('tr');
         
-        // Optional: add a subtle style to indicate it's dynamic
+        // Optional: add a subtle style to indicate it's adhoc 
         row.style.backgroundColor = '#f0f8ff'; // light blue tint
-        // Or add a class: row.classList.add('dynamic-rule');
+        // Or add a class: row.classList.add('adhoc-rule');
   
         row.innerHTML = `
           <td>${data.rule.node}</td>
           <td>${data.rule.type}</td>
           <td>
             ${data.rule.external_port} ➡ ${data.rule.internal_port}
-            <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(dynamic)</span>
+            <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(adhoc)</span>
           </td>
         `;
         dnatTableBody.appendChild(row);
@@ -552,7 +552,7 @@ end
 get '/labs' do
   @labs = all_labs
   @selected_lab = get_running_lab || session[:selected_lab] || (@labs.first if @labs.any?)
-  session[:dynamic_dnat_rules] ||= {}
+  session[:adhoc_dnat_rules] ||= {}
 
   # Parse info for the selected lab
   @lab_info = nil
@@ -580,7 +580,7 @@ post '/labs/*/dnat' do
 
   running = get_running_lab
   halt 400, "No lab is running" unless running
-  halt 400, "Dynamic DNAT only allowed on the running lab" unless running == lab_name
+  halt 400, "AdHoc DNAT only allowed on the running lab" unless running == lab_name
 
   node     = params[:node]
   ext_port = params[:external_port]&.to_i
@@ -595,20 +595,20 @@ post '/labs/*/dnat' do
   begin
     lab_file_path = File.join(LABS_DIR, lab_name)
     lab = Lab.new(lab_file_path, nil, 'warn')
-    rule = lab.add_dynamic_dnat(node, ext_port, int_port, proto)
+    rule = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
     # Optional: log it
     timestamp = Time.now.strftime('%Y-%m-%d %H:%M:%S')
-    log_entry = "[#{timestamp}] Dynamic DNAT: #{lab_name} → #{node} #{ext_port}->#{int_port}/#{proto}\n"
-    File.open("#{LOG_DIR}/ctlabs_dynamic_dnat.log", 'a') { |f| f.write(log_entry) }
+    log_entry = "[#{timestamp}] AdHoc DNAT: #{lab_name} → #{node} #{ext_port}->#{int_port}/#{proto}\n"
+    File.open("#{LOG_DIR}/ctlabs_adhoc_dnat.log", 'a') { |f| f.write(log_entry) }
 
-    session[:dynamic_dnat_rules] ||= {}
-    session[:dynamic_dnat_rules][lab_name] ||= []
-    session[:dynamic_dnat_rules][lab_name] << rule
+    session[:adhoc_dnat_rules] ||= {}
+    session[:adhoc_dnat_rules][lab_name] ||= []
+    session[:adhoc_dnat_rules][lab_name] << rule
 
     # Return success as plain text or redirect — but since we're using AJAX, return JSON *response*
     content_type :json 
-      { success: true, message: "Dynamic DNAT rule added", rule: rule }.to_json
+      { success: true, message: "AdHoc DNAT rule added", rule: rule }.to_json
   rescue => e
     content_type :json
     status 400
@@ -747,8 +747,8 @@ post '/labs/execute' do
 
     # ✅ CLEAR THE LOCK HERE ON THE SERVER SIDE BEFORE STARTING THREAD
     clear_running_lab
-    if session[:dynamic_dnat_rules] && session[:dynamic_dnat_rules].key?(lab_name)
-      session[:dynamic_dnat_rules].delete(lab_name)
+    if session[:adhoc_dnat_rules] && session[:adhoc_dnat_rules].key?(lab_name)
+      session[:adhoc_dnat_rules].delete(lab_name)
     end
   end
 

@@ -276,7 +276,7 @@ class Lab
   end
 
 
-def add_dynamic_dnat(node_name, ext_port, int_port, proto = 'tcp')
+def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
   @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}"
 
   chain = "#{@name.upcase}-DNAT"
@@ -314,7 +314,7 @@ def add_dynamic_dnat(node_name, ext_port, int_port, proto = 'tcp')
       raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
     end
 
-    puts "[DYNAMIC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+    puts "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
   elsif node.type == 'host'
     # === DATA NETWORK PATH (via natgw) ===
@@ -354,13 +354,13 @@ def add_dynamic_dnat(node_name, ext_port, int_port, proto = 'tcp')
       raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
     end
 
-    puts "[DYNAMIC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+    puts "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
   else
-    raise "Dynamic DNAT only supported for 'host' and 'controller' nodes"
+    raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
   end
 
-  return { node: node.name, type: node.type, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", dynamic: true }
+  return { node: node.name, type: node.type, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
 end
 
 
