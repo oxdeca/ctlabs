@@ -174,7 +174,6 @@ helpers do
           name: node.name,
           type: node.type   || 'N/A',
           kind: node.kind   || 'N/A',
-          proto: p[2] || 'tcp',
           image: lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A',
           cpus: 'N/A',
           memory: 'N/A',
@@ -212,6 +211,7 @@ helpers do
           node_info = {
             node: node.name,
             type: node.type,
+            proto: p[2] || 'tcp',
             external_port: "#{vip}:#{p[0]}",
             internal_port: "#{rip}:#{p[1]}",
           }
