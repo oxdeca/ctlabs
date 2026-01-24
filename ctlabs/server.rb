@@ -593,14 +593,17 @@ post '/labs/*/dnat' do
   halt 400, "Protocol must be tcp or udp" unless %w[tcp udp].include?(proto)
 
   begin
-    lab_file_path = File.join(LABS_DIR, lab_name)
-    lab = Lab.new(lab_file_path, nil, 'warn')
-    rule = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
+    lab_file_path  = File.join(LABS_DIR, lab_name)
+    lab            = Lab.new(lab_file_path, nil, 'warn')
+    rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
     # Optional: log it
-    timestamp = Time.now.strftime('%Y-%m-%d %H:%M:%S')
-    log_entry = "[#{timestamp}] AdHoc DNAT: #{lab_name} → #{node} #{ext_port}->#{int_port}/#{proto}\n"
-    File.open("#{LOG_DIR}/ctlabs_adhoc_dnat.log", 'a') { |f| f.write(log_entry) }
+    timestamp      = Time.now  #.strftime('%Y-%m-%d %H:%M:%S')
+    safe_lab       = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+
+    log_entry      = "[#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] AdHoc DNAT #{lab_name}: #{rule}\n"
+    adhoc_log_file = "#{LOG_DIR}/ctlabs_#{timestamp.to_i}_#{safe_lab}_adhoc.log"
+    File.open(adhoc_log_file, 'a') { |f| f.write(log_entry) }
 
     session[:adhoc_dnat_rules] ||= {}
     session[:adhoc_dnat_rules][lab_name] ||= []
@@ -1525,12 +1528,19 @@ __END__
     <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
       <% @log_files.each do |log| %>
         <%
-          basename = File.basename(log, '.log')
-          parts = basename.split('_')
-          timestamp = parts[1].to_i rescue 0
-          lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
-          action = parts.last == 'up' ? 'Start' : 'Stop'
-          time_str = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
+          basename    = File.basename(log, '.log')
+          parts       = basename.split('_')
+          timestamp   = parts[1].to_i rescue 0
+          lab_name    = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
+          action_part = parts.last
+          action      = case action_part
+            when 'up' then 'Start'
+            when 'down' then 'Stop'
+            when 'adhoc' then 'AdHoc'
+            else 'Unknown'
+          end
+          #action      = parts.last == 'up' ? 'Start' : 'Stop'
+          time_str  = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
         %>
         <li style="display: flex; justify-content: space-between; align-items: center;">
           <div>
