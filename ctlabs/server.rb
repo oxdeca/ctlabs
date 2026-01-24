@@ -174,6 +174,7 @@ helpers do
           name: node.name,
           type: node.type   || 'N/A',
           kind: node.kind   || 'N/A',
+          proto: p[2] || 'tcp',
           image: lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A',
           cpus: 'N/A',
           memory: 'N/A',
@@ -355,13 +356,14 @@ helpers do
             <% else %>
               <table id="dnat_table" class="w3-table w3-bordered w3-striped">
                 <thead>
-                  <tr><th>Node</th><th>Type</th><th>Rule</th></tr>
+                  <tr><th>Node</th><th>Type</th><th>Protocol</th><th>Rule</th></tr>
                 </thead>
                 <tbody>
                   <% info_hash[:exposed_ports].each do |port| %>
                     <tr style="<%= 'background-color:#f0f8ff;' if port[:adhoc] %>">
                       <td><%= port[:node] %></td>
                       <td><%= port[:type] %></td>
+                      <td><%= port[:proto] %></td>
                       <td>
                         <%= port[:external_port] %> ➡ <%= port[:internal_port] %>
                         <% if port[:adhoc] %>
@@ -452,6 +454,7 @@ helpers do
         row.innerHTML = `
           <td>${data.rule.node}</td>
           <td>${data.rule.type}</td>
+          <td>${data.rule.proto}</td>
           <td>
             ${data.rule.external_port} ➡ ${data.rule.internal_port}
             <span style="color:#ff6f00; font-size:0.8em; margin-left:6px;">(adhoc)</span>

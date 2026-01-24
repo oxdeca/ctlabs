@@ -360,7 +360,7 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
   end
 
-  return { node: node.name, type: node.type, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
+  return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
 end
 
 
