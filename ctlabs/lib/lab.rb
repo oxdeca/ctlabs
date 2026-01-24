@@ -1,4 +1,3 @@
-
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/lab.rb
 # Description : lab class; reads in config and manages lab
@@ -275,6 +274,95 @@ class Lab
 
     end
   end
+
+
+def add_dynamic_dnat(node_name, ext_port, int_port, proto = 'tcp')
+  @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}"
+
+  chain = "#{@name.upcase}-DNAT"
+  vmip  = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
+
+  node = find_node(node_name)
+  raise "Node '#{node_name}' not found" if node.nil?
+
+  if node.type == 'controller'
+    # === MGMT NETWORK PATH (implicit via ro0) ===
+    router = find_node('ro0')
+    raise "'ro0' router not found for controller DNAT" if router.nil?
+    raise "'ro0' missing eth1" unless router.nics.key?('eth1')
+
+    mgmt_via = router.nics['eth1'].split('/')[0]
+    target_ip = node.nics['eth0']&.split('/')&.first
+    raise "Controller node missing eth0" if target_ip.nil?
+
+    # Rule 1: Host → ro0 (mgmt gateway)
+    rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
+    rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
+
+    unless system(rule1_check)
+      @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}"
+      raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+    end
+
+    router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
+    # Rule 2: Inside ro0 netns → final controller
+    rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+    rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+
+    unless system(rule2_check)
+      @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}"
+      raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
+    end
+
+    puts "[DYNAMIC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+
+  elsif node.type == 'host'
+    # === DATA NETWORK PATH (via natgw) ===
+    natgw = find_node('natgw')
+    raise "No 'natgw' node found (required for host DNAT)" if natgw.nil?
+    raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
+
+    parts = natgw.dnat.to_s.split(':')
+    raise "Invalid natgw.dnat format" unless parts.length == 2
+    router_name, nic = parts
+    raise "Empty router/interface in natgw.dnat" if router_name.empty? || nic.empty?
+
+    router = find_node(router_name)
+    raise "Router '#{router_name}' not found" if router.nil?
+    raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
+
+    via = router.nics[nic].split('/')[0]
+    target_ip = node.nics['eth1']&.split('/')&.first
+    raise "Host node missing eth1" if target_ip.nil?
+
+    # Rule 1: Host → natgw internal IP (same port)
+    rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
+    rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
+
+    unless system(rule1_check)
+      @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}"
+      raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+    end
+
+    router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
+    # Rule 2: Inside router netns → final host
+    rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+    rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+
+    unless system(rule2_check)
+      @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}"
+      raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
+    end
+
+    puts "[DYNAMIC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+
+  else
+    raise "Dynamic DNAT only supported for 'host' and 'controller' nodes"
+  end
+
+  return { node: node.name, type: node.type, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", dynamic: true }
+end
+
 
   def del_dnat
     @log.write "#{__method__}(): "
