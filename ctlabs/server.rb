@@ -196,7 +196,7 @@ helpers do
     #p "here"
     #p ansible_info
     info[:ansible] = ansible_info
-  
+
     vip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
     exposed_ports = []
     lab.nodes.each do |node|
@@ -219,11 +219,25 @@ helpers do
         end
       end
     end
+
     adhoc_rules = []
-    if session && session[:adhoc_dnat_rules]
-      current_lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
-      adhoc_rules = session[:adhoc_dnat_rules][current_lab_name] || []
+    # Always try to load from disk if lab is running
+    if running_lab? && yaml_file_path.sub(LABS_DIR + '/', '') == get_running_lab
+      lab_name_safe = get_running_lab.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+      adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
+      if File.file?(adhoc_file)
+        begin
+          adhoc_rules = JSON.parse(File.read(adhoc_file), :symbolize_names => true)
+        rescue JSON::ParserError
+          adhoc_rules = []
+        end
+      end
     end
+    
+    #if session && session[:adhoc_dnat_rules]
+    #  current_lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
+    #  adhoc_rules = session[:adhoc_dnat_rules][current_lab_name] || []
+    #end
     # Mark them as adhoc and merge
     adhoc_rules.each do |dr|
       exposed_ports << dr.merge(adhoc: true)
@@ -239,7 +253,9 @@ helpers do
     { error: "Error processing lab info: #{e.message}" }
   end
 
-  # Inside helpers do ... end block
+  #
+  #
+  #
   def render_lab_info_card(info_hash)
     # This is a simplified example using ERB directly within Ruby code.
     # A more robust approach might involve separate .erb partials.
@@ -564,6 +580,18 @@ get '/labs' do
     @lab_info = parse_lab_info(lab_file_path)
   end
 
+  # In /labs route
+  running = get_running_lab
+  if running && @selected_lab == running
+    # Load from disk and update session for consistency
+    lab_name_safe = running.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+    adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
+    if File.file?(adhoc_file)
+      session[:adhoc_dnat_rules] ||= {}
+      session[:adhoc_dnat_rules][running] = JSON.parse(File.read(adhoc_file), :symbolize_names => true)
+    end
+  end
+
   erb :labs
 end
 
@@ -605,12 +633,29 @@ post '/labs/*/dnat' do
     safe_lab       = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
 
     log_entry      = "[#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] AdHoc DNAT #{lab_name}: #{rule}\n"
+    adhoc_file     = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
     adhoc_log_file = "#{LOG_DIR}/ctlabs_#{timestamp.to_i}_#{safe_lab}_adhoc.log"
     File.open(adhoc_log_file, 'a') { |f| f.write(log_entry) }
 
+    # Load existing rules (if any)
+    existing = []
+    if File.file?(adhoc_file)
+      begin
+        existing = JSON.parse(File.read(adhoc_file), :symbolize_names => true)
+      rescue JSON::ParserError
+        existing = []
+      end
+    end
+    
+    # Append new rule
+    existing << rule
+    
+    # Save back
+    File.write(adhoc_file, JSON.pretty_generate(existing))
+
     session[:adhoc_dnat_rules] ||= {}
     session[:adhoc_dnat_rules][lab_name] ||= []
-    session[:adhoc_dnat_rules][lab_name] << rule
+    session[:adhoc_dnat_rules][lab_name] = existing
 
     # Return success as plain text or redirect — but since we're using AJAX, return JSON *response*
     content_type :json 
@@ -755,6 +800,11 @@ post '/labs/execute' do
     clear_running_lab
     if session[:adhoc_dnat_rules] && session[:adhoc_dnat_rules].key?(lab_name)
       session[:adhoc_dnat_rules].delete(lab_name)
+    end
+    if running_lab_name
+      lab_name_safe = running_lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+      adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
+      File.delete(adhoc_file) if File.file?(adhoc_file)
     end
   end
 
