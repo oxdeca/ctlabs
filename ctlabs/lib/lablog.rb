@@ -24,17 +24,10 @@ class LabLog
 
   # For user-facing output (goes to @out AND file)
   def info(msg)
-    @output_io.puts(msg)        # ← no timestamp for user-facing
+    @output_io.puts(msg)
     @output_io.flush
-    @logger_file.info("[#{Time.now}] #{msg}")  # ← timestamp only in file
+    @logger_file.info(msg)
   end
-
-#  def info(msg)
-#    line = "[#{Time.now.strftime('%H:%M:%S')}] #{msg}"
-#    @output_io.puts(line)
-#    @output_io.flush
-#    @logger_file.info(msg)
-#  end
 
   # Optional: alias for compatibility
   def write(msg, level = 'info')

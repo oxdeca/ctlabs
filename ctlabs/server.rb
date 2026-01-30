@@ -123,22 +123,20 @@ helpers do
   end
 
   def running_lab?
-    File.file?(LOCK_FILE)
+    Lab.running?
   end
   
   def get_running_lab
-    File.read(LOCK_FILE).strip if running_lab?
-  rescue
-    nil
+    Lab.current_name
   end
-  
-  def set_running_lab(lab_name)
-    File.write(LOCK_FILE, lab_name)
-  end
-  
-  def clear_running_lab
-    File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
-  end
+#  
+#  def set_running_lab(lab_name)
+#    File.write(LOCK_FILE, lab_name)
+#  end
+#  
+#  def clear_running_lab
+#    File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
+#  end
 
   def parse_lab_info(yaml_file_path, adhoc_rules_by_lab = {})
     require 'yaml'
