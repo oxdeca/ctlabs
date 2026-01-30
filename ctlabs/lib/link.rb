@@ -21,8 +21,8 @@ class Link
 
     #@log = log || LabLog.new
     @log = args['log'] || LabLog.new
-    @log.write "== Link =="
-    @log.write "#{__method__}(): nodes=#{@nodes.object_id},links=#{@links},mgmt=#{@mgmt}", 'info'
+    @log.write "== Link ==", "debug"
+    @log.write "#{__method__}(): nodes=#{@nodes.object_id},links=#{@links},mgmt=#{@mgmt}", 'debug'
     @log.write "#{__method__}(): nodes=#{@nodes},links=#{@links},mgmt=#{@mgmt}"          , 'debug'
  
     # @links    = links
@@ -34,14 +34,14 @@ class Link
     @node1    = find_node(n1)
     @node2    = find_node(n2)
  
-    @log.write "initialize(): node1=#{@node1},nic1=#{@nic1}"
-    @log.write "initialize(): node2=#{@node2},nic2=#{@nic2}"
+    @log.write "initialize(): node1=#{@node1},nic1=#{@nic1}", "debug"
+    @log.write "initialize(): node2=#{@node2},nic2=#{@nic2}", "debug"
  
     connect
   end
  
   def find_node(name)
-    @log.write "find_node(): name=#{name}"
+    @log.write "find_node(): name=#{name}", "debug"
  
     @nodes.each do |node|
       if( node.name == name )
@@ -51,7 +51,7 @@ class Link
   end
  
   def nic_exists?(node, nic)
-    @log.write "#{__method__}():"
+    @log.write "#{__method__}():", "debug"
  
     %x( ip netns exec #{node.netns} ip link ls #{nic} 2>/dev/null )
     if $?.exitstatus == 0
@@ -69,8 +69,8 @@ class Link
   # assume all nodes are container and are connected via veth pair
   #
   def connect()
-    @log.write "#{__method__}(): #{@links[0]} -- #{@links[1]}"
-    puts "#{__method__}(): #{@links[0]} -- #{@links[1]}"
+    @log.write "#{__method__}(): #{@links[0]} -- #{@links[1]}", "debug"
+    @log.info "#{__method__}(): #{@links[0]} -- #{@links[1]}"
  
     create_veth
  
@@ -92,7 +92,7 @@ class Link
   #  add gateway/snat
   #
   def set_gateway(node1, nic1, node2, nic2)
-    @log.write "#{__method__}(): #{node1}:#{nic1} -- #{node2}:#{nic2}"
+    @log.write "#{__method__}(): #{node1}:#{nic1} -- #{node2}:#{nic2}", "debug"
 
     case node1.type
       when 'host', 'router', 'switch', 'controller'
@@ -101,7 +101,7 @@ class Link
         # adding default gateway and snat
         #
         if( !node1.gw.nil? )
-          @log.write "#{__method__}(): node1(host,router,switch) - adding default gw #{node1.gw}"
+          @log.write "#{__method__}(): node1(host,router,switch) - adding default gw #{node1.gw}", "debug"
           %x( ip netns exec #{node1.netns} ip route add default via #{node1.gw} 2>/dev/null )
           if( node1.type == 'router' && node1.snat )
             snat_nic = %x( ip netns exec #{node1.netns} ip route get #{node1.gw} 2>/dev/null | grep dev | awk '{print $3}' ).rstrip
@@ -124,7 +124,7 @@ class Link
         end
  
       when 'gateway'
-        @log.write "#{__method__}(): node1(gateway) - adding link to bridge"
+        @log.write "#{__method__}(): node1(gateway) - adding link to bridge", "debug"
         %x( ip link set #{node1.name}#{nic1} master #{node1.name} up )
     end
   end
@@ -136,7 +136,7 @@ class Link
     case node.type
       when 'host', 'router', 'switch', 'controller'
         if( !node.nics.nil? && !node.nics[nic].to_s.empty? )
-          @log.write "#{__method__}(): node(host,router,switch) - adding ip addr #{nic}:#{node.nics[nic]}"
+          @log.write "#{__method__}(): node(host,router,switch) - adding ip addr #{nic}:#{node.nics[nic]}", "debug"
           %x( ip netns exec #{node.netns} ip addr add #{node.nics[nic]} dev #{nic} 2>/dev/null )
         end
     end
@@ -151,17 +151,17 @@ class Link
         #%x( ip netns exec #{node.netns} ip link ls #{nic} 2> /dev/null )
         #if $?.exitstatus > 0
         if( ! nic_exists?(node, nic) )
-          @log.write "#{__method__}(): node(host,router,switch) - moving veth endpoints into container"
+          @log.write "#{__method__}(): node(host,router,switch) - moving veth endpoints into container", "debug"
           %x( ip link set #{node.name}#{nic} netns #{node.netns} )
   
-          @log.write "#{__method__}(): node(host,router,switch) - changing name in container"
+          @log.write "#{__method__}(): node(host,router,switch) - changing name in container", "debug"
           %x( ip netns exec #{node.netns} ip link set #{node.name}#{nic} name #{nic} mtu #{node.mtu} up )
           
           if(node.type == 'switch' && ['linux', 'mgmt'].include?(node.kind) )
-            @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to bridge #{node.name}"
+            @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to bridge #{node.name}", "debug"
             %x( ip netns exec #{node.netns} ip link set #{nic} master #{node.name} )
           elsif(node.type == 'switch' && ['ovs'].include?(node.kind) && nic != "eth0" )
-            @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to openvswitch #{node.name}"
+            @log.write "#{__method__}(): node(host,router,switch) - attaching #{nic} to openvswitch #{node.name}", "debug"
             %x( docker exec #{node.name} sh -c '/usr/bin/ovs-vsctl add-port #{node.name} #{nic}' )
           end
         end
@@ -175,7 +175,7 @@ class Link
   #
   def create_veth
     if( !( nic_exists?(@node1, @nic1) && nic_exists?(@node2, @nic2) ) )
-      @log.write "#{__method__}(): adding veth pair"
+      @log.write "#{__method__}(): adding veth pair", "debug"
       %x( ip link ls #{@node1.name}#{@nic1} 2>/dev/null )
       if $?.exitstatus > 0
         %x( ip link add #{@node1.name}#{@nic1} type veth peer #{@node2.name}#{@nic2} )
@@ -189,17 +189,17 @@ class Link
   def create_mgmt(node)
     case node.type
       when 'host', 'switch', 'router'
-        @log.write "#{__method__}(): adding mgmt vrf"
+        @log.write "#{__method__}(): adding mgmt vrf", "debug"
         if node.kind == 'mgmt'
-          @log.write "#{__method__}(): skipping mgmt vrf (node.kind == 'mgmt')"
+          @log.write "#{__method__}(): skipping mgmt vrf (node.kind == 'mgmt')", "debug"
           return # skip over as mgmt not needed
         end
         %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
         if $?.exitstatus == 0
           %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf"
-            @log.write "#{__method__}(): node=#{node.inspect}"
+            @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf", "debug"
+            @log.write "#{__method__}(): node=#{node.inspect}", "debug"
             %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 99 )
             %x( ip netns exec #{node.netns} ip link set mgmt up )
             %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
@@ -214,16 +214,16 @@ class Link
   #
   def create_bond(node)
     if( !node.bonds.nil? )
-      @log.write "#{__method__}(): node(host) - adding bonding"
+      @log.write "#{__method__}(): node(host) - adding bonding", "debug"
       node.bonds.each do |bond|
 
         %x( ip netns exec #{node.netns} ip link ls #{bond[0]} 2> /dev/null )
         if $?.exitstatus > 0
-          @log.write "#{__method__}(): node(host) - adding #{bond[0]}(#{bond[1]['nics'].join(',')})"
+          @log.write "#{__method__}(): node(host) - adding #{bond[0]}(#{bond[1]['nics'].join(',')})", "debug"
           %x( ip netns exec #{node.netns} ip link add #{bond[0]} type bond mode #{bond[1]['mode']}  )
         end
 
-        @log.write "#{__method__}(): node(host) - configuring  #{bond[0]}(#{bond[1]['nics'].join(',')})"
+        @log.write "#{__method__}(): node(host) - configuring  #{bond[0]}(#{bond[1]['nics'].join(',')})", "debug"
         bond[1]['nics'].each do |nic|
 
           %x( ip netns exec #{node.netns} ip link ls #{nic} 2> /dev/null )
@@ -245,14 +245,14 @@ class Link
 
             %x( ip netns exec #{node.netns} ip link ls #{bond[0]}.#{vnic[0]} 2> /dev/null )
             if $?.exitstatus > 0
-              @log.write "#{__method__}(): node2(host) - adding #{bond[0]}.#{vnic[0]}"
+              @log.write "#{__method__}(): node2(host) - adding #{bond[0]}.#{vnic[0]}", "debug"
               %x( ip netns exec #{node.netns} ip link add link #{bond[0]} name #{bond[0]}.#{vnic[0]} type vlan id #{vnic[0]} )
               %x( ip netns exec #{node.netns} ip link set #{bond[0]}.#{vnic[0]} up )
               %x( ip netns exec #{node.netns} ip addr add #{vnic[1]} dev #{bond[0]}.#{vnic[0]} )
             end
           end
         elsif( bond[1]['ipv4'] != '' )
-          @log.write "#{__method__}(): node(host) - add ip addr #{bond[0]}:#{bond[1]['ipv4']}"
+          @log.write "#{__method__}(): node(host) - add ip addr #{bond[0]}:#{bond[1]['ipv4']}", "debug"
           %x( ip netns exec #{node.netns} ip addr add #{bond[1]['ipv4']} dev #{bond[0]} )
         end
 

@@ -12,8 +12,8 @@ class Graph
 
   def initialize(args)
     @log = args[:log] || LabLog.new
-    @log.write "== Graph =="
-    @log.write "#{__method__}(): args=#{args}"
+    @log.write "== Graph ==", "debug"
+    @log.write "#{__method__}(): args=#{args}", "debug"
 
     @name    = args[:name]
     @pubdir  = args[:pubdir]
@@ -25,7 +25,7 @@ class Graph
   end
 
   def get_cons
-    @log.write "#{__method__}():  "
+    @log.write "#{__method__}():  ", "debug"
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
@@ -113,7 +113,7 @@ class Graph
   end
 
   def get_mgmt_cons
-    @log.write "#{__method__}():  "
+    @log.write "#{__method__}():  ", "debug"
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
@@ -426,7 +426,7 @@ class Graph
   end
 
   def to_dot(data)
-    @log.write "#{__method__}(): data=#{data}"
+    @log.write "#{__method__}(): data=#{data}", "debug"
 
     File.open("#{@dotfile}", "w" ) do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding) )
@@ -434,21 +434,21 @@ class Graph
   end
 
   def to_png(data, name)
-    @log.write "#{__method__}(): data=#{data},name=#{name}"
+    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
 
     to_dot(data)
     %x( dot -Tpng #{@dotfile} -o #{@pubdir}/#{name}.png )
   end
 
   def to_svg(data, name)
-    @log.write "#{__method__}(): data=#{data},name=#{name}"
+    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
 
     to_dot(data)
     %x( dot -Tsvg #{@dotfile} -o #{@pubdir}/#{name}.svg )
   end
 
   def to_ini(data, name)
-    @log.write "#{__method__}(): data=#{data},name=#{name}"
+    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
 
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))

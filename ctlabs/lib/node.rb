@@ -45,8 +45,8 @@ class Node
     @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
 
     @log = args['log'] || LabLog.new
-    @log.write "== Node =="
-    @log.write "#{__method__}(): name=#{@name},fqdn=#{@fqdn},eos=#{@eos},kind=#{@kind},kvm=#{@kvm},type=#{@type},image=#{@image},env=#{@env},cmd=#{@cmd},nics=#{@nics},ports=#{@ports},gw=#{@gw},ipv4=#{@ipv4},mgmt=#{@mgmt},snat=#{@snat},vxlan=#{@vxlan},dnat=#{@dnat},mtu=#{@mtu},priv=#{@priv},caps=#{@caps},vols=#{@vols},defaults=#{@defaults}"
+    @log.write "== Node ==", "debug"
+    @log.write "#{__method__}(): name=#{@name},fqdn=#{@fqdn},eos=#{@eos},kind=#{@kind},kvm=#{@kvm},type=#{@type},image=#{@image},env=#{@env},cmd=#{@cmd},nics=#{@nics},ports=#{@ports},gw=#{@gw},ipv4=#{@ipv4},mgmt=#{@mgmt},snat=#{@snat},vxlan=#{@vxlan},dnat=#{@dnat},mtu=#{@mtu},priv=#{@priv},caps=#{@caps},vols=#{@vols},defaults=#{@defaults}", "debug"
 
     case @type
       when 'switch', 'router', 'host', 'controller'
@@ -62,7 +62,7 @@ class Node
 
   # set max ports of a switch
   def switch_ports
-    @log.write "#{__method__}(): ports=#{@ports}"
+    @log.write "#{__method__}(): ports=#{@ports}", "debug"
 
     case
       when [ 'switch', 'gateway' ].include?(@type)
@@ -77,9 +77,9 @@ class Node
   end
 
   def run
-    @log.write "#{__method__}(): name=#{@name}"
+    @log.write "#{__method__}(): name=#{@name}", "debug"
 
-    puts "#{__method__}(): #{@name}"
+    @log.info "#{__method__}(): #{@name}"
     case @type
       when 'host', 'router', 'switch', 'controller'
         caps  = @caps.map { |c| "--cap-add #{c} " }.join
@@ -132,7 +132,7 @@ class Node
         # linux bridge
         #
         if(@type == 'switch' && [ 'linux', 'mgmt' ].include?(@kind) )
-          @log.write "#{__method__}(): (switch) - adding bridge"
+          @log.write "#{__method__}(): (switch) - adding bridge", "debug"
 
           %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
           if $?.exitstatus > 0
@@ -153,7 +153,7 @@ class Node
             dstport       = dport || 4789
             ipv4          = @ipv4.split('/')[0]
 
-            @log.write "#{__method__}(): (switch) - adding vxlan interface vxlan#{@vxlan['id']}:#{ipv4} -> #{remote}:#{dstport}"
+            @log.write "#{__method__}(): (switch) - adding vxlan interface vxlan#{@vxlan['id']}:#{ipv4} -> #{remote}:#{dstport}", "debug"
             %x( ip netns exec #{@netns} ip link add vxlan#{@vxlan['id']} type vxlan id #{@vxlan['id']} local #{ipv4} remote #{remote} dstport #{dstport} )
             %x( ip netns exec #{@netns} ip link set vxlan#{@vxlan['id']} master #{@name} up )
 
@@ -169,12 +169,13 @@ class Node
         # openvswitch
         #
         if(@type == 'switch' && [ 'ovs' ].include?(@kind) )
-          @log.write "#{__method__}(): (switch) - adding openvswitch"
+          @log.write "#{__method__}(): (switch) - adding openvswitch", "debug"
 
           # check if kernel module was loaded
           res = %x(modprobe openvswitch)
           if $?.exitstatus > 0
-            puts "ERROR: #{res}"
+            @log.write "#{__method__}(): ERROR: #{res}", error
+            @log.info "ERROR: #{res}"
             exit(1)
           end
 
@@ -192,7 +193,7 @@ class Node
         end
 
       when 'gateway'
-        @log.write "#{__method__}(): (gateway) - adding gateway"
+        @log.write "#{__method__}(): (gateway) - adding gateway", "debug"
         %x( ip link ls #{@name} 2>/dev/null )
         if $?.exitstatus > 0 
           %x( ip link add #{@name} type bridge )
@@ -202,13 +203,13 @@ class Node
         @ipv4 ? %x( ip addr add #{@ipv4} dev #{@name} 2>/dev/null ) : false
         ipt_rule('append', "FORWARD   -i #{@name} -o #{@name} -j ACCEPT")
         if(@snat)
-          @log.write "#{__method__}(): (gateway) - set snat gateway"
+          @log.write "#{__method__}(): (gateway) - set snat gateway", "debug"
           ipt_rule('append', "FORWARD ! -i #{@name}   -o #{@name} -j ACCEPT")
           ipt_rule('append', "FORWARD   -i #{@name} ! -o #{@name} -j ACCEPT")
           ipt_rule('insert', "POSTROUTING -tnat ! -o #{@name} -s #{@ipv4} -j MASQUERADE")
         end
         if(! @dnat.nil?)
-          @log.write "#{__method__}(): (gateway) - dnatgw=#{@dnat}"
+          @log.write "#{__method__}(): (gateway) - dnatgw=#{@dnat}", "debug"
           #ro, nic = @dnat.split(':')
           #node = find_node(ro)
           #@via = node.nics[nic].split('/')[0]
@@ -288,7 +289,7 @@ sleep $SLEEP
   end
 
   def ipt_rule(mode, rule)
-    @log.write "#{__method__}(): mode=#{mode},rule=#{rule}"
+    @log.write "#{__method__}(): mode=#{mode},rule=#{rule}", "debug"
 
     %x( iptables -C #{rule} 2> /dev/null )
     if $?.exitstatus > 0
@@ -307,7 +308,7 @@ sleep $SLEEP
   end
 
   def add_netns
-    @log.write "#{__method__}(): #{@cid}"
+    @log.write "#{__method__}(): #{@cid}", "debug"
 
     #p "name: #{@name}, cid: #{@cid}, cpid: #{@cpid}"
     %x( mkdir -vp /var/run/netns/ )
@@ -316,9 +317,9 @@ sleep $SLEEP
   end
 
   def stop
-    @log.write "#{__method__}(): name=#{@name}"
+    @log.write "#{__method__}(): name=#{@name}", "debug"
 
-    puts "#{__method__}(): #{@name}..."
+    @log.info "#{__method__}(): #{@name}..."
     case @type
       when 'host', 'router', 'switch', 'controller'
         %x( docker stop #{@name} )

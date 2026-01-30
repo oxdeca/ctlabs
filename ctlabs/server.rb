@@ -140,21 +140,12 @@ helpers do
     File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
   end
 
-  # Inside helpers do ... end block
   def parse_lab_info(yaml_file_path, adhoc_rules_by_lab = {})
     require 'yaml'
     require 'set'
   
-    begin
-      lab_config = YAML.safe_load(File.read(yaml_file_path), aliases: true)
-    rescue Psych::SyntaxError => e
-      return { error: "Error parsing YAML: #{e.message}" }
-    rescue => e
-      return { error: "Unexpected error: #{e.message}" }
-    end
-  
-    lab = Lab.new(yaml_file_path)
-    info = {}
+    lab             = Lab.new(cfg: yaml_file_path)
+    info            = {}
     info[:lab_name] = File.basename(yaml_file_path, '.yml')
     info[:desc]     = lab.desc || ''
   
@@ -625,7 +616,7 @@ post '/labs/*/dnat' do
 
   begin
     lab_file_path  = File.join(LABS_DIR, lab_name)
-    lab            = Lab.new(lab_file_path, nil, 'warn')
+    lab            = Lab.new(cfg: lab_file_path)
     rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
     # Optional: log it
@@ -753,7 +744,7 @@ get '/labs/*/info' do
   end
 
   lab_file_path = File.join(LABS_DIR, lab_name)
-  lab = Lab.new(lab_file_path, nil)
+  lab = Lab.new(cfg: lab_file_path)
   #puts "nodes"
   #lab.nodes.each do |node|
   #  p "Node: #{node}"
@@ -777,99 +768,87 @@ post '/labs/execute' do
   halt 400, "Invalid action" unless %w[up down].include?(action)
 
   if action == 'up'
-    # Validate lab name only for 'up'
     lab_name = params[:lab_name]
     labs_list = all_labs
     halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
 
-    if running_lab?
-      current = get_running_lab
-      halt 400, "A lab is already running: #{current}. Stop it first."
+    if Lab.running?
+      halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
     end
-    set_running_lab(lab_name)
   else # action == 'down'
-    # Get the running lab name SERVER-SIDE, not from the form parameters for 'down'
-    running_lab_name = get_running_lab
-    halt 400, "No lab is currently running." unless running_lab_name
-
-    lab_name = running_lab_name # Use the server-side determined name
+    unless Lab.running?
+      halt 400, "No lab is currently running."
+    end
+    lab_name = Lab.current_name
     labs_list = all_labs
     halt 500, "Running lab not found in lab list: #{lab_name}" unless labs_list.include?(lab_name)
 
-    # ✅ CLEAR THE LOCK HERE ON THE SERVER SIDE BEFORE STARTING THREAD
-    clear_running_lab
+    # Clean up ad-hoc DNAT session data
     if session[:adhoc_dnat_rules] && session[:adhoc_dnat_rules].key?(lab_name)
       session[:adhoc_dnat_rules].delete(lab_name)
     end
-    if running_lab_name
-      lab_name_safe = running_lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+
+    # Clean up ad-hoc DNAT file
+    if lab_name
+      lab_name_safe = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
       adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
       File.delete(adhoc_file) if File.file?(adhoc_file)
     end
   end
 
-  # At this point, 'lab_name' holds the correct name for the action (either from form or server state)
   lab_file_path = File.join(LABS_DIR, lab_name)
   timestamp     = Time.now.to_i
   safe_lab      = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
   log_file_path = "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
 
-  File.write(log_file_path, "Starting '#{action}' for lab: #{lab_name} (File: #{lab_file_path})\n")
+  # Write initial line to log file
+  File.open(log_file_path, 'w') do |f|
+    f.puts "Starting '#{action}' for lab: #{lab_name} (File: #{lab_file_path})"
+  end
 
-  # --- Start Background Thread (without detach) ---
+  # --- Background Thread ---
   Thread.new do
     begin
       File.open(log_file_path, 'a') do |log_file_handle|
-        old_stdout   = $stdout
-        old_stderr   = $stderr
-        $stdout      = log_file_handle
-        $stderr      = log_file_handle
-        $stdout.sync = true
-        $stderr.sync = true
+        log = LabLog.new(out: log_file_handle, level: 'info')
+        log.info "--- Background Thread Started ---"
 
-        puts "--- Background Thread Started ---"
-
-        lab_instance = Lab.new(lab_file_path, nil, dlevel='warn')
+        # 🔑 Pass relative_path = lab_name (e.g., "net/net01.yml")
+        lab_instance = Lab.new(
+          cfg: lab_file_path,
+          relative_path: lab_name,
+          log: log
+        )
 
         if action == 'up'
           lab_instance.visualize
           lab_instance.inventory
           lab_instance.up
-          puts "--- Lab #{lab_name} UP Operation Completed ---"
+          log.info "--- Lab #{lab_name} UP Operation Completed ---"
           lab_instance.run_playbook(true, log_file_path)
-          puts "--- Lab #{lab_name} Ansible Operation Completed ---"
+          log.info "--- Lab #{lab_name} Ansible Operation Completed ---"
         elsif action == 'down'
           lab_instance.down
-          puts "--- Lab #{lab_name} DOWN Operation Completed ---"
+          log.info "--- Lab #{lab_name} DOWN Operation Completed ---"
         end
 
-      ensure
-        $stdout = old_stdout
-        $stderr = old_stderr
-        puts "--- Background Thread Finished ---"
+        log.info "--- Background Thread Finished ---"
       end
-    rescue => e
-      error_msg = "Error in background thread executing '#{action}' for lab '#{lab_name}': #{e.message}\n#{e.backtrace.join("\n")}"
-      puts error_msg
-      $stderr.puts error_msg
 
-      if action == 'up'
-        lock_file_for_thread = "#{LOCK_DIR}/running_lab"
-        if File.file?(lock_file_for_thread)
-          current_locked_lab = File.read(lock_file_for_thread).strip
-          if current_locked_lab == lab_name
-            File.delete(lock_file_for_thread)
-            puts "--- Cleared lock for failed 'up' operation for #{lab_name} ---"
-          end
+    rescue => e
+      # Log error even if main block fails
+      File.open(log_file_path, 'a') do |f|
+        error_msg = "Error in background thread executing '#{action}' for lab '#{lab_name}': #{e.message}\n#{e.backtrace.join("\n")}"
+        f.puts error_msg
+
+        # Clean up lock on up-failure
+        if action == 'up' && Lab.running? && Lab.current_name == lab_name
+          Lab.release_lock!
+          f.puts "--- Cleared lock for failed 'up' operation for #{lab_name} ---"
         end
       end
     end
   end
-
-  # Do NOT call detach or join here.
-  # The thread is already running in the background.
-
-  # --- End Background Thread ---
 
   redirect "/logs?file=#{URI.encode_www_form_component(log_file_path)}&lab=#{lab_name}&action=#{action}"
 end

@@ -11,23 +11,37 @@ class Lab
   attr_writer :dotfile, :dtype, :diagram
   attr_reader :name, :desc, :nodes, :links, :defaults, :topology
 
-  def initialize(cfg, vm_name=nil, dlevel="warn")
-    @log = LabLog.new(level: dlevel)
-    @log.write "== Lab =="
-    @pubdir = "/srv/ctlabs-server/public"
+  LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
+  LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
+
+  #def initialize(cfg, vm_name=nil, dlevel="warn")
+  def initialize(args={})
+    cfg           = args[:cfg]
+    vm_name       = args[:vm_name]
+    dlevel        = args[:dlevel]
+    relative_path = args[:relative_path]
+
+    @cfg_file      = cfg
+    @relative_path = relative_path || File.basename(cfg)
+    @log           = args[:log] || LabLog.new(level: dlevel)
+    @pubdir        = "/srv/ctlabs-server/public"
+
+    @log.write "== Lab ==", "debug"
 
     unless File.directory?(@pubdir)
       FileUtils.mkdir_p(@pubdir)
     end
 
+    # write the current lab config to ctlabs-server pubdir
     if( File.file?(cfg) )
       File.open("#{@pubdir}/config.yml", 'w') do |f|
         f.write( File.read(cfg) )
       end
     end
 
+    # process lab config
     @cfg = YAML.load(File.read(cfg))
-    @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},vm=#{vm_name}"
+    @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},relative_path=#{@relative_path},vm=#{vm_name}", "debug"
 
     @vm_name    = vm_name
     @name       = @cfg['name']      || ''
@@ -50,8 +64,35 @@ class Lab
     @links += init_mgmt_links(vm_name)
   end
 
+  def self.running?
+    File.file?(LOCK_FILE)
+  end
+
+  def self.current_name
+    File.read(LOCK_FILE).strip if running?
+  rescue
+    nil
+  end
+
+#  def self.acquire_lock!(name)
+#    raise "A lab is already running: #{current_name}" if running?
+#    FileUtils.mkdir_p(File.dirname(LOCK_FILE))
+#    File.write(LOCK_FILE, name)
+#  end
+
+  def self.acquire_lock!(name)
+    raise ArgumentError, "Lab name must be relative path like 'dir/lab.yml'" unless name =~ %r{^[^/]+/[^/]+\.yml$}
+    raise "A lab is already running: #{current_name}" if running?
+    FileUtils.mkdir_p(File.dirname(LOCK_FILE))
+    File.write(LOCK_FILE, name)
+  end
+
+  def self.release_lock!
+    File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
+  end
+
   def find_vm(name)
-    @log.write "#{__method__}(): vm=#{name}"
+    @log.write "#{__method__}(): vm=#{name}", "debug"
 
     vm = nil
     @cfg['topology'].each_with_index do |v, i|
@@ -67,7 +108,7 @@ class Lab
   end
 
   def init_nodes(vm_name)
-    @log.write "#{__method__}(): vm=#{vm_name}"
+    @log.write "#{__method__}(): vm=#{vm_name}", "debug"
 
     nodes = []
     cfg    = find_vm(vm_name)
@@ -100,7 +141,7 @@ class Lab
   end
 
   def init_mgmt_links(vm_name)
-    @log.write "#{__method__}(): vm=#{vm_name}"
+    @log.write "#{__method__}(): vm=#{vm_name}", "debug"
 
     cfg      = find_vm(vm_name)
     switches = []
@@ -132,7 +173,7 @@ class Lab
   end
 
   def init_links(vm_name)
-    @log.write "#{__method__}(): vm=#{vm_name}"
+    @log.write "#{__method__}(): vm=#{vm_name}", "debug"
 
     cfg   = find_vm(vm_name)
     links = cfg['links']
@@ -141,7 +182,7 @@ class Lab
   end
 
   def add_node(name, node={})
-    @log.write "#{__method__}(): name=#{name}"
+    @log.write "#{__method__}(): name=#{name}", "debug"
 
     @nodes << Node.new( { 'name' => name, 'log' => @log }.merge( node ) )
   end
@@ -165,7 +206,7 @@ class Lab
   end
 
   def find_node(name)
-    @log.write "#{__method__}(): name=#{name}"
+    @log.write "#{__method__}(): name=#{name}", "debug"
 
     @nodes.each do |node|
       if node.name == name
@@ -178,7 +219,7 @@ class Lab
   # TODO
   # check if the rule already exists
   def add_dnat
-    @log.write "#{__method__}(): "
+    @log.write "#{__method__}(): ", "debug"
 
     chain = "#{@name.upcase}-DNAT"
     # find main ipv4 address
@@ -188,7 +229,7 @@ class Lab
     via   = nil
     #p "natgw=#{natgw}"
     if( !natgw.nil? && !natgw.dnat.nil? )
-      @log.write "#{__method__}(): natgw=#{natgw}"
+      @log.write "#{__method__}(): natgw=#{natgw}", "debug"
 
       ro, nic = natgw.dnat.split(':')
       node    = find_node(ro)
@@ -210,7 +251,7 @@ class Lab
       # VXLAN
       #
       if( ! node.vxlan.nil? )
-        @log.write "#{__method__}(): node=#{node},vxlan=#{node.vxlan}"
+        @log.write "#{__method__}(): node=#{node},vxlan=#{node.vxlan}", "debug"
 
         local, lport = node.vxlan['local'].split(':')
         router       = find_node(natgw.dnat.split(':')[0])
@@ -231,7 +272,7 @@ class Lab
       # DNAT
       #
       if( ! node.dnat.nil? and node.type == 'host' )
-        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}"
+        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}", "debug"
         #p @dnatgw
         #p vmip
         #p node
@@ -244,8 +285,7 @@ class Lab
           else
             dport = r[1]
           end
-          @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
-          puts "#{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
+          @log.info "#{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
           
           %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} 2> /dev/null )
           if $?.exitstatus > 0
@@ -257,14 +297,13 @@ class Lab
       end
 
       if( ! node.dnat.nil? and node.type == 'controller' )
-        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}"
+        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}", "debug"
         router   = find_node('ro0')
         mgmt_via = router.nics['eth1'].split('/')[0]
         node.dnat.each do |r|
           %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[1]} 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): #{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
-            puts "#{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
+            @log.info "#{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
             %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[0]} )
             %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{mgmt_via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth0'].split('/')[0]}:#{r[1]})
           end
@@ -277,7 +316,7 @@ class Lab
 
 
 def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
-  @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}"
+  @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
 
   chain = "#{@name.upcase}-DNAT"
   vmip  = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
@@ -300,7 +339,7 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
 
     unless system(rule1_check)
-      @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}"
+      @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}", "debug"
       raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
     end
 
@@ -310,11 +349,11 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
 
     unless system(rule2_check)
-      @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}"
+      @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}", "debug"
       raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
     end
 
-    puts "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+    @log.info "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
   elsif node.type == 'host'
     # === DATA NETWORK PATH (via natgw) ===
@@ -340,7 +379,7 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
 
     unless system(rule1_check)
-      @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}"
+      @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}", "debug"
       raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
     end
 
@@ -350,11 +389,11 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
 
     unless system(rule2_check)
-      @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}"
+      @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}", "debug"
       raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
     end
 
-    puts "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+    @log.info "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
   else
     raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
@@ -365,7 +404,7 @@ end
 
 
   def del_dnat
-    @log.write "#{__method__}(): "
+    @log.write "#{__method__}(): ", "debug"
 
     chain = "#{@name.upcase}-DNAT"
     vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
@@ -380,19 +419,26 @@ end
   end
 
   def up
-    @log.write "#{__method__}(): "
+    self.class.acquire_lock!(@relative_path)
 
-    puts "Starting Nodes:"
-    @nodes.each { |node| node.run }
+    synchronize_lab_operation do
+      @log.write "#{__method__}(): ", "debug"
 
-    puts "Starting Links:"
-    @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
-    #@links.each { |l| Link.new(@nodes, l, @log) }
+      @log.info "Starting Nodes:"
+      @nodes.each { |node| node.run }
 
-    puts "DNAT:"
-    add_dnat
-
-    sleep 1
+      @log.info "Starting Links:"
+      @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
+      #@links.each { |l| Link.new(@nodes, l, @log) }
+  
+      @log.info "DNAT:"
+      add_dnat
+  
+      sleep 1
+    end
+  rescue
+    self.class.release_lock!
+    raise
   end
 
   #
@@ -401,7 +447,7 @@ end
   # 2. defined in lab configuration
   #
   def run_playbook(play, output="shell")
-    @log.write "#{__method__}(): "
+    @log.write "#{__method__}(): ", "debug"
     cmd    = nil
     ctrl   = find_node('ansible')
     domain = find_vm(@vm_name)['domain'] || @domain
@@ -419,16 +465,17 @@ end
     end
 
     if play_cmd.class == String
-      #puts "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
+      @log.info "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
       #system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
-      puts "Playbook found: #{play_cmd}"
+      @log.info "Playbook found: #{play_cmd}"
       if output == "shell"
-        system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{play_cmd}'")
+        system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
       else
         stream_docker_exec(ctrl.name, play_cmd, output)
       end
     else
-      puts "No Playbook found."
+      @log.write "#{__method__}(): No Playbook found."
+      @log.info "No Playbook found."
     end
   end
 
@@ -471,11 +518,32 @@ end
 
 
   def down
-    @log.write "#{__method__}(): "
-
-    puts "Stopping Nodes:"
-    @nodes.each{ |node| node.stop }
-    del_dnat
+    begin
+      synchronize_lab_operation do
+        @log.write "#{__method__}(): ", "debug"
+  
+        @log.info "Stopping Nodes:"
+        @nodes.each{ |node| node.stop }
+        del_dnat
+      end
+    ensure
+      self.class.release_lock!
+    end
   end
 
-end
+
+  private
+  
+  def synchronize_lab_operation
+    lock_dir = File.dirname(LAB_OPERATION_LOCK)
+    Dir.mkdir(lock_dir, 0755) unless Dir.exist?(lock_dir)
+  
+    File.open(LAB_OPERATION_LOCK, File::CREAT | File::RDWR) do |f|
+      f.flock(File::LOCK_EX)  # ← THIS IS THE KEY LINE
+      yield
+    ensure
+      # Lock is automatically released when file is closed
+    end
+  end
+
+end # end class Lab
