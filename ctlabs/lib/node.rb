@@ -44,7 +44,7 @@ class Node
     @caps      = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
     @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
 
-    @log = args['log'] || LabLog.new
+    @log = args['log'] || LabLog.null
     @log.write "== Node ==", "debug"
     @log.write "#{__method__}(): name=#{@name},fqdn=#{@fqdn},eos=#{@eos},kind=#{@kind},kvm=#{@kvm},type=#{@type},image=#{@image},env=#{@env},cmd=#{@cmd},nics=#{@nics},ports=#{@ports},gw=#{@gw},ipv4=#{@ipv4},mgmt=#{@mgmt},snat=#{@snat},vxlan=#{@vxlan},dnat=#{@dnat},mtu=#{@mtu},priv=#{@priv},caps=#{@caps},vols=#{@vols},defaults=#{@defaults}", "debug"
 

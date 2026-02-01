@@ -142,7 +142,7 @@ helpers do
     require 'yaml'
     require 'set'
   
-    lab             = Lab.new(cfg: yaml_file_path)
+    lab             = Lab.new(cfg: yaml_file_path, log: LabLog.null)
     info            = {}
     info[:lab_name] = File.basename(yaml_file_path, '.yml')
     info[:desc]     = lab.desc || ''
@@ -617,11 +617,16 @@ post '/labs/*/dnat' do
     lab            = Lab.new(cfg: lab_file_path)
     rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
-    # Optional: log it
-    timestamp      = Time.now  #.strftime('%Y-%m-%d %H:%M:%S')
-    safe_lab       = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+    timestamp      = Time.now
+    log            = LabLog.for_lab(lab_name: lab_name, action: 'adhoc', level: 'info')
+    log.info "AdHoc DNAT #{lab_name}: #{rule.inspect}"
+    log.close
 
-    log_entry      = "[#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] AdHoc DNAT #{lab_name}: #{rule}\n"
+    # Optional: log it
+    #timestamp      = Time.now  #.strftime('%Y-%m-%d %H:%M:%S')
+    #log_entry      = "[#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] AdHoc DNAT #{lab_name}: #{rule}\n"
+
+    safe_lab       = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
     adhoc_file     = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
     adhoc_log_file = "#{LOG_DIR}/ctlabs_#{timestamp.to_i}_#{safe_lab}_adhoc.log"
     File.open(adhoc_log_file, 'a') { |f| f.write(log_entry) }
@@ -761,7 +766,81 @@ get '/labs/*/info' do
   lab_info.to_json
 end
 
+# server.rb — POST /labs/execute
 post '/labs/execute' do
+  action = params[:action]
+  halt 400, "Invalid action" unless %w[up down].include?(action)
+  
+  if action == 'up'
+    lab_name = params[:lab_name]
+    labs_list = all_labs
+    halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
+    if Lab.running?
+      halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
+    end
+  else # down
+    unless Lab.running?
+      halt 400, "No lab is currently running."
+    end
+    lab_name = Lab.current_name
+    labs_list = all_labs
+    halt 500, "Running lab not found" unless labs_list.include?(lab_name)
+    
+    # Cleanup ad-hoc DNAT
+    if lab_name
+      lab_name_safe = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
+      adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
+      File.delete(adhoc_file) if File.file?(adhoc_file)
+    end
+  end
+
+  lab_file_path = File.join(LABS_DIR, lab_name)
+  
+  # ✅ UNIFIED LOG CREATION - replaces 5 lines of path computation
+  log = LabLog.for_lab(lab_name: lab_name, action: action)
+  
+  Thread.new do
+    begin
+      lab_instance = Lab.new(
+        cfg: lab_file_path,
+        relative_path: lab_name,
+        log: log
+      )
+      
+      if action == 'up'
+        lab_instance.visualize
+        lab_instance.inventory
+        lab_instance.up
+        log.info "--- Lab #{lab_name} UP completed ---"
+        lab_instance.run_playbook(true, log.path)
+        log.info "--- Ansible playbook completed ---"
+      else
+        lab_instance.down
+        log.info "--- Lab #{lab_name} DOWN completed ---"
+      end
+      
+      log.info "--- Operation finished ---"
+      log.close
+      
+    rescue => e
+      log.info "ERROR: #{e.message}"
+      log.info e.backtrace.join("\n")
+      
+      # Cleanup lock on up-failure
+      if action == 'up' && Lab.running? && Lab.current_name == lab_name
+        Lab.release_lock!
+        log.info "--- Cleared orphaned lock ---"
+      end
+      
+      log.close
+    end
+  end
+  
+  redirect "/logs?file=#{URI.encode_www_form_component(log.path)}"
+end
+
+
+post '/labs/execute_old' do
   action = params[:action]
   halt 400, "Invalid action" unless %w[up down].include?(action)
 
@@ -769,120 +848,89 @@ post '/labs/execute' do
     lab_name = params[:lab_name]
     labs_list = all_labs
     halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
-
-    if Lab.running?
-      halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
-    end
-  else # action == 'down'
-    unless Lab.running?
-      halt 400, "No lab is currently running."
-    end
+    halt 400, "A lab is already running: #{Lab.current_name}" if Lab.running?
+  else # down
+    halt 400, "No lab is currently running." unless Lab.running?
     lab_name = Lab.current_name
     labs_list = all_labs
     halt 500, "Running lab not found in lab list: #{lab_name}" unless labs_list.include?(lab_name)
 
-    # Clean up ad-hoc DNAT session data
-    if session[:adhoc_dnat_rules] && session[:adhoc_dnat_rules].key?(lab_name)
+    # Clean up ad-hoc DNAT
+    if session[:adhoc_dnat_rules]&.key?(lab_name)
       session[:adhoc_dnat_rules].delete(lab_name)
     end
-
-    # Clean up ad-hoc DNAT file
-    if lab_name
-      lab_name_safe = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-      adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
-      File.delete(adhoc_file) if File.file?(adhoc_file)
-    end
+    lab_name_safe = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+    adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
+    File.delete(adhoc_file) if File.file?(adhoc_file)
   end
 
   lab_file_path = File.join(LABS_DIR, lab_name)
-  timestamp     = Time.now.to_i
-  safe_lab      = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-  log_file_path = "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
 
-  # Write initial line to log file
-  File.open(log_file_path, 'w') do |f|
-    f.puts "Starting '#{action}' for lab: #{lab_name} (File: #{lab_file_path})"
-  end
-
-  # --- Background Thread ---
   Thread.new do
     begin
-      File.open(log_file_path, 'a') do |log_file_handle|
-        log = LabLog.new(out: log_file_handle, level: 'info')
-        log.info "--- Background Thread Started ---"
+      # Create Lab with minimal logger (will be replaced by auto-log)
+      dummy_log = LabLog.new(out: $stdout, level: 'info')
+      lab_instance = Lab.new(
+        cfg: lab_file_path,
+        relative_path: lab_name,
+        log: dummy_log
+      )
 
-        # 🔑 Pass relative_path = lab_name (e.g., "net/net01.yml")
-        lab_instance = Lab.new(
-          cfg: lab_file_path,
-          relative_path: lab_name,
-          log: log
-        )
-
-        if action == 'up'
-          lab_instance.visualize
-          lab_instance.inventory
-          lab_instance.up
-          log.info "--- Lab #{lab_name} UP Operation Completed ---"
-          lab_instance.run_playbook(true, log_file_path)
-          log.info "--- Lab #{lab_name} Ansible Operation Completed ---"
-        elsif action == 'down'
-          lab_instance.down
-          log.info "--- Lab #{lab_name} DOWN Operation Completed ---"
-        end
-
-        log.info "--- Background Thread Finished ---"
+      if action == 'up'
+        lab_instance.up
+        lab_instance.run_playbook(true) # log file already set inside Lab
+      elsif action == 'down'
+        lab_instance.down
       end
-
     rescue => e
-      # Log error even if main block fails
-      File.open(log_file_path, 'a') do |f|
-        error_msg = "Error in background thread executing '#{action}' for lab '#{lab_name}': #{e.message}\n#{e.backtrace.join("\n")}"
-        f.puts error_msg
-
-        # Clean up lock on up-failure
-        if action == 'up' && Lab.running? && Lab.current_name == lab_name
-          Lab.release_lock!
-          f.puts "--- Cleared lock for failed 'up' operation for #{lab_name} ---"
-        end
-      end
+      # Fallback error logging
+      fallback_log = "/var/log/ctlabs/error_#{Time.now.to_i}.log"
+      File.open(fallback_log, 'w') { |f| f.puts "Fatal error: #{e.message}\n#{e.backtrace.join("\n")}" }
     end
   end
 
-  redirect "/logs?file=#{URI.encode_www_form_component(log_file_path)}&lab=#{lab_name}&action=#{action}"
+  # Redirect to the **latest log for this lab**
+  latest_log = Dir.glob("/var/log/ctlabs/*_#{lab_name.gsub(/\//, '_')}_#{action}.log").sort.last
+  if latest_log
+    redirect "/logs?file=#{URI.encode_www_form_component(latest_log)}&lab=#{lab_name}&action=#{action}"
+  else
+    redirect '/logs'
+  end
 end
 
 get '/logs' do
   if params[:file]
     # View specific log
     @log_file = URI.decode_www_form_component(params[:file])
-    # Security: only allow logs from our dir
-    halt 403 unless @log_file.start_with?(LOG_DIR) && @log_file.end_with?('.log')
+    halt 403 unless @log_file.start_with?(LabLog::LOG_DIR) && @log_file.end_with?('.log')
     halt 404 unless File.file?(@log_file)
-
-    # Extract lab name and action from filename
+    
+    # Extract from filename (minimal parsing for display only)
     basename = File.basename(@log_file, '.log')
     parts = basename.split('_')
     @lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown'
     @action = parts.last == 'up' ? 'up' : 'down'
-
+    
     erb :live_log
   else
     # Show log index
-    @log_files   = Dir.glob("#{LOG_DIR}/ctlabs_*.log") .sort_by { |f| File.mtime(f) } .reverse  # newest first
-    @running_lab = get_running_lab if running_lab?
-
+    @running_lab = Lab.running? ? Lab.current_name : nil
+    
+    # ✅ DELEGATE TO LABLOG
+    @log_files = if @running_lab
+      LabLog.all_for_lab(@running_lab)
+    else
+      LabLog.all_logs
+    end
+    
     erb :logs_index
   end
 end
 
 get '/logs/current' do
-  if running_lab?
-    latest = Dir.glob("#{LOG_DIR}/ctlabs_*_#{running_lab.gsub(/\//, '_')}*.log")
-                 .sort_by { |f| File.mtime(f) }
-                 .last
-    if latest
-      redirect "/logs?file=#{URI.encode_www_form_component(latest)}"
-    end
+  if Lab.running?
+    log_path = LabLog.latest_for_running_lab  # ✅ No pattern matching!
+    redirect "/logs?file=#{URI.encode_www_form_component(log_path)}" if log_path
   end
   redirect '/logs'
 end
@@ -895,6 +943,18 @@ get '/logs/content' do
 
   raw_text = File.read(log_file)
   ansi_to_html(raw_text)
+end
+
+get '/logs/system' do
+  system_log = '/var/log/ctlabs.log'
+  if File.file?(system_log)
+    @log_file = system_log
+    @lab_name = 'System Log (CLI operations)'
+    @action = 'system'
+    erb :live_log
+  else
+    halt 404, "System log not found"
+  end
 end
 
 # Delete a single log file
@@ -1517,8 +1577,78 @@ __END__
 </script>
 <%= FOOTER %>
 
-
+# In the logs_index template (was line ~1850)
 @@logs_index
+<%= HEADER %>
+<div class="w3-panel w3-green">
+  <h2>🧾 Lab Logs</h2>
+</div>
+<div class="w3-container w3-2021-inkwell">
+  
+  <% if @running_lab %>
+    <div class="w3-panel w3-green">
+      <strong>Currently running:</strong> <code><%= @running_lab %></code>
+      <% latest_log = LabLog.latest_for_running_lab %>
+      <% if latest_log %>
+        <a href="/logs?file=<%= URI.encode_www_form_component(latest_log) %>"
+           class="w3-button w3-small w3-white w3-margin-left">
+          ▶ View Live Log
+        </a>
+      <% end %>
+    </div>
+  <% end %>
+  
+  <h3>Recent Logs</h3>
+  <% if @log_files.empty? %>
+    <p>No logs found.</p>
+  <% else %>
+    <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
+      <% @log_files.each do |log_path %>
+        <%
+          basename    = File.basename(log_path, '.log')
+          parts       = basename.split('_')
+          timestamp   = parts[1].to_i rescue 0
+          lab_name    = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
+          action_part = parts.last
+          action      = case action_part
+                        when 'up' then 'Start'
+                        when 'down' then 'Stop'
+                        when 'adhoc' then 'AdHoc'
+                        else 'Unknown'
+                        end
+          time_str    = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
+        %>
+        <li style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong><%= lab_name %></strong>
+            (<%= action %>) — <%= time_str %>
+          </div>
+          <div>
+            <a href="/logs?file=<%= URI.encode_www_form_component(log_path) %>"
+               class="w3-button w3-tiny w3-blue w3-round">View</a>
+            <form method="post" action="/logs/delete" style="display: inline;"
+                  onsubmit="return confirm('Delete this log?')">
+              <input type="hidden" name="file" value="<%= URI.encode_www_form_component(log_path) %>">
+              <button type="submit" class="w3-button w3-tiny w3-red w3-round">🗑️</button>
+            </form>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+  
+  <% if @log_files.any? %>
+    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;"
+          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
+      <button type="submit" class="w3-button w3-red w3-tiny w3-round w3-right">
+        🗑️ Delete All Logs
+      </button>
+    </form>
+  <% end %>
+</div>
+<%= FOOTER %>
+
+@@logs_index_old
 <%= HEADER %>
 <div class="w3-panel w3-green">
   <h2>🧾 Lab Logs</h2>
@@ -1526,15 +1656,23 @@ __END__
 
 <div class="w3-container w3-2021-inkwell">
 
-
   <% if @running_lab %>
-    <div class="w3-panel w3-green">
+    <div class="w3-panel w3-<%= @cli_started ? 'orange' : 'green' %>">
       <strong>Currently running:</strong> <code><%= @running_lab %></code>
-      <a href="#" onclick="window.location.href = findLatestLog(); return false;"
-         class="w3-button w3-small w3-white w3-margin-left">
+      <% if @cli_started %>
+        <br>
+        <span style="font-size: 0.9em;">
+          ℹ️ This lab was started via CLI. 
+          <%= link_to 'Check system logs', '/logs?file=' + URI.encode_www_form_component('/var/log/ctlabs.log'), class: 'w3-button w3-tiny w3-white' %>
+        </span>
+      <% else %>
+        <strong>Currently running:</strong> <code><%= @running_lab %></code>
+        <a href="#" onclick="window.location.href = findLatestLog(); return false;" class="w3-button w3-small w3-white w3-margin-left">
         ▶ View Live Log
       </a>
+      <% end %>
     </div>
+
     <script>
       const logs = <%= JSON.generate(@log_files.map { |f| { file: f, mtime: File.mtime(f).to_i } }) %>;
       const runningLab = <%= JSON.generate(@running_lab) %>;

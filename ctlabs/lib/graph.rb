@@ -11,7 +11,7 @@ class Graph
   attr_reader :colors
 
   def initialize(args)
-    @log = args[:log] || LabLog.new
+    @log = args[:log] || LabLog.null
     @log.write "== Graph ==", "debug"
     @log.write "#{__method__}(): args=#{args}", "debug"
 

@@ -61,8 +61,11 @@ OptionParser.new do |opts|
   opts.on("-p", "--play [CMD]", "Run playbook") do |cmd|
     options[:play] = cmd.nil? ? true : cmd
   end
-  opts.on("-lLEVEL", "--debug=LEVEL", "Set the debug level") do |l|
-    options[:dlevel] = l || 'warn'
+  opts.on("-l", "--list", "List all available labs") do
+    options[:list] = true
+  end
+  opts.on("-LLEVEL", "--log-level=LEVEL", "Set the log level") do |level|
+    options[:dlevel] = level || 'warn'
   end
   opts.on("-s", "--status", "Show status of currently running lab") do
     options[:status] = true
@@ -70,6 +73,7 @@ OptionParser.new do |opts|
 end.parse!
 
 LABS_DIR = File.expand_path('../labs', __dir__)
+LOG_DIR  = '/var/log/ctlabs'
 
 # Handle --status first
 if options[:status]
@@ -97,6 +101,12 @@ if options[:status]
   exit 0
 end
 
+def generate_log_filename(lab_name, action)
+  timestamp = Time.now.to_i
+  safe_lab  = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+  "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
+end
+
 if options[:up]
   if !options[:config]
     puts "❌ Error: -c/--conf is required with --up"
@@ -117,19 +127,30 @@ if options[:up]
     exit 1
   end
 
-  log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
+  #log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
+  log = LabLog.for_lab(lab_name: config_path, action: 'up')
+  puts "Starting lab: #{config_path}"
+  puts "Log file: #{log.path}"
+
   l1 = Lab.new(cfg: full_path, relative_path: config_path, log: log)
   l1.visualize
   l1.inventory
   l1.up
+
+  log.info "✓ Lab started successfully"
+
   if options[:play]
     l1.run_playbook(options[:play])
   end
+
+  log.close
+  puts "✓ Lab started. View logs at: #{log.path}"
 end
 
 if( options[:play] )
   l1.run_playbook(options[:play])
 end
+
 if options[:down]
   if !Lab.running?
     puts "❌ Error: No lab is running. Use --status to check."
@@ -137,20 +158,45 @@ if options[:down]
   end
 
   running_lab = Lab.current_name
-  labs_dir = File.expand_path('../labs', __dir__)
-  full_path = File.join(labs_dir, running_lab)
+  labs_dir    = File.expand_path('../labs', __dir__)
+  full_path   = File.join(labs_dir, running_lab)
+
+  #log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
+  log = LabLog.for_lab(lab_name: running_lab, action: 'down')
 
   puts "Stopping running lab: #{running_lab}"
-  log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
+  puts "Log file: #{log.path}"
+
   l1 = Lab.new(cfg: full_path, relative_path: running_lab, log: log)
   l1.down
+
+  log.info "✓ Lab stopped successfully"
+  log.close
+  
+  puts "✓ Lab stopped. View logs at: #{log.path}"
 end
+
 if( options[:graph] )
   l1.visualize
 end
+
 if( options[:ini] )
   l1.inventory
 end
+
 if( options[:print] )
   p l1
+end
+
+if options[:list]
+  labs = Dir.glob(File.join(LABS_DIR, "**", "*.yml"))
+            .map { |f| f.sub(LABS_DIR + '/', '') }
+            .sort
+  if labs.empty?
+    puts "No labs found in #{LABS_DIR}"
+  else
+    puts "Available labs:"
+    labs.each { |lab| puts "  #{lab}" }
+  end
+  exit 0
 end

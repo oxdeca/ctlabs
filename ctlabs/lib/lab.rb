@@ -23,7 +23,7 @@ class Lab
 
     @cfg_file      = cfg
     @relative_path = relative_path || File.basename(cfg)
-    @log           = args[:log] || LabLog.new(level: dlevel)
+    @log           = args[:log]    || LabLog.null
     @pubdir        = "/srv/ctlabs-server/public"
 
     @log.write "== Lab ==", "debug"
@@ -420,25 +420,20 @@ end
 
   def up
     self.class.acquire_lock!(@relative_path)
-
+  
+    @log.info "Starting Lab: #{@relative_path}"
     synchronize_lab_operation do
-      @log.write "#{__method__}(): ", "debug"
-
       @log.info "Starting Nodes:"
       @nodes.each { |node| node.run }
-
+  
       @log.info "Starting Links:"
-      @links.each { |l| Link.new( 'nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt ) }
-      #@links.each { |l| Link.new(@nodes, l, @log) }
+      @links.each do |l|
+        Link.new('nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt)
+      end
   
       @log.info "DNAT:"
       add_dnat
-  
-      sleep 1
     end
-  rescue
-    self.class.release_lock!
-    raise
   end
 
   #
@@ -516,14 +511,20 @@ end
     end
   end
 
-
   def down
     begin
-      synchronize_lab_operation do
-        @log.write "#{__method__}(): ", "debug"
+      # Validate we own the lock
+      if self.class.running? && self.class.current_name != @relative_path
+        raise "Cannot stop '#{@relative_path}': currently running lab is '#{self.class.current_name}'"
+      end
   
+      @log.info "Stopping Lab: #{@relative_path}"
+  
+      synchronize_lab_operation do
         @log.info "Stopping Nodes:"
-        @nodes.each{ |node| node.stop }
+        @nodes.each { |node| node.stop }
+  
+        @log.info "Removing DNAT rules..."
         del_dnat
       end
     ensure
@@ -531,9 +532,16 @@ end
     end
   end
 
-
   private
-  
+
+  def generate_log_path(action)
+    require 'fileutils'
+    FileUtils.mkdir_p('/var/log/ctlabs')
+    timestamp = Time.now.to_i
+    safe_name = @relative_path.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+    "/var/log/ctlabs/ctlabs_#{timestamp}_#{safe_name}_#{action}.log"
+  end
+
   def synchronize_lab_operation
     lock_dir = File.dirname(LAB_OPERATION_LOCK)
     Dir.mkdir(lock_dir, 0755) unless Dir.exist?(lock_dir)
