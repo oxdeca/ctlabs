@@ -584,11 +584,8 @@ get '/labs' do
   erb :labs
 end
 
-# In server.rb, inside ROUTES section
-
 post '/labs/*/dnat' do
   lab_name = params[:splat].first
-
 
   # --- Validation ---
   halt 400, "Invalid lab name" unless lab_name
@@ -617,25 +614,23 @@ post '/labs/*/dnat' do
     lab            = Lab.new(cfg: lab_file_path)
     rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
-    timestamp      = Time.now
-    log            = LabLog.for_lab(lab_name: lab_name, action: 'adhoc')
-    log.info "AdHoc DNAT #{lab_name}: #{rule.inspect}"
-    log.close
+    # ✅ FIX: Append to lab's CURRENT operational log (visible in web UI)
+    log_path = LabLog.latest_for_running_lab
+    if log_path
+      log = LabLog.new(path: log_path)
+      log.info "AdHoc DNAT added: #{rule.inspect}"
+      log.close
+    end
 
-    # Optional: log it
-    #timestamp      = Time.now  #.strftime('%Y-%m-%d %H:%M:%S')
-    #log_entry      = "[#{timestamp.strftime('%Y-%m-%d %H:%M:%S')}] AdHoc DNAT #{lab_name}: #{rule}\n"
-
-    safe_lab       = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-    adhoc_file     = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
-    adhoc_log_file = "#{LOG_DIR}/ctlabs_#{timestamp.to_i}_#{safe_lab}_adhoc.log"
-    File.open(adhoc_log_file, 'a') { |f| f.write(log_entry) }
-
+    # Persist rule to ad-hoc DNAT file (for cleanup on lab stop)
+    safe_lab   = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
+    adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
+    
     # Load existing rules (if any)
     existing = []
     if File.file?(adhoc_file)
       begin
-        existing = JSON.parse(File.read(adhoc_file), :symbolize_names => true)
+        existing = JSON.parse(File.read(adhoc_file), symbolize_names: true)
       rescue JSON::ParserError
         existing = []
       end
@@ -651,15 +646,15 @@ post '/labs/*/dnat' do
     session[:adhoc_dnat_rules][lab_name] ||= []
     session[:adhoc_dnat_rules][lab_name] = existing
 
-    # Return success as plain text or redirect — but since we're using AJAX, return JSON *response*
     content_type :json 
-      { success: true, message: "AdHoc DNAT rule added", rule: rule }.to_json
+    { success: true, message: "AdHoc DNAT rule added", rule: rule }.to_json
   rescue => e
     content_type :json
     status 400
     { success: false, error: e.message }.to_json
   end
 end
+
 
 post '/labs/action' do
   @labs = all_labs
@@ -834,64 +829,6 @@ post '/labs/execute' do
   redirect "/logs?file=#{URI.encode_www_form_component(log.path)}"
 end
 
-
-post '/labs/execute_old' do
-  action = params[:action]
-  halt 400, "Invalid action" unless %w[up down].include?(action)
-
-  if action == 'up'
-    lab_name = params[:lab_name]
-    labs_list = all_labs
-    halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
-    halt 400, "A lab is already running: #{Lab.current_name}" if Lab.running?
-  else # down
-    halt 400, "No lab is currently running." unless Lab.running?
-    lab_name = Lab.current_name
-    labs_list = all_labs
-    halt 500, "Running lab not found in lab list: #{lab_name}" unless labs_list.include?(lab_name)
-
-    # Clean up ad-hoc DNAT
-    if session[:adhoc_dnat_rules]&.key?(lab_name)
-      session[:adhoc_dnat_rules].delete(lab_name)
-    end
-    lab_name_safe = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-    adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
-    File.delete(adhoc_file) if File.file?(adhoc_file)
-  end
-
-  lab_file_path = File.join(LABS_DIR, lab_name)
-
-  Thread.new do
-    begin
-      # Create Lab with minimal logger (will be replaced by auto-log)
-      dummy_log = LabLog.new(out: $stdout, level: 'info')
-      lab_instance = Lab.new(
-        cfg: lab_file_path,
-        relative_path: lab_name,
-        log: dummy_log
-      )
-
-      if action == 'up'
-        lab_instance.up
-        lab_instance.run_playbook(true) # log file already set inside Lab
-      elsif action == 'down'
-        lab_instance.down
-      end
-    rescue => e
-      # Fallback error logging
-      fallback_log = "/var/log/ctlabs/error_#{Time.now.to_i}.log"
-      File.open(fallback_log, 'w') { |f| f.puts "Fatal error: #{e.message}\n#{e.backtrace.join("\n")}" }
-    end
-  end
-
-  # Redirect to the **latest log for this lab**
-  latest_log = Dir.glob("/var/log/ctlabs/*_#{lab_name.gsub(/\//, '_')}_#{action}.log").sort.last
-  if latest_log
-    redirect "/logs?file=#{URI.encode_www_form_component(latest_log)}&lab=#{lab_name}&action=#{action}"
-  else
-    redirect '/logs'
-  end
-end
 
 get '/logs' do
   if params[:file]
@@ -1300,21 +1237,6 @@ __END__
     </script>
 <%= FOOTER %>
 
-@@demo_old
-<%= HEADER %>
-    <div class="w3-panel w3-green">
-      <h2>📹 Walkthrough </h2>
-    </div>
-    <div id="demo" class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 95%; overflow: auto;">
-      <div class="w3-round">
-      <script src="/asciinema-player.min.js"></script>
-      <script>
-        AsciinemaPlayer.create('/demo.cast', document.getElementById('demo'));
-      </script>
-      </div>
-    </div>
-<%= FOOTER %>
-
 
 @@markdown
 <%= HEADER %>
@@ -1572,7 +1494,6 @@ __END__
 </script>
 <%= FOOTER %>
 
-# In the logs_index template (was line ~1850)
 @@logs_index
 <%= HEADER %>
 <div class="w3-panel w3-green">
@@ -1640,100 +1561,5 @@ __END__
       </button>
     </form>
   <% end %>
-</div>
-<%= FOOTER %>
-
-@@logs_index_old
-<%= HEADER %>
-<div class="w3-panel w3-green">
-  <h2>🧾 Lab Logs</h2>
-</div>
-
-<div class="w3-container w3-2021-inkwell">
-
-  <% if @running_lab %>
-    <div class="w3-panel w3-<%= @cli_started ? 'orange' : 'green' %>">
-      <strong>Currently running:</strong> <code><%= @running_lab %></code>
-      <% if @cli_started %>
-        <br>
-        <span style="font-size: 0.9em;">
-          ℹ️ This lab was started via CLI. 
-          <%= link_to 'Check system logs', '/logs?file=' + URI.encode_www_form_component('/var/log/ctlabs.log'), class: 'w3-button w3-tiny w3-white' %>
-        </span>
-      <% else %>
-        <strong>Currently running:</strong> <code><%= @running_lab %></code>
-        <a href="#" onclick="window.location.href = findLatestLog(); return false;" class="w3-button w3-small w3-white w3-margin-left">
-        ▶ View Live Log
-      </a>
-      <% end %>
-    </div>
-
-    <script>
-      const logs = <%= JSON.generate(@log_files.map { |f| { file: f, mtime: File.mtime(f).to_i } }) %>;
-      const runningLab = <%= JSON.generate(@running_lab) %>;
-      
-      function findLatestLog() {
-        if (!runningLab) return '/logs';
-        const filtered = logs.filter(l => l.file.includes(runningLab.replace(/\//g, '_')));
-        if (filtered.length > 0) {
-          filtered.sort((a, b) => b.mtime - a.mtime);
-          return '/logs?file=' + encodeURIComponent(filtered[0].file);
-        }
-        return '/logs';
-      }
-    </script>
-  <% end %>
-
-  <h3>Recent Logs</h3>
-  <% if @log_files.empty? %>
-    <p>No logs found.</p>
-  <% else %>
-    <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
-      <% @log_files.each do |log| %>
-        <%
-          basename    = File.basename(log, '.log')
-          parts       = basename.split('_')
-          timestamp   = parts[1].to_i rescue 0
-          lab_name    = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
-          action_part = parts.last
-          action      = case action_part
-            when 'up' then 'Start'
-            when 'down' then 'Stop'
-            when 'adhoc' then 'AdHoc'
-            else 'Unknown'
-          end
-          #action      = parts.last == 'up' ? 'Start' : 'Stop'
-          time_str  = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
-        %>
-        <li style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <strong><%= lab_name %></strong> 
-            (<%= action %>) — <%= time_str %>
-          </div>
-          <div>
-            <a href="/logs?file=<%= URI.encode_www_form_component(log) %>" 
-               class="w3-button w3-tiny w3-blue w3-round">View</a>
-            <form method="post" action="/logs/delete" style="display: inline;"
-                  onsubmit="return confirm('Delete this log?')">
-              <input type="hidden" name="file" value="<%= URI.encode_www_form_component(log) %>">
-              <button type="submit" class="w3-button w3-tiny w3-red w3-round">🗑️</button>
-            </form>
-          </div>
-        </li>
-      <% end %>
-    </ul>
-  <% end %>
-  <br>
-  <!-- Delete All Button -->
-  <% if @log_files.any? %>
-    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;" 
-          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
-      <button type="submit" class="w3-button w3-red w3-tiny w3-round w3-right">
-        🗑️ Delete All Logs
-      </button>
-    </form>
-  <% end %>
-
-  <br>
 </div>
 <%= FOOTER %>
