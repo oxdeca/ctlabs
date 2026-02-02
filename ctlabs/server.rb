@@ -618,7 +618,7 @@ post '/labs/*/dnat' do
     rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
 
     timestamp      = Time.now
-    log            = LabLog.for_lab(lab_name: lab_name, action: 'adhoc', level: 'info')
+    log            = LabLog.for_lab(lab_name: lab_name, action: 'adhoc')
     log.info "AdHoc DNAT #{lab_name}: #{rule.inspect}"
     log.close
 
@@ -786,7 +786,7 @@ post '/labs/execute' do
     labs_list = all_labs
     halt 500, "Running lab not found" unless labs_list.include?(lab_name)
     
-    # Cleanup ad-hoc DNAT
+    # Cleanup ad-hoc DNAT (controller-owned session state - OK here)
     if lab_name
       lab_name_safe = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
       adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
@@ -796,24 +796,26 @@ post '/labs/execute' do
 
   lab_file_path = File.join(LABS_DIR, lab_name)
   
-  # ✅ UNIFIED LOG CREATION - replaces 5 lines of path computation
   log = LabLog.for_lab(lab_name: lab_name, action: action)
   
   Thread.new do
     begin
-      lab_instance = Lab.new(
-        cfg: lab_file_path,
-        relative_path: lab_name,
-        log: log
-      )
+      lab_instance = Lab.new(cfg: lab_file_path, relative_path: lab_name, log: log)
       
       if action == 'up'
         lab_instance.visualize
         lab_instance.inventory
         lab_instance.up
         log.info "--- Lab #{lab_name} UP completed ---"
-        lab_instance.run_playbook(true, log.path)
-        log.info "--- Ansible playbook completed ---"
+
+        # ✅ RUN PLAYBOOK ONCE with built-in concurrency protection
+        # (playbook lock handled internally by Lab#run_playbook)
+        begin
+          lab_instance.run_playbook(nil, log.path)
+          log.info "--- Ansible playbook completed ---"
+        rescue => e
+          log.info "⚠️  Playbook failed but lab is running: #{e.message}"
+        end
       else
         lab_instance.down
         log.info "--- Lab #{lab_name} DOWN completed ---"
@@ -825,13 +827,6 @@ post '/labs/execute' do
     rescue => e
       log.info "ERROR: #{e.message}"
       log.info e.backtrace.join("\n")
-      
-      # Cleanup lock on up-failure
-      if action == 'up' && Lab.running? && Lab.current_name == lab_name
-        Lab.release_lock!
-        log.info "--- Cleared orphaned lock ---"
-      end
-      
       log.close
     end
   end
@@ -1603,7 +1598,7 @@ __END__
     <p>No logs found.</p>
   <% else %>
     <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
-      <% @log_files.each do |log_path %>
+      <% @log_files.each do |log_path| %>
         <%
           basename    = File.basename(log_path, '.log')
           parts       = basename.split('_')

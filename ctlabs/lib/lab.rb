@@ -13,6 +13,8 @@ class Lab
 
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
+  PLAYBOOK_DIR       = '/root/ctlabs-ansible'.freeze
+  PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
 
   #def initialize(cfg, vm_name=nil, dlevel="warn")
   def initialize(args={})
@@ -105,6 +107,74 @@ class Lab
       vm = @cfg['topology'][0]
     end
     vm
+  end
+
+    # Acquire playbook execution lock (with stale lock cleanup)
+  def self.acquire_playbook_lock!(lab_name, timeout: 30)
+    lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
+    FileUtils.mkdir_p(PLAYBOOK_LOCK_DIR)
+    
+    # Check for stale lock (PID no longer exists)
+    if File.file?(lock_path)
+      begin
+        pid = File.read(lock_path).strip.to_i
+        if pid > 0
+          Process.kill(0, pid)  # Raises Errno::ESRCH if PID doesn't exist
+        else
+          # Invalid PID → stale lock
+          FileUtils.rm_f(lock_path)
+        end
+      rescue Errno::ESRCH
+        # PID doesn't exist → stale lock, clean it up
+        @log&.write "Cleaning stale playbook lock for #{lab_name} (PID #{pid} gone)", "debug"
+        FileUtils.rm_f(lock_path)
+      rescue => e
+        # Unknown error → assume lock is valid
+        raise "Playbook already running for lab '#{lab_name}' (lock held by PID #{pid || 'unknown'})"
+      end
+    end
+    
+    # Attempt to acquire lock with timeout
+    timeout.times do
+      begin
+        lock_file = File.open(lock_path, File::CREAT | File::EXCL | File::WRONLY)
+        lock_file.write(Process.pid.to_s)
+        lock_file.flush
+        return lock_path  # Return path to release later
+      rescue Errno::EEXIST
+        # Lock exists → wait and retry
+        sleep 1
+      end
+    end
+    
+    raise "Timeout: Playbook already running for lab '#{lab_name}' (lock file: #{lock_path})"
+  end
+
+  # Release playbook execution lock
+  def self.release_playbook_lock!(lock_path)
+    FileUtils.rm_f(lock_path) if lock_path && File.file?(lock_path)
+  rescue => e
+    @log&.write "Warning: Failed to release playbook lock #{lock_path}: #{e.message}", "debug"
+  end
+
+  # Check if playbook is currently running
+  def self.playbook_running?(lab_name)
+    lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
+    return false unless File.file?(lock_path)
+    
+    # Verify lock isn't stale
+    begin
+      pid = File.read(lock_path).strip.to_i
+      return false if pid == 0
+      Process.kill(0, pid)  # Raises if PID doesn't exist
+      true
+    rescue Errno::ESRCH
+      # Stale lock → clean up and return false
+      FileUtils.rm_f(lock_path)
+      false
+    rescue
+      true  # Unknown state → assume running
+    end
   end
 
   def init_nodes(vm_name)
@@ -441,7 +511,7 @@ end
   # 1. command args
   # 2. defined in lab configuration
   #
-  def run_playbook(play, output="shell")
+  def run_playbook_old(play, output="shell")
     @log.write "#{__method__}(): ", "debug"
     cmd    = nil
     ctrl   = find_node('ansible')
@@ -474,7 +544,111 @@ end
     end
   end
 
-  def stream_docker_exec(container_name, play_cmd, log_file_path = nil)
+  def run_playbook_old1(play = nil, log_file_path = nil)
+    @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
+    
+    # VALIDATION: Lab must be running
+    unless self.class.running? && self.class.current_name == @relative_path
+      raise "Cannot run playbook: Lab '#{@relative_path}' is not running. Start it first with --up"
+    end
+    
+    ctrl = find_node('ansible')
+    raise "No 'ansible' controller node found in topology" if ctrl.nil?
+    
+    domain = (@cfg['domain'] || @domain)
+    
+    # Determine playbook command (same logic as before)
+    if play.is_a?(String) && !play.strip.empty?
+      play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+    elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
+      play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+    elsif ctrl.play.is_a?(Hash) && ctrl.play['book'].is_a?(String)
+      inv_file  = ctrl.play['inv'] || "#{@name}.ini"
+      play_inv  = " -i ./inventories/#{inv_file}"
+      play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+      play_env += " #{(ctrl.play['env'] || []).map { |e| " -e #{e}" }.join}"
+      play_book = " ./playbooks/#{ctrl.play['book']}"
+      play_tags = ctrl.play['tags'] ? " -t #{ctrl.play['tags'].join(',')}" : ''
+      play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
+    else
+      raise "No playbook specified and no default playbook configured for 'ansible' node"
+    end
+    
+    @log.info "Executing playbook: #{play_cmd}"
+    
+    # Execute with proper output handling
+    if log_file_path
+      # Stream directly to log file (realtime visibility in web UI)
+      stream_docker_exec(ctrl.name, play_cmd, log_file_path)
+    else
+      # Fallback to shell output
+      success = system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
+      unless success
+        @log.info "Playbook execution failed (exit code: #{$?.exitstatus})"
+        raise "Playbook execution failed"
+      end
+    end
+    
+    @log.info "Playbook execution completed"
+  end
+
+  def run_playbook(play = nil, log_file_path = nil)
+    @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
+    
+    # VALIDATION: Lab must be running
+    unless self.class.running? && self.class.current_name == @relative_path
+      raise "Cannot run playbook: Lab '#{@relative_path}' is not running. Start it first with --up"
+    end
+    
+    # ACQUIRE PLAYBOOK LOCK (prevents concurrent execution)
+    playbook_lock = nil
+    begin
+      playbook_lock = self.class.acquire_playbook_lock!(@relative_path)
+      
+      ctrl = find_node('ansible')
+      raise "No 'ansible' controller node found in topology" if ctrl.nil?
+      
+      domain = (@cfg['domain'] || @domain)
+      
+      # Determine playbook command (same logic as before)
+      if play.is_a?(String) && !play.strip.empty?
+        play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+      elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
+        play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+      elsif ctrl.play.is_a?(Hash) && ctrl.play['book'].is_a?(String)
+        inv_file  = ctrl.play['inv'] || "#{@name}.ini"
+        play_inv  = " -i ./inventories/#{inv_file}"
+        play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+        play_env += " #{(ctrl.play['env'] || []).map { |e| " -e #{e}" }.join}"
+        play_book = " ./playbooks/#{ctrl.play['book']}"
+        play_tags = ctrl.play['tags'] ? " -t #{ctrl.play['tags'].join(',')}" : ''
+        play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
+      else
+        raise "No playbook specified and no default playbook configured for 'ansible' node"
+      end
+      
+      @log.info "Executing playbook: #{play_cmd}"
+      
+      # Execute with dual-stream output
+      if log_file_path
+        stream_docker_exec(ctrl.name, play_cmd, log_file_path)
+      else
+        success = system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
+        unless success
+          @log.info "Playbook execution failed (exit code: #{$?.exitstatus})"
+          raise "Playbook execution failed"
+        end
+      end
+      
+      @log.info "Playbook execution completed"
+      
+    ensure
+      # ALWAYS release lock (even on failure)
+      self.class.release_playbook_lock!(playbook_lock) if playbook_lock
+    end
+  end
+
+  def stream_docker_exec_old(container_name, play_cmd, log_file_path = nil)
     inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
   
@@ -507,6 +681,58 @@ end
         log_file&.close
         exit_status = wait_thr.value.exitstatus
         yield "[Command exited with status: #{exit_status}]\n" if block_given?
+      end
+    end
+  end
+
+  def stream_docker_exec(container_name, play_cmd, log_file_path = nil)
+    inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
+    cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
+  
+    # Open log file ONCE before streaming (critical for web UI visibility)
+    log_file = log_file_path ? File.open(log_file_path, 'a') : nil
+  
+    Open3.popen3(*cmd) do |stdin, stdout, stderr, wait_thr|
+      stdin.close
+  
+      begin
+        # Stream stdout → BOTH CLI ($stdout) AND log file
+        Thread.new do
+          while (line = stdout.gets)
+            $stdout.print(line)
+            $stdout.flush
+            log_file&.write(line)
+            log_file&.flush
+          end
+        end
+  
+        # Stream stderr → BOTH CLI ($stderr) AND log file
+        Thread.new do
+          while (err_line = stderr.gets)
+            $stderr.print(err_line)
+            $stderr.flush
+            log_file&.write(err_line)
+            log_file&.flush
+          end
+        end
+  
+        # Wait for command completion
+        wait_thr.value
+  
+      rescue => e
+        error_msg = "Error during playbook streaming: #{e.message}\n"
+        $stderr.print(error_msg)
+        $stderr.flush
+        log_file&.write(error_msg)
+        log_file&.flush
+      ensure
+        # Critical: close log file AFTER all streaming completes
+        log_file&.close
+        exit_status = wait_thr.value.exitstatus
+        summary = "[Playbook exited with status: #{exit_status}]\n"
+        $stdout.print(summary)
+        $stdout.flush
+        File.open(log_file_path, 'a') { |f| f.write(summary) } if log_file_path && exit_status != 0
       end
     end
   end

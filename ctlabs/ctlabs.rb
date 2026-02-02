@@ -107,6 +107,9 @@ def generate_log_filename(lab_name, action)
   "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
 end
 
+#
+# === UP MODE ===
+#
 if options[:up]
   if !options[:config]
     puts "❌ Error: -c/--conf is required with --up"
@@ -127,7 +130,6 @@ if options[:up]
     exit 1
   end
 
-  #log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
   log = LabLog.for_lab(lab_name: config_path, action: 'up')
   puts "Starting lab: #{config_path}"
   puts "Log file: #{log.path}"
@@ -138,19 +140,62 @@ if options[:up]
   l1.up
 
   log.info "✓ Lab started successfully"
-
-  if options[:play]
-    l1.run_playbook(options[:play])
-  end
-
   log.close
   puts "✓ Lab started. View logs at: #{log.path}"
 end
 
-if( options[:play] )
-  l1.run_playbook(options[:play])
+#
+# === PLAYBOOK MODE (orthogonal to up/down) ===
+#
+if options[:play]
+  unless Lab.running?
+    puts "❌ Error: No lab is running. Start a lab first with -u/--up"
+    exit 1
+  end
+
+  running_lab = Lab.current_name
+  labs_dir    = File.expand_path('../labs', __dir__)
+  full_path   = File.join(labs_dir, running_lab)
+
+  # CHECK FOR CONCURRENT EXECUTION BEFORE STARTING
+  if Lab.playbook_running?(running_lab)
+    puts "⚠️  Warning: Playbook already running for '#{running_lab}'"
+    puts "    Use 'ctlabs.rb -s' to check lab status."
+    exit 1
+  end
+
+  # CRITICAL: Append to lab's EXISTING operational log (not create new file)
+  log_path = LabLog.latest_for_running_lab
+  unless log_path
+    puts "❌ Error: No active log found for running lab '#{running_lab}'"
+    exit 1
+  end
+
+  puts "Running playbook on lab: #{running_lab}"
+  puts "Appending to log: #{log_path}\n\n"
+
+  begin
+    # Reuse existing log file (append mode)
+    log = LabLog.new(path: log_path)
+    l1 = Lab.new(cfg: full_path, relative_path: running_lab, log: log)
+    
+    playbook_arg = options[:play] == true ? nil : options[:play]
+    l1.run_playbook(playbook_arg, log_path)  # Dual-stream: CLI + log file
+    
+    puts "\n✓ Playbook completed successfully"
+  rescue => e
+    puts "\n✗ Playbook failed: #{e.message}"
+    exit 1
+  ensure
+    log&.close
+  end
+
+  puts "Full logs: #{log_path}"
 end
 
+#
+# === DOWN MODE ===
+#
 if options[:down]
   if !Lab.running?
     puts "❌ Error: No lab is running. Use --status to check."

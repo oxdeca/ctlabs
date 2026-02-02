@@ -1,4 +1,9 @@
-# lib/lablog.rb
+# -----------------------------------------------------------------------------
+# File        : ctlabs/lib/lablog.rb
+# Description : logger
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
 require 'logger'
 require 'fileutils'
 
@@ -13,17 +18,26 @@ class LabLog
     safe_lab  = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
     path      = "#{LOG_DIR}/ctlabs_#{timestamp}_#{safe_lab}_#{action}.log"
     
-    # Write header
-    File.open(path, 'w') do |f|
-      f.puts "=" * 80
-      f.puts "CTLabs Lab #{action.capitalize} Log"
-      f.puts "Lab: #{lab_name}"
-      f.puts "Started: #{Time.now.strftime('%Y-%m-%d %H:%M:%S %Z')}"
-      f.puts "=" * 80
-      f.puts
-    end
+    # Build header (reusable for file + stdout)
+    header_lines = [
+      "=" * 80,
+      "CTLabs Lab #{action.capitalize} Log",
+      "Lab: #{lab_name}",
+      "Started: #{Time.now.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+      "=" * 80,
+      ""
+    ]
+    header = header_lines.join("\n")
+
+    # 1. Write to log file
+    File.open(path, 'w') { |f| f.puts header_lines }
     
-    new(path: path, lab_name: lab_name, action: action)
+    # 2. PRINT TO CLI STDOUT IMMEDIATELY (critical for UX)
+    $stdout.puts header
+    $stdout.flush
+    
+    new(path: path)
+    #new(path: path, lab_name: lab_name, action: action)
   end
 
   # Factory: silent logger for read-only operations (no file creation)
@@ -55,6 +69,21 @@ class LabLog
     Dir.glob("#{LOG_DIR}/ctlabs_*.log")
       .sort_by { |f| File.mtime(f) }
       .reverse
+  end
+
+  # Append to existing log file (for playbook execution on running lab)
+  def self.append_to(path)
+    raise ArgumentError, "Log file not found: #{path}" unless File.exist?(path)
+    
+    new(path: path)  # Ruby Logger appends by default when file exists
+  end
+
+  # Find and append to the lab's current operational log
+  def self.for_running_lab(lab_name)
+    log_path = latest_for_running_lab
+    raise "No active log found for lab '#{lab_name}'" unless log_path
+    
+    append_to(log_path)
   end
 
   # Instance initialization - ALWAYS requires path:

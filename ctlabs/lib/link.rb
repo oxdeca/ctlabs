@@ -20,7 +20,7 @@ class Link
 
 
     #@log = log || LabLog.new
-    @log = args['log'] || LabLog.new
+    @log = args['log'] || LabLog.null
     @log.write "== Link ==", "debug"
     @log.write "#{__method__}(): nodes=#{@nodes.object_id},links=#{@links},mgmt=#{@mgmt}", 'debug'
     @log.write "#{__method__}(): nodes=#{@nodes},links=#{@links},mgmt=#{@mgmt}"          , 'debug'
