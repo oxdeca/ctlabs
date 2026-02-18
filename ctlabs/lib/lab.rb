@@ -504,6 +504,15 @@ end
       @log.info "DNAT:"
       add_dnat
     end
+
+    # Copy lab-specific flashcards if they exist
+    lab_flashcards = File.join(File.dirname(@cfg_file), 'flashcards.json')
+    public_flashcards = '/srv/ctlabs-server/public/flashcards.json'
+    
+    if File.file?(lab_flashcards)
+      FileUtils.cp(lab_flashcards, public_flashcards)
+      @log.info "Loaded flashcards from lab: #{lab_flashcards}"
+    end
   end
 
   #

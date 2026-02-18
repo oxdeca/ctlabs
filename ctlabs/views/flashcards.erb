@@ -791,27 +791,89 @@ class FlashCardsView {
   }
   closeModal() { document.getElementById('modal-container').style.display = 'none'; }
 }
+
 class FlashCardsController {
   constructor(view) {
-    this.view = view;
-    this.cardset = new CardSet();
-    this.isEditing = false;
-    this.isQuiz = false;
-    this.quizScores = [];
-    this.timer = { seconds: 0, interval: null };
+    this.view                 = view;
+    this.cardset              = new CardSet();
+    this.isEditing            = false;
+    this.isQuiz               = false;
+    this.quizScores           = [];
+    this.timer                = { seconds: 0, interval: null };
+    this.editBuffer           = null;
+    this.autoSaveTimer        = null;
     this.shuffledAnswersCache = [];
-    this.editBuffer = null;
     this.init();
   }
+
   init() {
     const container = document.getElementById('flashcards-container');
-    const t = localStorage.getItem('flashcards-theme') || 'dark';
+    const t         = localStorage.getItem('flashcards-theme') || 'dark';
     container.setAttribute('data-theme', t);
     document.getElementById('theme-icon').className = (t === 'dark' ? 'fa fa-sun btn-orange' : 'fa fa-moon btn-orange');
     document.getElementById('file-input').onchange = (e) => this.handleFileImport(e);
-    this.loadSession();
-    this.update();
+
+    this.loadFromServer().then(() => {
+      this.loadSession();
+      this.update();
+      this.setupAutoSave();
+     });
   }
+
+  // ✅ NEW: Load flashcards from server
+  async loadFromServer() {
+    try {
+      const res = await fetch('/flashcards/data');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.set) {
+          this.cardset = new CardSet(data.set.meta.name, data.set.meta.filename);
+          this.cardset.meta = data.set.meta;
+          this.cardset.cards = data.set.cards.map(c => new Card(c.id, c.question, c.answers, c.info));
+          this.cardset.index = data.set.index || 0;
+          console.log('✓ Loaded flashcards from server');
+          return true;
+        }
+      }
+    } catch(e) {
+      console.warn('Server load failed, using localStorage:', e);
+    }
+    return false;
+  }
+  
+  // ✅ NEW: Save flashcards to server
+  async saveToServer() {
+    try {
+      const data = { set: this.cardset, version: VERSION };
+      const res = await fetch('/flashcards/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        console.log('✓ Saved flashcards to server');
+      }
+    } catch(e) {
+      console.warn('Server save failed:', e);
+    }
+  }
+  
+  // ✅ NEW: Auto-save on changes (debounced)
+  setupAutoSave() {
+    // Save immediately on load
+    this.saveToServer();
+    
+    // Debounced auto-save on changes
+    this.originalSaveSession = this.saveSession.bind(this);
+    this.saveSession = () => {
+      this.originalSaveSession();
+      clearTimeout(this.autoSaveTimer);
+      this.autoSaveTimer = setTimeout(() => {
+        this.saveToServer();
+      }, 2000); // Save 2 seconds after last change
+    };
+  }
+
   saveSession() { localStorage.setItem('flashcards_mvc_session', JSON.stringify({ set: this.cardset })); }
   loadSession() {
     const stored = localStorage.getItem('flashcards_mvc_session');

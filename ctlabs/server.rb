@@ -94,6 +94,39 @@ get '/demo' do
   erb :demo
 end
 
+get '/flashcards' do
+  erb :flashcards
+end
+
+# Get flashcards for current lab
+get '/flashcards/data' do
+  content_type :json
+  flashcards_file = '/srv/ctlabs-server/public/flashcards.json'
+  
+  if File.file?(flashcards_file)
+    File.read(fashcards_file)
+  else
+    { set: { meta: { name: 'Default', created: getISOString }, cards: [] } }.to_json
+  end
+rescue => e
+  { error: e.message }.to_json
+end
+
+# Save flashcards for current lab
+post '/flashcards/data' do
+  content_type :json
+  flashcards_file = '/srv/ctlabs-server/public/flashcards.json'
+  
+  begin
+    data = JSON.parse(request.body.read)
+    File.write(flashcards_file, JSON.pretty_generate(data))
+    { success: true }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
 get '/markdown' do
   erb :markdown
 end
@@ -525,7 +558,7 @@ HEADER = %q(
       transition: transform 0.2s ease;
     }
   </style>
-  <body bgcolor="#1c1c1c">
+  <body class=bgcolor="#1c1c1c">
     <div class="w3-top w3-bar w3-black">
       <a href="/"          class="w3-bar-item w3-button">🔬 CTLABS</a>
 <!--      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a> -->
