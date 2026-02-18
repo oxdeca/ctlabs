@@ -1,0 +1,54 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/demo.erb
+# Description : walkthrough view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+<%= HEADER %>
+    <div class="w3-panel w3-green">
+      <h2>📹 Walkthrough </h2>
+    </div>
+    <!-- Constrain total height to viewport, similar to live_log -->
+    <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;"> <!-- Adjust calc value if needed -->
+      <!-- Main card/container for the demo player -->
+      <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px;"> <!-- Added padding -->
+        <!-- Container specifically for the Asciinema player -->
+        <div id="demo-container" style="flex: 1; display: flex; align-items: stretch; justify-content: center; overflow: hidden;"> <!-- New container div -->
+          <div id="demo" style="flex: 1; height: 100%; width: 100%;"> <!-- Target div for Asciinema, fills its container -->
+            <!-- Asciinema player will be injected here -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/asciinema-player.min.js"></script>
+    <script>
+      // Wait for the DOM to be fully loaded before initializing the player
+      document.addEventListener('DOMContentLoaded', function() {
+        // Get the target div
+        const demoDiv = document.getElementById('demo');
+
+        // Create the player, targeting the 'demo' div
+        // Pass configuration options to influence sizing
+        AsciinemaPlayer.create('/demo.cast', demoDiv, {
+          // --- Player Sizing Options ---
+          cols: null, // Let the player determine based on container/recording width
+          rows: null, // Let the player determine based on container/recording height
+          // fit: "width", // Alternative: fit only width, height adapts
+          // fit: "height", // Alternative: fit only height, width adapts (might distort)
+          fit: "both", // Default behavior might be similar, but explicit 'both' can sometimes help
+          // autoFit: true, // Check Asciinema docs - this might be the key option if supported
+          // --- Other Common Options ---
+          // autoplay: true, // Start playing automatically
+          // loop: false,    // Loop the playback
+          // startAt: 0,     // Start time in seconds
+          // poster: "npt:0", // Poster frame (e.g., at start)
+          // fontSize: "small", // Font size ("small", "normal", "big")
+          // theme: "dracula", // Color theme
+          // terminalFontFamily: "Monaco, Courier New", // Custom font
+          // terminalLineHeight: 1.3, // Line height multiplier
+          // terminalPadding: "4px", // Padding around terminal content
+        });
+      });
+    </script>
+<%= FOOTER %>

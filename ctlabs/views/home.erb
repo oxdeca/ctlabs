@@ -1,0 +1,33 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/home.erb
+# Description : landing page view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+<%= HEADER %>
+    <div id="con" class="w3-panel w3-green">
+      <h2>🕸 Connections [Data Network] </h2>
+    </div>
+    <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span></br>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
+      </div>
+      <div class="svg-container">
+        <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="🕸 Connections" type="image/svg+xml" width="100%">
+      </div>
+    </div>
+    <div id="topo" class="w3-panel w3-green">
+      <h2>🗺️ Topology [Data Network]</h2>
+    </div>
+    <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
+      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
+        <span> Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span></br>
+        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
+      </div>
+      <div class="svg-container">
+        <embed id="topo-embed" src="topo.svg" class="w3-round responsive-embed" alt="Management" type="image/svg+xml" width="100%">
+      </div>
+    </div>
+<%= SCRIPT %>
+<%= FOOTER %>

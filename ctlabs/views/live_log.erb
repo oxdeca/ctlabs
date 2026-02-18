@@ -1,0 +1,65 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/live_log.erb
+# Description : log view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+<%= HEADER %>
+<div class="w3-panel w3-<%= @action == 'up' ? 'green' : 'red' %>">
+  <h2>
+    <%= @action == 'up' ? '🚀 Starting' : '⏹ Stopping' %> Lab: 
+    <code><%= @lab_name %></code>
+  </h2>
+</div>
+
+<!-- Constrain total height to viewport -->
+<div class="w3-container" style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
+  <div class="w3-container w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+    <br>
+    <pre id="log-content" style="flex: 1; resize: vertical; overflow: auto; min-height: 150px; background: #1e1e1e; color: #f0f0f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: none;"></pre>
+    <div id="scroll-status" style="font-size: 0.8em; color: #aaa; margin-top: 4px; height: 16px;"></div>
+  </div>
+</div>
+
+<script>
+  // === Save log context to localStorage ===
+  const logFile = <%= @log_file.to_json %>;
+  const labName = <%= @lab_name.to_json %>;
+  const action  = <%= @action.to_json %>;
+  const logContent = document.getElementById('log-content');
+
+  localStorage.setItem('ctlabs_last_log', JSON.stringify({
+    file: logFile,
+    lab: labName,
+    action: action,
+    timestamp: Date.now()
+  }));
+
+  // === Auto-scroll with pause/resume ===
+  let isAutoScroll = true;
+
+  logContent.addEventListener('scroll', () => {
+    const atBottom = logContent.scrollHeight - logContent.scrollTop <= logContent.clientHeight + 5;
+    isAutoScroll = atBottom;
+    document.getElementById('scroll-status').textContent = 
+      isAutoScroll ? '' : '⏸ Paused (scroll to bottom to resume)';
+  });
+
+  function fetchLog() {
+    if (!isAutoScroll) return;
+    fetch(`/logs/content?file=${encodeURIComponent(logFile)}`)
+      .then(response => response.text())
+      .then(html => {
+        logContent.innerHTML = html;
+        if (isAutoScroll) {
+          logContent.scrollTop = logContent.scrollHeight;
+        }
+      })
+      .catch(err => console.error("Log fetch failed:", err));
+  }
+
+  fetchLog();
+  const logInterval = setInterval(fetchLog, 500);
+  window.addEventListener('beforeunload', () => clearInterval(logInterval));
+</script>
+<%= FOOTER %>

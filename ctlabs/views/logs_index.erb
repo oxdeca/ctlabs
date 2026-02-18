@@ -1,0 +1,74 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/logs_index.erb
+# Description : logs view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+<%= HEADER %>
+<div class="w3-panel w3-green">
+  <h2>🧾 Lab Logs</h2>
+</div>
+<div class="w3-container w3-2021-inkwell">
+  
+  <% if @running_lab %>
+    <div class="w3-panel w3-green">
+      <strong>Currently running:</strong> <code><%= @running_lab %></code>
+      <% latest_log = LabLog.latest_for_running_lab %>
+      <% if latest_log %>
+        <a href="/logs?file=<%= URI.encode_www_form_component(latest_log) %>"
+           class="w3-button w3-small w3-white w3-margin-left">
+          ▶ View Live Log
+        </a>
+      <% end %>
+    </div>
+  <% end %>
+  
+  <h3>Recent Logs</h3>
+  <% if @log_files.empty? %>
+    <p>No logs found.</p>
+  <% else %>
+    <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
+      <% @log_files.each do |log_path| %>
+        <%
+          basename    = File.basename(log_path, '.log')
+          parts       = basename.split('_')
+          timestamp   = parts[1].to_i rescue 0
+          lab_name    = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
+          action_part = parts.last
+          action      = case action_part
+                        when 'up' then 'Start'
+                        when 'down' then 'Stop'
+                        when 'adhoc' then 'AdHoc'
+                        else 'Unknown'
+                        end
+          time_str    = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
+        %>
+        <li style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong><%= lab_name %></strong>
+            (<%= action %>) — <%= time_str %>
+          </div>
+          <div>
+            <a href="/logs?file=<%= URI.encode_www_form_component(log_path) %>"
+               class="w3-button w3-tiny w3-blue w3-round">View</a>
+            <form method="post" action="/logs/delete" style="display: inline;"
+                  onsubmit="return confirm('Delete this log?')">
+              <input type="hidden" name="file" value="<%= URI.encode_www_form_component(log_path) %>">
+              <button type="submit" class="w3-button w3-tiny w3-red w3-round">🗑️</button>
+            </form>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+  
+  <% if @log_files.any? %>
+    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;"
+          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
+      <button type="submit" class="w3-button w3-red w3-tiny w3-round w3-right">
+        🗑️ Delete All Logs
+      </button>
+    </form>
+  <% end %>
+</div>
+<%= FOOTER %>

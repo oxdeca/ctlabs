@@ -1,0 +1,116 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/labs.erb
+# Description : labs view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+<%= HEADER %>
+<% last_log = nil
+   if request.xhr?
+     # Can't access localStorage from server
+   else %>
+  <!-- Check localStorage via JS -->
+  <div id="resume-log" style="display:none;" class="w3-panel w3-blue">
+    <span id="resume-content"></span>
+  </div>
+  <script>
+    const lastLog = localStorage.getItem('ctlabs_last_log');
+    if (lastLog) {
+      try {
+        const { lab, action } = JSON.parse(lastLog);
+        const url = `/logs?file=${encodeURIComponent(JSON.parse(lastLog).file)}&lab=${encodeURIComponent(lab)}&action=${action}`;
+        document.getElementById('resume-content').innerHTML =
+          `💡 <a href="${url}">Resume last log</a> for <code>${lab}</code>`;
+        document.getElementById('resume-log').style.display = 'block';
+      } catch(e) { /* ignore */ }
+    }
+  </script>
+<% end %>
+<div class="w3-panel w3-green">
+  <h2>🧪 Manage Labs</h2>
+</div>
+
+<% running = running_lab? %>
+<div class="w3-container w3-card-4 w3-padding w3-2021-inkwell">
+  <form method="post" action="/labs/execute">
+    <label><b>Select Lab:</b></label>
+    <select name="lab_name" id="lab-selector" class="w3-select w3-margin-bottom" required <%= 'disabled' if running %>>
+      <% @labs.each do |lab| %>
+        <option value="<%= lab %>" <%= 'selected' if lab == @selected_lab %>><%= lab %></option>
+      <% end %>
+    </select>
+    <br/>
+    <button type="submit" name="action" value="up" class="w3-button w3-green w3-round" <%= 'disabled' if running %>> ▶ Start Lab </button>
+    <button type="submit" name="action" value="down" class="w3-button w3-red w3-round"> ⏹ Stop Lab </button>
+  </form>
+
+  <% if running %>
+    <div class="w3-panel w3-orange w3-margin-top" style="padding:8px;">
+      <strong>⚠️ A lab is already running:</strong>
+      <code><%= get_running_lab || 'unknown' %></code>
+      <br>Please stop it before starting another.
+    </div>
+  <% end %>
+</div>
+
+<br>
+
+<!-- Lab Info Card Section -->
+<div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round">
+  <% if @lab_info %>
+    <%= render_lab_info_card(@lab_info) %> <!-- Use the helper -->
+  <% else %>
+    <div id="lab-info-placeholder" class="w3-panel w3-light-grey">
+      <p>Select a lab to view its details.</p>
+    </div>
+  <% end %>
+</div>
+
+<br>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const lastLog = localStorage.getItem('ctlabs_last_log');
+    const selectElement = document.getElementById('lab-selector');
+    const infoSection = document.getElementById('lab-info-section');
+
+    if (lastLog && selectElement) {
+      try {
+        const { lab } = JSON.parse(lastLog);
+        if (Array.from(selectElement.options).some(opt => opt.value === lab)) {
+          selectElement.value = lab;
+          // Trigger change event to update info card if needed
+          // This might be redundant if the server already rendered the info,
+          // but ensures client-side update if selection changes externally.
+          selectElement.dispatchEvent(new Event('change'));
+        }
+      } catch (e) {
+        console.warn('Failed to parse last log:', e);
+      }
+    }
+    selectElement.addEventListener('change', function() {
+      const selectedLab = this.value;
+      if (selectedLab) {
+        // Show a loading message or spinner
+        infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue"><p>Loading lab info...</p></div>';
+    
+        // Fetch the new lab info card HTML via AJAX
+        fetch(`/labs/${encodeURIComponent(selectedLab)}/info_card`) // New route
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              return response.text(); // Get the HTML string
+          })
+          .then(htmlFragment => {
+              // Directly inject the rendered HTML
+              infoSection.innerHTML = htmlFragment;
+          })
+          .catch(error => {
+              console.error('Error fetching lab info card:', error);
+              infoSection.innerHTML = '<div class="w3-panel w3-red"><h4>Error</h4><p>Could not load lab info.</p></div>';
+          });
+      }
+    })
+  });
+</script>
+<%= FOOTER %>

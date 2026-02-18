@@ -11,6 +11,10 @@ It automates the setup and configuration of lab components, which are all run as
 * Flexibility to define custom lab topologies and configurations.
 * Automatic creation of segregated Data and Management Networks for enhanced lab isolation.
 * Each node is equipped with a dedicated management interface and one or more data network interfaces.
+* Unified Logging Architecture - CLI and web interface share identical log files with realtime visibility in both interfaces
+* Concurrency Protection - Playbook execution lock prevents dangerous concurrent runs (CLI + web simultaneously)
+* MVC-Compliant Logging - `LabLog` service object owns entire log lifecycle with zero hardcoded path patterns.
+* Ad-hoc DNAT Management - Runtime port forwarding with full audit trail visible in operational logs
 
 **Use Cases:**
 
@@ -74,8 +78,21 @@ This command uses the `ctlabs.rb` script to create a lab environment defined in 
 
 ```bash
 cd ctlabs/ctlabs
-./ctlabs.rb -c ../labs/lpic2/lpic208.yml -up
+./ctlabs.rb 
+Usage: ctlabs [options]
+    -c, --conf=CFG                   Configuration File
+    -u, --up                         Start the Environment
+    -d, --down                       Stop the Environment
+    -g, --graph                      Create a graphviz dot export file
+    -i, --ini                        Create an inventory ini-file
+    -t, --print                      Print inspect output
+    -p, --play [CMD]                 Run playbook
+    -l, --list                       List all available labs
+    -L, --log-level=LEVEL            Set the log level
+    -s, --status                     Show status of currently running lab
 ```
+
+Open the web UI at https://<host>:4567/logs/current to see the exact same realtime output while the playbook runs.
 
 ![img](./lab_setup.gif)
 
@@ -98,9 +115,11 @@ ctlabs automatically creates separate Data and Management Networks when starting
 
 The included `server.rb` app provides a simple overview of the lab, i.e.
 
-* visual representations
-* configuration
-* management network inventory
+* Visual topology representation (SVG/PNG)
+* Realtime log streaming with ANSI-to-HTML conversion
+* Ad-hoc DNAT rule management (AJAX-powered)
+* Session-persisted lab selection and DNAT rules
+* Unified log visibility - all operations (startup, playbook, DNAT) append to the same operational log visible in the live viewer
 
 ### Installation
 
@@ -116,3 +135,4 @@ systemctl enable --now ctlabs-server.service
 By default the interface can be accessed via `https://<your_host>:4567`.
 
 ![img](./ctlabs-server_overview.png)
+
