@@ -444,7 +444,7 @@
     #flashcards-container .hidden {
       display: none !important;
     }
-    /* READ-ONLY MODE STYLES */
+    /* === READ-ONLY MODE: HIDE ALL ADMIN BUTTONS === */
     #flashcards-container.read-only .admin-tool {
       display: none !important;
     }
@@ -456,7 +456,7 @@
     <!-- SCOPED CONTAINER -->
     <div id="flashcards-container" data-theme="dark">
       
-      <!-- Read-Only Banner (hidden by default) -->
+      <!-- Read-Only Banner (hidden by default, shown via CSS when read-only class added) -->
       <div id="readonly-banner" style="display:none;background:rgba(255,152,0,0.2);padding:8px 15px;border-radius:8px;margin-bottom:10px;text-align:center;color:var(--text-main);">
         <i class="fa fa-lock btn-orange"></i> <span style="margin-left:8px;">Read-Only Mode (Lab-Associated Flashcards)</span>
       </div>
@@ -968,7 +968,6 @@
         }
       }
       
-      // ... rest of methods (update, check, next, prev, quiz, import, export, etc.) unchanged ...
       update() {
         const total = this.cardset.cards.length;
         if (this.cardset.index >= total && total > 0) this.cardset.index = 0;
