@@ -800,8 +800,10 @@ class FlashCardsController {
     this.isQuiz               = false;
     this.quizScores           = [];
     this.timer                = { seconds: 0, interval: null };
+    this.readOnly             = false;
     this.editBuffer           = null;
     this.autoSaveTimer        = null;
+    this.serverDataLoaded     = false;
     this.shuffledAnswersCache = [];
     this.init();
   }
@@ -813,14 +815,46 @@ class FlashCardsController {
     document.getElementById('theme-icon').className = (t === 'dark' ? 'fa fa-sun btn-orange' : 'fa fa-moon btn-orange');
     document.getElementById('file-input').onchange = (e) => this.handleFileImport(e);
 
-    this.loadFromServer().then(() => {
-      this.serverDataLoaded;
+    this.loadFromServer().then((serverLoaded) => {
+      this.serverDataLoaded = serverLoaded;
       if(!serverLoaded) {
       	this.loadSession();
       }
       this.update();
       this.setupAutoSave();
+      this.applyReadOnlyMode();
      });
+  }
+
+  // ✅ NEW: Apply read-only mode to UI
+  applyReadOnlyMode() {
+    if (!this.readOnly) return;
+    
+    // Hide edit/admin buttons
+    const adminButtons = document.querySelectorAll('.admin-tool');
+    adminButtons.forEach(btn => {
+      btn.style.display = 'none';
+    });
+    
+    // Hide theme toggle (optional - keep if you want theme switching)
+    // document.querySelector('button[onclick="app.toggleTheme()"]').style.display = 'none';
+    
+    // Show read-only banner
+    const toolbar = document.querySelector('.card-toolbar');
+    if (toolbar && !document.getElementById('readonly-banner')) {
+      const banner = document.createElement('div');
+      banner.id = 'readonly-banner';
+      banner.innerHTML = '<i class="fa fa-lock btn-orange"></i> <span style="margin-left:8px;">Read-Only Mode (Lab-Associated Flashcards)</span>';
+      banner.style.cssText = 'background:rgba(255,152,0,0.2);padding:8px 15px;border-radius:8px;margin-bottom:10px;text-align:center;color:var(--text-main);';
+      toolbar.parentNode.insertBefore(banner, toolbar.nextSibling);
+    }
+    
+    // Disable keyboard shortcuts for editing
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'e' || e.key === 'n' || e.key === 'd') {
+        e.preventDefault();
+      }
+    });
   }
 
   // ✅ NEW: Load flashcards from server
@@ -834,7 +868,8 @@ class FlashCardsController {
           this.cardset.meta  = data.set.meta;
           this.cardset.cards = data.set.cards.map(c => new Card(c.id, c.question, c.answers, c.info));
           this.cardset.index = data.set.index || 0;
-          console.log('✓ Loaded flashcards from server');
+          this.readOnly      = data.read_only || false;
+          console.log('✓ Loaded flashcards from server', this.readOnly ? '(read-only)' : '');
           return true;
         }
       }
@@ -844,8 +879,14 @@ class FlashCardsController {
     return false;
   }
   
-  // ✅ Save flashcards to server (source of truth)
+  // ✅ Save flashcards to server (blocked if read-only)
   async saveToServer() {
+    // ✅ NEVER save if read-only mode
+    if (this.readOnly) {
+      console.log('⚠️  Skipping server save: read-only mode');
+      return;
+    }
+    
     // ✅ NEVER save empty data to server
     if (!this.cardset || this.cardset.cards.length === 0) {
       console.log('⚠️  Skipping server save: no cards');
@@ -859,6 +900,15 @@ class FlashCardsController {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
+      
+      if (res.status === 403) {
+        // Read-only enforced by server
+        this.readOnly = true;
+        this.applyReadOnlyMode();
+        console.log('⚠️  Server enforced read-only mode');
+        return;
+      }
+      
       if (res.ok) {
         console.log('✓ Saved flashcards to server');
       }
@@ -870,7 +920,7 @@ class FlashCardsController {
   // ✅ Auto-save on changes (debounced)
   setupAutoSave() {
     // Save to server immediately on load if we have data
-    if (this.cardset.cards.length > 0) {
+    if (this.cardset.cards.length > 0 && !this.readOny) {
       this.saveToServer();
     }
     
@@ -907,6 +957,10 @@ class FlashCardsController {
   
   // ✅ CRITICAL FIX: clearCache ONLY clears localStorage, NEVER server data
   clearCache() {
+  	if(this.readOnly) {
+  		alert('Cannot clear cache in read-only mode');
+  		return;
+  	}
     if(confirm("Clear local cache only? Server data will remain intact.")) {
       localStorage.removeItem('flashcards_mvc_session');
       console.log('✓ LocalStorage cleared, server data preserved');
@@ -1017,6 +1071,10 @@ class FlashCardsController {
     this.update();
   }
   toggleEditMode() {
+  	if(this.readOnly) {
+  		alert('Cannot edit lab-associated flashcards in read-only mode');
+  		return;
+  	}
     if(this.cardset.cards.length === 0) return;
     const card = this.cardset.cards[this.cardset.index];
     this.editBuffer = new Card(card.id, card.question, [...card.answers].sort((a,b)=>a.id-b.id), card.info);
@@ -1069,6 +1127,10 @@ class FlashCardsController {
     this.update();
   }
   addCard() {
+  	if(this.readOnly) {
+  		alert('Cannot add cards in read-only mode');
+  		return;
+  	}
     const newCard = new Card(Date.now(), "", [
       new Answer(1, "", "false"), new Answer(2, "", "false"), new Answer(3, "", "false"), new Answer(4, "", "false")
     ]);
@@ -1078,6 +1140,10 @@ class FlashCardsController {
     this.toggleEditMode();
   }
   deleteCard() {
+  	if(this.readOnly) {
+  		alert('Cannot delete cards in read-only mode');
+  		return;
+  	}
     if(confirm("Delete this card?")) {
       this.cardset.cards.splice(this.cardset.index, 1);
       this.cardset.index = Math.max(0, this.cardset.index - 1);
