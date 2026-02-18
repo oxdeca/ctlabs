@@ -506,7 +506,7 @@ end
     end
 
     # Copy lab-specific flashcards if they exist
-    lab_flashcards = File.join(File.dirname(@cfg_file), 'flashcards.json')
+    lab_flashcards    = File.join(File.dirname(@cfg_file), 'flashcards.json')
     public_flashcards = '/srv/ctlabs-server/public/flashcards.json'
     
     if File.file?(lab_flashcards)

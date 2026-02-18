@@ -814,7 +814,10 @@ class FlashCardsController {
     document.getElementById('file-input').onchange = (e) => this.handleFileImport(e);
 
     this.loadFromServer().then(() => {
-      this.loadSession();
+      this.serverDataLoaded;
+      if(!serverLoaded) {
+      	this.loadSession();
+      }
       this.update();
       this.setupAutoSave();
      });
@@ -826,9 +829,9 @@ class FlashCardsController {
       const res = await fetch('/flashcards/data');
       if (res.ok) {
         const data = await res.json();
-        if (data.set) {
-          this.cardset = new CardSet(data.set.meta.name, data.set.meta.filename);
-          this.cardset.meta = data.set.meta;
+        if (data.set && data.set.cards && data.set.cards.length > 0) {
+          this.cardset       = new CardSet(data.set.meta.name, data.set.meta.filename);
+          this.cardset.meta  = data.set.meta;
           this.cardset.cards = data.set.cards.map(c => new Card(c.id, c.question, c.answers, c.info));
           this.cardset.index = data.set.index || 0;
           console.log('✓ Loaded flashcards from server');
@@ -841,8 +844,14 @@ class FlashCardsController {
     return false;
   }
   
-  // ✅ NEW: Save flashcards to server
+  // ✅ Save flashcards to server (source of truth)
   async saveToServer() {
+    // ✅ NEVER save empty data to server
+    if (!this.cardset || this.cardset.cards.length === 0) {
+      console.log('⚠️  Skipping server save: no cards');
+      return;
+    }
+    
     try {
       const data = { set: this.cardset, version: VERSION };
       const res = await fetch('/flashcards/data', {
@@ -858,20 +867,54 @@ class FlashCardsController {
     }
   }
   
-  // ✅ NEW: Auto-save on changes (debounced)
+  // ✅ Auto-save on changes (debounced)
   setupAutoSave() {
-    // Save immediately on load
-    this.saveToServer();
+    // Save to server immediately on load if we have data
+    if (this.cardset.cards.length > 0) {
+      this.saveToServer();
+    }
     
     // Debounced auto-save on changes
     this.originalSaveSession = this.saveSession.bind(this);
     this.saveSession = () => {
-      this.originalSaveSession();
+      this.originalSaveSession();  // Save to localStorage
       clearTimeout(this.autoSaveTimer);
       this.autoSaveTimer = setTimeout(() => {
-        this.saveToServer();
-      }, 2000); // Save 2 seconds after last change
+        this.saveToServer();  // Save to server
+      }, 2000);  // Save 2 seconds after last change
     };
+  }
+  
+  // ✅ localStorage is ONLY a cache/backup
+  saveSession() { 
+    localStorage.setItem('flashcards_mvc_session', JSON.stringify({ set: this.cardset })); 
+  }
+  
+  loadSession() {
+    const stored = localStorage.getItem('flashcards_mvc_session');
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        this.cardset = new CardSet(data.set.meta.name, data.set.meta.filename);
+        this.cardset.meta = data.set.meta;
+        this.cardset.meta.loadedAt = getISOString();
+        this.cardset.cards = data.set.cards.map(c => new Card(c.id, c.question, c.answers, c.info));
+        this.cardset.index = data.set.index || 0;
+        console.log('✓ Loaded flashcards from localStorage');
+      } catch(e) { console.error(e); }
+    }
+  }
+  
+  // ✅ CRITICAL FIX: clearCache ONLY clears localStorage, NEVER server data
+  clearCache() {
+    if(confirm("Clear local cache only? Server data will remain intact.")) {
+      localStorage.removeItem('flashcards_mvc_session');
+      console.log('✓ LocalStorage cleared, server data preserved');
+      // ✅ Reload from server after clearing localStorage
+      this.loadFromServer().then(() => {
+        this.update();
+      });
+    }
   }
 
   saveSession() { localStorage.setItem('flashcards_mvc_session', JSON.stringify({ set: this.cardset })); }

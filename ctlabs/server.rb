@@ -104,11 +104,13 @@ get '/flashcards/data' do
   flashcards_file = '/srv/ctlabs-server/public/flashcards.json'
   
   if File.file?(flashcards_file)
-    File.read(fashcards_file)
+    File.read(flashcards_file)
   else
-    { set: { meta: { name: 'Default', created: getISOString }, cards: [] } }.to_json
+    # Return empty structure (not 404)
+    { set: { meta: { name: 'Default', created: getISOString, filename: 'flashcards.json' }, cards: [] } }.to_json
   end
 rescue => e
+  status 500
   { error: e.message }.to_json
 end
 
@@ -119,8 +121,15 @@ post '/flashcards/data' do
   
   begin
     data = JSON.parse(request.body.read)
-    File.write(flashcards_file, JSON.pretty_generate(data))
-    { success: true }.to_json
+    
+    # ✅ VALIDATION: Never save empty card sets
+    if !data['set'] || !data['set']['cards'] || data['set']['cards'].empty?
+      status 400
+      { success: false, error: 'Cannot save empty flashcard set' }.to_json
+    else
+      File.write(flashcards_file, JSON.pretty_generate(data))
+      { success: true }.to_json
+    end
   rescue => e
     status 400
     { success: false, error: e.message }.to_json
@@ -567,6 +576,7 @@ HEADER = %q(
       <a href="/inventory" class="w3-bar-item w3-button">🗂️ Inventory</a>
       <a href="/config"    class="w3-bar-item w3-button">⚙️  Configuration</a>
       <a href="/logs"      class="w3-bar-item w3-button">🧾 Logs</a>
+      <a href="/flashcards" class="w3-bar-item w3-button">🎴 Flashcards</a>
       <a href="/demo"      class="w3-bar-item w3-button">📹 Walkthrough</a>
 <!--      <a href="/upload" class="w3-bar-item w3-button">📤 Upload</a> -->
     </div>
