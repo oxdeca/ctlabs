@@ -95,66 +95,29 @@ get '/demo' do
 end
 
 get '/flashcards' do
+  @read_only = Lab.running?
   erb :flashcards
 end
 
-# Get flashcards for current lab (with read-only flag)
-get '/flashcards/data' do
-  content_type :json
-  flashcards_file = '/srv/ctlabs-server/public/flashcards.json'
-  
-  # Check if current lab has read-only flashcards
-  running_lab = Lab.current_name
-  read_only = false
-  
-  if running_lab
-    lab_flashcards = File.join(LABS_DIR, running_lab, 'flashcards.json')
-    # If flashcards come from lab directory (not user-created), mark as read-only
-    read_only = File.file?(lab_flashcards)
-  end
-  
-  if File.file?(flashcards_file)
-    data = JSON.parse(File.read(flashcards_file))
-    data['read_only'] = read_only
-    data.to_json
-  else
-    { 
-      set: { 
-        meta: { name: 'Default', created: getISOString, filename: 'flashcards.json' }, 
-        cards: [] 
-      },
-      read_only: false
-    }.to_json
-  end
-rescue => e
-  status 500
-  { error: e.message, read_only: false }.to_json
-end
-
-# Save flashcards for current lab (blocked if read-only)
+# Save flashcards (Blocked if Lab is Running)
 post '/flashcards/data' do
   content_type :json
-  flashcards_file = '/srv/ctlabs-server/public/flashcards.json'
+  
+  # Security: Block saves if Lab is running
+  if Lab.running?
+     status 403
+     return { success: false, error: 'Read-Only Mode: Cannot save while Lab is running.' }.to_json
+  end
   
   begin
-    data = JSON.parse(request.body.read)
+    data        = JSON.parse(request.body.read)
+    public_file = '/srv/ctlabs-server/public/flashcards.json'
     
-    # ✅ CHECK READ-ONLY FLAG
-    running_lab = Lab.current_name
-    if running_lab
-      lab_flashcards = File.join(LABS_DIR, running_lab, 'flashcards.json')
-      if File.file?(lab_flashcards)
-        status 403
-        { success: false, error: 'Cannot modify lab-associated flashcards (read-only mode)' }.to_json
-      end
-    end
-    
-    # ✅ VALIDATION: Never save empty card sets
     if !data['set'] || !data['set']['cards'] || data['set']['cards'].empty?
       status 400
       { success: false, error: 'Cannot save empty flashcard set' }.to_json
     else
-      File.write(flashcards_file, JSON.pretty_generate(data))
+      File.write(public_file, JSON.pretty_generate(data))
       { success: true }.to_json
     end
   rescue => e
@@ -594,7 +557,7 @@ HEADER = %q(
       transition: transform 0.2s ease;
     }
   </style>
-  <body class=bgcolor="#1c1c1c">
+  <body bgcolor="#1c1c1c">
     <div class="w3-top w3-bar w3-black">
       <a href="/"          class="w3-bar-item w3-button">🔬 CTLABS</a>
 <!--      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a> -->
