@@ -7,29 +7,63 @@
 -->
 
 <%= HEADER %>
-    <div id="topo" class="w3-panel w3-green">
-      <h2>🗺️ Topology [Data Network]</h2>
+
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <div id="topo-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
+      <h2><i class="fas fa-project-diagram"></i> Topology Maps</h2>
     </div>
-    <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
-      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
-        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
-        <span>Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span>
-      </div>
-      <div class="svg-container">
-        <embed id="topo-embed" src="topo.svg" class="w3-round responsive-embed" alt="🗺 Topology" type="image/svg+xml" width="100%">
-      </div>
+
+    <div class="w3-bar w3-round-large w3-margin-bottom" style="background-color: #1e293b; border: 1px solid #334155;">
+      <button class="w3-bar-item w3-button tablink w3-blue w3-round-large" onclick="openMapTab(event, 'DataNet')" style="font-weight: 600;">
+        <i class="fas fa-project-diagram"></i> Data Network
+      </button>
+      <button class="w3-bar-item w3-button tablink w3-round-large" onclick="openMapTab(event, 'MgmtNet')" style="font-weight: 600;">
+        <i class="fas fa-network-wired"></i> Management Network
+      </button>
     </div>
-    <div id="mgmt_topo" class="w3-panel w3-green">
-      <h2>🗺️ Topology [Management Network]</h2>
+    
+    <div id="DataNet" class="w3-card-4 w3-margin-bottom map-tab" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 210px);">
+      <object id="topo-obj" type="image/svg+xml" data="topo.svg" style="width: 100%; height: 100%;"></object>
     </div>
-    <div class="w3-card-4" style="max-width: 100%; overflow: auto; position: relative;">
-      <div class="w3-panel w3-text-yellow" display: flex; flex-direction: column;>
-        <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="mgmt-topo-embed">
-        <span>Zoom: <strong><span id="zoom-value-mgmt-topo">100</span>%</strong></span>
-      </div>
-      <div class="svg-container">
-        <embed id="mgmt-topo-embed" src="mgmt_topo.svg" class="w3-round responsive-embed" alt="Management" type="image/svg+xml" width="100%">
-      </div>
+
+    <div id="MgmtNet" class="w3-card-4 w3-margin-bottom map-tab" style="display:none; background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 210px);">
+      <object id="mgmt-topo-obj" type="image/svg+xml" data="mgmt_topo.svg" style="width: 100%; height: 100%;"></object>
     </div>
+
+<script>
+  window.panZoomData = null;
+  window.panZoomMgmt = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('topo-obj').addEventListener('load', function() {
+      window.panZoomData = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+    });
+
+    document.getElementById('mgmt-topo-obj').addEventListener('load', function() {
+      window.panZoomMgmt = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+    });
+  });
+
+  window.openMapTab = function(evt, tabName) {
+    let i, x, tablinks;
+    x = document.getElementsByClassName("map-tab");
+    for (i = 0; i < x.length; i++) {
+      x[i].style.display = "none";
+    }
+    tablinks = document.getElementsByClassName("tablink");
+    for (i = 0; i < tablinks.length; i++) {
+      tablinks[i].className = tablinks[i].className.replace(" w3-blue", "");
+    }
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " w3-blue";
+
+    // Recalculate dimensions for the newly visible SVG so it doesn't glitch
+    if (window.panZoomData) { window.panZoomData.resize(); window.panZoomData.fit(); window.panZoomData.center(); }
+    if (window.panZoomMgmt) { window.panZoomMgmt.resize(); window.panZoomMgmt.fit(); window.panZoomMgmt.center(); }
+  }
+</script>
+
 <%= SCRIPT %>
 <%= FOOTER %>
+
