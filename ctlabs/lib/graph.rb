@@ -21,8 +21,6 @@ class Graph
     @binding = args[:binding]
     @dotfile = "#{@pubdir}/../#{@name}.dot"
     
-    # Modern vivid palette for network cables
-    #@colors  = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e']
     # High-contrast, alternating palette to easily distinguish intertwined cables
     @colors  = [
       '#ef4444', # Red
@@ -38,6 +36,34 @@ class Graph
       '#14b8a6', # Teal
       '#d946ef'  # Fuchsia
     ]
+  end
+
+  # Helper method to dynamically generate interactive hover info
+  def build_tooltip(node)
+    tt = ["#{node.name.upcase}  [ #{node.type.capitalize} ]"]
+    tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    tt << "🌐 IPv4: #{node.ipv4}" unless node.ipv4.to_s.empty?
+    
+    if node.nics && !node.nics.empty?
+      tt << "🔌 Interfaces:"
+      node.nics.each do |k, v| 
+        next if v.to_s.strip.empty?
+        tt << "   ▪ #{k}  ➔  #{v}"
+      end
+    end
+    
+    if node.dnat && !node.dnat.empty?
+      tt << "🔀 Port Forwarding:"
+      if node.dnat.is_a?(Array)
+        node.dnat.each { |d| tt << "   ▪ Ext:#{d[0]}  ➔  Int:#{d[1]} (#{d[2] || 'tcp'})" }
+      elsif node.dnat.is_a?(String)
+        tt << "   ▪ Target ➔  #{node.dnat}"
+      end
+    end
+    
+    # Use HTML newline entity which correctly renders in SVG titles
+    tt.join('&#10;')
   end
 
   def get_cons
@@ -69,7 +95,7 @@ class Graph
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
             graph[style="invis", group="<%= group %>"]
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
-            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=<
+            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
         <%- if group != 'host' -%>
               <tr>
@@ -137,7 +163,7 @@ class Graph
           subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
             graph[style="invis", group="<%= group %>"]
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
-            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=<
+            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
         <%- if ![ 'host', 'controller' ].include?(group) -%>
               <tr>
@@ -199,7 +225,7 @@ class Graph
                 node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
         <%-     if node.type == 'host' -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16"><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
+        <%=       node.name.sub(/.-/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16"><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -212,7 +238,7 @@ class Graph
                 end
         -%>
         <%-     if node.type == 'router' -%>
-        <%=       node.name %> [color="#f59e0b", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16"><%= node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.ipv4.to_s.empty? ? '&nbsp;' : node.ipv4 %></font></td></tr></table> >]
+        <%=       node.name %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16"><%= node.name %></font></b></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -226,7 +252,7 @@ class Graph
                 end
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", label=<<b><font point-size="16"><%= node.name %></font></b>>]
+        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16"><%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -238,7 +264,7 @@ class Graph
               end
         -%>
         <%-   if node.type == 'gateway' && !node.dnat.nil? -%>
-                <%= node.name %> [color="#a855f7", label=<<b><font point-size="16"><%= node.name %></font></b>>]
+                <%= node.name %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16"><%= node.name %></font></b>>]
         <%-   end -%>
         <%- end -%>
 
@@ -275,7 +301,7 @@ class Graph
                   node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
                   node_color = node.type == 'controller' ? '#ef4444' : '#38bdf8'
         -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= node.name.sub(/.-/,"_") %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth0'].to_s.empty? ? '&nbsp;' : node.nics['eth0'] %></font></td></tr></table> >]
+        <%=       node.name.sub(/.-/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth0'].to_s.empty? ? '&nbsp;' : node.nics['eth0'] %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -284,7 +310,7 @@ class Graph
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if node.type == 'router' -%>
-        <%=       node.name %> [color="#f59e0b", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16"><%= node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.ipv4.to_s.empty? ? '&nbsp;' : node.ipv4 %></font></td></tr></table> >]
+        <%=       node.name %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16"><%= node.name %></font></b></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -295,7 +321,7 @@ class Graph
               nodes.each do |node|
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", label=<<b><font point-size="16"><%= node.name %></font></b>>]
+        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16"><%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -304,7 +330,7 @@ class Graph
             @nodes.each do |node|
         -%>
         <%-   if node.type == 'gateway' -%>
-                <%= node.name %> [color="#a855f7", label=<<b><font point-size="16"><%= node.name %></font></b>>]
+                <%= node.name %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16"><%= node.name %></font></b>>]
         <%-   end -%>
         <%- end -%>
 
