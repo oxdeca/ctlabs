@@ -87,6 +87,12 @@ get '/inventory' do
 end
 
 get '/config' do
+  @running_lab = Lab.running? ? Lab.current_name : nil
+  
+  if @running_lab
+    runtime_path = "#{LOCK_DIR}/#{@running_lab.gsub('/', '_')}.yml"
+    @active_yaml = File.file?(runtime_path) ? File.read(runtime_path) : nil
+  end
   erb :config
 end
 
@@ -176,77 +182,307 @@ get '/labs' do
   erb :labs
 end
 
-post '/labs/*/dnat' do
-  lab_name = params[:splat].first
-
-  # --- Validation ---
-  halt 400, "Invalid lab name" unless lab_name
-  halt 400, "Lab must be a .yml file" unless lab_name.end_with?('.yml')
-  halt 400, "Path traversal detected" if lab_name.include?('..') || lab_name.include?("\0")
-
-  labs_list = all_labs
-  halt 400, "Lab not found" unless labs_list.include?(lab_name)
-
-  running = get_running_lab
-  halt 400, "No lab is running" unless running
-  halt 400, "AdHoc DNAT only allowed on the running lab" unless running == lab_name
-
-  node     = params[:node]
-  ext_port = params[:external_port]&.to_i
-  int_port = params[:internal_port]&.to_i
-  proto    = (params[:protocol] || 'tcp').downcase
-
-  halt 400, "Missing node" unless node
-  halt 400, "Invalid external port" unless ext_port >= 1 && ext_port <= 65535
-  halt 400, "Invalid internal port" unless int_port >= 1 && int_port <= 65535
-  halt 400, "Protocol must be tcp or udp" unless %w[tcp udp].include?(proto)
-
-  begin
-    lab_file_path  = File.join(LABS_DIR, lab_name)
-    lab            = Lab.new(cfg: lab_file_path)
-    rule           = lab.add_adhoc_dnat(node, ext_port, int_port, proto)
-
-    # ✅ FIX: Append to lab's CURRENT operational log (visible in web UI)
-    log_path = LabLog.latest_for_running_lab
-    if log_path
-      log = LabLog.new(path: log_path)
-      log.info "AdHoc DNAT added: #{rule.inspect}"
-      log.close
-    end
-
-    # Persist rule to ad-hoc DNAT file (for cleanup on lab stop)
-    safe_lab   = lab_name.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
-    adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
+# Helper to regenerate Graphs with AdHoc nodes injected in memory
+def visualize_with_adhoc(lab_name)
+  lab_file_path = File.join(LABS_DIR, lab_name)
+  lab = Lab.new(cfg: lab_file_path, log: LabLog.null)
+  safe_lab = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
+  
+  adhoc_nodes_file = "#{LOCK_DIR}/adhoc_nodes_#{safe_lab}.json"
+  if File.file?(adhoc_nodes_file)
+    adhoc_nodes = JSON.parse(File.read(adhoc_nodes_file), symbolize_names: true)
     
-    # Load existing rules (if any)
-    existing = []
-    if File.file?(adhoc_file)
-      begin
-        existing = JSON.parse(File.read(adhoc_file), symbolize_names: true)
-      rescue JSON::ParserError
-        existing = []
+    # Inject into raw @cfg so get_topology sees it
+    cfg = lab.instance_variable_get(:@cfg)
+    cfg['topology'][0]['nodes'] ||= {}
+    
+    adhoc_nodes.each do |an|
+      cfg['topology'][0]['nodes'][an[:name].to_s] = an[:raw_cfg] || { 'type' => an[:type].to_s, 'kind' => an[:kind].to_s }
+      
+      existing = lab.nodes.find { |n| n.name == an[:name].to_s }
+      if existing
+        existing.instance_variable_set(:@type, an[:type].to_s)
+      else
+        node = Node.new({ 'name' => an[:name].to_s, 'defaults' => lab.defaults, 'log' => LabLog.null }.merge(an[:raw_cfg] || {}))
+        lab.nodes << node
+        lab.links << ["#{an[:switch]}:eth_adhoc", "#{an[:name]}:eth1"] if an[:switch] && !an[:switch].to_s.empty?
       end
     end
-    
-    # Append new rule
-    existing << rule
-    
-    # Save back
-    File.write(adhoc_file, JSON.pretty_generate(existing))
+  end
+  
+  adhoc_dnat_file = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
+  if File.file?(adhoc_dnat_file)
+     JSON.parse(File.read(adhoc_dnat_file), symbolize_names: true).each do |rule|
+        if n = lab.nodes.find { |node| node.name == rule[:node].to_s }
+           n.instance_variable_set(:@dnat, []) if n.dnat.nil?
+           n.dnat << [rule[:external_port].split(':').last, rule[:internal_port].split(':').last, rule[:proto]]
+        end
+     end
+  end
 
-    session[:adhoc_dnat_rules] ||= {}
-    session[:adhoc_dnat_rules][lab_name] ||= []
-    session[:adhoc_dnat_rules][lab_name] = existing
+  lab.visualize
+end
 
-    content_type :json 
-    { success: true, message: "AdHoc DNAT rule added", rule: rule }.to_json
-  rescue => e
+# Helper to resolve lab file path
+def get_lab_file_path(lab_name)
+  runtime_path = "#{LOCK_DIR}/#{lab_name.gsub('/', '_')}.yml"
+  (Lab.running? && Lab.current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(LABS_DIR, lab_name)
+end
+
+# Helper to format nested YAML arrays strictly inline (cleaner readability)
+def write_formatted_yaml(path, data)
+  yaml_str = data.to_yaml
+  
+  # Clean up psych array formatting for nested 2-element or 3-element arrays
+  yaml_str.gsub!(/^(\s*)-\s*-\s*(.+?)\n\1\s{2}-\s*(.+?)\n(?:\1\s{2}-\s*(.+?)\n)?/) do |match|
+    indent = $1
+    v1, v2, v3 = $2.strip, $3.strip, $4&.strip
+
+    # Remove surrounding quotes if psych added them
+    v1 = v1[1..-2] if v1.start_with?('"') && v1.end_with?('"') || v1.start_with?("'") && v1.end_with?("'")
+    v2 = v2[1..-2] if v2.start_with?('"') && v2.end_with?('"') || v2.start_with?("'") && v2.end_with?("'")
+    v3 = v3[1..-2] if v3 && (v3.start_with?('"') && v3.end_with?('"') || v3.start_with?("'") && v3.end_with?("'"))
+
+    # Re-quote if it looks like an interface string
+    v1 = "\"#{v1}\"" if v1.match?(/[a-zA-Z]+.*:/)
+    v2 = "\"#{v2}\"" if v2.match?(/[a-zA-Z]+.*:/)
+    
+    if v3
+      v3 = "\"#{v3}\"" if v3.match?(/[a-zA-Z]+.*:/)
+      "#{indent}- [ #{v1}, #{v2}, #{v3} ]\n"
+    else
+      "#{indent}- [ #{v1}, #{v2} ]\n"
+    end
+  end
+  
+  # Remove empty 'nics: {}' if it was stripped down to nothing
+  yaml_str.gsub!(/\n\s*nics:\s*\{\}/, '')
+
+  File.write(path, yaml_str)
+end
+
+post '/labs/*/dnat' do
+  lab_name = params[:splat].first
+  halt 400, "AdHoc DNAT only allowed on the running lab" unless get_running_lab == lab_name
+
+  begin
+    lab_path = get_lab_file_path(lab_name)
+    lab = Lab.new(cfg: lab_path)
+    rule = lab.add_adhoc_dnat(params[:node], params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase)
+
+    # Append to runtime YAML
+    data = YAML.load_file(lab_path)
+    data['topology'][0]['nodes'][params[:node]]['dnat'] ||= []
+    data['topology'][0]['nodes'][params[:node]]['dnat'] << [params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase]
+    
+    # Save beautifully formatted YAML
+    write_formatted_yaml(lab_path, data)
+
+    # Re-instantiate to natively redraw graphs with the new rule
+    updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
+    updated_lab.visualize 
+
     content_type :json
+    { success: true, message: "AdHoc DNAT rule added" }.to_json
+  rescue => e
     status 400
     { success: false, error: e.message }.to_json
   end
 end
 
+post '/labs/*/node' do
+  lab_name = params[:splat].first
+  halt 400, "AdHoc Nodes only allowed on the running lab" unless get_running_lab == lab_name
+  node_name = params[:node_name]
+
+  node_cfg = { 'type' => params[:type] || 'host', 'kind' => params[:kind] || 'linux' }
+  node_cfg['gw'] = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
+  node_cfg['nics'] = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
+
+  begin
+    lab_path = get_lab_file_path(lab_name)
+    lab = Lab.new(cfg: lab_path)
+    
+    # Start node and get config/links
+    cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch])
+
+    # Append to runtime YAML
+    data = YAML.load_file(lab_path)
+    data['topology'][0]['nodes'][node_name] = cfg_out
+    
+    data['topology'][0]['links'] ||= []
+    if data_link
+      data['topology'][0]['links'] << data_link
+      
+      # Auto-expand switch port capacity if necessary
+      sw_name = params[:switch].strip
+      sw_port = data_link[0].split(':eth').last.to_i
+      sw_node = data['topology'][0]['nodes'][sw_name]
+      if sw_node
+        current_ports = sw_node['ports'] || 4 
+        if sw_port > current_ports
+          sw_node['ports'] = sw_port
+        end
+      end
+    end
+    
+    write_formatted_yaml(lab_path, data)
+    
+    # Re-instantiate from the updated YAML file to natively update inventory & graphs!
+    updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
+    updated_lab.visualize
+    updated_lab.inventory
+
+    content_type :json
+    { success: true, message: "AdHoc Node '#{node_name}' started" }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+get '/labs/*/node/:node_name' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+
+  node_cfg = nil
+  if File.file?(lab_path)
+    data = YAML.load_file(lab_path)
+    node_cfg = data['topology'][0]['nodes'][node_name] if data['topology'] && data['topology'][0]
+  end
+
+  node_cfg ||= { 'type' => 'host', 'kind' => 'linux', 'gw' => '', 'nics' => { 'eth1' => '' } }
+  
+  yaml_str = node_cfg.to_yaml
+  yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}, #{$4}]\n" }
+  yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}]\n" }
+
+  content_type :json
+  { yaml: yaml_str, json: node_cfg }.to_json
+end
+
+post '/labs/*/node/:node_name/edit' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path)
+    base_data = full_yaml['topology'][0]['nodes'][node_name] || {}
+
+    if params[:format] == 'form'
+      new_cfg = base_data.dup
+      new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
+      params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
+      params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
+      
+      if params[:nics] && !params[:nics].strip.empty?
+        new_cfg['nics'] = params[:nics].split("\n").map { |l| l.split('=').map(&:strip) }.to_h.reject { |k,v| k.nil? || v.nil? }
+      else
+        new_cfg.delete('nics')
+      end
+    else
+      new_cfg = YAML.safe_load(params[:yaml_data])
+    end
+
+    full_yaml['topology'][0]['nodes'][node_name] = new_cfg
+    write_formatted_yaml(lab_path, full_yaml)
+
+    if running_lab? && get_running_lab == lab_name
+      # Re-instantiate from the updated YAML file to natively update inventory & graphs!
+      updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
+      updated_lab.visualize
+      updated_lab.inventory
+    end
+
+    content_type :json
+    { success: true, message: "Node configuration saved." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/playbook' do
+  lab_name = params[:splat].first
+  halt 400, { error: "No lab is running" }.to_json unless get_running_lab == lab_name
+  halt 400, { error: "Playbook running!" }.to_json if Lab.playbook_running?(lab_name)
+
+  log_path = LabLog.latest_for_running_lab
+  Thread.new do
+    begin
+      lab_instance = Lab.new(cfg: get_lab_file_path(lab_name), relative_path: lab_name)
+      File.open(log_path, 'a') { |f| f.puts "\n--- Manual Ansible playbook run triggered ---\n" }
+      lab_instance.run_playbook(nil, log_path)
+    rescue => e
+      File.open(log_path, 'a') { |f| f.puts "\n⚠️ Playbook failed: #{e.message}\n" }
+    end
+  end
+  content_type :json
+  { success: true }.to_json
+end
+
+post '/labs/execute' do
+  action = params[:action]
+  halt 400, "Invalid action" unless %w[up down].include?(action)
+
+  if action == 'up'
+    lab_name = params[:lab_name]
+    labs_list = all_labs
+    halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
+    if Lab.running?
+      halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
+    end
+  else # down
+    unless Lab.running?
+      halt 400, "No lab is currently running."
+    end
+    lab_name = Lab.current_name
+    labs_list = all_labs
+    halt 500, "Running lab not found" unless labs_list.include?(lab_name)
+  end
+
+  source_path = File.join(LABS_DIR, lab_name)
+  runtime_path = "#{LOCK_DIR}/#{lab_name.gsub('/', '_')}.yml"
+  log = LabLog.for_lab(lab_name: lab_name, action: action)
+
+  Thread.new do
+    begin
+      if action == 'up'
+        FileUtils.cp(source_path, runtime_path)
+        lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
+        lab_instance.visualize
+        lab_instance.inventory
+        lab_instance.up
+        log.info "--- Lab #{lab_name} UP completed ---"
+
+        # ✅ RUN PLAYBOOK ONCE with built-in concurrency protection
+        begin
+          lab_instance.run_playbook(nil, log.path)
+          log.info "--- Ansible playbook completed ---"
+        rescue => e
+          log.info "⚠️  Playbook failed but lab is running: #{e.message}"
+        end
+      else
+        lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
+        lab_instance.down
+        log.info "--- Lab #{lab_name} DOWN completed ---"
+        FileUtils.rm_f(runtime_path)
+      end
+      
+      log.info "--- Operation finished ---"
+      log.close
+      
+    rescue => e
+      log.info "ERROR: #{e.message}"
+      log.info e.backtrace.join("\n")
+      log.close
+    end
+  end
+  
+  redirect "/logs?file=#{URI.encode_www_form_component(log.path)}"
+end
 
 post '/labs/action' do
   @labs = all_labs
@@ -353,75 +589,6 @@ get '/labs/*/info' do
   lab_info.to_json
 end
 
-# server.rb — POST /labs/execute
-post '/labs/execute' do
-  action = params[:action]
-  halt 400, "Invalid action" unless %w[up down].include?(action)
-  
-  if action == 'up'
-    lab_name = params[:lab_name]
-    labs_list = all_labs
-    halt 400, "Invalid lab" unless lab_name && labs_list.include?(lab_name)
-    if Lab.running?
-      halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
-    end
-  else # down
-    unless Lab.running?
-      halt 400, "No lab is currently running."
-    end
-    lab_name = Lab.current_name
-    labs_list = all_labs
-    halt 500, "Running lab not found" unless labs_list.include?(lab_name)
-    
-    # Cleanup ad-hoc DNAT (controller-owned session state - OK here)
-    if lab_name
-      lab_name_safe = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
-      adhoc_file = "#{LOCK_DIR}/adhoc_dnat_#{lab_name_safe}.json"
-      File.delete(adhoc_file) if File.file?(adhoc_file)
-    end
-  end
-
-  lab_file_path = File.join(LABS_DIR, lab_name)
-  
-  log = LabLog.for_lab(lab_name: lab_name, action: action)
-  
-  Thread.new do
-    begin
-      lab_instance = Lab.new(cfg: lab_file_path, relative_path: lab_name, log: log)
-      
-      if action == 'up'
-        lab_instance.visualize
-        lab_instance.inventory
-        lab_instance.up
-        log.info "--- Lab #{lab_name} UP completed ---"
-
-        # ✅ RUN PLAYBOOK ONCE with built-in concurrency protection
-        # (playbook lock handled internally by Lab#run_playbook)
-        begin
-          lab_instance.run_playbook(nil, log.path)
-          log.info "--- Ansible playbook completed ---"
-        rescue => e
-          log.info "⚠️  Playbook failed but lab is running: #{e.message}"
-        end
-      else
-        lab_instance.down
-        log.info "--- Lab #{lab_name} DOWN completed ---"
-      end
-      
-      log.info "--- Operation finished ---"
-      log.close
-      
-    rescue => e
-      log.info "ERROR: #{e.message}"
-      log.info e.backtrace.join("\n")
-      log.close
-    end
-  end
-  
-  redirect "/logs?file=#{URI.encode_www_form_component(log.path)}"
-end
-
-
 get '/logs' do
   if params[:file]
     # View specific log
@@ -514,6 +681,7 @@ BADREQ = %q(
 HEADER = %q(
 <!DOCTYPE html>
 <html lang="en">
+<head>
   <title>🔬 CTLABS</title>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -521,56 +689,92 @@ HEADER = %q(
   <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-colors-2021.css">
   <link rel="stylesheet" href="/asciinema-player.css" type="text/css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/dracula.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ini.min.js"></script>
   <script>hljs.highlightAll();</script>
   <script src="https://www.w3schools.com/lib/w3.js"></script>
+
   <style>
-    #log-content span {
-      font-weight: normal;
+    /* Global Modern Typography */
+    body, h1, h2, h3, h4, h5, h6, button, input, select, textarea {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     }
-    /* Optional: make bold ANSI codes actually bold */
-    /* Would require parsing '1;' in ANSI codes */
-    .svg-container {
-      width: 100%;
-      height: auto;
-      position: relative;
-      overflow: auto; /* Fallback scroll if needed */
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
+    
+    /* Sleek Slate Dark Theme */
+    body { background-color: #0f172a; color: #e2e8f0; }
+    
+    /* Frosted Glass Navbar */
+    .w3-top .w3-bar { 
+      background-color: rgba(15, 23, 42, 0.85) !important; 
+      backdrop-filter: blur(12px); 
+      border-bottom: 1px solid #1e293b; 
+      box-shadow: none;
     }
-  
-    .responsive-embed {
-      width: 100%;
-      height: auto;
-      min-height: 100px; /* prevent collapse */
-      display: block;
-      /* Preserve aspect ratio */
-      max-width: 100%;
-      max-height: 70vh; /* optional: cap height */
+    .w3-bar-item.w3-button:hover { background-color: rgba(255,255,255,0.1) !important; border-radius: 6px; }
+
+    /* Modernized Cards and Panels */
+    .w3-card-4, .w3-panel, .w3-2021-inkwell { 
+      background-color: #1e293b !important; 
+      color: #f8fafc !important; 
+      border-radius: 12px; 
+      border: 1px solid #334155; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important; 
     }
-  
-    /* Optional: smooth scaling during zoom */
-    .responsive-embed.zooming {
-      transition: transform 0.2s ease;
+    
+    /* Page Titles */
+    .w3-panel.w3-green {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+      color: white !important;
+      border: none;
     }
+
+    /* Buttons */
+    .w3-button { border-radius: 6px; transition: all 0.2s ease-in-out; font-weight: 500; }
+    .w3-button.w3-green { background-color: #10b981 !important; }
+    .w3-button.w3-green:hover { background-color: #059669 !important; transform: translateY(-1px); }
+    .w3-button.w3-blue { background-color: #3b82f6 !important; }
+    .w3-button.w3-blue:hover { background-color: #2563eb !important; transform: translateY(-1px); }
+    .w3-button.w3-red { background-color: #ef4444 !important; }
+    .w3-button.w3-red:hover { background-color: #dc2626 !important; transform: translateY(-1px); }
+
+    /* Inputs & Selects */
+    .w3-select, .w3-input { 
+      border-radius: 6px; 
+      background-color: #0f172a !important; 
+      color: #e2e8f0 !important; 
+      border: 1px solid #475569 !important;
+    }
+    .w3-select:focus, .w3-input:focus { border-color: #3b82f6 !important; outline: none; }
+
+    /* Tables */
+    .w3-table td, .w3-table th { border-bottom: 1px solid #334155 !important; }
+    .w3-striped tbody tr:nth-child(even) { background-color: rgba(255,255,255,0.03) !important; }
+    
+    #log-content span { font-weight: normal; }
+    .svg-container { width: 100%; height: auto; position: relative; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
+    .responsive-embed { width: 100%; height: auto; min-height: 100px; display: block; max-width: 100%; max-height: 70vh; }
+    .responsive-embed.zooming { transition: transform 0.2s ease; }
+    
+    /* Code Blocks */
+    pre, code { border-radius: 8px; }
   </style>
-  <body bgcolor="#1c1c1c">
-    <div class="w3-top w3-bar w3-black">
-      <a href="/"          class="w3-bar-item w3-button">🔬 CTLABS</a>
-<!--      <a href="/labs"      class="w3-bar-item w3-button">🧪 Labs</a> -->
-      <a href="/topo"      class="w3-bar-item w3-button">🗺️ Topology</a>
-      <a href="/con"       class="w3-bar-item w3-button">🕸 Connections</a>
-      <a href="/inventory" class="w3-bar-item w3-button">🗂️ Inventory</a>
-      <a href="/config"    class="w3-bar-item w3-button">⚙️  Configuration</a>
-      <a href="/logs"      class="w3-bar-item w3-button">🧾 Logs</a>
-      <a href="/flashcards" class="w3-bar-item w3-button">🎴 Flashcards</a>
-      <a href="/demo"      class="w3-bar-item w3-button">📹 Walkthrough</a>
-<!--      <a href="/upload" class="w3-bar-item w3-button">📤 Upload</a> -->
-    </div>
-    <div id="ctlabs"><br></div>
+</head>
+<body>
+  <div class="w3-top w3-bar w3-padding-small">
+    <a href="/"          class="w3-bar-item w3-button w3-margin-right"><b>🔬 CTLABS</b></a>
+    <a href="/topo"      class="w3-bar-item w3-button"><i class="fas fa-sitemap w3-margin-right"></i>Topology</a>
+    <a href="/con"       class="w3-bar-item w3-button"><i class="fas fa-network-wired w3-margin-right"></i>Connections</a>
+    <a href="/inventory" class="w3-bar-item w3-button"><i class="fas fa-list w3-margin-right"></i>Inventory</a>
+    <a href="/config"    class="w3-bar-item w3-button"><i class="fas fa-cogs w3-margin-right"></i>Configuration</a>
+    <a href="/logs"      class="w3-bar-item w3-button"><i class="fas fa-terminal w3-margin-right"></i>Logs</a>
+    <a href="/flashcards" class="w3-bar-item w3-button"><i class="fas fa-layer-group w3-margin-right"></i>Flashcards</a>
+    <a href="/demo"      class="w3-bar-item w3-button"><i class="fas fa-video w3-margin-right"></i>Walkthrough</a>
+  </div>
+  <div id="ctlabs" style="height: 70px;"></div>
 )
 
 SCRIPT = %q(

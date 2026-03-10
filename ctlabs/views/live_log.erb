@@ -7,19 +7,19 @@
 -->
 
 <%= HEADER %>
-<div class="w3-panel w3-<%= @action == 'up' ? 'green' : 'red' %>">
+<div class="w3-panel w3-<%= @action == 'up' ? 'green' : 'red' %>" style="margin-top: 0; margin-bottom: 16px;">
   <h2>
     <%= @action == 'up' ? '🚀 Starting' : '⏹ Stopping' %> Lab: 
     <code><%= @lab_name %></code>
   </h2>
 </div>
 
-<!-- Constrain total height to viewport -->
-<div class="w3-container" style="height: calc(100vh - 130px); display: flex; flex-direction: column;">
-  <div class="w3-container w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-    <br>
-    <pre id="log-content" style="flex: 1; resize: vertical; overflow: auto; min-height: 150px; background: #1e1e1e; color: #f0f0f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: none;"></pre>
-    <div id="scroll-status" style="font-size: 0.8em; color: #aaa; margin-top: 4px; height: 16px;"></div>
+<div class="w3-container" style="height: calc(100vh - 170px); display: flex; flex-direction: column; padding-bottom: 16px;">
+  <div class="w3-container w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 16px;">
+    
+    <pre id="log-content" style="flex: 1; resize: none; overflow: auto; min-height: 150px; background: #0f172a; color: #e2e8f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: 1px solid #334155; border-radius: 8px; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);"></pre>
+    
+    <div id="scroll-status" style="font-size: 0.8em; color: #94a3b8; margin-top: 8px; height: 16px;"></div>
   </div>
 </div>
 

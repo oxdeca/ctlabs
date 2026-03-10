@@ -9,7 +9,6 @@
 $DEBUG = false
 
 #
-#
 # Depends on
 #   - iproute2
 #   - iptables
@@ -130,11 +129,16 @@ if options[:up]
     exit 1
   end
 
+  # Create Runtime Copy
+  runtime_path = "/var/run/ctlabs/#{config_path.gsub('/', '_')}.yml"
+  FileUtils.mkdir_p('/var/run/ctlabs')
+  FileUtils.cp(full_path, runtime_path) # <-- Fixed bug here (was source_path)
+
   log = LabLog.for_lab(lab_name: config_path, action: 'up')
   puts "Starting lab: #{config_path}"
   puts "Log file: #{log.path}"
 
-  l1 = Lab.new(cfg: full_path, relative_path: config_path, log: log)
+  l1 = Lab.new(cfg: runtime_path, relative_path: config_path, log: log)
   l1.visualize
   l1.inventory
   l1.up
@@ -155,7 +159,10 @@ if options[:play]
 
   running_lab = Lab.current_name
   labs_dir    = File.expand_path('../labs', __dir__)
-  full_path   = File.join(labs_dir, running_lab)
+  
+  # Read from runtime copy
+  runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
+  full_path   = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
 
   # CHECK FOR CONCURRENT EXECUTION BEFORE STARTING
   if Lab.playbook_running?(running_lab)
@@ -204,9 +211,11 @@ if options[:down]
 
   running_lab = Lab.current_name
   labs_dir    = File.expand_path('../labs', __dir__)
-  full_path   = File.join(labs_dir, running_lab)
+  
+  # Read from runtime copy to ensure AdHoc nodes are stopped!
+  runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
+  full_path   = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
 
-  #log = LabLog.new(out: $stdout, level: options[:dlevel] || 'info')
   log = LabLog.for_lab(lab_name: running_lab, action: 'down')
 
   puts "Stopping running lab: #{running_lab}"
@@ -214,6 +223,9 @@ if options[:down]
 
   l1 = Lab.new(cfg: full_path, relative_path: running_lab, log: log)
   l1.down
+  
+  # Clean up runtime copy
+  FileUtils.rm_f(runtime_path)
 
   log.info "✓ Lab stopped successfully"
   log.close
@@ -221,16 +233,45 @@ if options[:down]
   puts "✓ Lab stopped. View logs at: #{log.path}"
 end
 
-if( options[:graph] )
-  l1.visualize
-end
+#
+# === STANDALONE UTILITY MODES ===
+#
+if options[:graph] || options[:ini] || options[:print]
+  # Initialize l1 if it wasn't already initialized by up/down/play
+  unless defined?(l1) && l1
+    if options[:config]
+      config_path = options[:config]
+      labs_dir = File.expand_path('../labs', __dir__)
+      target_path = File.join(labs_dir, config_path)
+      
+      # If this specific lab is currently running, use its runtime copy so the graphs show ad-hoc nodes!
+      if Lab.running? && Lab.current_name == config_path
+        runtime_path = "/var/run/ctlabs/#{config_path.gsub('/', '_')}.yml"
+        target_path = runtime_path if File.file?(runtime_path)
+      end
 
-if( options[:ini] )
-  l1.inventory
-end
+      unless File.file?(target_path)
+        puts "❌ Error: Config file not found: #{target_path}"
+        exit 1
+      end
+      l1 = Lab.new(cfg: target_path, relative_path: config_path, log: LabLog.null)
+    elsif Lab.running?
+      # Fallback to the currently running lab if no config is specified
+      running_lab = Lab.current_name
+      labs_dir    = File.expand_path('../labs', __dir__)
+      runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
+      target_path  = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
+      
+      l1 = Lab.new(cfg: target_path, relative_path: running_lab, log: LabLog.null)
+    else
+      puts "❌ Error: No lab running and no -c/--conf specified. Cannot generate graphs or inventory."
+      exit 1
+    end
+  end
 
-if( options[:print] )
-  p l1
+  l1.visualize if options[:graph]
+  l1.inventory if options[:ini]
+  p l1 if options[:print]
 end
 
 if options[:list]

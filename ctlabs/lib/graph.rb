@@ -1,4 +1,3 @@
-
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/graph.rb
 # Description : graph class; creating visualizations
@@ -29,7 +28,7 @@ class Graph
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
-          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="grey11",fontname="Courier New",fontsize="11"]
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="#1e293b",fontname="Courier New",fontsize="11"]
 
         <%- 
             @nodes.each do |node|
@@ -104,7 +103,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
-          fontcolor = "seashell"
+          fontcolor = "#f8fafc"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -117,7 +116,7 @@ class Graph
 
     %{
         graph <%= @name.sub(/.-/, "_") %> {
-          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="grey11",fontname="Courier New",fontsize="11"]
+          graph [pad="0.2",nodesep="0.3",ranksep="2.5",overlap=false,splines=true,layout=dot,rankdir=TB,bgcolor="#1e293b",fontname="Courier New",fontsize="11"]
 
         <%- 
             @nodes.each do |node|
@@ -186,7 +185,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
-          fontcolor = "seashell"
+          fontcolor = "#f8fafc"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -202,8 +201,8 @@ class Graph
         #layout=neato
         #layout=sfdp
         #layout=circo
-        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="grey11"]
-        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="grey11",fontname="Courier New",fontsize="11"]
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="#1e293b"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="#1e293b",fontname="Courier New",fontsize="11"]
 
         node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
         <%- 
@@ -290,7 +289,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
-          fontcolor = "seashell"
+          fontcolor = "#f8fafc"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left
@@ -306,8 +305,8 @@ class Graph
         #layout=neato
         #layout=sfdp
         #layout=circo
-        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="grey11"]
-        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="grey11",fontname="Courier New",fontsize="11"]
+        #graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=twopi,bgcolor="#1e293b"]
+        graph [pad="0.2",esep="0.1",ranksep="1",overlap=false,splines=true,layout=neato,bgcolor="#1e293b",fontname="Courier New",fontsize="11"]
 
         node[shape=rectangle,style="rounded,filled",fillcolor="lightsteelblue"]
         <%- @cfg['topology'].each do |vm| -%>
@@ -375,7 +374,7 @@ class Graph
         <%- end -%>
 
           fontsize  = "18"
-          fontcolor = "seashell"
+          fontcolor = "#f8fafc"
           label     = "<%= @name %> [<%= @desc %>]"
           labelloc  = top
           labeljust = left

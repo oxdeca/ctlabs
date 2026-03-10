@@ -472,6 +472,119 @@ def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
   return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
 end
 
+  def add_adhoc_node(node_name, node_cfg, target_switch = nil)
+    @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
+    raise "Node '#{node_name}' already exists" if find_node(node_name)
+
+    # 1. Fetch live container namespace IDs for existing nodes
+    @nodes.each do |n|
+      if n.netns.nil?
+        cid = %x( docker ps --format '{{.ID}}' --filter name=#{n.name} ).strip
+        n.instance_variable_set(:@netns, cid) unless cid.empty?
+      end
+    end
+
+    # 2. Determine explicitly vs implicitly managed networks
+    type = node_cfg['type']
+    kind = node_cfg['kind']
+    is_explicit_mgmt = (type == 'controller' || (type == 'router' && kind == 'mgmt'))
+    needs_implicit_mgmt = (['host', 'switch'].include?(type) || (type == 'router' && kind != 'mgmt'))
+
+    # Calculate next available Mgmt IP safely
+    vm_name = @vm_name || @cfg['topology'][0]['name']
+    cfg_vm  = find_vm(vm_name)
+    mgmt    = cfg_vm['mgmt'] || @mgmt || {}
+    net     = mgmt['net'] || "192.168.40.0/24"
+    
+    tmp  = net.split('/')
+    mask = tmp[1]
+    net_prefix = tmp[0].split('.')[0..2].join('.') + '.' 
+    
+    used_ips = @nodes.map do |n| 
+      n.nics['eth0'].to_s.split('/')[0].to_s.split('.').last.to_i if n.nics && !n.nics['eth0'].to_s.strip.empty?
+    end.compact
+    
+    mgmt_ip = "#{net_prefix}#{(used_ips.max || 20) + 1}/#{mask}"
+
+    # 3. Create Runtime Configuration
+    runtime_cfg = Marshal.load(Marshal.dump(node_cfg)) # Deep clone
+    runtime_cfg['nics'] ||= {}
+    
+    if is_explicit_mgmt
+      # Explicit mgmt nodes MUST have eth0 explicitly in the YAML
+      if runtime_cfg['nics']['eth0'].nil? || runtime_cfg['nics']['eth0'].strip.empty?
+        runtime_cfg['nics']['eth0'] = mgmt_ip
+        node_cfg['nics'] ||= {}
+        node_cfg['nics']['eth0'] = mgmt_ip
+      end
+    elsif needs_implicit_mgmt
+      # Implicit mgmt nodes get eth0 at runtime, but it MUST NOT save to YAML
+      runtime_cfg['nics']['eth0'] = mgmt_ip
+      node_cfg['nics'].delete('eth0') if node_cfg['nics']
+    end
+    
+    node_cfg['adhoc'] = true # Tag for UI
+
+    # 4. Instantiate Node with RUNTIME config
+    node = Node.new({
+      'name'      => node_name,
+      'ephemeral' => @ephemeral,
+      'defaults'  => @defaults,
+      'log'       => @log,
+      'domain'    => cfg_vm['domain'] || @domain,
+      'dns'       => cfg_vm['dns'] || @dns
+    }.merge(runtime_cfg))
+
+    @nodes << node
+    node.run
+
+    # 5. Connect Mgmt Interface to sw0 sequentially
+    if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
+      sw0 = find_node('sw0')
+      if sw0
+        used_sw0 = @links.map do |l| 
+          if l[0] =~ /^sw0:eth(\d+)$/
+            $1.to_i
+          elsif l[1] =~ /^sw0:eth(\d+)$/
+            $1.to_i
+          end
+        end.compact
+        
+        next_sw0_port = 1
+        next_sw0_port += 1 while used_sw0.include?(next_sw0_port)
+
+        mgmt_link = ["sw0:eth#{next_sw0_port}", "#{node_name}:eth0"]
+        @links << mgmt_link
+        Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
+      end
+    end
+
+    # 6. Connect Data Interface to Target Switch sequentially
+    data_link = nil
+    if target_switch && !target_switch.to_s.strip.empty?
+      if target_sw_node = find_node(target_switch)
+        used_sw = @links.map do |l| 
+          if l[0] =~ /^#{target_switch}:eth(\d+)$/
+            $1.to_i
+          elsif l[1] =~ /^#{target_switch}:eth(\d+)$/
+            $1.to_i
+          end
+        end.compact
+        
+        next_port = 1
+        next_port += 1 while used_sw.include?(next_port)
+
+        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:eth1"]
+        @links << data_link
+        Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
+      end
+    end
+
+    @log.info "[ADHOC NODE] Started node #{node_name}"
+    
+    # Return the CLEAN node_cfg (no implicit eth0) and ONLY the data_link for the YAML
+    [node_cfg, data_link]
+  end
 
   def del_dnat
     @log.write "#{__method__}(): ", "debug"
