@@ -367,6 +367,57 @@ class Graph
     }
   end
 
+  def get_data_inventory
+    %{ <%- -%>
+[local]
+  #localhost
+
+[controller]
+  <%- @nodes.each do |node| -%>
+  <%-   if node.type == 'controller' and node.nics && !node.nics['eth1'].to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
+[router]
+  <%- @nodes.each do |node| -%>
+  <%-   ip = node.ipv4 || (node.nics && node.nics['eth1']) -%>
+  <%-   if node.type == 'router' && !ip.to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= ip.split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
+[switches]
+  <%- @nodes.each do |node| -%>
+  <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
+[hosts]
+  <%- @nodes.each do |node| -%>
+  <%-   if node.type == 'host' and node.nics && !node.nics['eth1'].to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
+[all:vars]
+  <%= "ansible_user".ljust(24)         + "= root" %>
+  <%= "ansible_ssh_password".ljust(24) + "= secret" %>
+    }
+  end
+
+  def to_data_ini(data, name)
+    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
+
+    File.open("../../ctlabs-ansible/inventories/#{name}_data.ini", "w") do |f|
+      f.write( ERB.new(data, trim_mode:'-').result(@binding))
+    end
+    File.open("#{@pubdir}/inventory_data.ini", "w") do |f|
+      f.write( ERB.new(data, trim_mode:'-').result(@binding))
+    end
+  end
+
   def to_dot(data)
     @log.write "#{__method__}(): data=#{data}", "debug"
 
