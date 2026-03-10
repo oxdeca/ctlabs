@@ -10,6 +10,27 @@
 
 <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
 
+<style>
+  /* Sleek, floating custom tooltip */
+  #custom-html-tooltip {
+    position: fixed;
+    display: none;
+    background: rgba(15, 23, 42, 0.95);
+    color: #f8fafc;
+    border: 1px solid #38bdf8;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+    z-index: 10000;
+    pointer-events: none; /* Prevents the tooltip from blocking your mouse */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    white-space: pre-wrap; /* Honors our line breaks */
+    backdrop-filter: blur(4px);
+  }
+</style>
+
     <div id="topo-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
       <h2><i class="fas fa-project-diagram"></i> Topology Maps</h2>
     </div>
@@ -35,13 +56,93 @@
   window.panZoomData = null;
   window.panZoomMgmt = null;
 
+  // Tooltip Engine
+  function attachCustomTooltips(svgObject) {
+    const svgDoc = svgObject.contentDocument;
+    if (!svgDoc) return;
+
+    let tooltip = document.getElementById('custom-html-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'custom-html-tooltip';
+      document.body.appendChild(tooltip);
+    }
+
+    // 1. Scrub ALL native <title> tags from the entire SVG to kill OS tooltips
+    const allTitles = svgDoc.querySelectorAll('title');
+    allTitles.forEach(t => {
+      const text = t.textContent.trim();
+      const parent = t.parentElement;
+      // Only cache the text if it's our detailed node tooltip (contains '[')
+      if (text && text.includes('[')) {
+        parent.setAttribute('data-custom-tooltip', text);
+      }
+      t.remove(); // Annihilate the tag immediately
+    });
+
+    // 2. Scrub ALL title attributes from links/nodes
+    const allLinks = svgDoc.querySelectorAll('a, g.node');
+    allLinks.forEach(el => {
+      ['title', 'xlink:title'].forEach(attr => {
+        if (el.hasAttribute(attr)) {
+          const text = el.getAttribute(attr).trim();
+          if (text && text.includes('[')) {
+            el.setAttribute('data-custom-tooltip', text);
+          }
+          el.removeAttribute(attr); // Destroy the native attribute
+        }
+      });
+    });
+
+    // 3. Attach our custom lightning-fast hover events
+    const interactiveElements = svgDoc.querySelectorAll('[data-custom-tooltip]');
+    interactiveElements.forEach(el => {
+      const rawText = el.getAttribute('data-custom-tooltip');
+      const formattedText = rawText.replace(/&#10;/g, '<br>').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+
+      el.addEventListener('mouseenter', (e) => {
+        tooltip.innerHTML = formattedText;
+        tooltip.style.display = 'block';
+      });
+
+      el.addEventListener('mousemove', (e) => {
+        const rect = svgObject.getBoundingClientRect();
+        tooltip.style.left = (e.clientX + rect.left + 15) + 'px';
+        tooltip.style.top = (e.clientY + rect.top + 15) + 'px';
+      });
+
+      el.addEventListener('mouseleave', () => {
+        tooltip.style.display = 'none';
+      });
+    });
+
+    // 4. Style the SVG Pan/Zoom controls to match the dark theme!
+    let customStyle = svgDoc.getElementById('custom-dark-controls');
+    if (!customStyle) {
+      customStyle = svgDoc.createElementNS("http://www.w3.org/2000/svg", "style");
+      customStyle.id = 'custom-dark-controls';
+      customStyle.textContent = `
+        /* Dark slate background for the buttons */
+        #svg-pan-zoom-controls rect { fill: #1e293b !important; fill-opacity: 0.95 !important; stroke: #334155; stroke-width: 1px; }
+        /* Bright white icons */
+        #svg-pan-zoom-controls path { fill: #f8fafc !important; }
+        /* Hover effects */
+        #svg-pan-zoom-controls g:hover rect { fill: #334155 !important; cursor: pointer; }
+        #svg-pan-zoom-controls g:hover path { fill: #38bdf8 !important; }
+      `;
+      svgDoc.documentElement.appendChild(customStyle);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('topo-obj').addEventListener('load', function() {
       window.panZoomData = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+      attachCustomTooltips(this);
     });
 
     document.getElementById('mgmt-topo-obj').addEventListener('load', function() {
       window.panZoomMgmt = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+      attachCustomTooltips(this);
     });
   });
 
@@ -58,7 +159,6 @@
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " w3-blue";
 
-    // Recalculate dimensions for the newly visible SVG so it doesn't glitch
     if (window.panZoomData) { window.panZoomData.resize(); window.panZoomData.fit(); window.panZoomData.center(); }
     if (window.panZoomMgmt) { window.panZoomMgmt.resize(); window.panZoomMgmt.fit(); window.panZoomMgmt.center(); }
   }
@@ -66,4 +166,3 @@
 
 <%= SCRIPT %>
 <%= FOOTER %>
-
