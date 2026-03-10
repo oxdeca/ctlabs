@@ -1279,6 +1279,11 @@ class FlashCardsController {
     const chart = this.getChartHTML(correct, answered - correct, answered);
     this.view.showModal("Quiz Progress", `<div style="text-align:center; margin-bottom:10px; font-size:2em; font-weight:bold; color:var(--primary)">${answered > 0 ? Math.round(correct/answered*100) : 0}%</div>${chart}`, `<button class="w3-button w3-blue w3-round" onclick="app.closeModal()">Close</button>`);
   }
+
+  closeModal() {
+    this.view.closeModal();
+  }
+
 }
 
 let app;
