@@ -381,15 +381,13 @@ module ApplicationHelper
                     <label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label>
                     <textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea>
                   </div>
-
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
-                    <input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-
                   <div class="w3-col m12 w3-margin-bottom">
                     <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label>
                     <input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+                  </div>
+                  <div class="w3-col m12 w3-margin-bottom">
+                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
+                    <input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
                   </div>
                   <div class="w3-col m12 w3-margin-bottom">
                     <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs</label>
