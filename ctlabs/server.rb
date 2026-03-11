@@ -442,6 +442,54 @@ post '/labs/*/node/:node_name/edit' do
   end
 end
 
+# Edit Ansible Playbook Configuration
+post '/labs/*/ansible/edit' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path)
+    
+    # Locate the ansible controller node
+    ansible_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| k == 'ansible' || full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' }
+    raise "No ansible controller node found in topology" unless ansible_node_name
+    
+    base_data = full_yaml['topology'][0]['nodes'][ansible_node_name] || {}
+    
+    # Initialize or reset the play configuration
+    play_cfg = base_data['play'] || {}
+    play_cfg = {} if play_cfg.is_a?(String) # Convert raw strings to hashes
+    
+    # 1. Update Playbook
+    params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
+    
+    # 2. Update Environment Variables
+    if params[:env] && !params[:env].strip.empty?
+      play_cfg['env'] = params[:env].split("\n").map(&:strip).reject(&:empty?)
+    else
+      play_cfg.delete('env')
+    end
+    
+    # 3. Update Tags
+    if params[:tags] && !params[:tags].strip.empty?
+      play_cfg['tags'] = params[:tags].split(",").map(&:strip).reject(&:empty?)
+    else
+      play_cfg.delete('tags')
+    end
+
+    # Save it back
+    base_data['play'] = play_cfg
+    full_yaml['topology'][0]['nodes'][ansible_node_name] = base_data
+    write_formatted_yaml(lab_path, full_yaml)
+
+    content_type :json
+    { success: true, message: "Ansible configuration updated." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
 post '/labs/*/playbook' do
   lab_name = params[:splat].first
   halt 400, { error: "No lab is running" }.to_json unless get_running_lab == lab_name

@@ -378,12 +378,20 @@ module ApplicationHelper
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
           <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
             <span><i class="fas fa-code-branch"></i> Ansible Playbook Configuration</span>
-            <% if get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
-              <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) %>
-              <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
-                <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
-              </button>
-            <% end %>
+            <div>
+              <% if get_running_lab == info_hash[:lab_path] %>
+                <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;">
+                  <i class="fas fa-edit"></i> Edit
+                </button>
+                
+                <% if info_hash[:ansible][:playbook] != 'N/A' %>
+                  <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) %>
+                  <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
+                    <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
+                  </button>
+                <% end %>
+              <% end %>
+            </div>
           </div>
           <div class="w3-padding w3-small">
             <table class="w3-table">
@@ -408,6 +416,43 @@ module ApplicationHelper
                 </td>
               </tr>
             </table>
+          </div>
+        </div>
+
+        <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
+          <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+            <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+              <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+              <h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4>
+            </header>
+
+            <div class="w3-container w3-padding">
+              <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
+                <i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong> for the current run.
+              </div>
+
+              <div class="w3-margin-bottom">
+                <label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label>
+                <input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              </div>
+
+              <div class="w3-margin-bottom">
+                <label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label>
+                <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              </div>
+
+              <div class="w3-margin-bottom">
+                <label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label>
+                <textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea>
+              </div>
+
+              <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
+            </div>
+
+            <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+              <button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+              <button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
+            </footer>
           </div>
         </div>
 
@@ -614,6 +659,66 @@ module ApplicationHelper
           btn.disabled = false;
           btn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
           btn.classList.replace('w3-grey', 'w3-green');
+        }
+      };
+
+      window.openAnsibleEditor = async function(labName) {
+        window.currentEditLab = labName;
+        document.getElementById('ansible-editor-result').style.display = 'none';
+
+        try {
+          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+          // Fetch the ansible node directly to get its current play config
+          const res = await fetch(`/labs/${safeLab}/node/ansible`);
+          if (!res.ok) throw new Error("Could not fetch ansible node configuration");
+          const data = await res.json();
+
+          let play = data.json.play || {};
+          
+          if (typeof play === 'string') {
+            document.getElementById('edit-ansible-book').value = play;
+            document.getElementById('edit-ansible-tags').value = '';
+            document.getElementById('edit-ansible-env').value = '';
+          } else {
+            document.getElementById('edit-ansible-book').value = play.book || '';
+            document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
+            document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
+          }
+
+          document.getElementById('ansible-editor-modal').style.display = 'block';
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      };
+
+      window.saveAnsibleConfig = async function() {
+        const resultDiv = document.getElementById('ansible-editor-result');
+        const formData = new URLSearchParams();
+
+        formData.append('book', document.getElementById('edit-ansible-book').value);
+        formData.append('tags', document.getElementById('edit-ansible-tags').value);
+        formData.append('env', document.getElementById('edit-ansible-env').value);
+
+        const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+
+        try {
+          const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+          });
+
+          const data = await res.json();
+          if (res.ok) {
+            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+            resultDiv.textContent = '✅ ' + data.message + ' (Reloading...)';
+            setTimeout(() => location.reload(), 1200);
+          } else {
+            throw new Error(data.error || 'Failed to save configuration');
+          }
+        } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.textContent = '❌ ' + err.message;
         }
       };
 
