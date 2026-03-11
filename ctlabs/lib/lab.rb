@@ -55,7 +55,8 @@ class Lab
     @domain     = @cfg['domain']    || "ctlabs.internal"
     @mgmt       = @cfg['mgmt']      || {}
     @dnatgw     = {}
-    @server_ip  = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
+    #@server_ip  = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
+    @server_ip = Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }&.ip_address || '127.0.0.1'
 
     # hack, before we start the nodes make sure ip_forwarding is enabled
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )

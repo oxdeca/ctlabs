@@ -64,12 +64,13 @@ module ApplicationHelper
     require 'set'
 
     lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
+    refresh_lab_visuals(lab_name)
     runtime_path = "#{LOCK_DIR}/#{lab_name.gsub('/', '_')}.yml"
     is_running = running_lab? && get_running_lab == lab_name
-    
+
     actual_path = (is_running && File.file?(runtime_path)) ? runtime_path : yaml_file_path
 
-    # Load runtime lab and base lab to compute the diff!
+    # Load runtime lab and base lab to compute the diff
     lab = Lab.new(cfg: actual_path, log: LabLog.null)
     base_lab = is_running ? Lab.new(cfg: yaml_file_path, log: LabLog.null) : lab
 
@@ -80,6 +81,25 @@ module ApplicationHelper
 
     info = { lab_name: File.basename(yaml_file_path, '.yml'), lab_path: lab_name, desc: lab.desc || '' }
 
+    # --- BULLETPROOF LINKS PARSER ---
+    raw_links = []
+    if base_lab.topology.is_a?(Array) && base_lab.topology.first.is_a?(Hash)
+      raw_links = base_lab.topology.first['links'] || []
+    elsif base_lab.topology.is_a?(Hash)
+      raw_links = base_lab.topology['links'] || []
+    end
+
+    info[:links] = raw_links.map do |l|
+      if l.is_a?(Array) && l.size == 2
+         n_a, i_a = l[0].split(':', 2)
+         n_b, i_b = l[1].split(':', 2)
+         { node_a: n_a, int_a: i_a, node_b: n_b, int_b: i_b, ep1: l[0], ep2: l[1] }
+      else
+         nil
+      end
+    end.compact
+    # --------------------------------
+
     # Images Map
     images = []
     images_map = {}
@@ -88,7 +108,21 @@ module ApplicationHelper
         if tv.is_a?(Hash)
           images_map[tk] = tv.keys
           tv.each do |kk, kv|
-            images << {type: tk, kind: kk, image: (kv && kv['image']) ? kv['image'] : 'N/A'}
+            if kv
+              # Grab any keys that aren't the standard three
+              core_keys = ['image', 'caps', 'env']
+              extras = kv.reject { |k, _| core_keys.include?(k) }
+              extras_yaml = extras.empty? ? "" : extras.to_yaml.sub("---\n", "").strip
+
+              images << {
+                type: tk, 
+                kind: kk, 
+                image: kv['image'] || 'N/A',
+                caps: kv['caps'] || [],
+                env: kv['env'] || [],
+                extras: extras_yaml
+              }
+            end
           end
         else
           images_map[tk] = []
@@ -97,6 +131,17 @@ module ApplicationHelper
     end
     info[:images] = images
     info[:images_map] = images_map
+
+    # --- BULK HEALTH CHECK (Lightning Fast) ---
+    # Fetch all running container names exactly ONCE, and ONLY if the lab is active!
+    active_containers = []
+    
+    if is_running
+      podman_running = `podman ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
+      docker_running = `docker ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
+      active_containers = (podman_running + docker_running).uniq
+    end
+    # ------------------------------------------
 
     # Nodes (With Diffing)
     nodes = []
@@ -111,17 +156,8 @@ module ApplicationHelper
           # If it's not in the base YAML, it was added AdHoc!
           is_adhoc = !base_nodes_list.include?(node.name)
 
-          # Real-time Podman / Docker Health Check
-          cmd = "/usr/bin/podman inspect -f '{{.State.Running}}' #{node.name} 2>&1"
-          raw_output = `#{cmd}`.strip
-          
-          # Fallback to docker if podman is missing entirely
-          if raw_output.include?("No such file") || raw_output.empty?
-            raw_output = `docker inspect -f '{{.State.Running}}' #{node.name} 2>/dev/null`.strip
-          end
-
-          # Bulletproof boolean check (ignores hidden characters/quotes)
-          container_running = raw_output.to_s.downcase.include?('true')
+          # Real-time Health Check (In-Memory Array Lookup)
+          container_running = active_containers.include?(node.name)
 
           node_info = {
             name: node.name,
@@ -181,7 +217,9 @@ module ApplicationHelper
               proto: p[2] || 'tcp',
               external_port: "#{vip}:#{p[0]}",
               internal_port: "#{rip || 'N/A'}:#{p[1]}",
-              adhoc: is_adhoc_dnat
+              adhoc: is_adhoc_dnat,
+              raw_ext: p[0],   # NEW
+              raw_int: p[1]    # NEW
             }
             exposed_ports << node_info
           end
@@ -195,6 +233,56 @@ module ApplicationHelper
     { error: "Error processing lab info: #{e.message}" }
   end
 
+  # Helper to automatically regenerate Topology Maps and Inventories ONLY if needed
+  def refresh_lab_visuals(lab_name, force: false)
+    begin
+      lock_dir = defined?(LOCK_DIR) ? LOCK_DIR : '/var/run/ctlabs'
+      runtime_path = File.join(lock_dir, "#{lab_name.gsub('/', '_')}.yml")
+      base_path = File.join(LABS_DIR, lab_name)
+      
+      # Intelligently decide whether to map the active runtime or the offline base YAML
+      is_running = Lab.running? && Lab.current_name == lab_name
+      actual_path = (is_running && File.file?(runtime_path)) ? runtime_path : base_path
+
+      # SMART CACHE CHECK
+      pubdir = '/srv/ctlabs-server/public'
+      topo_file = File.join(pubdir, 'topo.png')
+      tracker_file = File.join(pubdir, '.topo_tracker')
+      
+      needs_rebuild = force
+      
+      if !needs_rebuild
+        # 1. Did we choose a different lab from the dropdown?
+        last_drawn_lab = File.exist?(tracker_file) ? File.read(tracker_file).strip : ""
+        if last_drawn_lab != lab_name
+          needs_rebuild = true
+          
+        # 2. Was the YAML edited (via UI or CLI) since we last drew the map?
+        elsif File.exist?(topo_file) && File.exist?(actual_path)
+          needs_rebuild = true if File.mtime(actual_path) > File.mtime(topo_file)
+          
+        # 3. Are the images missing entirely?
+        else
+          needs_rebuild = true
+        end
+      end
+
+      # Skip heavy processing if nothing changed!
+      return unless needs_rebuild
+
+      # Generate visuals
+      lab = Lab.new(cfg: actual_path, log: LabLog.null)
+      lab.visualize
+      lab.inventory
+      
+      # Update the tracker file with the currently drawn lab
+      File.write(tracker_file, lab_name)
+      
+    rescue => e
+      puts "[Warning] Failed to generate visuals for #{lab_name}: #{e.message}"
+    end
+  end
+
   def render_lab_info_card(info_hash)
     template = %q(
 <% if info_hash[:error] %>
@@ -204,6 +292,9 @@ module ApplicationHelper
   </div>
 <% else %>
   <div class="w3-panel w3-round-large" style="background-color: #1e293b; padding: 20px;">
+    <div id="lab-running-state" data-is-running="<%= get_running_lab == info_hash[:lab_path] %>" style="display:none;"></div>
+    <div id="lab-dynamic-data" data-images-map="<%= ERB::Util.html_escape(info_hash[:images_map].to_json) %>" style="display:none;"></div>
+
     <div style="border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
       <h3 style="margin:0; font-weight: 600; color: #38bdf8;">
         <i class="fas fa-flask"></i> <%= info_hash[:lab_name] %>
@@ -212,335 +303,77 @@ module ApplicationHelper
     </div>
 
     <div class="w3-row-padding" style="margin: 0 -16px;">
+      
       <div class="w3-col s12 m6 l6">
-
+        
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
           <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
             <span><i class="fas fa-server"></i> Active Nodes</span>
+            <button type="button" onclick="window.openBaseNodeModal()" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;">
+              <i class="fas fa-plus"></i> Add Node
+            </button>
           </div>
           <div class="w3-padding">
             <table class="w3-table w3-striped w3-small" id="nodes_table">
               <thead>
                 <tr style="color: #94a3b8;">
                   <th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
-                  <th>Name</th>
-                  <th>Type</th>
-                  <th>Kind</th>
-                  <th>Image</th>
-                  <th style="text-align:right;">Actions</th>
+                  <th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th style="text-align:right;">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <% (info_hash[:nodes] || []).each do |node| %>
                   <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
-                    
                     <td style="text-align: center; vertical-align: middle;">
                       <% if node[:running] %>
-                        <span title="Running" style="color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);">
-                          <i class="fas fa-circle" style="font-size: 0.8em;"></i>
-                        </span>
+                        <span title="Running" style="color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);"><i class="fas fa-circle" style="font-size: 0.8em;"></i></span>
                       <% else %>
-                        <span title="Stopped / Missing" style="color: #ef4444; opacity: 0.7;">
-                          <i class="fas fa-circle" style="font-size: 0.8em;"></i>
-                        </span>
+                        <span title="Stopped / Missing" style="color: #ef4444; opacity: 0.7;"><i class="fas fa-circle" style="font-size: 0.8em;"></i></span>
                       <% end %>
                     </td>
-
                     <td>
                       <strong style="color: #38bdf8;"><%= node[:name] %></strong>
-                      <% if node[:adhoc] %>
-                        <span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span>
-                      <% end %>
+                      <% if node[:adhoc] %><span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span><% end %>
                     </td>
                     <td><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= node[:type] %></span></td>
                     <td><%= node[:kind] %></td>
                     <td style="color: #cbd5e1;"><%= node[:image] %></td>
-                    <td style="text-align:right;">
-                      <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;">
-                        <i class="fas fa-edit"></i> Edit
-                      </button>
+                    <td style="text-align:right; white-space: nowrap;">
+                      <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                      <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
                     </td>
                   </tr>
                 <% end %>
               </tbody>
             </table>
           </div>
-
-          <div class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2); text-align: center;">
-            <% if get_running_lab == info_hash[:lab_path] %>
-              <button onclick="window.openAddNodeModal('<%= info_hash[:lab_path] %>')" class="w3-button w3-blue w3-small w3-round">
-                <i class="fas fa-plus"></i> Add AdHoc Node
-              </button>
-            <% end %>
-          </div>
-        </div>
-
-        <div id="add-node-modal" class="w3-modal" style="z-index: 9999;">
-          <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-            <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-              <span onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-              <h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add AdHoc Node</h4>
-            </header>
-            
-            <form id="adhoc-node-form" onsubmit="window.submitAdhocNode(event)">
-              <div class="w3-container w3-padding">
-                <input type="hidden" name="lab_name" id="add-node-lab-name">
-                
-                <div class="w3-margin-bottom">
-                  <label style="font-size: 0.85em; color: #94a3b8;">Node Name</label>
-                  <input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
-                </div>
-
-                <div class="w3-row-padding" style="margin: 0 -8px;">
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Type</label>
-                    <select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value)" required>
-                      <option value="" disabled selected>-- Select Type --</option>
-                      <% (info_hash[:images_map] || {}).keys.each do |t| %>
-                        <option value="<%= t %>"><%= t %></option>
-                      <% end %>
-                    </select>
-                  </div>
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Kind</label>
-                    <select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
-                      <option value="" disabled selected>-- Select Kind --</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="w3-margin-bottom">
-                  <label style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (Data Network)</label>
-                  <select name="switch" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                    <option value="" selected>-- None (Mgmt Only) --</option>
-                    <% (info_hash[:switches] || []).each do |sw| %>
-                      <option value="<%= sw %>"><%= sw %></option>
-                    <% end %>
-                  </select>
-                </div>
-
-                <div class="w3-row-padding" style="margin: 0 -8px;">
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (Optional)</label>
-                    <input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Default Gateway (Optional)</label>
-                    <input type="text" name="gw" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                </div>
-
-                <div id="adhoc-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
-              </div>
-              <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-                <button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-                <button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-play"></i> Start Node</button>
-              </footer>
-            </form>
-          </div>
-        </div>
-
-        <div id="node-editor-modal" class="w3-modal" style="z-index: 9999;">
-          <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
-            <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-              <span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-              <h4 style="margin: 0;"><i class="fas fa-edit"></i> Configure Node: <span id="editor-node-name" style="color: #38bdf8;"></span></h4>
-            </header>
-
-            <div class="w3-container w3-padding">
-              <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
-                <i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong>. They will <u>not</u> modify the original YAML file. Shut down the lab to clear changes.
-              </div>
-
-              <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #475569;">
-                <button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic Form</b></button>
-                <button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button>
-              </div>
-
-              <div id="FormEdit" class="editor-tab">
-                <div class="w3-row-padding" style="margin: 0 -8px;">
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Type</label>
-                    <select id="edit-type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                      <option value="host">host</option>
-                      <option value="router">router</option>
-                      <option value="switch">switch</option>
-                      <option value="controller">controller</option>
-                      <option value="gateway">gateway</option>
-                    </select>
-                  </div>
-                  <div class="w3-col m6 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Kind</label>
-                    <input type="text" id="edit-kind" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Gateway (gw)</label>
-                    <input type="text" id="edit-gw" class="w3-input w3-small w3-round" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label>
-                    <textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea>
-                  </div>
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label>
-                    <input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
-                    <input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-                  </div>
-                  <div class="w3-col m12 w3-margin-bottom">
-                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs</label>
-                    <p style="font-size: 0.75em; color: #64748b; margin: 0 0 4px 0;">Format: <code>Title|https://link.com</code> (One per line)</p>
-                    <textarea id="edit-urls" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="Flashcards|https://quizlet.com/...&#10;Walkthrough|https://docs.local/..."></textarea>
-                  </div>
-                </div> </div> <div id="YamlEdit" class="editor-tab" style="display:none">
-                <textarea id="node-yaml-editor" class="w3-input w3-round w3-small" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; height: 250px; resize: vertical; white-space: pre;"></textarea>
-              </div>
-
-              <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-            </div> <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-              <button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-              <button type="button" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save Override</button>
-            </footer>
-          </div>
+          <% if get_running_lab == info_hash[:lab_path] %>
+            <div class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2); text-align: center;">
+              <button onclick="window.openAddNodeModal('<%= info_hash[:lab_path] %>')" class="w3-button w3-blue w3-small w3-round"><i class="fas fa-plus"></i> Add AdHoc Node</button>
+            </div>
+          <% end %>
         </div>
 
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
           <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-            <span><i class="fas fa-code-branch"></i> Ansible Playbook Configuration</span>
-            <div>
-              <% if get_running_lab == info_hash[:lab_path] %>
-                <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;">
-                  <i class="fas fa-edit"></i> Edit
-                </button>
-                
-                <% if info_hash[:ansible][:playbook] != 'N/A' %>
-                  <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) %>
-                  <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
-                    <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
-                  </button>
-                <% end %>
-              <% end %>
-            </div>
-          </div>
-          <div class="w3-padding w3-small">
-            <table class="w3-table">
-              <tr>
-                <td style="color: #94a3b8; width: 120px;">Playbook:</td>
-                <td><code style="background-color: #1e293b; padding: 2px 6px;"><%= info_hash[:ansible][:playbook] %></code></td>
-              </tr>
-              <tr>
-                <td style="color: #94a3b8;">Environment:</td>
-                <td>
-                  <% (info_hash[:ansible][:environment] || []).each do |e| %>
-                    <div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div>
-                  <% end %>
-                </td>
-              </tr>
-              <tr>
-                <td style="color: #94a3b8;">Tags:</td>
-                <td>
-                  <% (info_hash[:ansible][:tags] || []).each do |t| %>
-                    <span class="w3-badge w3-tiny w3-round" style="background-color: #10b981; margin-right: 4px;"><%= t %></span>
-                  <% end %>
-                </td>
-              </tr>
-            </table>
-          </div>
-        </div>
-
-        <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
-          <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-            <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-              <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-              <h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4>
-            </header>
-
-            <div class="w3-container w3-padding">
-              <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
-                <i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong> for the current run.
-              </div>
-
-              <div class="w3-margin-bottom">
-                <label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label>
-                <input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-              </div>
-
-              <div class="w3-margin-bottom">
-                <label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label>
-                <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-              </div>
-
-              <div class="w3-margin-bottom">
-                <label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label>
-                <textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea>
-              </div>
-
-              <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-            </div>
-
-            <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-              <button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-              <button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
-            </footer>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="w3-col s12 m6 l6">
-
-        <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
-          <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500;">
-            <i class="fas fa-box-open"></i> Defined Images
+            <span><i class="fas fa-box-open"></i> Defined Images</span>
+            <button type="button" onclick="window.openImageEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add</button>
           </div>
           <div class="w3-padding">
             <% if (info_hash[:images] || []).empty? %>
               <p style="color: #94a3b8; font-style: italic;">No images defined</p>
             <% else %>
               <table class="w3-table w3-striped w3-small">
-                <thead>
-                  <tr style="color: #94a3b8;"><th>Type</th><th>Kind</th><th>Image Reference</th></tr>
-                </thead>
+                <thead><tr style="color: #94a3b8;"><th>Type</th><th>Kind</th><th>Image Reference</th><th></th></tr></thead>
                 <tbody>
                   <% (info_hash[:images] || []).each do |img| %>
                     <tr>
-                      <td><%= img[:type] %></td>
+                      <td><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:type] %></span></td>
                       <td><%= img[:kind] %></td>
                       <td style="color: #cbd5e1;"><%= img[:image] %></td>
-                    </tr>
-                  <% end %>
-                </tbody>
-              </table>
-            <% end %>
-          </div>
-        </div>
-
-        <div class="w3-card w3-round-large" style="background-color: #0f172a; overflow:hidden;">
-          <div class="w3-padding" style="background-color: #b91c1c; color: #fff; font-weight: 500;">
-            <i class="fas fa-network-wired"></i> Exposed Ports (DNAT)
-          </div>
-          <div class="w3-padding">
-            <% if (info_hash[:exposed_ports] || []).empty? %>
-              <p style="color: #94a3b8; font-style: italic;">No ports exposed</p>
-            <% else %>
-              <table id="dnat_table" class="w3-table w3-striped w3-small">
-                <thead>
-                  <tr style="color: #94a3b8;"><th>Node</th><th>Proto</th><th>Forwarding Rule</th></tr>
-                </thead>
-                <tbody>
-                  <% (info_hash[:exposed_ports] || []).each do |port| %>
-                    <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if port[:adhoc] %>">
-                      <td><strong><%= port[:node] %></strong></td>
-                      <td><span class="w3-badge w3-tiny" style="background: #475569;"><%= port[:proto].upcase %></span></td>
-                      <td>
-                        <code style="color: #10b981;"><%= port[:external_port] %></code>
-                        <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i>
-                        <code style="color: #38bdf8;"><%= port[:internal_port] %></code>
-                        <% if port[:adhoc] %>
-                          <span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span>
-                        <% end %>
+                      <td style="text-align:right; white-space: nowrap;">
+                        <button type="button" onclick="window.editImageConfig('<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                        <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
                       </td>
                     </tr>
                   <% end %>
@@ -548,340 +381,215 @@ module ApplicationHelper
               </table>
             <% end %>
           </div>
+        </div>
+      </div>
 
-          <div id="me" class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2);">
-            <% if get_running_lab == info_hash[:lab_path] %>
-              <h6 style="color: #94a3b8; font-weight: 600; margin-top: 0;"><i class="fas fa-plus"></i> Add AdHoc DNAT Rule</h6>
-              <form id="adhoc-dnat-form" onsubmit="window.submitAdhocDnat(event)" class="w3-row-padding" style="margin:0 -8px;">
-                <input type="hidden" name="lab_name" value="<%= info_hash[:lab_path] %>">
-                <div class="w3-col s12 m4 l4 w3-margin-bottom" style="padding:0 4px;">
-                  <select name="node" class="w3-select w3-small" required>
-                    <option value="" disabled selected>-- Node --</option>
-                    <% (info_hash[:nodes] || []).each do |n| %>
-                      <% if n[:type] == 'host' || n[:type] == 'controller' %>
-                        <option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option>
-                      <% end %>
-                    <% end %>
-                  </select>
-                </div>
-                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;">
-                  <input type="number" name="external_port" placeholder="Ext Port" min="1" max="65535" class="w3-input w3-small" required>
-                </div>
-                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;">
-                  <input type="number" name="internal_port" placeholder="Int Port" min="1" max="65535" class="w3-input w3-small" required>
-                </div>
-                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;">
-                  <select name="protocol" class="w3-select w3-small">
-                    <option value="tcp">TCP</option>
-                    <option value="udp">UDP</option>
-                  </select>
-                </div>
-                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;">
-                  <button type="submit" class="w3-button w3-blue w3-small w3-block"><i class="fas fa-plus"></i> Add</button>
-                </div>
-              </form>
-              <div id="adhoc-dnat-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
-            <% end %>
+      <div class="w3-col s12 m6 l6">
+        
+        <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+          <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-code-branch"></i> Ansible Playbook</span>
+            <div>
+              <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+              <% if get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
+                <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) %>
+                <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
+                  <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
+                </button>
+              <% end %>
+            </div>
+          </div>
+          <div class="w3-padding w3-small">
+            <table class="w3-table">
+              <tr><td style="color: #94a3b8; width: 120px;">Playbook:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= info_hash[:ansible][:playbook] %></code></td></tr>
+              <tr><td style="color: #94a3b8;">Environment:</td><td><% (info_hash[:ansible][:environment] || []).each do |e| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div><% end %></td></tr>
+              <tr><td style="color: #94a3b8;">Tags:</td><td><% (info_hash[:ansible][:tags] || []).each do |t| %><span class="w3-badge w3-tiny w3-round" style="background-color: #10b981; margin-right: 4px;"><%= t %></span><% end %></td></tr>
+            </table>
           </div>
         </div>
 
+        <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+          <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500;"><i class="fas fa-network-wired w3-text-red"></i> Exposed Ports (DNAT)</div>
+          <div class="w3-padding">
+            <% if (info_hash[:exposed_ports] || []).empty? %>
+              <p style="color: #94a3b8; font-style: italic;">No ports exposed</p>
+            <% else %>
+              <table id="dnat_table" class="w3-table w3-striped w3-small">
+                <thead><tr style="color: #94a3b8;"><th>Node</th><th>Proto</th><th>Forwarding Rule</th><th></th></tr></thead>
+                <tbody>
+                  <% (info_hash[:exposed_ports] || []).each do |port| %>
+                    <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if port[:adhoc] %>">
+                      <td><strong><%= port[:node] %></strong></td>
+                      <td><span class="w3-badge w3-tiny" style="background: #475569;"><%= port[:proto].upcase %></span></td>
+                      <td><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code><% if port[:adhoc] %> <span style="color:#f59e0b; font-size:0.75em; font-weight: bold;">(adhoc)</span><% end %></td>
+                      <td style="text-align:right; white-space: nowrap;"><button type="button" onclick="window.deleteDnat('<%= info_hash[:lab_path] %>', '<%= port[:node] %>', '<%= port[:raw_ext] %>', '<%= port[:raw_int] %>', '<%= port[:proto] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button></td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          </div>
+          <% if get_running_lab == info_hash[:lab_path] %>
+            <div class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2);">
+              <h6 style="color: #94a3b8; font-weight: 600; margin-top: 0;"><i class="fas fa-plus"></i> Add AdHoc DNAT Rule</h6>
+              <form id="adhoc-dnat-form" onsubmit="window.submitAdhocDnat(event)" class="w3-row-padding" style="margin:0 -8px;">
+                <input type="hidden" name="lab_name" value="<%= info_hash[:lab_path] %>">
+                <div class="w3-col s12 m4 l4 w3-margin-bottom" style="padding:0 4px;"><select name="node" class="w3-select w3-small" required><option value="" disabled selected>-- Node --</option><% (info_hash[:nodes] || []).each do |n| %><% if n[:type] == 'host' || n[:type] == 'controller' %><option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option><% end %><% end %></select></div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="external_port" placeholder="Ext" min="1" max="65535" class="w3-input w3-small" required></div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="internal_port" placeholder="Int" min="1" max="65535" class="w3-input w3-small" required></div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><select name="protocol" class="w3-select w3-small"><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
+                <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><button type="submit" class="w3-button w3-blue w3-small w3-block"><i class="fas fa-plus"></i> Add</button></div>
+              </form>
+              <div id="adhoc-dnat-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+          <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-project-diagram w3-text-green"></i> Network Links</span>
+            <button type="button" onclick="window.openLinkEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Link</button>
+          </div>
+          <div class="w3-padding">
+            <% if (info_hash[:links] || []).empty? %>
+              <p style="color: #94a3b8; font-style: italic;">No links defined</p>
+            <% else %>
+              <table class="w3-table w3-striped w3-small">
+                <thead><tr style="color: #94a3b8;"><th>Endpoint A</th><th>Endpoint B</th><th style="text-align:right;">Actions</th></tr></thead>
+                <tbody>
+                  <% info_hash[:links].each do |l| %>
+                    <tr>
+                      <td><strong style="color: #38bdf8;"><%= l[:node_a] %></strong> <span style="color: #64748b;">[<%= l[:int_a] %>]</span></td>
+                      <td><strong style="color: #38bdf8;"><%= l[:node_b] %></strong> <span style="color: #64748b;">[<%= l[:int_b] %>]</span></td>
+                      <td style="text-align:right; white-space: nowrap;">
+                        <button type="button" onclick="window.editLinkConfig('<%= info_hash[:lab_path] %>', '<%= l[:node_a] %>', '<%= l[:int_a] %>', '<%= l[:node_b] %>', '<%= l[:int_b] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Link" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                        <button type="button" onclick="window.deleteLink('<%= info_hash[:lab_path] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Link" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                      </td>
+                    </tr>
+                  <% end %>
+                </tbody>
+              </table>
+            <% end %>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    window.labImagesMap = <%= info_hash[:images_map].to_json %>;
+  <div id="add-node-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+        <span onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+        <h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add AdHoc Node</h4>
+      </header>
+      <form id="adhoc-node-form" onsubmit="window.submitAdhocNode(event)">
+        <div class="w3-container w3-padding">
+          <input type="hidden" name="lab_name" id="add-node-lab-name">
+          <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required></div>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value)" required><option value="" disabled selected>-- Select Type --</option><% (info_hash[:images_map] || {}).keys.each do |t| %><option value="<%= t %>"><%= t %></option><% end %></select></div>
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required><option value="" disabled selected>-- Select Kind --</option></select></div>
+          </div>
+          <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (Data Network)</label><select name="switch" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="" selected>-- None (Mgmt Only) --</option><% (info_hash[:switches] || []).each do |sw| %><option value="<%= sw %>"><%= sw %></option><% end %></select></div>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (Optional)</label><input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Default Gateway (Optional)</label><input type="text" name="gw" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+          </div>
+          <div id="adhoc-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+        </div>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-play"></i> Start Node</button></footer>
+      </form>
+    </div>
+  </div>
 
-    if (!window.ctlabsListenersAttached) {
-      window.ctlabsListenersAttached = true;
-      
-      window.submitAdhocDnat = async function(e) {
-        e.preventDefault();
-        const form = e.target;
-        const formData = new FormData(form);
-        const labName = formData.get('lab_name');
-        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-        const url = `/labs/${safeLab}/dnat`;
+  <div id="node-editor-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-edit"></i> Configure Node: <span id="editor-node-name" style="color: #38bdf8;"></span></h4></header>
+      <div class="w3-container w3-padding">
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;"><i class="fas fa-info-circle"></i> If the lab is running, edits apply as an <strong>override</strong>. If stopped, they save permanently to the <strong>base YAML</strong>.</div>
+        <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #475569;"><button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic Form</b></button><button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button></div>
+        <div id="FormEdit" class="editor-tab">
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select id="edit-type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="host">host</option><option value="router">router</option><option value="switch">switch</option><option value="controller">controller</option><option value="gateway">gateway</option></select></div>
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><input type="text" id="edit-kind" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Gateway (gw)</label><input type="text" id="edit-gw" class="w3-input w3-small w3-round" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label><textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label><input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label><textarea id="edit-urls" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="Flashcards|https://quizlet.com/...&#10;Walkthrough|https://docs.local/..."></textarea></div>
+          </div>
+        </div>
+        <div id="YamlEdit" class="editor-tab" style="display:none"><textarea id="node-yaml-editor" class="w3-input w3-round w3-small" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 250px; resize: vertical; white-space: pre;"></textarea></div>
+        <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
+      </div>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save Override</button></footer>
+    </div>
+  </div>
 
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams(formData).toString()
-        });
+  <div id="builder-node-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('builder-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span><h4 style="margin: 0;"><i class="fas fa-server"></i> Add Node to Topology</h4></header>
+      <div class="w3-container w3-padding">
+        <label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" id="builder-node-name" class="w3-input w3-small w3-round w3-margin-bottom" placeholder="e.g. h1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        <label style="font-size: 0.85em; color: #94a3b8;">Type</label><select id="builder-node-type" class="w3-select w3-small w3-round w3-margin-bottom" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="host">host</option><option value="router">router</option><option value="switch">switch</option></select>
+        <label style="font-size: 0.85em; color: #94a3b8;">Kind</label><input type="text" id="builder-node-kind" class="w3-input w3-small w3-round" placeholder="e.g. linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+      </div>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('builder-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveBuilderNode('<%= info_hash[:lab_path] %>')" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+    </div>
+  </div>
 
-        const resultDiv = document.getElementById('adhoc-dnat-result');
+  <div id="image-editor-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-box-open"></i> Add/Edit Image</h4></header>
+      <div class="w3-container w3-padding">
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Node Type & Kind</label>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6" style="padding: 0 8px;"><input type="text" id="edit-img-type" class="w3-input w3-small w3-round" placeholder="host, router..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col s6" style="padding: 0 8px;"><input type="text" id="edit-img-kind" class="w3-input w3-small w3-round" placeholder="linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+          </div>
+        </div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Image Reference</label><input type="text" id="edit-img-ref" class="w3-input w3-small w3-round" placeholder="ctlabs/c9/base" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Capabilities (caps) - Comma separated</label><input type="text" id="edit-img-caps" class="w3-input w3-small w3-round" placeholder="SYS_PTRACE, IPC_LOCK" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (env) - One per line</label><textarea id="edit-img-env" class="w3-input w3-small w3-round" rows="2" placeholder="VAR=value" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Extra Attributes (YAML formatting)</label><textarea id="edit-img-extras" class="w3-input w3-small w3-round" rows="3" placeholder="ports: 18&#10;privileged: true" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
+        <div id="image-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
+      </div>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+    </div>
+  </div>
 
-        if (res.ok) {
-          const data = await res.json();
-          resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '✅ ' + data.message;
-          setTimeout(() => location.reload(), 1200);
-        } else {
-          const err = await res.json().catch(() => ({error: 'Unknown error'}));
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + (err.error || 'Failed');
-        }
-      };
-      
-      window.submitAdhocNode = async function(e) {
-        e.preventDefault();
-        const form = e.target;
-        const formData = new FormData(form);
-        const labName = formData.get('lab_name');
-        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-        const url = `/labs/${safeLab}/node`;
+  <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4></header>
+      <div class="w3-container w3-padding">
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;"><i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong> for the current run.</div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label><input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label><input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label><textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea></div>
+        <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
+      </div>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+    </div>
+  </div>
 
-        const resultDiv = document.getElementById('adhoc-node-result');
-        const btn = form.querySelector('button[type="submit"]');
-        let originalBtnHTML = '';
-        if (btn) {
-           originalBtnHTML = btn.innerHTML;
-           btn.disabled = true;
-           btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-        }
-
-        try {
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(formData).toString()
-          });
-
-          const data = await res.json();
-          if (res.ok) {
-            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-            resultDiv.textContent = '✅ ' + data.message + ' (Reloading...)';
-            setTimeout(() => location.reload(), 1200);
-          } else {
-            throw new Error(data.error || 'Failed to start node');
-          }
-        } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + err.message;
-          if (btn) {
-             btn.disabled = false;
-             btn.innerHTML = originalBtnHTML;
-          }
-        }
-      };
-
-      window.runAnsiblePlaybook = async function(event, labName) {
-        const btn = event.currentTarget;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-        btn.classList.replace('w3-green', 'w3-grey');
-
-        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-        const url = `/labs/${safeLab}/playbook`;
-
-        try {
-          const res = await fetch(url, { method: 'POST' });
-          const data = await res.json();
-          if (res.ok) {
-            window.location.href = '/logs/current';
-          } else {
-            alert("Error: " + (data.error || 'Failed to start playbook'));
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
-            btn.classList.replace('w3-grey', 'w3-green');
-          }
-        } catch (err) {
-          alert("Error: " + err.message);
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
-          btn.classList.replace('w3-grey', 'w3-green');
-        }
-      };
-
-      window.openAnsibleEditor = async function(labName) {
-        window.currentEditLab = labName;
-        document.getElementById('ansible-editor-result').style.display = 'none';
-
-        try {
-          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          // Fetch the ansible node directly to get its current play config
-          const res = await fetch(`/labs/${safeLab}/node/ansible`);
-          if (!res.ok) throw new Error("Could not fetch ansible node configuration");
-          const data = await res.json();
-
-          let play = data.json.play || {};
-          
-          if (typeof play === 'string') {
-            document.getElementById('edit-ansible-book').value = play;
-            document.getElementById('edit-ansible-tags').value = '';
-            document.getElementById('edit-ansible-env').value = '';
-          } else {
-            document.getElementById('edit-ansible-book').value = play.book || '';
-            document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
-            document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
-          }
-
-          document.getElementById('ansible-editor-modal').style.display = 'block';
-        } catch (err) {
-          alert("Error: " + err.message);
-        }
-      };
-
-      window.saveAnsibleConfig = async function() {
-        const resultDiv = document.getElementById('ansible-editor-result');
-        const formData = new URLSearchParams();
-
-        formData.append('book', document.getElementById('edit-ansible-book').value);
-        formData.append('tags', document.getElementById('edit-ansible-tags').value);
-        formData.append('env', document.getElementById('edit-ansible-env').value);
-
-        const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
-
-        try {
-          const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-          });
-
-          const data = await res.json();
-          if (res.ok) {
-            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-            resultDiv.textContent = '✅ ' + data.message + ' (Reloading...)';
-            setTimeout(() => location.reload(), 1200);
-          } else {
-            throw new Error(data.error || 'Failed to save configuration');
-          }
-        } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + err.message;
-        }
-      };
-
-      window.openAddNodeModal = function(labPath) {
-        document.getElementById('add-node-lab-name').value = labPath;
-        document.getElementById('adhoc-node-form').reset();
-        document.getElementById('add-node-kind').innerHTML = '<option value="" disabled selected>-- Select Kind --</option>';
-        document.getElementById('adhoc-node-result').style.display = 'none';
-        document.getElementById('add-node-modal').style.display = 'block';
-      };
-
-      window.updateKindOptions = function(type) {
-        const kindSelect = document.getElementById('add-node-kind');
-        kindSelect.innerHTML = '<option value="" disabled selected>-- Select Kind --</option>';
-        const kinds = window.labImagesMap[type] || [];
-        kinds.forEach(k => {
-          kindSelect.innerHTML += `<option value="${k}">${k}</option>`;
-        });
-      };
-
-      window.currentEditNode = '';
-      window.currentEditLab = '';
-
-      window.openEditorTab = function(evt, tabName) {
-        var i, x, tablinks;
-        x = document.getElementsByClassName("editor-tab");
-        for (i = 0; i < x.length; i++) {
-          x[i].style.display = "none";
-        }
-        tablinks = document.getElementsByClassName("editor-tablink");
-        for (i = 0; i < tablinks.length; i++) {
-          tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
-        }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " w3-text-blue";
-      };
-
-      window.editNodeConfig = async function(labName, nodeName) {
-        window.currentEditLab = labName;
-        window.currentEditNode = nodeName;
-        document.getElementById('editor-node-name').textContent = nodeName;
-        document.getElementById('node-editor-result').style.display = 'none';
-
-        try {
-          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
-          if (!res.ok) throw new Error("HTTP Status " + res.status);
-          const data = await res.json();
-
-          document.getElementById('node-yaml-editor').value = data.yaml;
-
-          if(data.json) {
-             document.getElementById('edit-type').value = data.json.type || 'host';
-             document.getElementById('edit-kind').value = data.json.kind || '';
-             document.getElementById('edit-gw').value = data.json.gw || '';
-             
-             // NEW: Load Info field
-             document.getElementById('edit-info').value = data.json.info || '';
-             document.getElementById('edit-term').value = data.json.term || '';
-
-             // Load NICs
-             let nicsStr = '';
-             if (data.json.nics) {
-                for (const [key, value] of Object.entries(data.json.nics)) {
-                   nicsStr += `${key}=${value}\n`;
-                }
-             }
-             document.getElementById('edit-nics').value = nicsStr.trim();
-
-             // NEW: Load URLs Hash and convert to multi-line string format
-             let urlStr = '';
-             if (data.json.urls && typeof data.json.urls === 'object') {
-                for (const [title, link] of Object.entries(data.json.urls)) {
-                   urlStr += `${title}|${link}\n`;
-                }
-             }
-             document.getElementById('edit-urls').value = urlStr.trim();
-          }
-
-          document.getElementById('defaultTab').click();
-          document.getElementById('node-editor-modal').style.display = 'block';
-        } catch (err) {
-          alert("Failed to load node configuration. " + err.message);
-        }
-      };
-
-      window.saveNodeConfig = async function() {
-        const resultDiv = document.getElementById('node-editor-result');
-        const formData = new URLSearchParams();
-
-        const isYaml = document.getElementById('YamlEdit').style.display === 'block';
-
-        if (isYaml) {
-           formData.append('format', 'yaml');
-           formData.append('yaml_data', document.getElementById('node-yaml-editor').value);
-        } else {
-           formData.append('format', 'form');
-           formData.append('type', document.getElementById('edit-type').value);
-           formData.append('kind', document.getElementById('edit-kind').value);
-           formData.append('gw', document.getElementById('edit-gw').value);
-           formData.append('nics', document.getElementById('edit-nics').value);
-           
-           // NEW: Append the info and urls data from our new HTML fields!
-           formData.append('info', document.getElementById('edit-info').value);
-           formData.append('urls_text', document.getElementById('edit-urls').value);
-           formData.append('term', document.getElementById('edit-term').value);
-        }
-
-        const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
-
-        try {
-          const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(window.currentEditNode)}/edit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString()
-          });
-
-          const data = await res.json();
-          if (res.ok) {
-            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-            resultDiv.textContent = '✅ ' + data.message + ' (Reloading view...)';
-            setTimeout(() => location.reload(), 1200);
-          } else {
-            throw new Error(data.error || 'Failed to save configuration');
-          }
-        } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + err.message;
-        }
-      };
-    }
-  </script>
+  <div id="link-editor-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span><h4 style="margin: 0;"><i class="fas fa-project-diagram"></i> Configure Network Link</h4></header>
+      <div class="w3-container w3-padding">
+        <input type="hidden" id="edit-link-old-ep1"><input type="hidden" id="edit-link-old-ep2">
+        <div class="w3-row-padding" style="margin: 0 -8px;">
+          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node A</label><input type="text" id="edit-link-node-a" class="w3-input w3-small w3-round" placeholder="e.g. h1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface A</label><input type="text" id="edit-link-int-a" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        </div>
+        <div class="w3-row-padding" style="margin: 0 -8px;">
+          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node B</label><input type="text" id="edit-link-node-b" class="w3-input w3-small w3-round" placeholder="e.g. sw1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface B</label><input type="text" id="edit-link-int-b" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        </div>
+      </div>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveLinkConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+    </div>
+  </div>
 <% end %>
 )
 
@@ -896,4 +604,5 @@ module ApplicationHelper
     end
     result
   end
+
 end

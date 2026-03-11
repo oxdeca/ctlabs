@@ -178,12 +178,7 @@ get '/labs' do
   @selected_lab = get_running_lab || session[:selected_lab] || (@labs.first if @labs.any?)
   session[:adhoc_dnat_rules] ||= {}
 
-  # Parse info for the selected lab
-  @lab_info = nil
-  if @selected_lab && @labs.include?(@selected_lab)
-    lab_file_path = File.join(LABS_DIR, @selected_lab)
-    @lab_info = parse_lab_info(lab_file_path)
-  end
+  # (DELETED THE @lab_info = parse_lab_info(...) BLOCK ENTIRELY)
 
   # In /labs route
   running = get_running_lab
@@ -198,47 +193,6 @@ get '/labs' do
   end
 
   erb :labs
-end
-
-# Helper to regenerate Graphs with AdHoc nodes injected in memory
-def visualize_with_adhoc(lab_name)
-  lab_file_path = File.join(LABS_DIR, lab_name)
-  lab = Lab.new(cfg: lab_file_path, log: LabLog.null)
-  safe_lab = lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')
-  
-  adhoc_nodes_file = "#{LOCK_DIR}/adhoc_nodes_#{safe_lab}.json"
-  if File.file?(adhoc_nodes_file)
-    adhoc_nodes = JSON.parse(File.read(adhoc_nodes_file), symbolize_names: true)
-    
-    # Inject into raw @cfg so get_topology sees it
-    cfg = lab.instance_variable_get(:@cfg)
-    cfg['topology'][0]['nodes'] ||= {}
-    
-    adhoc_nodes.each do |an|
-      cfg['topology'][0]['nodes'][an[:name].to_s] = an[:raw_cfg] || { 'type' => an[:type].to_s, 'kind' => an[:kind].to_s }
-      
-      existing = lab.nodes.find { |n| n.name == an[:name].to_s }
-      if existing
-        existing.instance_variable_set(:@type, an[:type].to_s)
-      else
-        node = Node.new({ 'name' => an[:name].to_s, 'defaults' => lab.defaults, 'log' => LabLog.null }.merge(an[:raw_cfg] || {}))
-        lab.nodes << node
-        lab.links << ["#{an[:switch]}:eth_adhoc", "#{an[:name]}:eth1"] if an[:switch] && !an[:switch].to_s.empty?
-      end
-    end
-  end
-  
-  adhoc_dnat_file = "#{LOCK_DIR}/adhoc_dnat_#{safe_lab}.json"
-  if File.file?(adhoc_dnat_file)
-     JSON.parse(File.read(adhoc_dnat_file), symbolize_names: true).each do |rule|
-        if n = lab.nodes.find { |node| node.name == rule[:node].to_s }
-           n.instance_variable_set(:@dnat, []) if n.dnat.nil?
-           n.dnat << [rule[:external_port].split(':').last, rule[:internal_port].split(':').last, rule[:proto]]
-        end
-     end
-  end
-
-  lab.visualize
 end
 
 # Helper to resolve lab file path
@@ -279,6 +233,9 @@ def write_formatted_yaml(path, data)
   File.write(path, yaml_str)
 end
 
+# ---------------------------------------------------
+# DNAT
+# ---------------------------------------------------
 post '/labs/*/dnat' do
   lab_name = params[:splat].first
   halt 400, "AdHoc DNAT only allowed on the running lab" unless get_running_lab == lab_name
@@ -296,12 +253,64 @@ post '/labs/*/dnat' do
     # Save beautifully formatted YAML
     write_formatted_yaml(lab_path, data)
 
-    # Re-instantiate to natively redraw graphs with the new rule
-    updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
-    updated_lab.visualize 
-
     content_type :json
     { success: true, message: "AdHoc DNAT rule added" }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# Delete a DNAT Rule
+post '/labs/*/dnat/delete' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    node = params[:node]
+    dnat_rules = yaml['topology'][0]['nodes'][node]['dnat'] rescue nil
+    
+    if dnat_rules
+      dnat_rules.reject! do |r| 
+        r[0].to_s == params[:ext].to_s && r[1].to_s == params[:int].to_s && (r[2] || 'tcp').to_s == params[:proto].to_s
+      end
+      yaml['topology'][0]['nodes'][node].delete('dnat') if dnat_rules.empty?
+      write_formatted_yaml(lab_path, yaml)
+    end
+    { success: true, message: "DNAT rule deleted." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ---------------------------------------------------
+# NODES
+# ---------------------------------------------------
+
+# Add a New Node to the Base YAML
+post '/labs/*/node/new' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path) || {}
+    node_name = params[:node_name].strip
+    
+    raise "Node name is required." if node_name.empty?
+    
+    # Bulletproof YAML path generation
+    yaml['topology'] ||= [{}]
+    yaml['topology'][0] ||= {}
+    yaml['topology'][0]['nodes'] ||= {}
+    
+    raise "Node '#{node_name}' already exists!" if yaml['topology'][0]['nodes'].key?(node_name)
+
+    yaml['topology'][0]['nodes'][node_name] = {
+      'type' => params[:type],
+      'kind' => params[:kind]
+    }
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
   rescue => e
     status 400
     { success: false, error: e.message }.to_json
@@ -346,11 +355,6 @@ post '/labs/*/node' do
     
     write_formatted_yaml(lab_path, data)
     
-    # Re-instantiate from the updated YAML file to natively update inventory & graphs!
-    updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
-    updated_lab.visualize
-    updated_lab.inventory
-
     content_type :json
     { success: true, message: "AdHoc Node '#{node_name}' started" }.to_json
   rescue => e
@@ -427,13 +431,6 @@ post '/labs/*/node/:node_name/edit' do
     full_yaml['topology'][0]['nodes'][node_name] = new_cfg
     write_formatted_yaml(lab_path, full_yaml)
 
-    if running_lab? && get_running_lab == lab_name
-      # Re-instantiate from the updated YAML file to natively update inventory & graphs!
-      updated_lab = Lab.new(cfg: lab_path, log: LabLog.null)
-      updated_lab.visualize
-      updated_lab.inventory
-    end
-
     content_type :json
     { success: true, message: "Node configuration saved." }.to_json
   rescue => e
@@ -442,6 +439,95 @@ post '/labs/*/node/:node_name/edit' do
   end
 end
 
+# Delete a Node, Stop the Container, and Clean up Dangling Links
+post '/labs/*/node/:node_name/delete' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+  
+  begin
+    # 1. Stop the live container if the lab is running
+    if Lab.running? && Lab.current_name == lab_name
+      lab = Lab.new(cfg: lab_path, log: LabLog.null)
+      target_node = lab.find_node(node_name)
+      target_node.stop if target_node
+    end
+
+    # 2. Remove the node from the YAML
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['nodes'].delete(node_name)
+
+    # 3. SCRUB ORPHANED LINKS: Remove any links connected to this node!
+    yaml['topology'][0]['links']&.reject! do |l|
+      l.is_a?(Array) && (l[0].start_with?("#{node_name}:") || l[1].start_with?("#{node_name}:"))
+    end
+
+    # 4. Save the file (This updates the timestamp, which triggers the visual Smart Cache on reload!)
+    write_formatted_yaml(lab_path, yaml)
+    
+    { success: true, message: "Node deleted and orphaned links removed." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ---------------------------------------------------
+# LINKS
+# ---------------------------------------------------
+# Add or Edit a Network Link
+post '/labs/*/link/save' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['links'] ||= []
+
+    ep1 = "#{params[:node_a]}:#{params[:int_a]}"
+    ep2 = "#{params[:node_b]}:#{params[:int_b]}"
+    
+    # Native Format: ["h1:eth1", "sw1:eth1"]
+    new_link = [ep1, ep2]
+
+    if params[:old_ep1] && params[:old_ep2] && !params[:old_ep1].empty?
+      # Update Existing Link
+      idx = yaml['topology'][0]['links'].find_index do |l|
+        l.is_a?(Array) && l.include?(params[:old_ep1]) && l.include?(params[:old_ep2])
+      end
+      idx ? (yaml['topology'][0]['links'][idx] = new_link) : (yaml['topology'][0]['links'] << new_link)
+    else
+      # Add New Link
+      yaml['topology'][0]['links'] << new_link
+    end
+
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Link saved successfully." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# Delete a Network Link
+post '/labs/*/link/delete' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['links']&.reject! do |l|
+      l.is_a?(Array) && l.include?(params[:ep1]) && l.include?(params[:ep2])
+    end
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Link deleted." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ---------------------------------------------------
+# ANSIBLE
+# ---------------------------------------------------
 # Edit Ansible Playbook Configuration
 post '/labs/*/ansible/edit' do
   lab_name = params[:splat].first
@@ -509,6 +595,239 @@ post '/labs/*/playbook' do
   { success: true }.to_json
 end
 
+# ---------------------------------------------------
+# IMAGES
+# ---------------------------------------------------
+# Add or Edit a Defined Image
+post '/labs/*/image/edit' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path) || {}
+    full_yaml['defaults'] ||= {}
+    
+    type = params[:type].to_s.strip
+    kind = params[:kind].to_s.strip
+    
+    raise "Type and Kind are required." if type.empty? || kind.empty?
+
+    full_yaml['defaults'][type] ||= {}
+    img_cfg = full_yaml['defaults'][type][kind] || {}
+    
+    img_cfg['image'] = params[:image].strip unless params[:image].to_s.strip.empty?
+
+    # Parse capabilities
+    params[:caps].to_s.strip.empty? ? img_cfg.delete('caps') : img_cfg['caps'] = params[:caps].split(',').map(&:strip)
+    
+    # Parse environment variables
+    if params[:env] && !params[:env].strip.empty?
+      img_cfg['env'] = params[:env].split("\n").map(&:strip).reject(&:empty?)
+    else
+      img_cfg.delete('env')
+    end
+
+    # Process Extra Arbitrary Attributes (ports, privileged, etc.)
+    # 1. Clean out old extra keys first
+    core_keys = ['image', 'caps', 'env']
+    img_cfg.keys.each { |k| img_cfg.delete(k) unless core_keys.include?(k) }
+    
+    # 2. Safely merge the new ones
+    if params[:extra_attrs] && !params[:extra_attrs].strip.empty?
+      parsed_extras = YAML.safe_load(params[:extra_attrs])
+      img_cfg.merge!(parsed_extras) if parsed_extras.is_a?(Hash)
+    end
+
+    full_yaml['defaults'][type][kind] = img_cfg
+    write_formatted_yaml(lab_path, full_yaml)
+
+    content_type :json
+    { success: true, message: "Image configuration saved." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# Delete an Image
+post '/labs/*/image/:type/:kind/delete' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    yaml['defaults'][params[:type]].delete(params[:kind]) rescue nil
+    yaml['defaults'].delete(params[:type]) if yaml['defaults'][params[:type]]&.empty?
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Image deleted." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ---------------------------------------------------
+# LABS
+# ---------------------------------------------------
+
+# Create a Brand New Lab YAML with the Default Base Environment
+post '/labs/new' do
+  lab_name = params[:lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/]/, '') # sanitize
+  desc = params[:desc].to_s.strip
+  
+  lab_name += '.yml' unless lab_name.end_with?('.yml')
+  lab_path = File.join(LABS_DIR, lab_name)
+
+  if File.exist?(lab_path)
+    halt 400, "A lab with that filename already exists!"
+  end
+
+  FileUtils.mkdir_p(File.dirname(lab_path))
+  
+  # Base name without the .yml extension
+  base_name = File.basename(lab_name, '.yml')
+
+  # Use a Heredoc to perfectly preserve spacing, alignment, and arrays!
+  default_yaml = <<~YAML
+    # -----------------------------------------------------------------------------
+    # File        : ctlabs/labs/#{lab_name}
+    # Description : #{desc}
+    # -----------------------------------------------------------------------------
+
+    name: #{base_name}
+    desc: #{desc}
+
+    defaults:
+      controller:
+        linux:
+          image: ctlabs/c9/ctrl
+      switch:
+        mgmt:
+          image: ctlabs/c9/ctrl
+          ports: 16
+        linux:
+          image: ctlabs/c9/base
+          ports: 6
+      host:
+        linux:
+          image: ctlabs/c9/base
+        db2:
+          image: ctlabs/misc/db2
+          caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
+        cbeaver:
+          image: ctlabs/misc/cbeaver
+        d12:
+          image: ctlabs/d12/base
+        kali:
+          image: ctlabs/kali/base
+        parrot:
+          image: ctlabs/parrot/base
+        slapd:
+          image: ctlabs/d12/base
+          caps: [SYS_PTRACE]
+      router:
+        frr:
+          image: ctlabs/c9/frr
+          caps : [SYS_NICE,NET_BIND_SERVICE]
+        mgmt:
+          image: ctlabs/c9/frr
+          caps : [SYS_NICE,NET_BIND_SERVICE]
+
+    topology:
+      - name: #{base_name}-vm1
+        dns : [192.168.10.11, 192.168.10.12, 8.8.8.8]
+        mgmt:
+          vrfid : 99
+          dns   : [1.1.1.1, 8.8.8.8]
+          net   : 192.168.99.0/24
+          gw    : 192.168.99.1
+        nodes:
+          ansible :
+            type : controller
+            gw   : 192.168.99.1
+            nics :
+              eth0: 192.168.99.3/24
+            vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+            play: 
+              book: ctlabs.yml
+              tags: [up, setup, ca, bind, jupyter, smbadc, slapd, sssd]
+            dnat :
+              - [9988, 8888]
+          sw0:
+            type  : switch
+            kind  : mgmt
+            ipv4  : 192.168.99.11/24
+            gw    : 192.168.99.1
+          ro0:
+            type : router
+            kind : mgmt
+            gw   : 192.168.15.1
+            nics :
+              eth0: 192.168.99.1/24
+              eth1: 192.168.15.2/29
+          natgw:
+            type : gateway
+            ipv4 : 192.168.15.1/29
+            snat : true
+            dnat : ro1:eth1
+          sw1:
+            type : switch
+          sw2:
+            type : switch
+          sw3:
+            type : switch
+          ro1:
+            type : router
+            kind : frr
+            gw   : 192.168.15.1
+            nics :
+              eth1: 192.168.15.3/29
+              eth2: 192.168.10.1/24
+              eth3: 192.168.20.1/24
+              eth4: 192.168.30.1/24
+        links: []
+  YAML
+
+  File.write(lab_path, default_yaml)
+  redirect '/labs' # Refresh the page to show the new lab in the dropdown
+end
+
+# Save Current Lab (Base or Runtime) as a New File
+post '/labs/*/save_as' do
+  lab_name = params[:splat].first
+  new_lab_name = params[:new_lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/]/, '')
+  new_desc = params[:new_desc].to_s.strip
+  
+  halt 400, { success: false, error: "New lab name is required" }.to_json if new_lab_name.empty?
+  
+  new_lab_name += '.yml' unless new_lab_name.end_with?('.yml')
+  new_lab_path = File.join(LABS_DIR, new_lab_name)
+  
+  if File.exist?(new_lab_path)
+    halt 400, { success: false, error: "A lab with that filename already exists!" }.to_json
+  end
+  
+  begin
+    # get_lab_file_path automatically grabs the runtime lock file if the lab is currently running!
+    source_path = get_lab_file_path(lab_name)
+    yaml = YAML.load_file(source_path) || {}
+    
+    # Update the internal metadata for the new lab
+    base_name = File.basename(new_lab_name, '.yml')
+    yaml['name'] = base_name
+    yaml['desc'] = new_desc unless new_desc.empty?
+    
+    # Ensure the target directory exists (e.g. custom/my_new_lab.yml)
+    FileUtils.mkdir_p(File.dirname(new_lab_path))
+    
+    write_formatted_yaml(new_lab_path, yaml)
+    
+    { success: true, message: "Lab saved as #{new_lab_name}", new_lab: new_lab_name }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
 post '/labs/execute' do
   action = params[:action]
   halt 400, "Invalid action" unless %w[up down].include?(action)
@@ -538,8 +857,6 @@ post '/labs/execute' do
       if action == 'up'
         FileUtils.cp(source_path, runtime_path)
         lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
-        lab_instance.visualize
-        lab_instance.inventory
         lab_instance.up
         log.info "--- Lab #{lab_name} UP completed ---"
 
