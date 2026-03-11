@@ -96,6 +96,24 @@ get '/config' do
   erb :config
 end
 
+# Download the active runtime YAML configuration
+get '/labs/download' do
+  lab_name = params[:lab]
+  
+  # Try to grab the active runtime file first
+  runtime_path = File.join(LOCK_DIR, "#{lab_name.gsub('/', '_')}.yml")
+  
+  # Fallback to the base lab file if it's not currently running
+  file_path = File.file?(runtime_path) ? runtime_path : File.join(LABS_DIR, lab_name)
+
+  if File.file?(file_path)
+    # Send the file as a downloadable attachment
+    send_file file_path, :filename => "custom_#{File.basename(lab_name)}", :type => 'application/x-yaml'
+  else
+    halt 404, "Configuration file not found."
+  end
+end
+
 get '/demo' do
   erb :demo
 end
@@ -377,11 +395,31 @@ post '/labs/*/node/:node_name/edit' do
       params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
       params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
       
+      # NEW: Process the Info field
+      params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]
+      params[:term].to_s.empty? ? new_cfg.delete('term') : new_cfg['term'] = params[:term]
+
       if params[:nics] && !params[:nics].strip.empty?
         new_cfg['nics'] = params[:nics].split("\n").map { |l| l.split('=').map(&:strip) }.to_h.reject { |k,v| k.nil? || v.nil? }
       else
         new_cfg.delete('nics')
       end
+
+      # NEW: Process the Custom URLs Textarea
+      if params[:urls_text] && !params[:urls_text].strip.empty?
+        urls_hash = {}
+        params[:urls_text].split("\n").each do |line|
+          title, link = line.split('|', 2)
+          # Only add if both a title and a link exist on the line
+          if title && !title.strip.empty? && link && !link.strip.empty?
+            urls_hash[title.strip] = link.strip 
+          end
+        end
+        new_cfg['urls'] = urls_hash unless urls_hash.empty?
+      else
+        new_cfg.delete('urls')
+      end
+
     else
       new_cfg = YAML.safe_load(params[:yaml_data])
     end

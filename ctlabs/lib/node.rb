@@ -1,4 +1,3 @@
-
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/node.rb
 # Description : node class; describes the container
@@ -8,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term
   attr_writer :nics
 
   def initialize(args)
@@ -38,6 +37,9 @@ class Node
     @mtu       = args['mtu'  ]     || 1460
     @priv      = args['priv' ]     || false
     @devs      = args['devs' ]     || []
+    @info      = args[:info  ]     || args['info' ]
+    @urls      = args[:urls  ]     || args['urls' ]
+    @term      = args[:term  ]     || args['term' ]
 
     dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols      = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]

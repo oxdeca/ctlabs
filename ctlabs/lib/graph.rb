@@ -38,10 +38,43 @@ class Graph
     ]
   end
 
+#  # Helper method to dynamically generate interactive hover info
+#  def build_tooltip(node)
+#    tt = ["#{node.name.upcase}  [ #{node.type.capitalize} ]"]
+#    tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
+#    
+#    tt << "🌐 IPv4: #{node.ipv4}" unless node.ipv4.to_s.empty?
+#    
+#    if node.nics && !node.nics.empty?
+#      tt << "🔌 Interfaces:"
+#      node.nics.each do |k, v| 
+#        next if v.to_s.strip.empty?
+#        tt << "   ▪ #{k}  ➔  #{v}"
+#      end
+#    end
+#    
+#    if node.dnat && !node.dnat.empty?
+#      tt << "🔀 Port Forwarding:"
+#      if node.dnat.is_a?(Array)
+#        node.dnat.each { |d| tt << "   ▪ Ext:#{d[0]}  ➔  Int:#{d[1]} (#{d[2] || 'tcp'})" }
+#      elsif node.dnat.is_a?(String)
+#        tt << "   ▪ Target ➔  #{node.dnat}"
+#      end
+#    end
+#    
+#    # Use HTML newline entity which correctly renders in SVG titles
+#    tt.join('&#10;')
+#  end
+
   # Helper method to dynamically generate interactive hover info
   def build_tooltip(node)
     tt = ["#{node.name.upcase}  [ #{node.type.capitalize} ]"]
     tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    if node.respond_to?(:info) && node.info && !node.info.empty?
+      tt << "ℹ️ #{node.info}"
+      tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
+    end
     
     tt << "🌐 IPv4: #{node.ipv4}" unless node.ipv4.to_s.empty?
     
@@ -60,6 +93,34 @@ class Graph
       elsif node.dnat.is_a?(String)
         tt << "   ▪ Target ➔  #{node.dnat}"
       end
+    end
+
+    # =========================================================
+    # HIDDEN CONTEXT MENU LINKS
+    # These will be extracted by JS and put into the Right-Click menu
+    # =========================================================
+    
+    # 1. Automatically generate a web link for every DNAT array rule
+    if node.dnat && node.dnat.is_a?(Array)
+      server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
+      node.dnat.each do |d|
+        tt << "[LINK:Web Interface (Port #{d[0]})|https://#{server_ip}:#{d[0]}]"
+      end
+    end
+
+    # 2. Support arbitrary custom URLs from your YAML config!
+    # If you add `urls: {"Flashcards": "https://...", "Walkthrough": "..."}` to a node's YAML
+    if node.respond_to?(:urls) && node.urls.is_a?(Hash)
+      node.urls.each do |title, url|
+        tt << "[LINK:#{title}|#{url}]"
+      end
+    end
+
+    if node.respond_to?(:term) && node.term && !node.term.empty?
+      tt << "[TERM:#{node.term}]"
+    elsif node.ipv4 && !node.ipv4.to_s.empty?
+      # Fallback: automatically generate an SSH link using the node's IP!
+      tt << "[TERM:ssh://root@#{node.ipv4}]"
     end
     
     # Use HTML newline entity which correctly renders in SVG titles

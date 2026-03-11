@@ -11,7 +11,6 @@
 <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
 
 <style>
-  /* Sleek, floating custom tooltip */
   #custom-html-tooltip {
     position: fixed;
     display: none;
@@ -28,6 +27,38 @@
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
     white-space: pre-wrap;
     backdrop-filter: blur(4px);
+  }
+
+  /* Right-Click Context Menu */
+  #custom-context-menu {
+    position: fixed;
+    display: none;
+    background: #0f172a;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
+    z-index: 10002;
+    min-width: 180px;
+    overflow: hidden;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-size: 13px;
+  }
+  .context-menu-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: background 0.2s;
+  }
+  .context-menu-item:hover {
+    background: #1e293b;
+    color: #38bdf8;
+  }
+  .context-menu-item i {
+    width: 16px;
+    text-align: center;
   }
 </style>
 
@@ -56,11 +87,12 @@
   window.panZoomData = null;
   window.panZoomMgmt = null;
 
-  // Tooltip Engine
+  // Tooltip & Context Menu Engine
   function attachCustomTooltips(svgObject) {
     const svgDoc = svgObject.contentDocument;
     if (!svgDoc) return;
 
+    // Setup Tooltip Div
     let tooltip = document.getElementById('custom-html-tooltip');
     if (!tooltip) {
       tooltip = document.createElement('div');
@@ -68,16 +100,26 @@
       document.body.appendChild(tooltip);
     }
 
-    // 1. Scrub ALL native <title> tags from the entire SVG to kill OS tooltips
+    // Setup Context Menu Div
+    let contextMenu = document.getElementById('custom-context-menu');
+    if (!contextMenu) {
+      contextMenu = document.createElement('div');
+      contextMenu.id = 'custom-context-menu';
+      document.body.appendChild(contextMenu);
+      
+      document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+    }
+    svgDoc.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+    // 1. Scrub ALL native <title> tags from the entire SVG
     const allTitles = svgDoc.querySelectorAll('title');
     allTitles.forEach(t => {
       const text = t.textContent.trim();
       const parent = t.parentElement;
-      // Only cache the text if it's our detailed node tooltip (contains '[')
       if (text && text.includes('[')) {
         parent.setAttribute('data-custom-tooltip', text);
       }
-      t.remove(); // Annihilate the tag immediately
+      t.remove(); 
     });
 
     // 2. Scrub ALL title attributes from links/nodes
@@ -89,17 +131,37 @@
           if (text && text.includes('[')) {
             el.setAttribute('data-custom-tooltip', text);
           }
-          el.removeAttribute(attr); // Destroy the native attribute
+          el.removeAttribute(attr); 
         }
       });
     });
 
-    // 3. Attach our custom lightning-fast hover events
+    // 3. Attach hover & Right-Click events
     const interactiveElements = svgDoc.querySelectorAll('[data-custom-tooltip]');
     interactiveElements.forEach(el => {
       const rawText = el.getAttribute('data-custom-tooltip');
-      const formattedText = rawText.replace(/&#10;/g, '<br>').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+      
+      // -- NEW: Extract Custom Links from Hidden Tags --
+      const linkRegex = /\[LINK:(.+?)\|(.+?)\]/g;
+      const customLinks = [];
+      let match;
+      while ((match = linkRegex.exec(rawText)) !== null) {
+        customLinks.push({ title: match[1], url: match[2] });
+      }
 
+      // NEW: Extract Terminal Link
+      const termRegex = /\[TERM:(.+?)\]/g;
+      let termMatch = termRegex.exec(rawText);
+      let termLink = termMatch ? termMatch[1] : null;
+      
+      // Strip the tags from the visual text so they don't show up in the hover box
+      let cleanText = rawText.replace(/\[LINK:.+?\|.+?\](&#10;)?/g, '').trim();
+      const formattedText = cleanText.replace(/&#10;/g, '<br>').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+
+      // Change cursor to indicate interactivity
+      el.style.cursor = 'pointer';
+
+      // Hover Tooltip Events
       el.addEventListener('mouseenter', (e) => {
         tooltip.innerHTML = formattedText;
         tooltip.style.display = 'block';
@@ -114,25 +176,58 @@
       el.addEventListener('mouseleave', () => {
         tooltip.style.display = 'none';
       });
+
+      // RIGHT-CLICK Context Menu Event
+      el.addEventListener('contextmenu', (e) => {
+        e.preventDefault(); 
+        tooltip.style.display = 'none'; 
+
+        let menuHtml = '';
+        
+        // Add dynamic extracted links first
+        customLinks.forEach(link => {
+          menuHtml += `<div class="context-menu-item" onclick="window.open('${link.url}', '_blank')"><i class="fas fa-external-link-alt"></i> ${link.title}</div>`;
+        });
+
+        // Add native href fallback if it exists and wasn't caught by the regex
+        let linkElement = el.tagName.toLowerCase() === 'a' ? el : el.querySelector('a');
+        let href = linkElement ? (linkElement.getAttribute('href') || linkElement.getAttribute('xlink:href')) : null;
+        if (href && href !== "" && !customLinks.some(l => l.url === href)) {
+          menuHtml += `<div class="context-menu-item" onclick="window.open('${href}', '_blank')"><i class="fas fa-external-link-alt"></i> Open Web Interface</div>`;
+        }
+
+        // Standard Utility Actions
+        const safeText = cleanText.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n").replace(/&#10;/g, "\\n");
+        menuHtml += `<div class="context-menu-item" onclick="navigator.clipboard.writeText('${safeText.replace(/<br>/g, '\\n')}'); alert('Node details copied to clipboard!');"><i class="fas fa-copy"></i> Copy Node Info</div>`;
+
+        if (termLink) {
+          // Using target="_self" so ssh:// links open smoothly via the OS handler without leaving a blank browser tab
+          menuHtml += `<div class="context-menu-item" onclick="window.open('${termLink}', '_self')"><i class="fas fa-terminal"></i> Connect via SSH</div>`;
+        }
+
+        contextMenu.innerHTML = menuHtml;
+
+        const rect = svgObject.getBoundingClientRect();
+        contextMenu.style.left = (e.clientX + rect.left) + 'px';
+        contextMenu.style.top = (e.clientY + rect.top) + 'px';
+        contextMenu.style.display = 'block';
+      });
     });
-    
-    // 4. Style the SVG Pan/Zoom controls to match the dark theme!
+
+    // 4. Style the SVG Pan/Zoom controls
     let customStyle = svgDoc.getElementById('custom-dark-controls');
     if (!customStyle) {
       customStyle = svgDoc.createElementNS("http://www.w3.org/2000/svg", "style");
       customStyle.id = 'custom-dark-controls';
       customStyle.textContent = `
-        /* Dark slate background for the buttons */
         #svg-pan-zoom-controls rect { fill: #1e293b !important; fill-opacity: 0.95 !important; stroke: #334155; stroke-width: 1px; }
-        /* Bright white icons */
         #svg-pan-zoom-controls path { fill: #f8fafc !important; }
-        /* Hover effects */
         #svg-pan-zoom-controls g:hover rect { fill: #334155 !important; cursor: pointer; }
         #svg-pan-zoom-controls g:hover path { fill: #38bdf8 !important; }
       `;
       svgDoc.documentElement.appendChild(customStyle);
     }
-  }
+  } 
 
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('con-obj').addEventListener('load', function() {
@@ -166,3 +261,4 @@
 
 <%= SCRIPT %>
 <%= FOOTER %>
+

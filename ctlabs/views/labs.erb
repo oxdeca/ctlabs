@@ -51,14 +51,31 @@
     </select>
     <br/>
     <button type="submit" name="action" value="up" class="w3-button w3-green w3-round" <%= 'disabled' if running %>> ▶ Start Lab </button>
-    <button type="submit" name="action" value="down" class="w3-button w3-red w3-round"> ⏹ Stop Lab </button>
+    
+    <% if running %>
+      <button type="submit" name="action" value="down" class="w3-button w3-red w3-round"> ⏹ Stop Lab </button>
+    <% else %>
+      <button type="button" class="w3-button w3-red w3-round w3-opacity" onclick="document.getElementById('not-running-alert').style.display='block'"> ⏹ Stop Lab </button>
+    <% end %>
   </form>
 
+  <div id="not-running-alert" class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-margin-top w3-round" style="display: none; position: relative; padding: 12px;">
+    <span onclick="this.parentElement.style.display='none'" class="w3-button w3-display-topright w3-hover-yellow w3-round">&times;</span>
+    <strong style="color: #854d0e;"><i class="fas fa-info-circle"></i> No Action Needed:</strong> 
+    <span style="color: #3f3f46;">There is currently no active lab environment running to stop.</span>
+  </div>
+
   <% if running %>
-    <div class="w3-panel w3-orange w3-margin-top" style="padding:8px;">
+    <div class="w3-panel w3-orange w3-margin-top w3-round" style="padding:12px;">
       <strong>⚠️ A lab is already running:</strong>
       <code><%= get_running_lab || 'unknown' %></code>
       <br>Please stop it before starting another.
+      
+      <div style="margin-top: 10px;">
+        <a href="/labs/download?lab=<%= ERB::Util.url_encode(get_running_lab) %>" class="w3-button w3-black w3-round-small">
+          <i class="fas fa-download"></i> Download Runtime Config (YAML)
+        </a>
+      </div>
     </div>
   <% end %>
 </div>

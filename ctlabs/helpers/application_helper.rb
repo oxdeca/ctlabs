@@ -313,7 +313,7 @@ module ApplicationHelper
               <span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
               <h4 style="margin: 0;"><i class="fas fa-edit"></i> Configure Node: <span id="editor-node-name" style="color: #38bdf8;"></span></h4>
             </header>
-            
+
             <div class="w3-container w3-padding">
               <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
                 <i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong>. They will <u>not</u> modify the original YAML file. Shut down the lab to clear changes.
@@ -348,17 +348,27 @@ module ApplicationHelper
                     <label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label>
                     <textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea>
                   </div>
-                </div>
-              </div>
 
-              <div id="YamlEdit" class="editor-tab" style="display:none">
+                  <div class="w3-col m12 w3-margin-bottom">
+                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
+                    <input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+                  </div>
+
+                  <div class="w3-col m12 w3-margin-bottom">
+                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label>
+                    <input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+                  </div>
+                  <div class="w3-col m12 w3-margin-bottom">
+                    <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs</label>
+                    <p style="font-size: 0.75em; color: #64748b; margin: 0 0 4px 0;">Format: <code>Title|https://link.com</code> (One per line)</p>
+                    <textarea id="edit-urls" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; resize: vertical;" rows="3" placeholder="Flashcards|https://quizlet.com/...&#10;Walkthrough|https://docs.local/..."></textarea>
+                  </div>
+                </div> </div> <div id="YamlEdit" class="editor-tab" style="display:none">
                 <textarea id="node-yaml-editor" class="w3-input w3-round w3-small" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: 'Courier New', Courier, monospace !important; height: 250px; resize: vertical; white-space: pre;"></textarea>
               </div>
 
               <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-            </div>
-
-            <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+            </div> <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
               <button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
               <button type="button" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save Override</button>
             </footer>
@@ -652,13 +662,19 @@ module ApplicationHelper
           const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
           if (!res.ok) throw new Error("HTTP Status " + res.status);
           const data = await res.json();
-          
+
           document.getElementById('node-yaml-editor').value = data.yaml;
-          
+
           if(data.json) {
              document.getElementById('edit-type').value = data.json.type || 'host';
              document.getElementById('edit-kind').value = data.json.kind || '';
              document.getElementById('edit-gw').value = data.json.gw || '';
+             
+             // NEW: Load Info field
+             document.getElementById('edit-info').value = data.json.info || '';
+             document.getElementById('edit-term').value = data.json.term || '';
+
+             // Load NICs
              let nicsStr = '';
              if (data.json.nics) {
                 for (const [key, value] of Object.entries(data.json.nics)) {
@@ -666,6 +682,15 @@ module ApplicationHelper
                 }
              }
              document.getElementById('edit-nics').value = nicsStr.trim();
+
+             // NEW: Load URLs Hash and convert to multi-line string format
+             let urlStr = '';
+             if (data.json.urls && typeof data.json.urls === 'object') {
+                for (const [title, link] of Object.entries(data.json.urls)) {
+                   urlStr += `${title}|${link}\n`;
+                }
+             }
+             document.getElementById('edit-urls').value = urlStr.trim();
           }
 
           document.getElementById('defaultTab').click();
@@ -678,9 +703,9 @@ module ApplicationHelper
       window.saveNodeConfig = async function() {
         const resultDiv = document.getElementById('node-editor-result');
         const formData = new URLSearchParams();
-        
+
         const isYaml = document.getElementById('YamlEdit').style.display === 'block';
-        
+
         if (isYaml) {
            formData.append('format', 'yaml');
            formData.append('yaml_data', document.getElementById('node-yaml-editor').value);
@@ -690,8 +715,13 @@ module ApplicationHelper
            formData.append('kind', document.getElementById('edit-kind').value);
            formData.append('gw', document.getElementById('edit-gw').value);
            formData.append('nics', document.getElementById('edit-nics').value);
+           
+           // NEW: Append the info and urls data from our new HTML fields!
+           formData.append('info', document.getElementById('edit-info').value);
+           formData.append('urls_text', document.getElementById('edit-urls').value);
+           formData.append('term', document.getElementById('edit-term').value);
         }
-        
+
         const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
 
         try {
