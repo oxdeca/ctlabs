@@ -111,6 +111,18 @@ module ApplicationHelper
           # If it's not in the base YAML, it was added AdHoc!
           is_adhoc = !base_nodes_list.include?(node.name)
 
+          # Real-time Podman / Docker Health Check
+          cmd = "/usr/bin/podman inspect -f '{{.State.Running}}' #{node.name} 2>&1"
+          raw_output = `#{cmd}`.strip
+          
+          # Fallback to docker if podman is missing entirely
+          if raw_output.include?("No such file") || raw_output.empty?
+            raw_output = `docker inspect -f '{{.State.Running}}' #{node.name} 2>/dev/null`.strip
+          end
+
+          # Bulletproof boolean check (ignores hidden characters/quotes)
+          container_running = raw_output.to_s.downcase.include?('true')
+
           node_info = {
             name: node.name,
             type: node.type   || 'N/A',
@@ -118,7 +130,8 @@ module ApplicationHelper
             image: image_ref,
             cpus: 'N/A',
             memory: 'N/A',
-            adhoc: is_adhoc
+            adhoc: is_adhoc,
+            running: container_running
           }
           nodes << node_info
         end
@@ -208,11 +221,31 @@ module ApplicationHelper
           <div class="w3-padding">
             <table class="w3-table w3-striped w3-small" id="nodes_table">
               <thead>
-                <tr style="color: #94a3b8;"><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th style="text-align:right;">Actions</th></tr>
+                <tr style="color: #94a3b8;">
+                  <th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>Kind</th>
+                  <th>Image</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
               </thead>
               <tbody>
                 <% (info_hash[:nodes] || []).each do |node| %>
                   <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
+                    
+                    <td style="text-align: center; vertical-align: middle;">
+                      <% if node[:running] %>
+                        <span title="Running" style="color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);">
+                          <i class="fas fa-circle" style="font-size: 0.8em;"></i>
+                        </span>
+                      <% else %>
+                        <span title="Stopped / Missing" style="color: #ef4444; opacity: 0.7;">
+                          <i class="fas fa-circle" style="font-size: 0.8em;"></i>
+                        </span>
+                      <% end %>
+                    </td>
+
                     <td>
                       <strong style="color: #38bdf8;"><%= node[:name] %></strong>
                       <% if node[:adhoc] %>

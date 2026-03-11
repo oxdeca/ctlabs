@@ -229,15 +229,35 @@
     }
   } 
 
+  // --- NEW LAZY LOAD ENGINE FOR FIREFOX ---
+  let dataSvgReady = false;
+  let mgmtSvgReady = false;
+
+  function initDataMap() {
+    if (!window.panZoomData && dataSvgReady) {
+      const obj = document.getElementById('con-obj');
+      window.panZoomData = svgPanZoom(obj, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+      attachCustomTooltips(obj);
+    }
+  }
+
+  function initMgmtMap() {
+    if (!window.panZoomMgmt && mgmtSvgReady) {
+      const obj = document.getElementById('mgmt-con-obj');
+      window.panZoomMgmt = svgPanZoom(obj, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+      attachCustomTooltips(obj);
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('con-obj').addEventListener('load', function() {
-      window.panZoomData = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
-      attachCustomTooltips(this);
+      dataSvgReady = true;
+      if (document.getElementById('DataNet').style.display !== 'none') initDataMap();
     });
 
     document.getElementById('mgmt-con-obj').addEventListener('load', function() {
-      window.panZoomMgmt = svgPanZoom(this, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
-      attachCustomTooltips(this);
+      mgmtSvgReady = true;
+      if (document.getElementById('MgmtNet').style.display !== 'none') initMgmtMap();
     });
   });
 
@@ -251,14 +271,21 @@
     for (i = 0; i < tablinks.length; i++) {
       tablinks[i].className = tablinks[i].className.replace(" w3-blue", "");
     }
+    
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " w3-blue";
 
-    if (window.panZoomData) { window.panZoomData.resize(); window.panZoomData.fit(); window.panZoomData.center(); }
-    if (window.panZoomMgmt) { window.panZoomMgmt.resize(); window.panZoomMgmt.fit(); window.panZoomMgmt.center(); }
+    setTimeout(() => {
+      if (tabName === 'DataNet') {
+        initDataMap(); 
+        if (window.panZoomData) { window.panZoomData.resize(); window.panZoomData.fit(); window.panZoomData.center(); }
+      } else if (tabName === 'MgmtNet') {
+        initMgmtMap(); 
+        if (window.panZoomMgmt) { window.panZoomMgmt.resize(); window.panZoomMgmt.fit(); window.panZoomMgmt.center(); }
+      }
+    }, 50);
   }
 </script>
 
 <%= SCRIPT %>
 <%= FOOTER %>
-

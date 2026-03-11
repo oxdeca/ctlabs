@@ -96,48 +96,75 @@
 <br>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const lastLog = localStorage.getItem('ctlabs_last_log');
     const selectElement = document.getElementById('lab-selector');
     const infoSection = document.getElementById('lab-info-section');
+    let refreshTimer = null; // Holds our background heartbeat
 
-    if (lastLog && selectElement) {
-      try {
-        const { lab } = JSON.parse(lastLog);
-        if (Array.from(selectElement.options).some(opt => opt.value === lab)) {
-          selectElement.value = lab;
-          // Trigger change event to update info card if needed
-          // This might be redundant if the server already rendered the info,
-          // but ensures client-side update if selection changes externally.
-          selectElement.dispatchEvent(new Event('change'));
+    // Function to fetch and update the card
+    const fetchLabInfo = (selectedLab, isAutoRefresh = false) => {
+      
+      // SAFETY CHECK: Do not auto-refresh if the user is typing in a modal!
+      if (isAutoRefresh) {
+        const modals = ['add-node-modal', 'node-editor-modal', 'ansible-editor-modal'];
+        const isEditing = modals.some(id => {
+          const el = document.getElementById(id);
+          return el && el.style.display === 'block';
+        });
+        if (isEditing) return; // Skip this refresh tick so we don't interrupt them
+      } else {
+        // Only show the big loading spinner on a manual/initial load
+        infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue w3-round"><p><i class="fas fa-spinner fa-spin"></i> Loading lab info...</p></div>';
+      }
+
+      fetch(`/labs/${encodeURIComponent(selectedLab)}/info_card`)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return response.text(); 
+        })
+        .then(htmlFragment => {
+            infoSection.innerHTML = htmlFragment;
+        })
+        .catch(error => {
+            console.error('Error fetching lab info card:', error);
+            if (!isAutoRefresh) {
+              infoSection.innerHTML = '<div class="w3-panel w3-red w3-round"><h4><i class="fas fa-exclamation-triangle"></i> Error</h4><p>Could not load lab info.</p></div>';
+            }
+        });
+    };
+
+    if (selectElement) {
+      // 1. Recover the last selected lab from local storage
+      const savedLab = localStorage.getItem('ctlabs_last_selected_lab');
+      
+      if (savedLab && !selectElement.disabled) {
+        const exists = Array.from(selectElement.options).some(opt => opt.value === savedLab);
+        if (exists) selectElement.value = savedLab;
+      }
+
+      // 2. Setup the Dropdown Change Event
+      selectElement.addEventListener('change', function() {
+        const selectedLab = this.value;
+        if (selectedLab) {
+          localStorage.setItem('ctlabs_last_selected_lab', selectedLab);
+          
+          // Clear any existing timer when switching labs
+          if (refreshTimer) clearInterval(refreshTimer);
+          
+          // A) Fetch immediately with the loading spinner
+          fetchLabInfo(selectedLab, false);
+          
+          // B) Start the silent auto-refresh loop (Every 5 seconds)
+          refreshTimer = setInterval(() => {
+            fetchLabInfo(selectedLab, true);
+          }, 5000);
         }
-      } catch (e) {
-        console.warn('Failed to parse last log:', e);
+      });
+
+      // 3. Fire the change event immediately on page load
+      if (selectElement.value) {
+        selectElement.dispatchEvent(new Event('change'));
       }
     }
-    selectElement.addEventListener('change', function() {
-      const selectedLab = this.value;
-      if (selectedLab) {
-        // Show a loading message or spinner
-        infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue"><p>Loading lab info...</p></div>';
-    
-        // Fetch the new lab info card HTML via AJAX
-        fetch(`/labs/${encodeURIComponent(selectedLab)}/info_card`) // New route
-          .then(response => {
-              if (!response.ok) {
-                  throw new Error(`HTTP error! status: ${response.status}`);
-              }
-              return response.text(); // Get the HTML string
-          })
-          .then(htmlFragment => {
-              // Directly inject the rendered HTML
-              infoSection.innerHTML = htmlFragment;
-          })
-          .catch(error => {
-              console.error('Error fetching lab info card:', error);
-              infoSection.innerHTML = '<div class="w3-panel w3-red"><h4>Error</h4><p>Could not load lab info.</p></div>';
-          });
-      }
-    })
   });
 </script>
 <%= FOOTER %>
