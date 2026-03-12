@@ -1,0 +1,122 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/terminal.erb
+# Description : labs view
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Terminal: <%= @node_name %></title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Use Flexbox to dynamically fill the height */
+    body, html { 
+      margin: 0; padding: 0; height: 100%; 
+      background: #0f172a; color: #f8fafc; 
+      font-family: sans-serif; overflow: hidden; 
+      display: flex; flex-direction: column; 
+    }
+    
+    /* Header takes up exactly the space it needs and doesn't shrink */
+    #header { 
+      background: #1e293b; padding: 10px 20px; 
+      border-bottom: 1px solid #334155; 
+      display: flex; justify-content: space-between; align-items: center; 
+      flex-shrink: 0; 
+    }
+    
+    /* Terminal container grows to perfectly fill the rest of the window */
+    #terminal-container { 
+      width: 100%; flex-grow: 1; 
+      padding: 5px; box-sizing: border-box; 
+      overflow: hidden; 
+    }
+    
+    .status { color: #10b981; font-size: 0.9em; }
+    .status.disconnected { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
+    <span id="status" class="status"><i class="fas fa-circle"></i> Connecting...</span>
+  </div>
+  <div id="terminal-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script>
+    const term = new Terminal({
+      //theme: { background: '#0f172a', foreground: '#e2e8f0', cursor: '#38bdf8' },
+      theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(255, 255, 255, 0.3)' },
+      //theme: { background: '#282a36', foreground: '#f8f8f2', cursor: '#ff79c6', selectionBackground: 'rgba(68, 71, 90, 0.5)' },
+      fontFamily: '"Courier New", Courier, monospace',
+      cursorBlink: true,
+      fontSize: 14
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal-container'));
+    
+    // Give the popup window time to physically render before measuring!
+    setTimeout(() => {
+      fitAddon.fit();
+      // Send the initial dimensions to the server now that it's sized correctly
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      }
+    }, 100);
+
+    // Setup WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+    const wsUrl = protocol + window.location.host + '/terminal/<%= ERB::Util.url_encode(@node_name) %>';
+    const ws = new WebSocket(wsUrl);
+
+    const statusEl = document.getElementById('status');
+
+    ws.onopen = () => {
+      statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+      term.focus();
+      
+      // NEW: Send the initial terminal size to the server as soon as we connect
+    //  ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+    };
+
+    ws.onmessage = (event) => {
+      term.write(event.data);
+    };
+
+    ws.onclose = () => {
+      statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+      statusEl.classList.add('disconnected');
+      term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+    };
+
+    // MODIFIED: Wrap keystrokes in a JSON packet before sending
+    term.onData(data => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'input', data: data }));
+      }
+    });
+
+    // NEW: Listen for xterm.js resize events and tell the backend
+    term.onResize(size => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
+      }
+    });
+
+    // When the browser window resizes, trigger xterm's fitAddon
+    // (This automatically triggers the term.onResize event above!)
+    window.addEventListener('resize', () => { 
+      fitAddon.fit(); 
+    });
+  </script>
+</body>
+</html>

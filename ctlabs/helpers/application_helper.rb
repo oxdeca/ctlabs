@@ -176,6 +176,7 @@ module ApplicationHelper
 
     info[:nodes] = nodes
     info[:switches] = lab.nodes.select { |n| n.type == 'switch' }.map(&:name)
+    info[:gateways] = lab.nodes.map { |n| n.gw }.compact.reject { |g| g.to_s.strip.empty? }.uniq
 
     # Ansible
     ansible_info = { playbook: 'N/A', environment: [], tags: [], roles: [] }
@@ -283,7 +284,7 @@ module ApplicationHelper
     end
   end
 
-  def render_lab_info_card(info_hash)
+    def render_lab_info_card(info_hash)
     template = %q(
 <% if info_hash[:error] %>
   <div class="w3-panel w3-red w3-round-large">
@@ -296,40 +297,28 @@ module ApplicationHelper
     <div id="lab-dynamic-data" data-images-map="<%= ERB::Util.html_escape(info_hash[:images_map].to_json) %>" style="display:none;"></div>
 
     <div style="border-bottom: 1px solid #334155; padding-bottom: 15px; margin-bottom: 20px;">
-      <h3 style="margin:0; font-weight: 600; color: #38bdf8;">
-        <i class="fas fa-flask"></i> <%= info_hash[:lab_name] %>
-      </h3>
+      <h3 style="margin:0; font-weight: 600; color: #38bdf8;"><i class="fas fa-flask"></i> <%= info_hash[:lab_name] %></h3>
       <span style="color: #94a3b8; font-size: 0.95em;"><%= info_hash[:desc] %></span>
     </div>
 
     <div class="w3-row-padding" style="margin: 0 -16px;">
-      
       <div class="w3-col s12 m6 l6">
         
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
           <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
             <span><i class="fas fa-server"></i> Active Nodes</span>
-            <button type="button" onclick="window.openBaseNodeModal()" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;">
+            <button type="button" onclick="window.openAddNodeModal('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;">
               <i class="fas fa-plus"></i> Add Node
             </button>
           </div>
           <div class="w3-padding">
             <table class="w3-table w3-striped w3-small" id="nodes_table">
-              <thead>
-                <tr style="color: #94a3b8;">
-                  <th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
-                  <th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th style="text-align:right;">Actions</th>
-                </tr>
-              </thead>
+              <thead><tr style="color: #94a3b8;"><th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th><th>Name</th><th>Type</th><th>Kind</th><th>Image</th><th style="text-align:right;">Actions</th></tr></thead>
               <tbody>
                 <% (info_hash[:nodes] || []).each do |node| %>
                   <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
                     <td style="text-align: center; vertical-align: middle;">
-                      <% if node[:running] %>
-                        <span title="Running" style="color: #10b981; text-shadow: 0 0 8px rgba(16, 185, 129, 0.8);"><i class="fas fa-circle" style="font-size: 0.8em;"></i></span>
-                      <% else %>
-                        <span title="Stopped / Missing" style="color: #ef4444; opacity: 0.7;"><i class="fas fa-circle" style="font-size: 0.8em;"></i></span>
-                      <% end %>
+                      <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
                     </td>
                     <td>
                       <strong style="color: #38bdf8;"><%= node[:name] %></strong>
@@ -339,6 +328,8 @@ module ApplicationHelper
                     <td><%= node[:kind] %></td>
                     <td style="color: #cbd5e1;"><%= node[:image] %></td>
                     <td style="text-align:right; white-space: nowrap;">
+                      <button type="button" onclick="window.open('/terminal/<%= node[:name] %>', 'term_<%= node[:name] %>', 'width=850,height=550,resizable=yes,scrollbars=yes')" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now" style="padding: 2px 6px;"><i class="fas fa-terminal fa-lg"></i></button>
+
                       <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
                       <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
                     </td>
@@ -347,11 +338,6 @@ module ApplicationHelper
               </tbody>
             </table>
           </div>
-          <% if get_running_lab == info_hash[:lab_path] %>
-            <div class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2); text-align: center;">
-              <button onclick="window.openAddNodeModal('<%= info_hash[:lab_path] %>')" class="w3-button w3-blue w3-small w3-round"><i class="fas fa-plus"></i> Add AdHoc Node</button>
-            </div>
-          <% end %>
         </div>
 
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
@@ -477,27 +463,77 @@ module ApplicationHelper
   </div>
 
   <div id="add-node-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
       <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
         <span onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-        <h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add AdHoc Node</h4>
+        <h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add Node</h4>
       </header>
-      <form id="adhoc-node-form" onsubmit="window.submitAdhocNode(event)">
-        <div class="w3-container w3-padding">
+      <form id="add-node-form" onsubmit="window.submitCombinedNode(event)">
+        <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
           <input type="hidden" name="lab_name" id="add-node-lab-name">
-          <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required></div>
-          <div class="w3-row-padding" style="margin: 0 -8px;">
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value)" required><option value="" disabled selected>-- Select Type --</option><% (info_hash[:images_map] || {}).keys.each do |t| %><option value="<%= t %>"><%= t %></option><% end %></select></div>
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required><option value="" disabled selected>-- Select Kind --</option></select></div>
+          <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
+            <i class="fas fa-info-circle"></i> If the lab is running, the node will automatically boot. If stopped, it will be saved to the YAML.
           </div>
-          <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (Data Network)</label><select name="switch" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="" selected>-- None (Mgmt Only) --</option><% (info_hash[:switches] || []).each do |sw| %><option value="<%= sw %>"><%= sw %></option><% end %></select></div>
+
           <div class="w3-row-padding" style="margin: 0 -8px;">
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (Optional)</label><input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Default Gateway (Optional)</label><input type="text" name="gw" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Node Name</label>
+              <input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
+            </div>
+            <div class="w3-col m6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Type</label>
+              <select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value, 'add-node-kind')" required>
+                <option value="" disabled selected>-- Select Type --</option>
+                <% (info_hash[:images_map] || {}).keys.each do |t| %><option value="<%= t %>"><%= t %></option><% end %>
+              </select>
+            </div>
+            <div class="w3-col m6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Kind</label>
+              <select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
+                <option value="" disabled selected>-- Select Kind --</option>
+              </select>
+            </div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (eth1)</label>
+              <select name="switch" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+                <option value="" selected>-- None (Mgmt Only) --</option>
+                <% (info_hash[:switches] || []).each do |sw| %><option value="<%= sw %>"><%= sw %></option><% end %>
+              </select>
+            </div>
+            <div class="w3-col m6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (eth1)</label>
+              <input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col m6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Gateway (Select or Type Override)</label>
+              <input type="text" name="gw" list="gw-options" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              <datalist id="gw-options">
+                <% (info_hash[:gateways] || []).each do |g| %><option value="<%= g %>"><% end %>
+              </datalist>
+            </div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Additional NICs (key=val)</label>
+              <textarea name="nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="eth2=10.0.0.1/24"></textarea>
+            </div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label>
+              <input type="text" name="info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
+              <input type="text" name="term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col m12 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label>
+              <textarea name="urls_text" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="Walkthrough|https://docs.local/..."></textarea>
+            </div>
           </div>
-          <div id="adhoc-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+          <div id="add-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
         </div>
-        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-play"></i> Start Node</button></footer>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+          <button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+          <button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save Node</button>
+        </footer>
       </form>
     </div>
   </div>
@@ -515,7 +551,7 @@ module ApplicationHelper
             <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Gateway (gw)</label><input type="text" id="edit-gw" class="w3-input w3-small w3-round" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
             <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label><textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea></div>
             <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label><input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5 or https://tty.local" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
             <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label><textarea id="edit-urls" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="Flashcards|https://quizlet.com/...&#10;Walkthrough|https://docs.local/..."></textarea></div>
           </div>
         </div>
@@ -523,18 +559,6 @@ module ApplicationHelper
         <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
       </div>
       <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save Override</button></footer>
-    </div>
-  </div>
-
-  <div id="builder-node-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('builder-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span><h4 style="margin: 0;"><i class="fas fa-server"></i> Add Node to Topology</h4></header>
-      <div class="w3-container w3-padding">
-        <label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" id="builder-node-name" class="w3-input w3-small w3-round w3-margin-bottom" placeholder="e.g. h1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-        <label style="font-size: 0.85em; color: #94a3b8;">Type</label><select id="builder-node-type" class="w3-select w3-small w3-round w3-margin-bottom" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="host">host</option><option value="router">router</option><option value="switch">switch</option></select>
-        <label style="font-size: 0.85em; color: #94a3b8;">Kind</label><input type="text" id="builder-node-kind" class="w3-input w3-small w3-round" placeholder="e.g. linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('builder-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveBuilderNode('<%= info_hash[:lab_path] %>')" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
     </div>
   </div>
 
@@ -592,7 +616,7 @@ module ApplicationHelper
   </div>
 <% end %>
 )
-
+    
     erb_template = ERB.new(template)
     old_info_hash = instance_variable_get("@info_hash")
     instance_variable_set("@info_hash", info_hash)

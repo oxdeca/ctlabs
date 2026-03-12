@@ -35,8 +35,8 @@ It automates the setup and configuration of lab components, which are all run as
 **System Dependencies:**
 
 ```bash
-sh# dnf install git ruby graphviz ipvsadm make podman-docker qemu-img cloud-utils-growpart python3-pip tmux vim
-sh# gem install webrick sinatra rackup
+sh# dnf install git ruby graphviz ipvsadm make podman-docker qemu-img cloud-utils-growpart python3-pip tmux vim ruby-devel gcc make redhat-rpm-config
+sh# gem install webrick sinatra rackup faye-websocket puma
 ```
 
 _optional_

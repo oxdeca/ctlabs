@@ -9,13 +9,17 @@
 #require 'kramdown'
 #require 'kramdown-parser-gfm'
 require 'fileutils'
-require 'webrick'
+#require 'webrick'
+require 'openssl'
 require 'sinatra'
 require 'erb'
 require 'net/http'
 require 'shellwords'
 require 'set'
 require 'securerandom'
+require 'websocket/driver'
+require 'pty'
+require 'json'
 
 $LOAD_PATH.unshift File.join(File.dirname(__FILE__), 'lib')
 require 'lab'
@@ -26,18 +30,44 @@ require 'lablog'
 
 require_relative 'helpers/application_helper'
 
+class WSSocketWrapper
+  attr_reader :env
+  def initialize(env, io, mutex)
+    @env = env
+    @io = io
+    @mutex = mutex
+  end
+  def url
+    scheme = @env['rack.url_scheme'] == 'https' ? 'wss' : 'ws'
+    "#{scheme}://#{@env['HTTP_HOST']}#{@env['REQUEST_URI']}"
+  end
+  def write(data)
+    # Safely lock the SSL socket before writing!
+    @mutex.synchronize { @io.write(data) } rescue nil
+  end
+end
+
 # sinatra settings
 disable :logging
 enable  :sessions
+set     :server,            'webrick'
 set     :session_secret,     SecureRandom.hex(64)
 set     :bind,              '0.0.0.0'
 set     :port,               4567
 set     :public_folder,     '/srv/ctlabs-server/public'
 set     :host_authorization, permitted_hosts: []
-set     :markdown, input: 'GFM'
-set     :server_settings,    SSLEnable: true,
-                            SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
-                            SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
+set     :markdown,           input: 'GFM'
+
+disable :run
+
+#set     :server_settings,    SSLEnable: true,
+#                             SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+#                             SSLCertName:     [[ 'CN', WEBrick::Utils.getservername ]]
+#set     :server_settings,    SSLEnable: true,
+#                             SSLVerifyClient: OpenSSL::SSL::VERIFY_NONE,
+#                             SSLCertificate: CERT_PATH,
+#                             SSLPrivateKey: KEY_PATH
+
 
 CONFIG        = '/srv/ctlabs-server/public/config.yml'
 INVENTORY     = '/srv/ctlabs-server/public/inventory.ini'
@@ -94,6 +124,137 @@ get '/config' do
     @active_yaml = File.file?(runtime_path) ? File.read(runtime_path) : nil
   end
   erb :config
+end
+
+# Web Terminal Endpoint
+get '/terminal/:node_name' do
+  if request.env['HTTP_UPGRADE']&.downcase == 'websocket'
+    
+    request.env['rack.hijack'].call
+    io = request.env['rack.hijack_io']
+
+    ssl_mutex = Mutex.new
+    wrapper = WSSocketWrapper.new(request.env, io, ssl_mutex)
+    driver = WebSocket::Driver.rack(wrapper)
+    
+    node_name = params[:node_name]
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color', node_name, 'bash']
+
+    pty_read = nil
+    pty_write = nil
+    pty_pid = nil
+    pty_thread = nil
+
+    # 1. Connection Established
+    driver.on(:open) do |event|
+      begin
+        # PTY.spawn returns [read_io, write_io, pid]
+        pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
+        
+        # WE DO NOT CLOSE pty_write HERE! That is our keyboard input!
+
+        # PTY Read Loop
+        pty_thread = Thread.new do
+          loop do
+            begin
+              data = pty_read.readpartial(8192)
+              driver.text(data.force_encoding('UTF-8').scrub) 
+            rescue IO::WaitReadable
+              IO.select([pty_read], nil, nil, 0.1) rescue sleep(0.01)
+              retry
+            rescue EOFError, Errno::EIO, Errno::ECONNRESET, IOError
+              driver.text("\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n") rescue nil
+              break
+            rescue StandardError => e
+              puts "[PTY Error] #{e.message}"
+              break
+            end
+          end
+          driver.close rescue nil
+        end
+      rescue => e
+        driver.text("\r\n\x1b[31m[Error spawning terminal: #{e.message}]\x1b[0m\r\n") rescue nil
+        driver.close rescue nil
+      end
+    end
+
+#    # 2. Keystrokes (Browser -> Container)
+#    driver.on(:message) do |event|
+#      # Write directly to the PTY write channel!
+#      pty_write.write(event.data) if pty_write
+#    end
+
+    # 2. Keystrokes & Resize Events (Browser -> Container)
+    driver.on(:message) do |event|
+      if pty_write
+        begin
+          payload = JSON.parse(event.data)
+          
+          if payload['type'] == 'input'
+            pty_write.write(payload['data'])
+            
+          elsif payload['type'] == 'resize'
+            # Pack the rows and cols into a C-style struct (4 unsigned shorts)
+            winsize = [payload['rows'].to_i, payload['cols'].to_i, 0, 0].pack('SSSS')
+            # 0x5414 is the hex code for TIOCSWINSZ (Set Window Size) on Linux
+            pty_write.ioctl(0x5414, winsize) rescue nil
+          end
+          
+        rescue JSON::ParserError
+          # Fallback just in case raw text gets sent
+          pty_write.write(event.data)
+        end
+      end
+    end
+
+    # 3. Cleanup on Disconnect
+    driver.on(:close) do |event|
+      pty_thread&.kill
+      pty_read&.close
+      pty_write&.close
+      Process.kill('TERM', pty_pid) rescue nil if pty_pid
+      ssl_mutex.synchronize { io.close } rescue nil
+    end
+
+    # 4. START HANDSHAKE
+    driver.start
+
+    # 5. Thread-Safe Socket Read Loop (Browser -> Parser)
+    Thread.new do
+      loop do
+        begin
+          data = nil
+          ssl_mutex.synchronize do
+            data = io.read_nonblock(8192)
+          end
+          
+          if data == :wait_readable || data == :wait_writable
+            sleep(0.01)
+            next
+          end
+          
+          driver.parse(data) if data && !data.empty?
+
+        rescue IO::WaitReadable
+          sleep(0.01)
+          retry
+        rescue EOFError, Errno::ECONNRESET, IOError, OpenSSL::SSL::SSLError
+          break
+        rescue StandardError => e
+          puts "[Socket Read Error] #{e.class}: #{e.message}"
+          break
+        end
+      end
+      driver.close rescue nil
+    end
+
+    return [-1, {}, []]
+  else
+    # Standard HTML Page
+    @node_name = params[:node_name]
+    erb :terminal, layout: false
+  end
 end
 
 # Download the active runtime YAML configuration
@@ -1241,3 +1402,49 @@ FOOTER = %q(
   </body>
 </html>
 )
+
+
+# ------------------------------------------------------------------------------
+# SECURE PUMA BOOTLOADER (Must remain at the bottom of the file!)
+# ------------------------------------------------------------------------------
+if __FILE__ == $0
+  require 'fileutils'
+  require 'openssl'
+  require 'webrick'
+  require 'puma'
+  require 'puma/configuration'
+  require 'puma/launcher'
+
+  CERT_DIR = '/srv/ctlabs-server/ssl'
+  FileUtils.mkdir_p(CERT_DIR)
+  CERT_PATH = File.join(CERT_DIR, 'cert.pem')
+  KEY_PATH  = File.join(CERT_DIR, 'key.pem')
+
+  # Auto-generate SSL Certs if they don't exist
+  unless File.exist?(CERT_PATH) && File.exist?(KEY_PATH)
+    puts "Generating secure self-signed SSL certificates for Puma..."
+    key             = OpenSSL::PKey::RSA.new(4096)
+    cert            = OpenSSL::X509::Certificate.new
+    cert.version    = 2
+    cert.serial     = 1
+    cn_name         = WEBrick::Utils.getservername rescue 'localhost'
+    cert.subject    = OpenSSL::X509::Name.parse("/CN=#{cn_name}")
+    cert.issuer     = cert.subject
+    cert.public_key = key.public_key
+    cert.not_before = Time.now
+    cert.not_after  = cert.not_before + (365 * 24 * 60 * 60)
+    cert.sign(key, OpenSSL::Digest.new('SHA256'))
+    
+    File.write(KEY_PATH, key.to_pem)
+    File.write(CERT_PATH, cert.to_pem)
+  end
+
+  puts "🚀 Starting CTLABS Secure Terminal Engine on https://0.0.0.0:4567"
+
+  conf = Puma::Configuration.new do |c|
+    c.bind "ssl://0.0.0.0:4567?key=#{KEY_PATH}&cert=#{CERT_PATH}&verify_mode=none"
+    c.app Sinatra::Application
+  end
+
+  Puma::Launcher.new(conf).run
+end

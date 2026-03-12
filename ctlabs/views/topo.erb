@@ -117,10 +117,19 @@
     allTitles.forEach(t => {
       const text = t.textContent.trim();
       const parent = t.parentElement;
+      
+      // NEW: Accurately extract the real hostname from Graphviz!
+      // Graphviz always puts the node name in the <title> tag.
+      if (parent.classList.contains('node')) {
+        // Grab the first line of the title text (which is always the hostname)
+        let actualName = text.split('\n')[0].trim();
+        parent.setAttribute('data-node-name', actualName);
+      }
+
       if (text && text.includes('[')) {
         parent.setAttribute('data-custom-tooltip', text);
       }
-      t.remove(); 
+      t.remove();
     });
 
     // 2. Scrub ALL title attributes from links/nodes
@@ -180,11 +189,31 @@
 
       // RIGHT-CLICK Context Menu Event
       el.addEventListener('contextmenu', (e) => {
-        e.preventDefault(); 
-        tooltip.style.display = 'none'; 
+        e.preventDefault();
+        tooltip.style.display = 'none';
 
         let menuHtml = '';
+
+        // --- NEW: IN-BROWSER FEATURES ---
+        // Grab the first line, split by space, keep the first word, and force lowercase!
+        const nodeName = cleanText.split('\n')[0].split(/\s+/)[0].trim().toLowerCase();
         
+        // Check if the element OR its parent container is a Graphviz node
+        const isNode = el.classList.contains('node') || (el.closest && el.closest('.node'));
+
+        // Only show these options if we clicked on a Node
+        if (nodeName && isNode) {
+          menuHtml += `<div class="context-menu-item" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
+
+          // TERMINAL POPUP
+          const w = 900;
+          const h = 600;
+          const top = window.top.outerHeight / 2 + window.top.screenY - ( h / 2);
+          const left = window.top.outerWidth / 2 + window.top.screenX - ( w / 2);
+          menuHtml += `<div class="context-menu-item" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
+        }
+        // --------------------------------
+
         // Add dynamic extracted links first
         customLinks.forEach(link => {
           menuHtml += `<div class="context-menu-item" onclick="window.open('${link.url}', '_blank')"><i class="fas fa-external-link-alt"></i> ${link.title}</div>`;
@@ -200,9 +229,10 @@
         // Standard Utility Actions
         const safeText = cleanText.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n").replace(/&#10;/g, "\\n");
         menuHtml += `<div class="context-menu-item" onclick="navigator.clipboard.writeText('${safeText.replace(/<br>/g, '\\n')}'); alert('Node details copied to clipboard!');"><i class="fas fa-copy"></i> Copy Node Info</div>`;
+        
+        // Custom Terminal/SSH link defined in your YAML config (Native OS Client)
         if (termLink) {
-          // Using target="_self" so ssh:// links open smoothly via the OS handler without leaving a blank browser tab
-          menuHtml += `<div class="context-menu-item" onclick="window.open('${termLink}', '_self')"><i class="fas fa-terminal"></i> Connect via SSH</div>`;
+          menuHtml += `<div class="context-menu-item" onclick="window.open('${termLink}', '_self')"><i class="fas fa-network-wired"></i> Connect via Local SSH Client</div>`;
         }
 
         contextMenu.innerHTML = menuHtml;
