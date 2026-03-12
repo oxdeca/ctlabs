@@ -15,28 +15,69 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     /* Use Flexbox to dynamically fill the height */
-    body, html { 
-      margin: 0; padding: 0; height: 100%; 
-      background: #0f172a; color: #f8fafc; 
-      font-family: sans-serif; overflow: hidden; 
-      display: flex; flex-direction: column; 
+    body, html {
+      margin: 0; padding: 0; height: 100%;
+      background: #0f172a; color: #f8fafc;
+      font-family: sans-serif; overflow: hidden;
+      display: flex; flex-direction: column;
     }
-    
-    /* Header takes up exactly the space it needs and doesn't shrink */
-    #header { 
-      background: #1e293b; padding: 10px 20px; 
-      border-bottom: 1px solid #334155; 
-      display: flex; justify-content: space-between; align-items: center; 
-      flex-shrink: 0; 
+
+    /* Header slimmed down for maximum terminal space */
+    #header {
+      background: #1e293b; 
+      padding: 4px 12px; /* Reduced from 10px 20px */
+      border-bottom: 1px solid #334155;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-shrink: 0;
+      font-size: 0.85em; /* Slightly smaller text overall */
     }
-    
-    /* Terminal container grows to perfectly fill the rest of the window */
-    #terminal-container { 
-      width: 100%; flex-grow: 1; 
-      padding: 5px; box-sizing: border-box; 
-      overflow: hidden; 
+
+    .status { 
+      color: #10b981; 
+      font-size: 0.85em; /* Shrink the status text a bit more */
     }
-    
+    .status.disconnected { color: #ef4444; }
+
+    /* Target xterm.js's internal scrolling viewport directly */
+    .xterm-viewport::-webkit-scrollbar {
+      width: 8px; /* Slims down the reserved gap! */
+    }
+
+    .xterm-viewport::-webkit-scrollbar-track {
+      background: transparent; /* Lets the terminal background show through */
+    }
+
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+      background: #38bdf8;
+    }
+
+    /* For Firefox compatibility */
+    .xterm-viewport {
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+
+    /* Terminal container dynamically fills the rest of the window */
+    #terminal-container {
+      width: 100%;
+      flex: 1 1 0;
+      height: 0;
+      min-height: 0;
+      padding: 2px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    /* Force xterm to respect the container's height */
+    .xterm {
+      height: 100%;
+    }
+
     .status { color: #10b981; font-size: 0.9em; }
     .status.disconnected { color: #ef4444; }
   </style>
@@ -53,12 +94,41 @@
   <script>
     const term = new Terminal({
       //theme: { background: '#0f172a', foreground: '#e2e8f0', cursor: '#38bdf8' },
-      theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(255, 255, 255, 0.3)' },
+      //theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(255, 255, 255, 0.3)' },
+      theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
       //theme: { background: '#282a36', foreground: '#f8f8f2', cursor: '#ff79c6', selectionBackground: 'rgba(68, 71, 90, 0.5)' },
       fontFamily: '"Courier New", Courier, monospace',
       cursorBlink: true,
       fontSize: 14
     });
+
+    term.onSelectionChange(() => {
+        const selection = term.getSelection();
+        if (selection) {
+            navigator.clipboard.writeText(selection);
+        }
+    });
+
+/*
+    // --- NEW: OSC 52 CLIPBOARD HANDLER ---
+    term.onCustomSequence(e => {
+      if (e.protocol === 'osc' && e.data.startsWith('52;')) {
+        const parts = e.data.split(';');
+        if (parts.length < 3) return;
+        
+        try {
+          // Decode the base64 data sent by tmux
+          const decoded = atob(parts[2]);
+          // Use the Browser Clipboard API
+          navigator.clipboard.writeText(decoded).then(() => {
+            console.log('Clipboard updated via OSC 52');
+          });
+        } catch (err) {
+          console.error('OSC 52 Error:', err);
+        }
+      }
+    });
+*/
 
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
