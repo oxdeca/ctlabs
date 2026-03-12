@@ -328,7 +328,7 @@ module ApplicationHelper
                     <td><%= node[:kind] %></td>
                     <td style="color: #cbd5e1;"><%= node[:image] %></td>
                     <td style="text-align:right; white-space: nowrap;">
-                      <button type="button" onclick="window.open('/terminal/<%= node[:name] %>', 'term_<%= node[:name] %>', 'width=850,height=550,resizable=yes,scrollbars=yes')" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now" style="padding: 2px 6px;"><i class="fas fa-terminal fa-lg"></i></button>
+                      <button type="button" onclick="const w=900, h=600, t=(window.top.outerHeight/2)+window.top.screenY-(h/2), l=(window.top.outerWidth/2)+window.top.screenX-(w/2); window.open('/terminal/<%= node[:name] %>', 'term_<%= node[:name] %>', 'width='+w+',height='+h+',top='+t+',left='+l+',resizable=yes,scrollbars=yes,toolbar=no,location=no');" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now" style="padding: 2px 6px;"><i class="fas fa-terminal fa-lg"></i></button>
 
                       <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
                       <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
