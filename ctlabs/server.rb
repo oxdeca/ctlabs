@@ -257,6 +257,134 @@ get '/terminal/:node_name' do
   end
 end
 
+#
+# IMAGES
+#
+# Fetch a Dockerfile
+get '/images/dockerfile' do
+  content_type :json
+  image = params[:image].split(':').first # Drop the tag
+  # e.g., 'ctlabs/c8/base' -> ['c8', 'base'] -> 'c8/base'
+  search_path = image.split('/').last(2).join('/')
+  
+  # Search the images directory
+  dockerfile_path = Dir.glob(File.join("..", "images", "**", search_path, "Dockerfile")).first
+
+  if dockerfile_path && File.exist?(dockerfile_path)
+    { dockerfile: File.read(dockerfile_path) }.to_json
+  else
+    status 404
+    { error: "Dockerfile not found for #{image}" }.to_json
+  end
+end
+
+# Save Dockerfile WITHOUT triggering build
+post '/images/save' do
+  content_type :json
+  image = params[:image].split(':').first
+  search_path = image.split('/').last(2).join('/')
+  dockerfile_path = Dir.glob(File.join("..", "images", "**", search_path, "Dockerfile")).first
+
+  if dockerfile_path
+    File.write(dockerfile_path, params[:dockerfile])
+    { message: "Dockerfile saved" }.to_json
+  else
+    status 404
+    { error: "Dockerfile path not found" }.to_json
+  end
+end
+
+# Save and trigger build
+post '/images/build' do
+  content_type :json
+  require 'fileutils'
+
+  image = params[:image].split(':').first
+  search_path = image.split('/').last(2).join('/')
+  dockerfile_path = Dir.glob(File.join("..", "images", "**", search_path, "Dockerfile")).first
+
+  if dockerfile_path
+    # ONLY overwrite the file if the UI actually sent text (so Quick Build works safely!)
+    if params[:dockerfile] && !params[:dockerfile].to_s.strip.empty?
+      File.write(dockerfile_path, params[:dockerfile])
+    end
+    build_script = File.join(File.dirname(dockerfile_path), 'build.sh')
+    
+    if File.exist?(build_script)
+      log_dir = defined?(LOG_DIR) ? LOG_DIR : '/var/log/ctlabs'
+      FileUtils.mkdir_p(log_dir)
+      
+      safe_img_name = image.gsub('/', '_').gsub(/[^0-9a-zA-Z_]/, '')
+      log_file_name = "build_#{safe_img_name}_#{Time.now.to_i}.log"
+      
+      # The absolute path for the spawn command
+      log_file = File.join(log_dir, log_file_name)
+      FileUtils.touch(log_file)
+      
+      # Trigger in background
+      spawn("cd #{File.dirname(build_script)} && bash build.sh > #{log_file} 2>&1")
+      
+      # FIX: Pass the absolute path (log_file) back to the frontend so the log viewer can find it!
+      { message: "Build triggered", log_path: log_file }.to_json
+    else
+      status 400
+      { error: "build.sh not found in directory" }.to_json
+    end
+  else
+    status 404
+    { error: "Dockerfile path not found" }.to_json
+  end
+end
+
+# Create a new Image Directory Structure
+post '/images/create' do
+  content_type :json
+  require 'fileutils'
+  
+  # Clean input to prevent path traversal
+  path = params[:image_path].to_s.gsub(/[^a-zA-Z0-9_\-\/]/, '')
+  full_dir = File.join("..", "images", path)
+  
+  if File.directory?(full_dir)
+    status 400
+    return { error: "Directory already exists" }.to_json
+  end
+
+  # Build the skeleton
+  FileUtils.mkdir_p(full_dir)
+  File.write(File.join(full_dir, "Dockerfile"), "FROM ubuntu:latest\n# Add your instructions here\n")
+  
+  build_sh = File.join(full_dir, "build.sh")
+  File.write(build_sh, "#!/bin/bash\n# Replace with podman/docker build command\necho 'Build script for #{path}'\n")
+  FileUtils.chmod(0755, build_sh) # Make executable
+
+  { message: "Created successfully" }.to_json
+end
+
+# Delete an Image Directory Structure
+post '/images/delete' do
+  content_type :json
+  require 'fileutils'
+  
+  # Clean input
+  image = params[:image].to_s.gsub(/[^a-zA-Z0-9_\-\/]/, '')
+  full_dir = File.join("..", "images", image)
+
+  # Security check to ensure it stays inside the images folder
+  if File.directory?(full_dir) && full_dir.include?("../images/")
+    FileUtils.rm_rf(full_dir)
+    { message: "Deleted successfully" }.to_json
+  else
+    status 404
+    { error: "Image directory not found" }.to_json
+  end
+end
+
+
+#
+# LABS
+#
+
 # Download the active runtime YAML configuration
 get '/labs/download' do
   lab_name = params[:lab]
@@ -1193,8 +1321,23 @@ end
 get '/logs/content' do
   content_type 'text/html; charset=utf-8'
   log_file = URI.decode_www_form_component(params[:file])
-  halt 403 unless log_file.start_with?("#{LOG_DIR}/ctlabs_") && log_file.end_with?('.log')
-  halt 404 unless File.file?(log_file)
+  
+  # Forgiving path check
+  log_dir = defined?(LOG_DIR) ? LOG_DIR : '/var/log/ctlabs'
+  basename = File.basename(log_file)
+  is_valid_prefix = basename.start_with?('ctlabs_') || basename.start_with?('build_')
+  
+  # If it fails the security check, print it to the UI!
+  unless log_file.start_with?(log_dir) && is_valid_prefix && log_file.end_with?('.log')
+    status 403
+    return "<span style='color:#ef4444;'>❌ Error 403: Log viewer blocked access to: #{log_file}.</span>"
+  end
+
+  # If the file hasn't been written to disk yet, print it to the UI!
+  unless File.file?(log_file)
+    status 404
+    return "<span style='color:#ef4444;'>❌ Error 404: The log file does not exist. (Did the build script fail to execute?)</span>"
+  end
 
   raw_text = File.read(log_file)
   ansi_to_html(raw_text)
@@ -1216,9 +1359,11 @@ end
 post '/logs/delete' do
   log_file = URI.decode_www_form_component(params[:file])
   # Security: only allow logs from our directory with correct pattern
-  halt 403 unless log_file.start_with?(LOG_DIR) && 
-                  File.basename(log_file).match?(/\Actlabs_\d+_.+_\w+\.log\z/) &&
-                  log_file.end_with?('.log')
+  # Security: allow standard lab logs AND image build logs
+  basename = File.basename(log_file)
+  is_valid_pattern = basename.match?(/\Actlabs_\d+_.+_\w+\.log\z/) || basename.match?(/\Abuild_.+_\d+\.log\z/)
+
+  halt 403 unless log_file.start_with?(LOG_DIR) && File.basename(log_file).match?(/\Actlabs_\d+_.+_\w+\.log\z/) && log_file.end_with?('.log')
   halt 404 unless File.file?(log_file)
 
   File.delete(log_file)
@@ -1227,7 +1372,7 @@ end
 
 # Delete all log files
 post '/logs/delete-all' do
-  log_files = Dir.glob("#{LOG_DIR}/ctlabs_*.log")
+  log_files = Dir.glob("#{LOG_DIR}/ctlabs_*.log") + Dir.glob("#{LOG_DIR}/build_*.log")
   log_files.each { |f| File.delete(f) if File.file?(f) }
   redirect '/logs'
 end

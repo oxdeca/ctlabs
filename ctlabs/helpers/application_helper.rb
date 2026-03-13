@@ -342,15 +342,15 @@ module ApplicationHelper
 
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
           <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-            <span><i class="fas fa-box-open"></i> Defined Images</span>
+            <span><i class="fas fa-sliders-h w3-text-blue"></i> Image Profiles</span>
             <button type="button" onclick="window.openImageEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add</button>
           </div>
           <div class="w3-padding">
             <% if (info_hash[:images] || []).empty? %>
-              <p style="color: #94a3b8; font-style: italic;">No images defined</p>
+              <p style="color: #94a3b8; font-style: italic;">No image profiles defined</p>
             <% else %>
               <table class="w3-table w3-striped w3-small">
-                <thead><tr style="color: #94a3b8;"><th>Type</th><th>Kind</th><th>Image Reference</th><th></th></tr></thead>
+                <thead><tr style="color: #94a3b8;"><th>Type</th><th>Kind</th><th>Mapped Image</th><th></th></tr></thead>
                 <tbody>
                   <% (info_hash[:images] || []).each do |img| %>
                     <tr>
@@ -358,8 +358,8 @@ module ApplicationHelper
                       <td><%= img[:kind] %></td>
                       <td style="color: #cbd5e1;"><%= img[:image] %></td>
                       <td style="text-align:right; white-space: nowrap;">
-                        <button type="button" onclick="window.editImageConfig('<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
-                        <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                        <button type="button" onclick="window.editImageConfig('<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image Profile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                        <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Profile" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
                       </td>
                     </tr>
                   <% end %>
@@ -368,8 +368,61 @@ module ApplicationHelper
             <% end %>
           </div>
         </div>
-      </div>
 
+        <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+          <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="fas fa-box w3-text-orange"></i> Images</span>
+            <button type="button" onclick="window.openAddLocalImageModal()" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add</button>
+          </div>
+          <div style="padding: 0;">
+            <% 
+              global_images = []
+              Dir.glob(File.join("..", "images", "**", "Dockerfile")).each do |df|
+                rel_path = df.sub(/\A.*?\.\.\/images\//, '').sub(/\/Dockerfile\z/, '')
+                global_images << rel_path
+              end
+              global_images.sort!
+            %>
+            
+            <% if global_images.empty? %>
+              <div class="w3-padding">
+                <p style="color: #94a3b8; font-style: italic;">No local images detected in ../images.</p>
+              </div>
+            <% else %>
+              <div style="max-height: 350px; overflow-y: auto;" class="docker-scroll">
+                <table class="w3-table w3-striped w3-small" style="margin: 0;">
+                  <thead style="position: sticky; top: 0; z-index: 1;">
+                    <tr style="color: #94a3b8; background-color: #1e293b;">
+                      <th style="border-bottom: 1px solid #475569 !important;">Name</th>
+                      <th style="border-bottom: 1px solid #475569 !important;">Category</th>
+                      <th style="border-bottom: 1px solid #475569 !important;">OS</th>
+                      <th style="border-bottom: 1px solid #475569 !important; text-align:right;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <% global_images.each do |img_path| %>
+                      <% parts = img_path.split('/') %>
+                      <% category = parts[0] %>
+                      <% os = parts.length > 2 ? parts[1] : '-' %>
+                      <tr>
+                        <td><strong style="color: #38bdf8;"><%= img_path %></strong></td>
+                        <td><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= category %></span></td>
+                        <td><%= os == '-' ? '-' : "<span class='w3-badge w3-tiny w3-round' style='background-color: #64748b;'>#{os}</span>" %></td>
+                        <td style="text-align:right; white-space: nowrap;">
+                          <button type="button" onclick="window.quickBuildImage('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-orange w3-hover-text-yellow" title="Quick Build" style="padding: 2px 6px;"><i class="fas fa-hammer fa-lg"></i></button>
+                          <button type="button" onclick="window.openBuildModal('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Dockerfile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                          <button type="button" onclick="window.deleteLocalImage('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Structure" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                        </td>
+                      </tr>
+                    <% end %>
+                  </tbody>
+                </table>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+      </div>
       <div class="w3-col s12 m6 l6">
         
         <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
@@ -562,6 +615,28 @@ module ApplicationHelper
     </div>
   </div>
 
+  <div id="add-local-image-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+        <span onclick="document.getElementById('add-local-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+        <h4 style="margin: 0;"><i class="fas fa-folder-plus"></i> Add New Image</h4>
+      </header>
+      <form onsubmit="window.submitNewLocalImage(event)">
+        <div class="w3-container w3-padding">
+          <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
+            <i class="fas fa-info-circle"></i> This will create the folder structure and a blank Dockerfile.
+          </div>
+          <label style="font-size: 0.85em; color: #94a3b8;">Image Path (e.g. centos/c9/test or kali/tool)</label>
+          <input type="text" name="image_path" class="w3-input w3-small w3-round w3-margin-bottom" placeholder="category/os/kind" required style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+          <button type="button" onclick="document.getElementById('add-local-image-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+          <button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-plus"></i> Create Folder</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
   <div id="image-editor-modal" class="w3-modal" style="z-index: 9999;">
     <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
       <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-box-open"></i> Add/Edit Image</h4></header>
@@ -580,6 +655,68 @@ module ApplicationHelper
         <div id="image-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
       </div>
       <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+    </div>
+  </div>
+
+  <div id="build-image-modal" class="w3-modal" style="z-index: 9999;">
+    <style>
+      /* Force Monospace */
+      .code-font { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important; }
+
+      /* Sleek Scrollbars */
+      .docker-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+      .docker-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+      .docker-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f172a; }
+      .docker-scroll::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+
+      .editor-container { position: relative; height: 450px; background: #0f172a; border: 1px solid #475569; border-radius: 4px; }
+      
+      /* Both layers share exact same padding and fonts */
+      .editor-layer { 
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+        padding: 12px; margin: 0; border: none; 
+        font-size: 13px; line-height: 1.5; 
+        white-space: pre !important; 
+        box-sizing: border-box; tab-size: 4; 
+      }
+      
+      /* BACK LAYER: Give it auto scrolling so the dimensions match, but hide its ugly scrollbar */
+      #raw-highlight-pre { z-index: 1; overflow: auto !important; color: #e2e8f0; -ms-overflow-style: none; scrollbar-width: none; }
+      #raw-highlight-pre::-webkit-scrollbar { display: none; }
+      #raw-highlight { background: transparent !important; padding: 0 !important; margin: 0 !important; }
+      
+      /* FRONT LAYER: Transparent text, visible scrollbar */
+      #build-dockerfile { 
+        z-index: 2; color: transparent !important; background: transparent !important; 
+        caret-color: #38bdf8; outline: none; resize: none; overflow: auto !important; 
+      }
+      #build-dockerfile::selection { background: rgba(56, 189, 248, 0.3) !important; color: transparent !important; }
+    </style>
+
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 850px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+        <span onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+        <h4 style="margin: 0;"><i class="fas fa-file-code w3-text-orange"></i> Edit Dockerfile: <span id="build-img-name" style="color: #38bdf8;"></span></h4>
+      </header>
+
+      <div class="w3-container w3-padding">
+        <input type="hidden" id="build-img-ref">
+
+        <div class="editor-container w3-margin-top">
+          <pre id="raw-highlight-pre" class="editor-layer"><code id="raw-highlight" class="language-dockerfile code-font"></code></pre>
+          <textarea id="build-dockerfile" class="editor-layer docker-scroll code-font" spellcheck="false" oninput="window.updateDockerHighlight();" onscroll="window.syncDockerScroll(this);"></textarea>
+        </div>
+
+        <div id="build-image-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
+      </div>
+
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+        <button type="button" onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+        <div>
+          <button type="button" onclick="window.saveDockerfileOnly()" class="w3-button w3-blue w3-round w3-small" style="margin-right: 8px;"><i class="fas fa-save"></i> Save File</button>
+          <button type="button" onclick="window.triggerImageBuild(event)" class="w3-button w3-orange w3-round w3-small"><i class="fas fa-hammer"></i> Build Image</button>
+        </div>
+      </footer>
     </div>
   </div>
 

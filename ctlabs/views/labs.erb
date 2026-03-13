@@ -8,6 +8,7 @@
 
 <%= HEADER %>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/dockerfile.min.js"></script>
 <%
   # Dynamically find the absolute newest log file using the global LOG_DIR constant
   latest_log_path = Dir.glob(File.join(LOG_DIR, "*.log")).max_by { |f| File.mtime(f) }
@@ -194,16 +195,15 @@
       const formData = new FormData(form);
       const safeLab = formData.get('lab_name').split('/').map(encodeURIComponent).join('/');
       const nodeName = formData.get('node_name');
-      
+
       const isRunning = document.getElementById('lab-running-state').getAttribute('data-is-running') === 'true';
       const resultDiv = document.getElementById('add-node-result');
       const btn = form.querySelector('button[type="submit"]');
       const originalBtnHTML = btn ? btn.innerHTML : 'Save Node';
-      
+
       if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
 
       try {
-          // STEP 1: CREATE THE NODE (AdHoc if running, Builder if stopped)
           const createUrl = isRunning ? `/labs/${safeLab}/node` : `/labs/${safeLab}/node/new`;
           const createRes = await fetch(createUrl, {
               method: 'POST',
@@ -216,7 +216,6 @@
               throw new Error(err.error || 'Failed to create node');
           }
 
-          // Merge the 'ip' field into the 'nics' string so it doesn't get wiped out by the edit endpoint
           let finalNics = formData.get('nics') || '';
           const ipField = formData.get('ip');
           if (!finalNics.trim() && ipField) {
@@ -224,7 +223,6 @@
               formData.set('nics', finalNics);
           }
 
-          // STEP 2: APPLY ADVANCED CONFIG (Chains directly to your Edit endpoint)
           formData.append('format', 'form');
           const editRes = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}/edit`, {
               method: 'POST',
@@ -460,6 +458,164 @@
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
           resultDiv.textContent = '❌ ' + err.message;
       }
+  };
+
+  // --- BULLETPROOF RAW IMAGE EDITOR ---
+  window.openBuildModal = async function(imageEnc) {
+      const decodedImg = decodeURIComponent(imageEnc);
+      document.getElementById('build-img-name').textContent = decodedImg;
+      document.getElementById('build-img-ref').value = decodedImg;
+      document.getElementById('build-image-result').style.display = 'none';
+      document.getElementById('build-dockerfile').value = "Loading...";
+      document.getElementById('build-image-modal').style.display = 'block';
+
+      try {
+          const res = await fetch(`/images/dockerfile?image=${encodeURIComponent(decodedImg)}`);
+          let data;
+          try { data = await res.json(); } 
+          catch (e) { throw new Error("Backend did not return valid JSON. Dockerfile missing?"); }
+
+          if (res.ok) {
+              document.getElementById('build-dockerfile').value = data.dockerfile;
+          } else {
+              document.getElementById('build-dockerfile').value = `# Error: ${data.error}`;
+          }
+      } catch (err) {
+          document.getElementById('build-dockerfile').value = `# Fetch Error:\n# ${err.message}`;
+      }
+      window.updateDockerHighlight();
+  };
+
+  window.saveDockerfileOnly = async function() {
+      const resultDiv = document.getElementById('build-image-result');
+      const formData = new URLSearchParams({
+          image: document.getElementById('build-img-ref').value,
+          dockerfile: document.getElementById('build-dockerfile').value
+      });
+
+      resultDiv.style.cssText = 'background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; display: block; margin-top: 10px; padding: 8px;';
+      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+      try {
+          const res = await fetch(`/images/save`, { method: 'POST', body: formData });
+          if (res.ok) {
+              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+              resultDiv.innerHTML = `✅ Saved successfully.`;
+          } else throw new Error((await res.json()).error);
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
+      }
+  };
+
+  window.triggerImageBuild = async function(event) {
+      const resultDiv = document.getElementById('build-image-result');
+      const formData = new URLSearchParams({
+          image: document.getElementById('build-img-ref').value,
+          dockerfile: document.getElementById('build-dockerfile').value
+      });
+
+      const btn = event ? event.currentTarget : document.querySelector("button[onclick='window.triggerImageBuild()']");
+      const originalHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+      }
+
+      resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 10px; padding: 8px;';
+      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Triggering build...';
+
+      try {
+          const res = await fetch(`/images/build`, { method: 'POST', body: formData });
+          const data = await res.json();
+          
+          if (res.ok) {
+              document.getElementById('build-image-modal').style.display = 'none';
+              window.location.href = `/logs?file=${encodeURIComponent(data.log_path)}&lab=ImageBuilder&action=build`;
+          } else {
+              throw new Error(data.error);
+          }
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
+          if (btn) {
+              btn.innerHTML = originalHtml;
+              btn.disabled = false;
+          }
+      }
+  };
+
+  window.updateDockerHighlight = function() {
+      let text = document.getElementById('build-dockerfile').value;
+      if (text.endsWith("\n")) text += " "; 
+      
+      try {
+          const highlighted = hljs.highlight(text, { language: 'dockerfile', ignoreIllegals: true }).value;
+          document.getElementById('raw-highlight').innerHTML = highlighted;
+      } catch (e) {
+          document.getElementById('raw-highlight').textContent = text;
+      }
+  };
+
+  window.syncDockerScroll = function(element) {
+      const bgLayer = document.getElementById('raw-highlight-pre');
+      bgLayer.scrollTop = element.scrollTop;
+      bgLayer.scrollLeft = element.scrollLeft;
+  };
+
+  // --- NEW IMAGE MANAGEMENT ACTIONS ---
+  
+  // Quick Build (Hammer Icon): Skips the editor and just runs the build script
+  window.quickBuildImage = async function(imageEnc) {
+      const decodedImg = decodeURIComponent(imageEnc);
+      if(!confirm(`Trigger a build for ${decodedImg} right now?`)) return;
+
+      try {
+          // Send request WITHOUT a dockerfile payload so it doesn't overwrite anything!
+          const res = await fetch(`/images/build`, { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ image: decodedImg }).toString() 
+          });
+          const data = await res.json();
+          if (res.ok) {
+              window.location.href = `/logs?file=${encodeURIComponent(data.log_path)}&lab=ImageBuilder&action=build`;
+          } else throw new Error(data.error);
+      } catch(err) { alert("Build failed to start: " + err.message); }
+  };
+
+  // Add Image (Plus Icon)
+  window.openAddLocalImageModal = function() {
+      document.getElementById('add-local-image-modal').style.display = 'block';
+  };
+
+  window.submitNewLocalImage = async function(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      try {
+          const res = await fetch(`/images/create`, { 
+              method: 'POST', 
+              body: new URLSearchParams(formData).toString() 
+          });
+          if (res.ok) location.reload();
+          else alert((await res.json()).error);
+      } catch(err) { alert(err.message); }
+  };
+
+  // Delete Image (Trash Icon)
+  window.deleteLocalImage = async function(imageEnc) {
+      const decodedImg = decodeURIComponent(imageEnc);
+      if (!confirm(`WARNING: Are you absolutely sure you want to permanently delete the ${decodedImg} directory and all files inside it?`)) return;
+      
+      try {
+          const res = await fetch(`/images/delete`, { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ image: decodedImg }).toString() 
+          });
+          if (res.ok) location.reload();
+          else alert((await res.json()).error);
+      } catch(err) { alert(err.message); }
   };
 
   // --- LINKS ---
