@@ -260,18 +260,30 @@ end
 #
 # IMAGES
 #
-# Fetch a Dockerfile
+# Fetch a Dockerfile and Version
 get '/images/dockerfile' do
   content_type :json
-  image = params[:image].split(':').first # Drop the tag
-  # e.g., 'ctlabs/c8/base' -> ['c8', 'base'] -> 'c8/base'
+  image = params[:image].split(':').first
   search_path = image.split('/').last(2).join('/')
-  
-  # Search the images directory
   dockerfile_path = Dir.glob(File.join("..", "images", "**", search_path, "Dockerfile")).first
 
   if dockerfile_path && File.exist?(dockerfile_path)
-    { dockerfile: File.read(dockerfile_path) }.to_json
+    build_sh = File.join(File.dirname(dockerfile_path), "build.sh")
+    version = "latest"
+    
+    # Extract version from build.sh
+    if File.exist?(build_sh)
+      content = File.read(build_sh)
+      if match = content.match(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+        version = match[1]
+      elsif match = content.match(/TAG\s*=\s*"?([^"\s\n]+)"?/)
+        version = match[1]
+      elsif match = content.match(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
+        version = match[1]
+      end
+    end
+    
+    { dockerfile: File.read(dockerfile_path), version: version }.to_json
   else
     status 404
     { error: "Dockerfile not found for #{image}" }.to_json
@@ -287,7 +299,30 @@ post '/images/save' do
 
   if dockerfile_path
     File.write(dockerfile_path, params[:dockerfile])
-    { message: "Dockerfile saved" }.to_json
+    
+    # Patch the version in build.sh
+    if params[:version] && !params[:version].strip.empty?
+      build_sh = File.join(File.dirname(dockerfile_path), "build.sh")
+      if File.exist?(build_sh)
+        content = File.read(build_sh)
+        new_ver = params[:version].strip
+        updated = false
+        
+        if content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(VERSION\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/TAG\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(TAG\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
+          content.gsub!(/(-t\s+[^\s:]+:)[a-zA-Z0-9_.-]+/, "\\1#{new_ver}")
+          updated = true
+        end
+        File.write(build_sh, content) if updated
+      end
+    end
+    
+    { message: "Dockerfile and Version saved" }.to_json
   else
     status 404
     { error: "Dockerfile path not found" }.to_json
@@ -304,28 +339,43 @@ post '/images/build' do
   dockerfile_path = Dir.glob(File.join("..", "images", "**", search_path, "Dockerfile")).first
 
   if dockerfile_path
-    # ONLY overwrite the file if the UI actually sent text (so Quick Build works safely!)
     if params[:dockerfile] && !params[:dockerfile].to_s.strip.empty?
       File.write(dockerfile_path, params[:dockerfile])
     end
+    
     build_script = File.join(File.dirname(dockerfile_path), 'build.sh')
     
     if File.exist?(build_script)
+      # Patch the version in build.sh before executing!
+      if params[:version] && !params[:version].strip.empty?
+        content = File.read(build_script)
+        new_ver = params[:version].strip
+        updated = false
+        
+        if content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(VERSION\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/TAG\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(TAG\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
+          content.gsub!(/(-t\s+[^\s:]+:)[a-zA-Z0-9_.-]+/, "\\1#{new_ver}")
+          updated = true
+        end
+        File.write(build_script, content) if updated
+      end
+
       log_dir = defined?(LOG_DIR) ? LOG_DIR : '/var/log/ctlabs'
       FileUtils.mkdir_p(log_dir)
       
       safe_img_name = image.gsub('/', '_').gsub(/[^0-9a-zA-Z_]/, '')
       log_file_name = "build_#{safe_img_name}_#{Time.now.to_i}.log"
-      
-      # The absolute path for the spawn command
       log_file = File.join(log_dir, log_file_name)
       FileUtils.touch(log_file)
       
-      # Trigger in background
       spawn("cd #{File.dirname(build_script)} && bash build.sh > #{log_file} 2>&1")
       
-      # FIX: Pass the absolute path (log_file) back to the frontend so the log viewer can find it!
-      { message: "Build triggered", log_path: log_file }.to_json
+      { message: "Build triggered", log_path: log_file_name }.to_json
     else
       status 400
       { error: "build.sh not found in directory" }.to_json

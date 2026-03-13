@@ -379,9 +379,26 @@ module ApplicationHelper
               global_images = []
               Dir.glob(File.join("..", "images", "**", "Dockerfile")).each do |df|
                 rel_path = df.sub(/\A.*?\.\.\/images\//, '').sub(/\/Dockerfile\z/, '')
-                global_images << rel_path
+                
+                # Smart Version Extractor: Scan build.sh for VERSION=, TAG=, or the docker -t flag
+                version = "latest"
+                build_sh = File.join(File.dirname(df), "build.sh")
+                if File.exist?(build_sh)
+                  content = File.read(build_sh)
+                  if match = content.match(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+                    version = match[1]
+                  elsif match = content.match(/TAG\s*=\s*"?([^"\s\n]+)"?/)
+                    version = match[1]
+                  elsif match = content.match(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
+                    version = match[1]
+                  end
+                end
+                
+                # Store as a hash so we can pass both path and version to the UI
+                global_images << { path: rel_path, version: version }
               end
-              global_images.sort!
+              # Alphabetical sort by path
+              global_images.sort_by! { |img| img[:path] }
             %>
             
             <% if global_images.empty? %>
@@ -396,22 +413,24 @@ module ApplicationHelper
                       <th style="border-bottom: 1px solid #475569 !important;">Name</th>
                       <th style="border-bottom: 1px solid #475569 !important;">Category</th>
                       <th style="border-bottom: 1px solid #475569 !important;">OS</th>
+                      <th style="border-bottom: 1px solid #475569 !important;">Version</th>
                       <th style="border-bottom: 1px solid #475569 !important; text-align:right;">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <% global_images.each do |img_path| %>
-                      <% parts = img_path.split('/') %>
+                    <% global_images.each do |img| %>
+                      <% parts = img[:path].split('/') %>
                       <% category = parts[0] %>
                       <% os = parts.length > 2 ? parts[1] : '-' %>
                       <tr>
-                        <td><strong style="color: #38bdf8;"><%= img_path %></strong></td>
+                        <td><strong style="color: #38bdf8;"><%= img[:path] %></strong></td>
                         <td><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= category %></span></td>
                         <td><%= os == '-' ? '-' : "<span class='w3-badge w3-tiny w3-round' style='background-color: #64748b;'>#{os}</span>" %></td>
+                        <td><span class="w3-badge w3-tiny w3-green"><%= img[:version] %></span></td>
                         <td style="text-align:right; white-space: nowrap;">
-                          <button type="button" onclick="window.quickBuildImage('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-orange w3-hover-text-yellow" title="Quick Build" style="padding: 2px 6px;"><i class="fas fa-hammer fa-lg"></i></button>
-                          <button type="button" onclick="window.openBuildModal('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Dockerfile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
-                          <button type="button" onclick="window.deleteLocalImage('<%= ERB::Util.url_encode(img_path) %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Structure" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                          <button type="button" onclick="window.quickBuildImage('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-orange w3-hover-text-yellow" title="Quick Build" style="padding: 2px 6px;"><i class="fas fa-hammer fa-lg"></i></button>
+                          <button type="button" onclick="window.openBuildModal('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Dockerfile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                          <button type="button" onclick="window.deleteLocalImage('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Structure" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
                         </td>
                       </tr>
                     <% end %>
@@ -701,6 +720,11 @@ module ApplicationHelper
 
       <div class="w3-container w3-padding">
         <input type="hidden" id="build-img-ref">
+
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
+          <label style="font-size: 0.85em; color: #94a3b8; font-weight: bold;"><i class="fas fa-tag"></i> Image Version / Tag:</label>
+          <input type="text" id="build-img-version" class="w3-input w3-small w3-round" style="width: 150px; background-color: #0f172a; color: #10b981; border: 1px solid #475569; font-family: monospace; font-weight: bold;">
+        </div>
 
         <div class="editor-container w3-margin-top">
           <pre id="raw-highlight-pre" class="editor-layer"><code id="raw-highlight" class="language-dockerfile code-font"></code></pre>

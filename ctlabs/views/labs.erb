@@ -461,10 +461,12 @@
   };
 
   // --- BULLETPROOF RAW IMAGE EDITOR ---
+  // --- BULLETPROOF RAW IMAGE EDITOR ---
   window.openBuildModal = async function(imageEnc) {
       const decodedImg = decodeURIComponent(imageEnc);
       document.getElementById('build-img-name').textContent = decodedImg;
       document.getElementById('build-img-ref').value = decodedImg;
+      document.getElementById('build-img-version').value = "Loading...";
       document.getElementById('build-image-result').style.display = 'none';
       document.getElementById('build-dockerfile').value = "Loading...";
       document.getElementById('build-image-modal').style.display = 'block';
@@ -477,6 +479,7 @@
 
           if (res.ok) {
               document.getElementById('build-dockerfile').value = data.dockerfile;
+              document.getElementById('build-img-version').value = data.version || "latest";
           } else {
               document.getElementById('build-dockerfile').value = `# Error: ${data.error}`;
           }
@@ -490,6 +493,7 @@
       const resultDiv = document.getElementById('build-image-result');
       const formData = new URLSearchParams({
           image: document.getElementById('build-img-ref').value,
+          version: document.getElementById('build-img-version').value,
           dockerfile: document.getElementById('build-dockerfile').value
       });
 
@@ -512,6 +516,7 @@
       const resultDiv = document.getElementById('build-image-result');
       const formData = new URLSearchParams({
           image: document.getElementById('build-img-ref').value,
+          version: document.getElementById('build-img-version').value,
           dockerfile: document.getElementById('build-dockerfile').value
       });
 
