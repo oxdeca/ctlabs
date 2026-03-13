@@ -9,6 +9,6 @@ COPY        --chmod=0750 files/if-down      /root/
 COPY        --chmod=0750 files/qemu_init.sh /root/
 COPY        files/qemu.service              /etc/systemd/system/
 
-RUN         systemctl enable qemu.service
+RUN         systemctl disable sshd-mgmt.service && systemctl enable qemu.service
 
 ENTRYPOINT  ["/bin/systemd"]
