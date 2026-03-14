@@ -1,0 +1,240 @@
+/*
+ -----------------------------------------------------------------------------
+ File        : ctlabs/public/js/ctlabs-maps.js
+ Description : con and topology view
+ License     : MIT License
+ -----------------------------------------------------------------------------
+*/
+
+// --- GLOBAL MAP STATE ---
+window.panZoomData = null;
+window.panZoomMgmt = null;
+
+// --- GLOBAL MAP STATE ---
+window.panZoomData = null;
+window.panZoomMgmt = null;
+
+// --- TOOLTIP & CONTEXT MENU ENGINE ---
+function attachCustomTooltips(svgObject) {
+  const svgDoc = svgObject.contentDocument;
+  if (!svgDoc) return;
+
+  // 1. Ensure Tooltip Div Exists & Force Critical Floating Styles
+  let tooltip = document.getElementById('custom-html-tooltip') || (function() {
+    let t = document.createElement('div'); 
+    t.id = 'custom-html-tooltip';
+    
+    // BULLETPROOFING: Force these styles inline just in case the CSS file 404s!
+    t.style.position = 'fixed';
+    t.style.zIndex = '10000';
+    t.style.pointerEvents = 'none';
+    t.style.display = 'none';
+    
+    // Add some fallback styling in case CSS completely fails
+    t.style.background = 'rgba(15, 23, 42, 0.95)';
+    t.style.color = '#f8fafc';
+    t.style.border = '1px solid #38bdf8';
+    t.style.borderRadius = '8px';
+    t.style.padding = '12px';
+    
+    document.body.appendChild(t); 
+    return t;
+  })();
+
+  // 2. Ensure Context Menu Div Exists & Force Critical Floating Styles
+  let contextMenu = document.getElementById('custom-context-menu') || (function() {
+    let c = document.createElement('div'); 
+    c.id = 'custom-context-menu';
+    
+    c.style.position = 'fixed';
+    c.style.zIndex = '10002';
+    c.style.display = 'none';
+    c.style.background = '#0f172a';
+    c.style.border = '1px solid #334155';
+    c.style.color = '#cbd5e1';
+    
+    document.body.appendChild(c);
+    document.addEventListener('click', () => { c.style.display = 'none'; });
+    return c;
+  })();
+  
+  svgDoc.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+  // 3. Convert Native Graphviz <title> tags to Custom Data Attributes
+  const allTitles = svgDoc.querySelectorAll('title');
+  allTitles.forEach(t => {
+    const text = t.textContent.trim();
+    const parent = t.parentElement;
+    if (parent.classList.contains('node')) {
+      let actualName = text.split('\n')[0].trim();
+      parent.setAttribute('data-node-name', actualName);
+    }
+    if (text && text.includes('[')) {
+      parent.setAttribute('data-custom-tooltip', text);
+    }
+    t.remove();
+  });
+
+  // 4. Scrub any lingering title attributes from links/groups
+  const allLinks = svgDoc.querySelectorAll('a, g.node');
+  allLinks.forEach(el => {
+    ['title', 'xlink:title'].forEach(attr => {
+      if (el.hasAttribute(attr)) {
+        const text = el.getAttribute(attr).trim();
+        if (text && text.includes('[')) {
+          el.setAttribute('data-custom-tooltip', text);
+        }
+        el.removeAttribute(attr);
+      }
+    });
+  });
+
+  // 5. Attach Hover and Right-Click Events
+  const interactiveElements = svgDoc.querySelectorAll('[data-custom-tooltip]');
+  interactiveElements.forEach(el => {
+    const rawText = el.getAttribute('data-custom-tooltip');
+    
+    const customLinks = [];
+    const linkRegex = /\[LINK:(.+?)\|(.+?)\]/g;
+    let match;
+    while ((match = linkRegex.exec(rawText)) !== null) {
+      customLinks.push({ title: match[1], url: match[2] });
+    }
+
+    const termRegex = /\[TERM:(.+?)\]/g;
+    let termMatch = termRegex.exec(rawText);
+    let termLink = termMatch ? termMatch[1] : null;
+
+    let cleanText = rawText.replace(/\[LINK:.+?\|.+?\](&#10;)?/g, '').trim();
+    cleanText = cleanText.replace(/\[TERM:.+?\](&#10;)?/g, '').trim();
+    const formattedText = cleanText.replace(/&#10;/g, '<br>').replace(/\\n/g, '<br>').replace(/\n/g, '<br>');
+
+    el.style.cursor = 'pointer';
+
+    el.addEventListener('mouseover', (e) => {
+      tooltip.innerHTML = formattedText;
+      tooltip.style.display = 'block';
+      const rect = svgObject.getBoundingClientRect();
+      tooltip.style.left = (e.clientX + rect.left + 15) + 'px';
+      tooltip.style.top = (e.clientY + rect.top + 15) + 'px';
+    });
+
+    el.addEventListener('mousemove', (e) => {
+      const rect = svgObject.getBoundingClientRect();
+      tooltip.style.left = (e.clientX + rect.left + 15) + 'px';
+      tooltip.style.top = (e.clientY + rect.top + 15) + 'px';
+    });
+
+    el.addEventListener('mouseout', () => {
+      tooltip.style.display = 'none';
+    });
+
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      tooltip.style.display = 'none';
+      let menuHtml = '';
+
+      const nodeName = cleanText.split('\n')[0].split(/\s+/)[0].trim().toLowerCase();
+      const isNode = el.classList.contains('node') || (el.closest && el.closest('.node'));
+
+      if (nodeName && isNode) {
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
+        const w = 900, h = 600;
+        const top = window.top.outerHeight / 2 + window.top.screenY - ( h / 2);
+        const left = window.top.outerWidth / 2 + window.top.screenX - ( w / 2);
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
+      }
+
+      customLinks.forEach(link => {
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('${link.url}', '_blank')"><i class="fas fa-external-link-alt"></i> ${link.title}</div>`;
+      });
+
+      let linkElement = el.tagName.toLowerCase() === 'a' ? el : el.querySelector('a');
+      let href = linkElement ? (linkElement.getAttribute('href') || linkElement.getAttribute('xlink:href')) : null;
+      if (href && href !== "" && !customLinks.some(l => l.url === href)) {
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('${href}', '_blank')"><i class="fas fa-external-link-alt"></i> Open Web Interface</div>`;
+      }
+
+      const safeText = cleanText.replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, "\\n").replace(/&#10;/g, "\\n");
+      menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="navigator.clipboard.writeText('${safeText.replace(/<br>/g, '\\n')}'); alert('Node details copied to clipboard!');"><i class="fas fa-copy"></i> Copy Node Info</div>`;
+
+      if (termLink) {
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('${termLink}', '_self')"><i class="fas fa-network-wired"></i> Connect via Local SSH Client</div>`;
+      }
+
+      contextMenu.innerHTML = menuHtml;
+      const rect = svgObject.getBoundingClientRect();
+      contextMenu.style.left = (e.clientX + rect.left) + 'px';
+      contextMenu.style.top = (e.clientY + rect.top) + 'px';
+      contextMenu.style.display = 'block';
+    });
+  });
+
+  let customStyle = svgDoc.getElementById('custom-dark-controls');
+  if (!customStyle) {
+    customStyle = svgDoc.createElementNS("http://www.w3.org/2000/svg", "style");
+    customStyle.id = 'custom-dark-controls';
+    customStyle.textContent = `
+      #svg-pan-zoom-controls rect { fill: #1e293b !important; fill-opacity: 0.95 !important; stroke: #334155; stroke-width: 1px; }
+      #svg-pan-zoom-controls path { fill: #f8fafc !important; }
+      #svg-pan-zoom-controls g:hover rect { fill: #334155 !important; cursor: pointer; }
+      #svg-pan-zoom-controls g:hover path { fill: #38bdf8 !important; }
+    `;
+    svgDoc.documentElement.appendChild(customStyle);
+  }
+}
+
+
+// --- LAZY LOAD ENGINE ---
+function initMap(objId, panZoomVarName) {
+    const obj = document.getElementById(objId);
+    
+    if (!obj || !obj.contentDocument || !obj.contentDocument.querySelector('svg')) {
+        return; // Will catch it later via load event
+    }
+
+    if (window[panZoomVarName]) {
+        window[panZoomVarName].resize();
+        window[panZoomVarName].fit();
+        window[panZoomVarName].center();
+        return;
+    }
+
+    window[panZoomVarName] = svgPanZoom(obj, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
+    attachCustomTooltips(obj);
+}
+
+// Ensure events map correctly on initial load
+document.addEventListener('DOMContentLoaded', () => {
+    const dataObj = document.getElementById('topo-obj');
+    const mgmtObj = document.getElementById('mgmt-topo-obj');
+
+    if (dataObj) {
+        dataObj.addEventListener('load', () => {
+            if (document.getElementById('DataNet').style.display !== 'none') initMap('topo-obj', 'panZoomData');
+        });
+    }
+    
+    if (mgmtObj) {
+        mgmtObj.addEventListener('load', () => {
+            if (document.getElementById('MgmtNet').style.display !== 'none') initMap('mgmt-topo-obj', 'panZoomMgmt');
+        });
+    }
+});
+
+// Handle Map Switching Safely
+window.openMapTab = function(evt, tabName) {
+    const tabs = document.getElementsByClassName("map-tab");
+    for (let i = 0; i < tabs.length; i++) tabs[i].style.display = "none";
+
+    const links = document.getElementsByClassName("tablink");
+    for (let i = 0; i < links.length; i++) links[i].className = links[i].className.replace(" w3-blue", "");
+
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " w3-blue";
+
+    setTimeout(() => {
+        if (tabName === 'DataNet') initMap('topo-obj', 'panZoomData');
+        else if (tabName === 'MgmtNet') initMap('mgmt-topo-obj', 'panZoomMgmt');
+    }, 50);
+};

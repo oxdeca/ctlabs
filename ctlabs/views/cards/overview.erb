@@ -1,0 +1,65 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/overview.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-code-branch"></i> Ansible Playbook</span>
+    <div>
+      <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
+        <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) rescue false %>
+        <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
+          <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
+        </button>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small">
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Playbook:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= info_hash[:ansible][:playbook] %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Environment:</td><td><% (info_hash[:ansible][:environment] || []).each do |e| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div><% end %></td></tr>
+      <tr><td style="color: #94a3b8;">Tags:</td><td><% (info_hash[:ansible][:tags] || []).each do |t| %><span class="w3-badge w3-tiny w3-round" style="background-color: #10b981; margin-right: 4px;"><%= t %></span><% end %></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500;"><i class="fas fa-network-wired w3-text-red"></i> Exposed Ports (DNAT)</div>
+  <div class="w3-padding">
+    <% if (info_hash[:exposed_ports] || []).empty? %>
+      <p style="color: #94a3b8; font-style: italic;">No ports exposed</p>
+    <% else %>
+      <table id="dnat_table" class="w3-table w3-striped w3-small">
+        <thead><tr style="color: #94a3b8;"><th>Node</th><th>Proto</th><th>Forwarding Rule</th><th></th></tr></thead>
+        <tbody>
+          <% (info_hash[:exposed_ports] || []).each do |port| %>
+            <tr style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if port[:adhoc] %>">
+              <td><strong><%= port[:node] %></strong></td>
+              <td><span class="w3-badge w3-tiny" style="background: #475569;"><%= port[:proto].upcase %></span></td>
+              <td><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code><% if port[:adhoc] %> <span style="color:#f59e0b; font-size:0.75em; font-weight: bold;">(adhoc)</span><% end %></td>
+              <td style="text-align:right; white-space: nowrap;"><button type="button" onclick="window.deleteDnat('<%= info_hash[:lab_path] %>', '<%= port[:node] %>', '<%= port[:raw_ext] %>', '<%= port[:raw_int] %>', '<%= port[:proto] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+  <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] %>
+    <div class="w3-padding" style="border-top: 1px solid #334155; background-color: rgba(0,0,0,0.2);">
+      <h6 style="color: #94a3b8; font-weight: 600; margin-top: 0;"><i class="fas fa-plus"></i> Add AdHoc DNAT Rule</h6>
+      <form id="adhoc-dnat-form" onsubmit="window.submitAdhocDnat(event)" class="w3-row-padding" style="margin:0 -8px;">
+        <input type="hidden" name="lab_name" value="<%= info_hash[:lab_path] %>">
+        <div class="w3-col s12 m4 l4 w3-margin-bottom" style="padding:0 4px;"><select name="node" class="w3-select w3-small" required><option value="" disabled selected>-- Node --</option><% (info_hash[:nodes] || []).each do |n| %><% if n[:type] == 'host' || n[:type] == 'controller' %><option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option><% end %><% end %></select></div>
+        <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="external_port" placeholder="Ext" min="1" max="65535" class="w3-input w3-small" required></div>
+        <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="internal_port" placeholder="Int" min="1" max="65535" class="w3-input w3-small" required></div>
+        <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><select name="protocol" class="w3-select w3-small"><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
+        <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><button type="submit" class="w3-button w3-blue w3-small w3-block"><i class="fas fa-plus"></i> Add</button></div>
+      </form>
+      <div id="adhoc-dnat-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
+    </div>
+  <% end %>
+</div>

@@ -29,6 +29,8 @@ require 'graph'
 require 'lablog'
 
 require_relative 'helpers/application_helper'
+require_relative 'helpers/yaml_helper'
+require_relative 'helpers/lab_helper'
 
 class WSSocketWrapper
   attr_reader :env
@@ -90,6 +92,8 @@ use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
 end
 
 helpers ApplicationHelper
+helpers YamlHelper
+helpers LabHelper
 
 # ------------------------------------------------------------------------------
 # ROUTES
@@ -105,11 +109,17 @@ get '/upload' do
 end
 
 get '/con' do
-  erb :con
+  @title       = "Connection Maps"
+  @icon        = "fa-link"
+  @file_prefix = "con"
+  erb :map_viewer
 end
 
 get '/topo' do
-  erb :topo
+  @title       = "Topology Maps"
+  @icon        = "fa-project-diagram"
+  @file_prefix = "topo"
+  erb :map_viewer
 end
 
 get '/inventory' do
@@ -271,15 +281,18 @@ get '/images/dockerfile' do
     build_sh = File.join(File.dirname(dockerfile_path), "build.sh")
     version = "latest"
     
-    # Extract version from build.sh
+    # Extract version from build.sh prioritizing IMG_VERS
     if File.exist?(build_sh)
       content = File.read(build_sh)
-      if match = content.match(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+      if match = content.match(/IMG_VERS\s*=\s*"?([^"\s\n]+)"?/)
+        version = match[1]
+      elsif match = content.match(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
         version = match[1]
       elsif match = content.match(/TAG\s*=\s*"?([^"\s\n]+)"?/)
         version = match[1]
       elsif match = content.match(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
-        version = match[1]
+        extracted = match[1]
+        version = extracted unless extracted == 'latest'
       end
     end
     
@@ -308,7 +321,11 @@ post '/images/save' do
         new_ver = params[:version].strip
         updated = false
         
-        if content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+        # Check for IMG_VERS first!
+        if content.match?(/IMG_VERS\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(IMG_VERS\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
           content.gsub!(/(VERSION\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
           updated = true
         elsif content.match?(/TAG\s*=\s*"?([^"\s\n]+)"?/)
@@ -318,6 +335,7 @@ post '/images/save' do
           content.gsub!(/(-t\s+[^\s:]+:)[a-zA-Z0-9_.-]+/, "\\1#{new_ver}")
           updated = true
         end
+        
         File.write(build_sh, content) if updated
       end
     end
@@ -352,7 +370,11 @@ post '/images/build' do
         new_ver = params[:version].strip
         updated = false
         
-        if content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+        # Check for IMG_VERS first!
+        if content.match?(/IMG_VERS\s*=\s*"?([^"\s\n]+)"?/)
+          content.gsub!(/(IMG_VERS\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
+          updated = true
+        elsif content.match?(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
           content.gsub!(/(VERSION\s*=\s*"?)[^"\s\n]+("?)/, "\\1#{new_ver}\\2")
           updated = true
         elsif content.match?(/TAG\s*=\s*"?([^"\s\n]+)"?/)
@@ -362,6 +384,7 @@ post '/images/build' do
           content.gsub!(/(-t\s+[^\s:]+:)[a-zA-Z0-9_.-]+/, "\\1#{new_ver}")
           updated = true
         end
+        
         File.write(build_script, content) if updated
       end
 
@@ -375,7 +398,7 @@ post '/images/build' do
       
       spawn("cd #{File.dirname(build_script)} && bash build.sh > #{log_file} 2>&1")
       
-      { message: "Build triggered", log_path: log_file_name }.to_json
+      { message: "Build triggered", log_path: log_file }.to_json
     else
       status 400
       { error: "build.sh not found in directory" }.to_json
@@ -384,6 +407,46 @@ post '/images/build' do
     status 404
     { error: "Dockerfile path not found" }.to_json
   end
+end
+
+# Pull an external image into the registry
+post '/images/pull' do
+  content_type :json
+  # Allow standard docker image naming characters
+  image = params[:image_name].to_s.gsub(/[^a-zA-Z0-9_\-\/:\.]/, '')
+  
+  if image.empty?
+    status 400
+    return { error: "Invalid image name provided" }.to_json
+  end
+  
+  # Try pulling with podman, fallback to docker
+  success = system("podman pull #{image} > /dev/null 2>&1")
+  success = system("docker pull #{image} > /dev/null 2>&1") unless success
+  
+  if success
+    { message: "Image pulled successfully" }.to_json
+  else
+    status 500
+    { error: "Failed to pull image '#{image}'. Ensure the name is correct and the registry is reachable." }.to_json
+  end
+end
+
+# Remove an imported image (no local folder check)
+post '/images/remove_imported' do
+  content_type :json
+  image = params[:image].to_s.gsub(/[^a-zA-Z0-9_\-\/:\.]/, '')
+  
+  if image.empty?
+    status 400
+    return { error: "Invalid image tag provided" }.to_json
+  end
+  
+  # Execute removal blindly on both engines
+  system("podman rmi #{image} > /dev/null 2>&1")
+  system("docker rmi #{image} > /dev/null 2>&1")
+  
+  { message: "External image removed successfully" }.to_json
 end
 
 # Create a new Image Directory Structure
@@ -424,6 +487,48 @@ post '/images/delete' do
   if File.directory?(full_dir) && full_dir.include?("../images/")
     FileUtils.rm_rf(full_dir)
     { message: "Deleted successfully" }.to_json
+  else
+    status 404
+    { error: "Image directory not found" }.to_json
+  end
+end
+
+# Unload an Image from the Local Registry (Sweeps ALL tags for that image)
+post '/images/unload' do
+  content_type :json
+  
+  # Clean input
+  image_path = params[:image].to_s.gsub(/[^a-zA-Z0-9_\-\/]/, '')
+  full_dir = File.join("..", "images", image_path)
+
+  if File.directory?(full_dir) && full_dir.include?("../images/")
+    # 1. Resolve exact image name by reading build.sh
+    parts = image_path.split('/')
+    img_name = parts.size > 1 ? "ctlabs/#{parts[1..-1].join('/')}" : "ctlabs/#{image_path}"
+
+    build_sh = File.join(full_dir, "build.sh")
+    if File.exist?(build_sh)
+      content = File.read(build_sh)
+      if match = content.match(/IMG_NAME\s*=\s*"?([^"\s\n]+)"?/)
+        img_name = match[1]
+      end
+    end
+
+    # 2. Find ALL tags currently on disk for this specific repository and nuke them
+    tags = `podman images --format '{{.Repository}}:{{.Tag}}' #{img_name} 2>/dev/null`.split("\n").map(&:strip)
+    tags += `docker images --format '{{.Repository}}:{{.Tag}}' #{img_name} 2>/dev/null`.split("\n").map(&:strip)
+    
+    tags.uniq.each do |tag|
+      next if tag.empty? || tag == "<none>:<none>"
+      `podman rmi #{tag} 2>/dev/null`
+      `docker rmi #{tag} 2>/dev/null`
+    end
+    
+    # Run a generic fallback just in case
+    `podman rmi #{img_name}:latest 2>/dev/null`
+    `docker rmi #{img_name}:latest 2>/dev/null`
+    
+    { message: "Image unloaded successfully" }.to_json
   else
     status 404
     { error: "Image directory not found" }.to_json
@@ -1130,6 +1235,27 @@ post '/labs/new' do
   redirect '/labs' # Refresh the page to show the new lab in the dropdown
 end
 
+# Save runtime state to base YAML
+post '/labs/*/save' do
+  content_type :json
+  # Using splat handles the slash in 'dev/test.yml' perfectly
+  lab_path = params[:splat].first
+  
+  begin
+    # NOTE: Replace 'Lab.save_runtime_to_base' with whatever your actual Ruby method
+    # is for saving the lab state!
+    if Lab.save_runtime_to_base(lab_path) 
+      { message: "Lab saved successfully" }.to_json
+    else
+      status 500
+      { error: "Failed to save lab configuration to disk." }.to_json
+    end
+  rescue => e
+    status 500
+    { error: "Backend Crash: #{e.message}" }.to_json
+  end
+end
+
 # Save Current Lab (Base or Runtime) as a New File
 post '/labs/*/save_as' do
   lab_name = params[:splat].first
@@ -1280,9 +1406,9 @@ get '/labs/*/info_card' do # <-- NEW: Wildcard for info_card
   lab_file_path = File.join(LABS_DIR, lab_name)
   lab_info = parse_lab_info(lab_file_path)
 
-  # --- Response (same as before) ---
-  # Use the helper method to render the card HTML
-  render_lab_info_card(lab_info)
+  # Use local variables if they exist, otherwise fallback to the instance variable
+  data_to_pass = defined?(lab_info) ? lab_info : @lab_info
+  erb :lab_details, layout: false, locals: { info_hash: data_to_pass }
 end
 
 # Add this route *before* the main routes, or wherever appropriate
@@ -1331,6 +1457,131 @@ get '/labs/*/info' do
   lab_info.to_json
 end
 
+# Get current Lab Metadata for the Edit Modal
+get '/labs/*/meta' do
+  content_type :json
+  lab_path = params[:splat].first
+  full_path = File.join("..", "labs", lab_path)
+  
+  begin
+    cfg = YAML.load_file(full_path) || {}
+    vm = cfg['topology']&.first || {}
+    mgmt = vm['mgmt'] || {}
+    
+    {
+      name: cfg['name'] || '',
+      desc: cfg['desc'] || '',
+      vm_name: vm['name'] || '',
+      vm_dns: (vm['dns'] || []).join(', '),
+      mgmt_vrfid: mgmt['vrfid'] || '',
+      mgmt_dns: (mgmt['dns'] || []).join(', '),
+      mgmt_net: mgmt['net'] || '',
+      mgmt_gw: mgmt['gw'] || ''
+    }.to_json
+  rescue => e
+    status 500
+    { error: e.message }.to_json
+  end
+end
+
+# Update Lab Metadata safely using a text-replacement scanner
+post '/labs/*/edit_meta' do
+  content_type :json
+  lab_path = params[:splat].first
+  full_path = File.join("..", "labs", lab_path)
+  
+  begin
+    lines = File.readlines(full_path)
+    
+    # Process variables
+    formatted_vm_dns = params[:vm_dns].to_s.split(',').map(&:strip).reject(&:empty?).join(', ')
+    formatted_mgmt_dns = params[:mgmt_dns].to_s.split(',').map(&:strip).reject(&:empty?).join(', ')
+    
+    new_lines = []
+    in_topology = false
+    in_vm = false
+    in_mgmt = false
+    in_nodes = false
+    
+    # We will track what we've injected so we can add missing keys
+    seen = { name: false, desc: false, vm_name: false, vm_dns: false, vrfid: false, mgmt_dns: false, net: false, gw: false }
+
+    lines.each do |line|
+      if line.match?(/^\s+nodes:/) || line.match?(/^\s+links:/)
+        in_nodes = true
+      end
+      
+      if in_nodes
+        new_lines << line
+        next
+      end
+
+      # Track Block State
+      if line.match?(/^topology:/)
+        in_topology = true
+      elsif in_topology && line.match?(/^\s+- vm:/)
+        in_vm = true
+      elsif in_vm && line.match?(/^\s+mgmt:/)
+        in_mgmt = true
+      end
+
+      # Perform Replacements & Mark as Seen
+      if !in_topology && line.match?(/^name:/)
+        new_lines << "name: #{params[:name]}\n"
+        seen[:name] = true
+      elsif !in_topology && line.match?(/^desc:/)
+        new_lines << "desc: #{params[:desc]}\n"
+        seen[:desc] = true
+      elsif in_vm && !in_mgmt && line.match?(/^\s+name:/)
+        new_lines << "    name: #{params[:vm_name]}\n"
+        seen[:vm_name] = true
+      elsif in_vm && !in_mgmt && line.match?(/^\s+dns\s*:/)
+        new_lines << "    dns : [#{formatted_vm_dns}]\n"
+        seen[:vm_dns] = true
+      elsif in_mgmt && line.match?(/^\s+vrfid\s*:/)
+        new_lines << "      vrfid : #{params[:mgmt_vrfid]}\n"
+        seen[:vrfid] = true
+      elsif in_mgmt && line.match?(/^\s+dns\s*:/)
+        new_lines << "      dns   : [#{formatted_mgmt_dns}]\n"
+        seen[:mgmt_dns] = true
+      elsif in_mgmt && line.match?(/^\s+net\s*:/)
+        new_lines << "      net   : #{params[:mgmt_net]}\n"
+        seen[:net] = true
+      elsif in_mgmt && line.match?(/^\s+gw\s*:/)
+        new_lines << "      gw    : #{params[:mgmt_gw]}\n"
+        seen[:gw] = true
+      
+      # INJECT MISSING KEYS RIGHT BEFORE THE NEXT BLOCK STARTS
+      elsif line.match?(/^defaults:/) || line.match?(/^topology:/)
+        new_lines << "name: #{params[:name]}\n" unless seen[:name]
+        new_lines << "desc: #{params[:desc]}\n" unless seen[:desc]
+        new_lines << line
+      elsif in_vm && !in_mgmt && line.match?(/^\s+mgmt:/)
+        new_lines << "    name: #{params[:vm_name]}\n" unless seen[:vm_name] || params[:vm_name].empty?
+        new_lines << "    dns : [#{formatted_vm_dns}]\n" unless seen[:vm_dns] || formatted_vm_dns.empty?
+        new_lines << line
+      elsif in_mgmt && line.match?(/^\s+nodes:/)
+        new_lines << "      vrfid : #{params[:mgmt_vrfid]}\n" unless seen[:vrfid] || params[:mgmt_vrfid].empty?
+        new_lines << "      dns   : [#{formatted_mgmt_dns}]\n" unless seen[:mgmt_dns] || formatted_mgmt_dns.empty?
+        new_lines << "      net   : #{params[:mgmt_net]}\n" unless seen[:net] || params[:mgmt_net].empty?
+        new_lines << "      gw    : #{params[:mgmt_gw]}\n" unless seen[:gw] || params[:mgmt_gw].empty?
+        new_lines << line
+      else
+        new_lines << line
+      end
+    end
+    
+    File.write(full_path, new_lines.join)
+    { message: "Lab metadata updated successfully." }.to_json
+  rescue => e
+    status 500
+    { error: "Failed to update lab: #{e.message}" }.to_json
+  end
+end
+
+#
+# LOGS
+#
 get '/logs' do
   if params[:file]
     # View specific log

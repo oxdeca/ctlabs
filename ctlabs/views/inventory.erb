@@ -7,6 +7,9 @@
 -->
 
 <%= HEADER %>
+<script src="/js/inventory.js"></script>
+
+<% inv_contents = fetch_inventory_contents %>
 
     <div id="inv-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
       <h2><i class="fas fa-list-alt"></i> Ansible Inventories</h2>
@@ -21,41 +24,13 @@
       </button>
     </div>
 
-    <%
-      # Default to standard public directory for manual CLI generation
-      mgmt_path = 'public/inventory.ini'
-      data_path = 'public/inventory_data.ini'
-      
-      # If a lab is actively running, ask the Lab class exactly where it put the files
-      if Lab.running?
-        begin
-          lab_name = Lab.current_name
-          runtime_path = "/var/run/ctlabs/#{lab_name.gsub('/', '_')}.yml"
-          labs_dir = File.expand_path('../labs', __dir__)
-          full_path = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, lab_name)
-          
-          lab = Lab.new(cfg: full_path, log: LabLog.null)
-          if lab.instance_variable_get(:@pubdir)
-            mgmt_path = File.join(lab.instance_variable_get(:@pubdir), 'inventory.ini')
-            data_path = File.join(lab.instance_variable_get(:@pubdir), 'inventory_data.ini')
-          end
-        rescue => e
-          # Silently fallback to standard path on error
-        end
-      end
-
-      # Safely read the files
-      mgmt_content = File.file?(mgmt_path) ? File.read(mgmt_path) : "Management inventory not generated.\nRun './ctlabs.rb -i' to generate."
-      data_content = File.file?(data_path) ? File.read(data_path) : "Data inventory not generated.\nRun './ctlabs.rb -i' to generate."
-    %>
-
     <div id="MgmtInv" class="w3-container inv-tab w3-margin-bottom" style="padding: 0;">
       <div class="w3-panel w3-round-large" style="background-color: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; margin-top: 0;">
         <h4 style="color: #38bdf8; margin-top: 10px;"><i class="fas fa-info-circle"></i> Management Network (eth0)</h4>
         <p style="color: #e2e8f0; font-size: 0.9em;">This inventory connects to the infrastructure over the isolated management plane.</p>
       </div>
       <div class="w3-card-4 w3-round-large" style="background-color: #0f172a; border: 1px solid #334155; padding: 15px; overflow: auto; max-height: 60vh;">
-        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(mgmt_content) %></code></pre>
+        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(inv_contents[:mgmt]) %></code></pre>
       </div>
     </div>
 
@@ -65,31 +40,9 @@
         <p style="color: #e2e8f0; font-size: 0.9em;">This inventory allows targeted configuration of data-plane services directly over the simulated network.</p>
       </div>
       <div class="w3-card-4 w3-round-large" style="background-color: #0f172a; border: 1px solid #334155; padding: 15px; overflow: auto; max-height: 60vh;">
-        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(data_content) %></code></pre>
+        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(inv_contents[:data]) %></code></pre>
       </div>
     </div>
-
-<script>
-  function openInvTab(evt, tabName) {
-    let i, x, tablinks;
-    
-    // Hide all tabs
-    x = document.getElementsByClassName("inv-tab");
-    for (i = 0; i < x.length; i++) {
-      x[i].style.display = "none";
-    }
-    
-    // Remove active highlight from all buttons
-    tablinks = document.getElementsByClassName("tablink");
-    for (i = 0; i < tablinks.length; i++) {
-      tablinks[i].className = tablinks[i].className.replace(" w3-blue", "");
-    }
-    
-    // Show the targeted tab and highlight the clicked button
-    document.getElementById(tabName).style.display = "block";
-    evt.currentTarget.className += " w3-blue";
-  }
-</script>
 
 <%= SCRIPT %>
 <%= FOOTER %>

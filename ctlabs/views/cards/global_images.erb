@@ -1,0 +1,130 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/global_images.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-box w3-text-orange"></i> Global Image Registry</span>
+    <button type="button" onclick="window.openAddLocalImageModal()" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add / Import</button>
+  </div>
+
+  <% 
+    local_built_images = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    local_built_images += `docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    
+    local_built_images.map! do |img|
+      img.sub(%r{^localhost/}, '').sub(%r{^docker\.io/library/}, '').sub(%r{^docker\.io/}, '').sub(%r{^quay\.io/}, '')
+    end
+    local_built_images.uniq!
+    local_built_images.reject! { |img| img == "<none>:<none>" || img.empty? }
+
+    global_images = []
+    claimed_registry_tags = []
+
+    Dir.glob(File.join("..", "images", "**", "Dockerfile")).each do |df|
+      rel_path = df.sub(/\A.*?\.\.\/images\//, '').sub(/\/Dockerfile\z/, '')
+      parts = rel_path.split('/')
+      category = parts[0]
+      os = parts.length > 2 ? parts[1] : '-'
+      
+      version = "latest"
+      img_name = parts.size > 1 ? "ctlabs/#{parts[1..-1].join('/')}" : "ctlabs/#{rel_path}"
+
+      build_sh = File.join(File.dirname(df), "build.sh")
+      if File.exist?(build_sh)
+        content = File.read(build_sh)
+        img_name = $1 if content.match(/IMG_NAME\s*=\s*"?([^"\s\n]+)"?/)
+        if match = content.match(/IMG_VERS\s*=\s*"?([^"\s\n]+)"?/)
+          version = match[1]
+        elsif match = content.match(/VERSION\s*=\s*"?([^"\s\n]+)"?/)
+          version = match[1]
+        elsif match = content.match(/TAG\s*=\s*"?([^"\s\n]+)"?/)
+          version = match[1]
+        elsif match = content.match(/-t\s+[^\s:]+:([a-zA-Z0-9_.-]+)/)
+          version = match[1] unless match[1] == "latest"
+        end
+      end
+      
+      target_exact = "#{img_name}:#{version}"
+      target_latest = "#{img_name}:latest"
+      
+      is_built = false
+      local_built_images.each do |tag|
+        if tag.split(':').first == img_name
+          claimed_registry_tags << tag
+          is_built = true if tag == target_exact || tag == target_latest
+        end
+      end
+      
+      global_images << { path: rel_path, category: category, os: os, version: version, built: is_built, imported: false, full_tag: target_exact }
+    end
+
+    unclaimed_images = local_built_images - claimed_registry_tags
+    unclaimed_images.each do |tag|
+      repo, ver = tag.split(':', 2)
+      ver ||= "latest"
+      global_images << { path: repo, category: "imported", os: "-", version: ver, built: true, imported: true, full_tag: tag }
+    end
+
+    global_images.sort_by! { |img| [img[:imported] ? 1 : 0, img[:path]] }
+  %>
+  
+  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
+    <% if global_images.empty? %>
+      <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No images detected.</p></div>
+    <% else %>
+      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+        <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
+          <tr style="color: #94a3b8;">
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Category</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">OS</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Version</th>
+            <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% global_images.each do |img| %>
+            <tr>
+              <td style="vertical-align: middle;">
+                <strong style="color: <%= img[:imported] ? '#cbd5e1' : '#38bdf8' %>;"><%= img[:path] %></strong>
+              </td>
+              <td style="vertical-align: middle;">
+                <% if img[:imported] %>
+                  <span class="w3-badge w3-tiny w3-round w3-deep-purple">imported</span>
+                <% else %>
+                  <span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:category] %></span>
+                <% end %>
+              </td>
+              <td style="vertical-align: middle;"><%= img[:os] == '-' ? '-' : "<span class='w3-badge w3-tiny w3-round' style='background-color: #64748b;'>#{img[:os]}</span>" %></td>
+              <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-green"><%= img[:version] %></span></td>
+              <td style="vertical-align: middle;">
+                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
+                  <span title="<%= img[:built] ? 'Ready in local registry' : 'Source only' %>" style="margin-right: 4px;">
+                    <i class="fas fa-cube fa-lg <%= img[:built] ? 'w3-text-green' : '' %>" <%= img[:built] ? '' : 'style="color: #475569;"' %>></i>
+                  </span>
+                  <% if img[:imported] %>
+                    <button type="button" onclick="window.removeImportedImage('<%= ERB::Util.url_encode(img[:full_tag]) %>')" class="w3-button w3-tiny w3-transparent w3-text-purple w3-hover-text-deep-purple" title="Remove External Image" style="padding: 2px 6px;"><i class="fas fa-eject fa-lg"></i></button>
+                    <button type="button" disabled class="w3-button w3-tiny w3-transparent" style="color: #475569; padding: 2px 6px; cursor: not-allowed;"><i class="fas fa-edit fa-lg"></i></button>
+                    <button type="button" disabled class="w3-button w3-tiny w3-transparent" style="color: #475569; padding: 2px 6px; cursor: not-allowed;"><i class="fas fa-trash fa-lg"></i></button>
+                  <% else %>
+                    <% if img[:built] %>
+                      <button type="button" onclick="window.unloadImage('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-purple w3-hover-text-deep-purple" title="Unload from Local Registry" style="padding: 2px 6px;"><i class="fas fa-eject fa-lg"></i></button>
+                    <% else %>
+                      <button type="button" disabled class="w3-button w3-tiny w3-transparent" style="color: #475569; padding: 2px 6px; cursor: not-allowed;" title="Not in registry"><i class="fas fa-eject fa-lg"></i></button>
+                    <% end %>
+                    <button type="button" onclick="window.openBuildModal('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Open Editor & Build" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                    <button type="button" onclick="window.deleteLocalImage('<%= ERB::Util.url_encode(img[:path]) %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Structure" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                  <% end %>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+</div>

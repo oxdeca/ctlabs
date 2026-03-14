@@ -1,0 +1,35 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/links.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-project-diagram w3-text-green"></i> Network Links</span>
+    <button type="button" onclick="window.openLinkEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Link</button>
+  </div>
+  <div class="w3-padding">
+    <% if (info_hash[:links] || []).empty? %>
+      <p style="color: #94a3b8; font-style: italic;">No links defined</p>
+    <% else %>
+      <table class="w3-table w3-striped w3-small">
+        <thead><tr style="color: #94a3b8;"><th>Endpoint A</th><th>Endpoint B</th><th style="text-align:right;">Actions</th></tr></thead>
+        <tbody>
+          <% info_hash[:links].each do |l| %>
+            <tr>
+              <td style="vertical-align: middle;"><strong style="color: #38bdf8;"><%= l[:node_a] %></strong> <span style="color: #64748b;">[<%= l[:int_a] %>]</span></td>
+              <td style="vertical-align: middle;"><strong style="color: #38bdf8;"><%= l[:node_b] %></strong> <span style="color: #64748b;">[<%= l[:int_b] %>]</span></td>
+              <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
+                <button type="button" onclick="window.editLinkConfig('<%= info_hash[:lab_path] %>', '<%= l[:node_a] %>', '<%= l[:int_a] %>', '<%= l[:node_b] %>', '<%= l[:int_b] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Link" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                <button type="button" onclick="window.deleteLink('<%= info_hash[:lab_path] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Link" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+</div>

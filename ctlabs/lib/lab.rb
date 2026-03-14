@@ -583,10 +583,43 @@ end
     end
 
     @log.info "[ADHOC NODE] Started node #{node_name}"
-    
-    # Return the CLEAN node_cfg (no implicit eth0) and ONLY the data_link for the YAML
+
+    # CACHE THE EXACT TEXT FOR SAVING LATER
+    begin
+      FileUtils.mkdir_p('/var/run/ctlabs')
+      runtime_file = "/var/run/ctlabs/#{@relative_path.gsub('/', '_')}.adhoc"
+      File.open(runtime_file, 'a') do |f|
+        clean_cfg = Marshal.load(Marshal.dump(node_cfg))
+        clean_cfg.delete('adhoc')
+        
+        # 8 spaces for node name
+        yaml_str = "      #{node_name}:\n"
+        # 10 spaces for attributes
+        yaml_str << "        type : #{clean_cfg['type']}\n" if clean_cfg['type']
+        yaml_str << "        kind : #{clean_cfg['kind']}\n" if clean_cfg['kind'] && !clean_cfg['kind'].to_s.empty?
+        yaml_str << "        gw   : #{clean_cfg['gw']}\n" if clean_cfg['gw'] && !clean_cfg['gw'].to_s.empty?
+        
+        # NEVER save explicit nics for switches. Strip eth0 for all others.
+        if clean_cfg['type'] != 'switch' && clean_cfg['nics'] && clean_cfg['nics'].any? { |k,v| k != 'eth0' }
+          yaml_str << "        nics :\n"
+          clean_cfg['nics'].each { |nic, ip| yaml_str << "          #{nic}: #{ip}\n" unless nic == 'eth0' }
+        end
+        
+        f.puts "===NODE==="
+        f.puts yaml_str.chomp # Chomp removes the trailing newline for cleaner injection
+        
+        if data_link
+          f.puts "===LINK==="
+          f.puts "      - [ \"#{data_link[0]}\",  \"#{data_link[1]}\" ]\n"
+        end
+      end
+    rescue => e
+      @log.write("Failed to write adhoc state cache: #{e.message}", "error")
+    end
+
     [node_cfg, data_link]
   end
+    
 
   def del_dnat
     @log.write "#{__method__}(): ", "debug"
@@ -877,6 +910,9 @@ end
         @log.info "Removing DNAT rules..."
         del_dnat
       end
+
+      # Clear any unsaved AdHoc cache!
+      FileUtils.rm_f("/var/run/ctlabs/#{@relative_path.gsub('/', '_')}.adhoc")
     ensure
       self.class.release_lock!
     end
@@ -901,6 +937,62 @@ end
       yield
     ensure
       # Lock is automatically released when file is closed
+    end
+  end
+
+  # Textually appends AdHoc changes to preserve the user's YAML formatting perfectly
+  def self.save_runtime_to_base(lab_path)
+    full_path = File.join("..", "labs", lab_path)
+    runtime_file = "/var/run/ctlabs/#{lab_path.gsub('/', '_')}.adhoc"
+    
+    return true unless File.exist?(runtime_file) # Nothing to save
+    return false unless File.file?(full_path)
+    
+    begin
+      lines = File.readlines(full_path)
+      adhoc_data = File.read(runtime_file)
+      
+      new_nodes = []
+      new_links = []
+      
+      current_block = nil
+      adhoc_data.each_line do |line|
+        if line.strip == "===NODE==="
+          current_block = new_nodes
+        elsif line.strip == "===LINK==="
+          current_block = new_links
+        else
+          current_block << line if current_block
+        end
+      end
+
+      # Ensure the file ends with a newline so we don't mash words together
+      lines << "\n" if !lines.last.to_s.end_with?("\n")
+      
+      # 1. Inject Nodes
+      if new_nodes.any?
+        # Find `links:` with any amount of leading whitespace
+        links_idx = lines.index { |l| l.match?(/^\s*links:/) }
+        
+        if links_idx
+          lines.insert(links_idx, *new_nodes)
+        else
+          lines.concat(new_nodes)
+        end
+      end
+      
+      # 2. Inject Links at the absolute bottom of the file
+      if new_links.any?
+        lines.concat(new_links)
+      end
+      
+      File.write(full_path, lines.join)
+      FileUtils.rm_f(runtime_file) 
+      
+      return true
+    rescue => e
+      puts "Error saving runtime to base: #{e.message}"
+      return false
     end
   end
 

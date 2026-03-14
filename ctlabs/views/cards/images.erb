@@ -1,0 +1,47 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/images.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-layer-group w3-text-orange"></i> Image Profiles (Lab Specific)</span>
+    <div>
+      <button type="button" onclick="window.openImageEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Profile</button>
+    </div>
+  </div>
+  
+  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
+    <% if (info_hash[:images] || []).empty? %>
+      <div class="w3-padding">
+        <p style="color: #94a3b8; font-style: italic;">No image profiles defined</p>
+      </div>
+    <% else %>
+      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+        <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
+          <tr style="color: #94a3b8;">
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Kind</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Mapped Image</th>
+            <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (info_hash[:images] || []).each do |img| %>
+            <tr>
+              <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:type] %></span></td>
+              <td style="vertical-align: middle;"><%= img[:kind] %></td>
+              <td style="color: #cbd5e1; vertical-align: middle;"><%= img[:image] %></td>
+              <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
+                <button type="button" onclick="window.editImageConfig('<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image Profile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Profile" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
+</div>

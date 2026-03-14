@@ -1,14 +1,13 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/labs.erb
-# Description : labs view
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
 
 <%= HEADER %>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/dockerfile.min.js"></script>
+
 <%
   # Dynamically find the absolute newest log file using the global LOG_DIR constant
   latest_log_path = Dir.glob(File.join(LOG_DIR, "*.log")).max_by { |f| File.mtime(f) }
@@ -149,13 +148,76 @@
       </div>
     </div>
   <% end %>
+
+  <div id="edit-lab-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+        <span onclick="document.getElementById('edit-lab-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+        <h4 style="margin: 0;"><i class="fas fa-edit"></i> Edit Lab Configuration</h4>
+      </header>
+      <form onsubmit="window.submitEditLab(event)">
+        <input type="hidden" id="edit-lab-path" name="lab_path">
+        <div class="w3-container w3-padding" style="max-height: 60vh; overflow-y: auto;">
+          
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-top: 0;">Global Settings</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Name</label>
+              <input type="text" id="edit-lab-name" name="name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Description</label>
+              <input type="text" id="edit-lab-desc" name="desc" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px;">Topology (VM)</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VM Name</label>
+              <input type="text" id="edit-lab-vm-name" name="vm_name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VM DNS (Comma separated)</label>
+              <input type="text" id="edit-lab-vm-dns" name="vm_dns" placeholder="1.1.1.1, 8.8.8.8" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px;">Management Network</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VRF ID</label>
+              <input type="number" id="edit-lab-mgmt-vrfid" name="mgmt_vrfid" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Mgmt DNS (Comma separated)</label>
+              <input type="text" id="edit-lab-mgmt-dns" name="mgmt_dns" placeholder="1.1.1.1, 8.8.8.8" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Network (e.g., 192.168.99.0/24)</label>
+              <input type="text" id="edit-lab-mgmt-net" name="mgmt_net" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Gateway</label>
+              <input type="text" id="edit-lab-mgmt-gw" name="mgmt_gw" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+          <div id="edit-lab-result" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;" class="w3-round"></div>
+        </div>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+          <button type="button" onclick="document.getElementById('edit-lab-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+          <button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save Changes</button>
+        </footer>
+      </form>
+    </div>
+  </div>
 </div>
 <br>
 
 <!-- Lab Info Card Section -->
 <div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round">
   <% if @lab_info %>
-    <%= render_lab_info_card(@lab_info) %> <!-- Use the helper -->
+    <%= erb :lab_details, layout: false, locals: { info_hash: @lab_info } %>
   <% else %>
     <div id="lab-info-placeholder" class="w3-panel w3-light-grey">
       <p>Select a lab to view its details.</p>
@@ -165,11 +227,177 @@
 
 <br>
 <script>
-  // Helper to dynamically read the images_map from the DOM after an AJAX load
-  function getImagesMap() {
-      const dataDiv = document.getElementById('lab-dynamic-data');
-      return dataDiv ? JSON.parse(dataDiv.getAttribute('data-images-map') || '{}') : {};
+  // JavaScript to handle Tab Switching in the Sidebar
+  function openLabTab(evt, tabId) {
+    localStorage.setItem('ctlabs_active_tab', tabId);
+
+    const contents = document.getElementsByClassName("lab-tab-content");
+    for (let i = 0; i < contents.length; i++) contents[i].style.display = "none";
+          
+    const btns = document.getElementsByClassName("lab-tab-btn");
+    for (let i = 0; i < btns.length; i++) {
+      btns[i].style.backgroundColor = "transparent";
+      btns[i].style.color = "#cbd5e1";
+      btns[i].style.fontWeight = "normal";
+    }
+    
+    // CRITICAL FIX: Use flex instead of block so CSS constraints work!
+    document.getElementById(tabId).style.display = "flex";
+    
+    evt.currentTarget.style.backgroundColor = "#38bdf8";
+    evt.currentTarget.style.color = "#0f172a";
+    evt.currentTarget.style.fontWeight = "bold";
   }
+
+  // --- PERFECT LAYOUT RESIZER ---
+  window.autoResizeLayout = function() {
+      const wrapper = document.getElementById('lab-layout-wrapper');
+      if (wrapper) {
+          const rect = wrapper.getBoundingClientRect();
+          // Increased to 60px to fully clear the bottom padding of the w3-panels
+          const newHeight = window.innerHeight - rect.top - 60;
+          wrapper.style.height = Math.max(400, newHeight) + 'px';
+      }
+  };
+  window.addEventListener('resize', window.autoResizeLayout);
+
+  // --- EDIT LAB ATTRIBUTES ---
+  window.openEditLabModal = async function(labPath) {
+      const pathInput = document.getElementById('edit-lab-path');
+      const modal = document.getElementById('edit-lab-modal');
+      
+      if (!pathInput || !modal) {
+          alert("Error: The Edit Lab modal HTML is missing from the page! Please make sure it was pasted into views/labs.erb");
+          return;
+      }
+
+      pathInput.value = labPath;
+      const resultDiv = document.getElementById('edit-lab-result');
+      if (resultDiv) resultDiv.style.display = 'none';
+
+      try {
+          const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+          const res = await fetch(`/labs/${safeLab}/meta`);
+          if (!res.ok) throw new Error("Failed to load lab data from backend.");
+          const data = await res.json();
+
+          document.getElementById('edit-lab-name').value = data.name || '';
+          document.getElementById('edit-lab-desc').value = data.desc || '';
+          document.getElementById('edit-lab-vm-name').value = data.vm_name || '';
+          document.getElementById('edit-lab-vm-dns').value = data.vm_dns || '';
+          document.getElementById('edit-lab-mgmt-vrfid').value = data.mgmt_vrfid || '';
+          document.getElementById('edit-lab-mgmt-dns').value = data.mgmt_dns || '';
+          document.getElementById('edit-lab-mgmt-net').value = data.mgmt_net || '';
+          document.getElementById('edit-lab-mgmt-gw').value = data.mgmt_gw || '';
+
+          modal.style.display = 'block';
+      } catch (err) {
+          alert("Error: " + err.message);
+      }
+  };
+
+  window.submitEditLab = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+      const labPath = formData.get('lab_path');
+      const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+      
+      const btn = form.querySelector('button[type="submit"]');
+      const origText = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      btn.disabled = true;
+
+      const resultDiv = document.getElementById('edit-lab-result');
+
+      try {
+          const res = await fetch(`/labs/${safeLab}/edit_meta`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams(formData).toString()
+          });
+
+          if (!res.ok) throw new Error((await res.json()).error || "Failed to save configuration.");
+
+          resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.textContent = '✅ Lab updated successfully! Reloading...';
+          setTimeout(() => location.reload(), 800);
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.textContent = '❌ ' + err.message;
+          btn.innerHTML = origText;
+          btn.disabled = false;
+      }
+  };
+
+  // Helper to dynamically read data from the DOM after an AJAX load
+  window.getLabData = function(key) {
+      const dataDiv = document.getElementById('lab-dynamic-data');
+      if (!dataDiv) return (key === 'images-map') ? {} : [];
+      try { return JSON.parse(dataDiv.getAttribute('data-' + key) || (key === 'images-map' ? '{}' : '[]')); } 
+      catch(e) { return (key === 'images-map') ? {} : []; }
+  };
+
+  // Old helper mapped to new helper to prevent breaking existing code
+  function getImagesMap() { return window.getLabData('images-map'); }
+
+  // Auto-fills the Gateway IP based on the Switch selected
+  window.updateGatewayForSwitch = function(switchName) {
+      const gwInput = document.querySelector('input[name="gw"]');
+      if (!gwInput) return;
+
+      const gwMap = window.getLabData('switch-gws');
+      if (switchName && gwMap && gwMap[switchName]) {
+          gwInput.value = gwMap[switchName];
+      } else {
+          // Optional: You can remove this else-block if you don't want 
+          // the field to automatically clear itself when "None" is selected
+          gwInput.value = ''; 
+      }
+  };
+
+  // --- SMART ADD NODE LOGIC ---
+  window.updateNodeFormFields = function(nodeType) {
+      const connectLabel = document.getElementById('add-node-connect-label');
+      const connectSelect = document.getElementById('add-node-connect-select');
+      const ipContainer = document.getElementById('add-node-ip-container');
+      const gwContainer = document.getElementById('add-node-gw-container');
+
+      if (!connectSelect) return;
+
+      // Default layout for Host/Router/Controller
+      let targetType = 'switches';
+      let labelText = 'Connect to Switch (eth1)';
+      let showIpGw = true;
+
+      // Smart Layout for Switches
+      if (nodeType === 'switch') {
+          targetType = 'routers';
+          labelText = 'Connect to Router (eth1)';
+          showIpGw = false; // Switches are L2, no IP needed!
+      }
+
+      connectLabel.innerHTML = labelText;
+      
+      // Toggle IP/GW visibility
+      ipContainer.style.display = showIpGw ? 'block' : 'none';
+      gwContainer.style.display = showIpGw ? 'block' : 'none';
+      
+      // Clear inputs if they are being hidden so we don't accidentally submit bad data
+      if (!showIpGw) {
+          ipContainer.querySelector('input').value = '';
+          gwContainer.querySelector('input').value = '';
+      }
+
+      // Rebuild the connection dropdown with the correct network devices
+      connectSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
+      const optionsList = window.getLabData(targetType);
+      optionsList.forEach(opt => {
+          connectSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+      });
+      // Clear the gateway autofill when dropdown options change
+      window.updateGatewayForSwitch('');
+  };
 
   // --- UNIFIED ADD NODE ---
   window.openAddNodeModal = function(labPath) {
@@ -177,6 +405,10 @@
       document.getElementById('add-node-form').reset();
       document.getElementById('add-node-kind').innerHTML = '<option value="" disabled selected>-- Select Kind --</option>';
       document.getElementById('add-node-result').style.display = 'none';
+      
+      // Reset the smart form to standard view on open
+      if(typeof window.updateNodeFormFields === 'function') window.updateNodeFormFields('');
+      
       document.getElementById('add-node-modal').style.display = 'block';
   };
 
@@ -211,9 +443,11 @@
               body: new URLSearchParams(formData).toString()
           });
 
+          // SAFELY HANDLE RAW TEXT OR JSON ERRORS
           if (!createRes.ok) {
-              const err = await createRes.json();
-              throw new Error(err.error || 'Failed to create node');
+              let errText = await createRes.text();
+              try { errText = JSON.parse(errText).error || errText; } catch(e) {}
+              throw new Error(errText || 'Failed to create node');
           }
 
           let finalNics = formData.get('nics') || '';
@@ -222,17 +456,19 @@
               finalNics = `eth1=${ipField}`;
               formData.set('nics', finalNics);
           }
-
           formData.append('format', 'form');
+          
           const editRes = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}/edit`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams(formData).toString()
           });
 
+          // SAFELY HANDLE RAW TEXT OR JSON ERRORS
           if (!editRes.ok) {
-              const err = await editRes.json();
-              throw new Error('Node created, but failed to save advanced settings: ' + (err.error || ''));
+              let errText = await editRes.text();
+              try { errText = JSON.parse(errText).error || errText; } catch(e) {}
+              throw new Error('Node created, but failed to save advanced settings: ' + errText);
           }
 
           resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
@@ -461,7 +697,6 @@
   };
 
   // --- BULLETPROOF RAW IMAGE EDITOR ---
-  // --- BULLETPROOF RAW IMAGE EDITOR ---
   window.openBuildModal = async function(imageEnc) {
       const decodedImg = decodeURIComponent(imageEnc);
       document.getElementById('build-img-name').textContent = decodedImg;
@@ -550,6 +785,7 @@
       }
   };
 
+  // Real-time Syntax Highlighting Sync
   window.updateDockerHighlight = function() {
       let text = document.getElementById('build-dockerfile').value;
       if (text.endsWith("\n")) text += " "; 
@@ -560,33 +796,56 @@
       } catch (e) {
           document.getElementById('raw-highlight').textContent = text;
       }
+      
+      // Trigger the vertical stretch every time the user types!
+      window.autoResizeGlassEditor();
   };
 
+  // Synchronizes horizontal scrolling between layers
   window.syncDockerScroll = function(element) {
       const bgLayer = document.getElementById('raw-highlight-pre');
-      bgLayer.scrollTop = element.scrollTop;
-      bgLayer.scrollLeft = element.scrollLeft;
+      bgLayer.scrollLeft = element.scrollLeft; // We only need horizontal sync now!
+  };
+
+  // Perfectly stretches the container, textarea, and background layer vertically
+  window.autoResizeGlassEditor = function() {
+      const ta = document.getElementById('build-dockerfile');
+      const pre = document.getElementById('raw-highlight-pre');
+      const container = document.querySelector('.editor-container');
+
+      // Briefly collapse to calculate true required height
+      ta.style.height = '450px'; 
+      
+      // Calculate height based on content (minimum 450px)
+      const newHeight = Math.max(450, ta.scrollHeight) + 'px';
+
+      // Apply exact height to all 3 layers so they lock together
+      ta.style.height = newHeight;
+      pre.style.height = newHeight;
+      container.style.height = newHeight;
   };
 
   // --- NEW IMAGE MANAGEMENT ACTIONS ---
-  
-  // Quick Build (Hammer Icon): Skips the editor and just runs the build script
-  window.quickBuildImage = async function(imageEnc) {
-      const decodedImg = decodeURIComponent(imageEnc);
-      if(!confirm(`Trigger a build for ${decodedImg} right now?`)) return;
 
+  // Open the Global Manage Images Modal
+  window.openManageImagesModal = function() {
+      document.getElementById('manage-images-modal').style.display = 'block';
+  };
+
+  // Unload Image from Local Registry (Eject Icon)
+  window.unloadImage = async function(imageEnc) {
+      const decodedImg = decodeURIComponent(imageEnc);
+      if (!confirm(`Are you sure you want to unload ${decodedImg} from the container registry? (This does not delete your source files.)`)) return;
+      
       try {
-          // Send request WITHOUT a dockerfile payload so it doesn't overwrite anything!
-          const res = await fetch(`/images/build`, { 
+          const res = await fetch(`/images/unload`, { 
               method: 'POST', 
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ image: decodedImg }).toString() 
           });
-          const data = await res.json();
-          if (res.ok) {
-              window.location.href = `/logs?file=${encodeURIComponent(data.log_path)}&lab=ImageBuilder&action=build`;
-          } else throw new Error(data.error);
-      } catch(err) { alert("Build failed to start: " + err.message); }
+          if (res.ok) location.reload();
+          else alert((await res.json()).error);
+      } catch(err) { alert("Failed to unload image: " + err.message); }
   };
 
   // Add Image (Plus Icon)
@@ -621,6 +880,47 @@
           if (res.ok) location.reload();
           else alert((await res.json()).error);
       } catch(err) { alert(err.message); }
+  };
+
+  // Pull External Image from Docker Hub / Registry
+  window.submitPullImage = async function(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const btn = e.target.querySelector('button[type="submit"]');
+      const origText = btn.innerHTML;
+      
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling...';
+      btn.disabled = true;
+
+      try {
+          const res = await fetch(`/images/pull`, { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // <-- THIS WAS MISSING!
+              body: new URLSearchParams(formData).toString() 
+          });
+          if (res.ok) location.reload();
+          else { 
+              alert((await res.json()).error); 
+              btn.innerHTML = origText; 
+              btn.disabled = false; 
+          }
+      } catch(err) { alert(err.message); btn.innerHTML = origText; btn.disabled = false; }
+  };
+
+  // Remove an imported image directly by its full registry tag
+  window.removeImportedImage = async function(imageTagEnc) {
+      const tag = decodeURIComponent(imageTagEnc);
+      if (!confirm(`Remove external image '${tag}' from the registry?`)) return;
+      
+      try {
+          const res = await fetch(`/images/remove_imported`, { 
+              method: 'POST', 
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ image: tag }).toString() 
+          });
+          if (res.ok) location.reload();
+          else alert((await res.json()).error);
+      } catch(err) { alert("Failed to remove image: " + err.message); }
   };
 
   // --- LINKS ---
@@ -745,6 +1045,59 @@
       }
   };
 
+  // --- SAVE ACTIVE LAB ---
+  window.saveActiveLab = async function() {
+      const labSelector = document.getElementById('lab-selector');
+      if (!labSelector || !labSelector.value) {
+          alert("No lab selected.");
+          return;
+      }
+
+      const labPath = labSelector.value;
+
+      // Find the button and show a loading state
+      const btn = document.querySelector('button[onclick="window.saveActiveLab()"]');
+      const origHTML = btn ? btn.innerHTML : '';
+      if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      }
+
+      try {
+          const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+          
+          // Send the save command to the backend
+          const res = await fetch(`/labs/${safeLab}/save`, { method: 'POST' });
+          
+          if (!res.ok) {
+              let errText = await res.text();
+              try { errText = JSON.parse(errText).error || errText; } catch(e) {}
+              
+              // If the backend sends an HTML error page (like a 404 or 500)
+              if (errText.trim().startsWith("<!DOCTYPE") || errText.trim().startsWith("<html")) {
+                  throw new Error(`HTTP ${res.status}: Backend route missing or crashed. Check the terminal!`);
+              }
+              throw new Error(errText || "Failed to save lab configuration.");
+          }
+
+          // Create a nice temporary success notification
+          const infoSection = document.getElementById('lab-info-section');
+          const successDiv = document.createElement('div');
+          successDiv.className = 'w3-panel w3-green w3-round';
+          successDiv.innerHTML = '<h4><i class="fas fa-check-circle"></i> Saved!</h4><p>Runtime changes permanently saved to base YAML.</p>';
+          infoSection.prepend(successDiv);
+          
+          setTimeout(() => location.reload(), 1500);
+
+      } catch (err) {
+          alert("Error: " + err.message);
+          if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = origHTML;
+          }
+      }
+  };
+
   window.submitSaveAs = async function(e) {
       e.preventDefault();
       const form = e.target;
@@ -799,6 +1152,14 @@
         })
         .then(htmlFragment => {
             infoSection.innerHTML = htmlFragment;
+            
+            // Auto-click the remembered tab
+            const activeTab = localStorage.getItem('ctlabs_active_tab') || 'tab-overview';
+            const tabBtn = document.querySelector(`button[onclick*="${activeTab}"]`);
+            if (tabBtn) tabBtn.click();
+
+            // Trigger the perfect height calculator!
+            setTimeout(window.autoResizeLayout, 50);
         })
         .catch(error => {
             console.error('Error fetching lab info card:', error);

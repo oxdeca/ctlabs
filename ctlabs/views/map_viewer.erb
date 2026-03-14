@@ -1,0 +1,36 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/map_viewer.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<%= HEADER %>
+
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<link rel="stylesheet" href="/css/ctlabs-maps.css">
+<script src="/js/ctlabs-maps.js"></script>
+
+<div id="map-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
+  <h2><i class="fas <%= @icon %>"></i> <%= @title %></h2>
+</div>
+
+<div class="w3-bar w3-round-large w3-margin-bottom" style="background-color: #1e293b; border: 1px solid #334155;">
+  <button class="w3-bar-item w3-button tablink w3-blue w3-round-large" onclick="openMapTab(event, 'DataNet')" style="font-weight: 600;">
+    <i class="fas <%= @icon %>"></i> Data Network
+  </button>
+  <button class="w3-bar-item w3-button tablink w3-round-large" onclick="openMapTab(event, 'MgmtNet')" style="font-weight: 600;">
+    <i class="fas fa-network-wired"></i> Management Network
+  </button>
+</div>
+
+<div id="DataNet" class="w3-card-4 w3-margin-bottom map-tab" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 230px);">
+  <object id="topo-obj" type="image/svg+xml" data="<%= @file_prefix %>.svg" style="width: 100%; height: 100%;"></object>
+</div>
+
+<div id="MgmtNet" class="w3-card-4 w3-margin-bottom map-tab" style="display:none; background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 230px);">
+  <object id="mgmt-topo-obj" type="image/svg+xml" data="mgmt_<%= @file_prefix %>.svg" style="width: 100%; height: 100%;"></object>
+</div>
+
+<%= SCRIPT %>
+<%= FOOTER %>
