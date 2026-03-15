@@ -15,12 +15,48 @@ get '/terminal/:node_name' do
     driver = WebSocket::Driver.rack(wrapper)
     
     node_name = params[:node_name]
-    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color', node_name, 'bash']
+    
+    if node_name == 'ctlabs_host'
+      cmd = ['bash']
+    else
+      # 1. Smart Lookup: Check the active lab YAML for custom terminal configurations
+      custom_term = nil
+      if Lab.running?
+        runtime_path = File.join(LOCK_DIR, "#{Lab.current_name.gsub('/', '_')}.yml")
+        if File.file?(runtime_path)
+          begin
+            yaml = YAML.load_file(runtime_path)
+            node_cfg = yaml.dig('topology', 0, 'nodes', node_name)
+            
+            if node_cfg
+              custom_term = node_cfg['term']
+              # Fallback for external nodes that might just have an ipv4 defined
+              if (!custom_term || custom_term.empty?) && node_cfg['type'] == 'external' && node_cfg['ipv4']
+                custom_term = "ssh://root@#{node_cfg['ipv4'].split('/').first}"
+              end
+            end
+          rescue
+            # Safely ignore YAML parsing errors and fallback to Docker
+          end
+        end
+      end
 
-    pty_read = nil
-    pty_write = nil
-    pty_pid = nil
+      # 2. Command Router: Launch SSH or Docker based on the lookup
+      if custom_term && custom_term.start_with?('ssh://')
+        require 'uri'
+        uri = URI.parse(custom_term)
+        user = uri.user || 'root'
+        host = uri.host
+        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', "#{user}@#{host}"]
+      else
+        engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+        cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color', node_name, 'bash']
+      end
+    end
+    
+    pty_read   = nil
+    pty_write  = nil
+    pty_pid    = nil
     pty_thread = nil
 
     # 1. Connection Established

@@ -149,32 +149,35 @@
       let labelText = 'Connect to Switch (eth1)';
       let showIpGw = true;
 
-      // Smart Layout for Switches
+      // Smart Layouts
       if (nodeType === 'switch') {
           targetType = 'routers';
           labelText = 'Connect to Router (eth1)';
           showIpGw = false; // Switches are L2, no IP needed!
+      } else if (nodeType === 'rhost') {
+          targetType = 'switches';
+          labelText = 'Connect to Switch (Optional)';
+          showIpGw = true; 
       }
 
       connectLabel.innerHTML = labelText;
       
-      // Toggle IP/GW visibility
+      // Toggle IP visibility
       ipContainer.style.display = showIpGw ? 'block' : 'none';
-      gwContainer.style.display = showIpGw ? 'block' : 'none';
       
-      // Clear inputs if they are being hidden so we don't accidentally submit bad data
+      // Hide Gateway for Switches AND External nodes
+      gwContainer.style.display = (showIpGw && nodeType !== 'external') ? 'block' : 'none';
+      
       if (!showIpGw) {
           ipContainer.querySelector('input').value = '';
           gwContainer.querySelector('input').value = '';
       }
 
-      // Rebuild the connection dropdown with the correct network devices
       connectSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
       const optionsList = window.getLabData(targetType);
       optionsList.forEach(opt => {
           connectSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
       });
-      // Clear the gateway autofill when dropdown options change
       window.updateGatewayForSwitch('');
   };
 
@@ -192,10 +195,18 @@
   };
 
   window.updateKindOptions = function(type, targetId) {
-      const map = getImagesMap();
+      const map = window.getImagesMap ? window.getImagesMap() : window.getLabData('images-map');
       const kindSelect = document.getElementById(targetId);
       if (!kindSelect) return;
-      kindSelect.innerHTML = '<option value="" disabled selected>-- Select Kind --</option>';
+
+      kindSelect.innerHTML = '<option value="remote" disabled selected>-- Select Kind --</option>';
+      
+      // Inject a fake "kind" for external nodes since they don't use containers!
+      if (type === 'external') {
+          kindSelect.innerHTML += `<option value="remote" selected>Remote Server</option>`;
+          return;
+      }
+
       const kinds = map[type] || [];
       kinds.forEach(k => { kindSelect.innerHTML += `<option value="${k}">${k}</option>`; });
   };
@@ -231,12 +242,22 @@
 
           let finalNics = formData.get('nics') || '';
           const ipField = formData.get('ip');
+          const typeField = formData.get('type');
+
+          // 1. ALWAYS assign the IP to eth1 if nics is currently empty (for both Hosts and External nodes)
           if (!finalNics.trim() && ipField) {
               finalNics = `eth1=${ipField}`;
               formData.set('nics', finalNics);
           }
-          formData.append('format', 'form');
+
+          // 2. Add the SSH terminal override specifically for External nodes
+          if (typeField === 'rhost' && ipField) {
+              const ipOnly = ipField.split('/')[0];
+              formData.set('term', `ssh://root@${ipOnly}`);
+          }
           
+          formData.append('format', 'form');
+
           const editRes = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}/edit`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

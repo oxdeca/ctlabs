@@ -374,7 +374,7 @@ post '/labs/action' do
 end
 
 # Add this route *before* the main routes, and importantly, BEFORE the '/labs/*/info' route
-get '/labs/*/info_card' do # <-- NEW: Wildcard for info_card
+get '/labs/*/info_card' do
   content_type 'text/html' # Return HTML fragment
 
   # params[:splat] is an Array containing the matched '*' part(s).

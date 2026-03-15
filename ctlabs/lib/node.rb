@@ -9,42 +9,44 @@ require 'fileutils'
 class Node
   attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term
   attr_writer :nics
+  attr_accessor :is_running
 
   def initialize(args)
-    @defaults  = args['defaults']
-    @name      = args['name' ]
-    @ephemeral = args['ephemeral'] || true
-    @domain    = args['domain']    || "ctlabs.internal"
-    @fqdn      = args['fqdn' ]     || "#{@name}.#{@domain}"
-    @dns       = args['dns'  ]     || []
-    @mgmt      = args['mgmt' ]
-    @type      = args['type' ]
-    @eos       = args['eos'  ]     || 'linux'
-    @kind      = args['kind' ]     || 'linux'
-    @kvm       = args['kvm'  ]     || false
-    @image     = args['image']
-    @env       = args['env'  ]     || []
-    @cmd       = args['cmd'  ]
-    @play      = args['play' ]
-    @nics      = args['nics' ]     || {}
-    @bonds     = args['bonds']
-    @ports     = args['ports']   # ||  @defaults[@type][@kind]['ports'] || 4
-    @gw        = args['gw'   ]
-    @ipv4      = args['ipv4' ]
-    @snat      = args['snat' ]
-    @vxlan     = args['vxlan']
-    @dnat      = args['dnat' ]
-    @mtu       = args['mtu'  ]     || 1460
-    @priv      = args['priv' ]     || false
-    @devs      = args['devs' ]     || []
-    @info      = args[:info  ]     || args['info' ]
-    @urls      = args[:urls  ]     || args['urls' ]
-    @term      = args[:term  ]     || args['term' ]
+    @defaults   = args['defaults']
+    @name       = args['name' ]
+    @ephemeral  = args['ephemeral'] || true
+    @domain     = args['domain']    || "ctlabs.internal"
+    @fqdn       = args['fqdn' ]     || "#{@name}.#{@domain}"
+    @dns        = args['dns'  ]     || []
+    @mgmt       = args['mgmt' ]
+    @type       = args['type' ]
+    @eos        = args['eos'  ]     || 'linux'
+    @kind       = args['kind' ]     || 'linux'
+    @kvm        = args['kvm'  ]     || false
+    @image      = args['image']
+    @env        = args['env'  ]     || []
+    @cmd        = args['cmd'  ]
+    @play       = args['play' ]
+    @nics       = args['nics' ]     || {}
+    @bonds      = args['bonds']
+    @ports      = args['ports']   # ||  @defaults[@type][@kind]['ports'] || 4
+    @gw         = args['gw'   ]
+    @ipv4       = args['ipv4' ]
+    @snat       = args['snat' ]
+    @vxlan      = args['vxlan']
+    @dnat       = args['dnat' ]
+    @mtu        = args['mtu'  ]     || 1460
+    @priv       = args['priv' ]     || false
+    @devs       = args['devs' ]     || []
+    @info       = args[:info  ]     || args['info' ]
+    @urls       = args[:urls  ]     || args['urls' ]
+    @term       = args[:term  ]     || args['term' ]
+    @is_running = false
 
-    dcaps      = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
-    dvols      = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
-    @caps      = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
-    @vols      = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
+    dcaps       = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
+    dvols       = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
+    @caps       = (! args['caps'].nil?) ? args['caps'] + dcaps : dcaps
+    @vols       = (! args['vols'].nil?) ? args['vols'] + dvols : dvols 
 
     @log = args['log'] || LabLog.null
     @log.write "== Node ==", "debug"
@@ -75,6 +77,55 @@ class Node
             @nics.merge!( {"eth#{i}" => '' } )
           end
         end
+    end
+  end
+
+  # CLASS METHOD: Solves the N+1 problem by doing one master check
+  def self.bulk_update_status(nodes)
+    return if nodes.empty?
+
+    # 1. Fetch local containers EXACTLY ONCE
+    podman_running = `podman ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
+    docker_running = `docker ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
+    active_containers = (podman_running + docker_running).uniq
+
+    # 2. Update every node in the array
+    nodes.each do |node|
+      if node.type == 'rhost'
+        # Remote nodes get a quick TCP ping
+        ip = (node.nics && node.nics['eth1']) ? node.nics['eth1'].split('/').first : nil
+        ip ||= node.ipv4 ? node.ipv4.split('/').first : nil
+        
+        if ip && !ip.empty?
+          begin
+            Socket.tcp(ip, 22, connect_timeout: 0.5) { |sock| true }
+            node.is_running = true
+          rescue StandardError
+            node.is_running = false
+          end
+        end
+      else
+        # Local nodes get the lightning-fast array check
+        node.is_running = active_containers.include?(node.name)
+      end
+    end
+  end
+
+  # INSTANCE METHOD: For when you just need to check one single node on the fly
+  def running?
+    if @type == 'rhost'
+      ip = (@nics && @nics['eth1']) ? @nics['eth1'].split('/').first : nil
+      ip ||= @ipv4 ? @ipv4.split('/').first : nil
+      return false unless ip && !ip.empty?
+      begin
+        Socket.tcp(ip, 22, connect_timeout: 0.5) { |sock| true }
+        return true
+      rescue StandardError
+        return false
+      end
+    else
+      engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+      system("#{engine} inspect -f '{{.State.Running}}' #{@name} >/dev/null 2>&1")
     end
   end
 

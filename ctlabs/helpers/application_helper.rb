@@ -61,6 +61,7 @@ module ApplicationHelper
   def parse_lab_info(yaml_file_path, adhoc_rules_by_lab = {})
     require 'yaml'
     require 'set'
+    require 'socket' # <-- Required for the TCP Ping
 
     lab_name = yaml_file_path.sub(LABS_DIR + '/', '')
     refresh_lab_visuals(lab_name)
@@ -131,16 +132,8 @@ module ApplicationHelper
     info[:images] = images
     info[:images_map] = images_map
 
-    # --- BULK HEALTH CHECK (Lightning Fast) ---
-    # Fetch all running container names exactly ONCE, and ONLY if the lab is active!
-    active_containers = []
-    
-    if is_running
-      podman_running = `podman ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
-      docker_running = `docker ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
-      active_containers = (podman_running + docker_running).uniq
-    end
-    # ------------------------------------------
+    # Let the Node class figure out who is running!
+    Node.bulk_update_status(lab.nodes) if is_running
 
     # Nodes (With Diffing)
     nodes = []
@@ -152,11 +145,7 @@ module ApplicationHelper
             image_ref = lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A'
           end
           
-          # If it's not in the base YAML, it was added AdHoc!
           is_adhoc = !base_nodes_list.include?(node.name)
-
-          # Real-time Health Check (In-Memory Array Lookup)
-          container_running = active_containers.include?(node.name)
 
           node_info = {
             name: node.name,
@@ -166,7 +155,7 @@ module ApplicationHelper
             cpus: 'N/A',
             memory: 'N/A',
             adhoc: is_adhoc,
-            running: container_running
+            running: node.is_running # <-- Just read the property!
           }
           nodes << node_info
         end
