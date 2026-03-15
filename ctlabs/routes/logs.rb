@@ -44,15 +44,15 @@ get '/logs/content' do
   content_type 'text/html; charset=utf-8'
   log_file = URI.decode_www_form_component(params[:file])
   
-  # Forgiving path check
-  log_dir = defined?(LOG_DIR) ? LOG_DIR : '/var/log/ctlabs'
+  # ✅ FIX 1: Use the actual LabLog constant instead of hardcoding /var/log/ctlabs
+  log_dir = LabLog::LOG_DIR
   basename = File.basename(log_file)
   is_valid_prefix = basename.start_with?('ctlabs_') || basename.start_with?('build_')
   
   # If it fails the security check, print it to the UI!
   unless log_file.start_with?(log_dir) && is_valid_prefix && log_file.end_with?('.log')
     status 403
-    return "<span style='color:#ef4444;'>❌ Error 403: Log viewer blocked access to: #{log_file}.</span>"
+    return "<span style='color:#ef4444;'>❌ Error 403: Log viewer blocked access to: #{log_file}. Expected directory: #{log_dir}</span>"
   end
 
   # If the file hasn't been written to disk yet, print it to the UI!
@@ -80,12 +80,13 @@ end
 # Delete a single log file
 post '/logs/delete' do
   log_file = URI.decode_www_form_component(params[:file])
-  # Security: only allow logs from our directory with correct pattern
-  # Security: allow standard lab logs AND image build logs
   basename = File.basename(log_file)
+  
+  # Security: allow standard lab logs AND image build logs
   is_valid_pattern = basename.match?(/\Actlabs_\d+_.+_\w+\.log\z/) || basename.match?(/\Abuild_.+_\d+\.log\z/)
 
-  halt 403 unless log_file.start_with?(LOG_DIR) && File.basename(log_file).match?(/\Actlabs_\d+_.+_\w+\.log\z/) && log_file.end_with?('.log')
+  # ✅ FIX 2: Use LabLog::LOG_DIR and actually apply the is_valid_pattern variable!
+  halt 403 unless log_file.start_with?(LabLog::LOG_DIR) && is_valid_pattern && log_file.end_with?('.log')
   halt 404 unless File.file?(log_file)
 
   File.delete(log_file)
@@ -94,7 +95,8 @@ end
 
 # Delete all log files
 post '/logs/delete-all' do
-  log_files = Dir.glob("#{LOG_DIR}/ctlabs_*.log") + Dir.glob("#{LOG_DIR}/build_*.log")
+  # ✅ FIX 3: Use LabLog::LOG_DIR
+  log_files = Dir.glob("#{LabLog::LOG_DIR}/ctlabs_*.log") + Dir.glob("#{LabLog::LOG_DIR}/build_*.log")
   log_files.each { |f| File.delete(f) if File.file?(f) }
   redirect '/logs'
 end
