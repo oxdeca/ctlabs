@@ -5,6 +5,38 @@
  -----------------------------------------------------------------------------
 */
 
+  // --- GLOBAL CODEMIRROR REGISTRY ---
+  window.cmEditors = {};
+
+  // --- UNIVERSAL EDITOR FACTORY ---
+  window.initCodeEditor = function(textAreaId, langMode) {
+      // If it already exists, just return it!
+      if (window.cmEditors[textAreaId]) {
+          setTimeout(() => window.cmEditors[textAreaId].refresh(), 50);
+          return window.cmEditors[textAreaId];
+      }
+
+      const ta = document.getElementById(textAreaId);
+      if (!ta) return null;
+
+      // Build the new editor dynamically
+      const editor = CodeMirror.fromTextArea(ta, {
+          mode: langMode,
+          theme: 'material-ocean',
+          lineNumbers: true,
+          tabSize: 2,
+          viewportMargin: Infinity
+      });
+      
+      editor.setSize("100%", "auto");
+      editor.getWrapperElement().style.minHeight = "400px";
+      
+      window.cmEditors[textAreaId] = editor;
+      
+      // Refresh to fix the hidden-div glitch
+      setTimeout(() => editor.refresh(), 50);
+      return editor;
+  };
 
   // JavaScript to handle Tab Switching in the Sidebar
   function openLabTab(evt, tabId) {
@@ -202,7 +234,7 @@
       kindSelect.innerHTML = '<option value="remote" disabled selected>-- Select Kind --</option>';
       
       // Inject a fake "kind" for external nodes since they don't use containers!
-      if (type === 'external') {
+      if (type === 'external' || type === 'rhost') {
           kindSelect.innerHTML += `<option value="remote" selected>Remote Server</option>`;
           return;
       }
@@ -283,13 +315,20 @@
   };
 
   window.openEditorTab = function(evt, tabName) {
-      let i, x, tablinks;
-      x = document.getElementsByClassName("editor-tab");
-      for (i = 0; i < x.length; i++) x[i].style.display = "none";
-      tablinks = document.getElementsByClassName("editor-tablink");
-      for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
-      document.getElementById(tabName).style.display = "block";
-      evt.currentTarget.className += " w3-text-blue";
+    let i, x, tablinks;
+    x = document.getElementsByClassName("editor-tab");
+    for (i = 0; i < x.length; i++) x[i].style.display = "none";
+    
+    tablinks = document.getElementsByClassName("editor-tablink");
+    for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
+    
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " w3-text-blue";
+
+    // --- CODEMIRROR INITIALIZATION FOR YAML ---
+    if (tabName === 'YamlEdit') {
+        window.initCodeEditor('node-yaml-editor', 'yaml');
+    }
   };
 
   // --- NODES ---
@@ -301,16 +340,22 @@
 
       try {
           const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
+          const res     = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
           if (!res.ok) throw new Error("HTTP Status " + res.status);
           const data = await res.json();
 
           document.getElementById('node-yaml-editor').value = data.yaml;
+          if (window.cmEditors['node-yaml-editor']) {
+            window.cmEditors['node-yaml-editor'].setValue(data.yaml);
+          }
+          //if (window.nodeYamlEditorInstance) {
+          //  window.nodeYamlEditorInstance.setValue(data.yaml);
+          // }
 
           if (data.json) {
               document.getElementById('edit-type').value = data.json.type || 'host';
               document.getElementById('edit-kind').value = data.json.kind || '';
-              document.getElementById('edit-gw').value = data.json.gw || '';
+              document.getElementById('edit-gw').value   = data.json.gw   || '';
               document.getElementById('edit-info').value = data.json.info || '';
               document.getElementById('edit-term').value = data.json.term || '';
 
@@ -340,12 +385,14 @@
 
   window.saveNodeConfig = async function() {
       const resultDiv = document.getElementById('node-editor-result');
-      const formData = new URLSearchParams();
-      const isYaml = document.getElementById('YamlEdit').style.display === 'block';
+      const formData  = new URLSearchParams();
+      const isYaml    = document.getElementById('YamlEdit').style.display === 'block';
 
       if (isYaml) {
           formData.append('format', 'yaml');
-          formData.append('yaml_data', document.getElementById('node-yaml-editor').value);
+          // USE CODEMIRROR VALUE IF IT EXISTS
+          const yamlValue = window.cmEditors['node-yaml-editor'] ? window.cmEditors['node-yaml-editor'].getValue() : document.getElementById('node-yaml-editor').value;
+          formData.append('yaml_data', yamlValue);
       } else {
           formData.append('format', 'form');
           formData.append('type', document.getElementById('edit-type').value);
@@ -496,15 +543,15 @@
       }
   };
 
-  // --- BULLETPROOF RAW IMAGE EDITOR ---
+  // --- CODEMIRROR RAW IMAGE EDITOR ---
   window.openBuildModal = async function(imageEnc) {
       const decodedImg = decodeURIComponent(imageEnc);
-      document.getElementById('build-img-name').textContent = decodedImg;
-      document.getElementById('build-img-ref').value = decodedImg;
-      document.getElementById('build-img-version').value = "Loading...";
+      document.getElementById('build-img-name').textContent       = decodedImg;
+      document.getElementById('build-img-ref').value              = decodedImg;
+      document.getElementById('build-img-version').value          = "Loading...";
       document.getElementById('build-image-result').style.display = 'none';
-      document.getElementById('build-dockerfile').value = "Loading...";
-      document.getElementById('build-image-modal').style.display = 'block';
+      document.getElementById('build-dockerfile').value           = "Loading...";
+      document.getElementById('build-image-modal').style.display  = 'block';
 
       try {
           const res = await fetch(`/images/dockerfile?image=${encodeURIComponent(decodedImg)}`);
@@ -513,23 +560,35 @@
           catch (e) { throw new Error("Backend did not return valid JSON. Dockerfile missing?"); }
 
           if (res.ok) {
-              document.getElementById('build-dockerfile').value = data.dockerfile;
+              document.getElementById('build-dockerfile').value  = data.dockerfile;
               document.getElementById('build-img-version').value = data.version || "latest";
+              
+              // --- UNIVERSAL CODEMIRROR INJECTION ---
+              const editor = window.initCodeEditor('build-dockerfile', 'dockerfile');
+              editor.setValue(data.dockerfile);
+
           } else {
-              document.getElementById('build-dockerfile').value = `# Error: ${data.error}`;
+              const errText = `# Error: ${data.error}`;
+              document.getElementById('build-dockerfile').value = errText;
+              if (window.cmEditors['build-dockerfile']) window.cmEditors['build-dockerfile'].setValue(errText);
           }
       } catch (err) {
-          document.getElementById('build-dockerfile').value = `# Fetch Error:\n# ${err.message}`;
+          const errText = `# Fetch Error:\n# ${err.message}`;
+          document.getElementById('build-dockerfile').value = errText;
+          if (window.cmEditors['build-dockerfile']) window.cmEditors['build-dockerfile'].setValue(errText);
       }
-      window.updateDockerHighlight();
   };
 
   window.saveDockerfileOnly = async function() {
       const resultDiv = document.getElementById('build-image-result');
+      
+      // USE CODEMIRROR VALUE IF IT EXISTS
+      const dockerfileText = window.cmEditors['build-dockerfile'] ? window.cmEditors['build-dockerfile'].getValue() : document.getElementById('build-dockerfile').value;
+
       const formData = new URLSearchParams({
           image: document.getElementById('build-img-ref').value,
           version: document.getElementById('build-img-version').value,
-          dockerfile: document.getElementById('build-dockerfile').value
+          dockerfile: dockerfileText
       });
 
       resultDiv.style.cssText = 'background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; display: block; margin-top: 10px; padding: 8px;';
@@ -549,10 +608,14 @@
 
   window.triggerImageBuild = async function(event) {
       const resultDiv = document.getElementById('build-image-result');
+      
+      // USE CODEMIRROR VALUE IF IT EXISTS
+      const dockerfileText = window.cmEditors['build-dockerfile'] ? window.cmEditors['build-dockerfile'].getValue() : document.getElementById('build-dockerfile').value;
+
       const formData = new URLSearchParams({
           image: document.getElementById('build-img-ref').value,
           version: document.getElementById('build-img-version').value,
-          dockerfile: document.getElementById('build-dockerfile').value
+          dockerfile: dockerfileText
       });
 
       const btn = event ? event.currentTarget : document.querySelector("button[onclick='window.triggerImageBuild()']");
@@ -583,46 +646,6 @@
               btn.disabled = false;
           }
       }
-  };
-
-  // Real-time Syntax Highlighting Sync
-  window.updateDockerHighlight = function() {
-      let text = document.getElementById('build-dockerfile').value;
-      if (text.endsWith("\n")) text += " "; 
-      
-      try {
-          const highlighted = hljs.highlight(text, { language: 'dockerfile', ignoreIllegals: true }).value;
-          document.getElementById('raw-highlight').innerHTML = highlighted;
-      } catch (e) {
-          document.getElementById('raw-highlight').textContent = text;
-      }
-      
-      // Trigger the vertical stretch every time the user types!
-      window.autoResizeGlassEditor();
-  };
-
-  // Synchronizes horizontal scrolling between layers
-  window.syncDockerScroll = function(element) {
-      const bgLayer = document.getElementById('raw-highlight-pre');
-      bgLayer.scrollLeft = element.scrollLeft; // We only need horizontal sync now!
-  };
-
-  // Perfectly stretches the container, textarea, and background layer vertically
-  window.autoResizeGlassEditor = function() {
-      const ta = document.getElementById('build-dockerfile');
-      const pre = document.getElementById('raw-highlight-pre');
-      const container = document.querySelector('.editor-container');
-
-      // Briefly collapse to calculate true required height
-      ta.style.height = '450px'; 
-      
-      // Calculate height based on content (minimum 450px)
-      const newHeight = Math.max(450, ta.scrollHeight) + 'px';
-
-      // Apply exact height to all 3 layers so they lock together
-      ta.style.height = newHeight;
-      pre.style.height = newHeight;
-      container.style.height = newHeight;
   };
 
   // --- NEW IMAGE MANAGEMENT ACTIONS ---
@@ -695,7 +718,7 @@
       try {
           const res = await fetch(`/images/pull`, { 
               method: 'POST', 
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, // <-- THIS WAS MISSING!
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
               body: new URLSearchParams(formData).toString() 
           });
           if (res.ok) location.reload();
@@ -993,3 +1016,4 @@
       }
     }
   });
+

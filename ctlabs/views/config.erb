@@ -1,28 +1,50 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/config.erb
+# Description : configuration view
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
 
-    <div id="config" class="w3-panel w3-green">
-      <h2>⚙️  Lab Configuration </h2>
-    </div>
+<script src="/js/labs.js"></script>
+
+<div id="config" class="w3-panel w3-green">
+  <h2>⚙️ Lab Configuration</h2>
+</div>
     
-    <% if @active_yaml %>
-      <div class="w3-container w3-margin-bottom">
-        <div class="w3-panel w3-round-large" style="background-color: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-top: 0;">
-          <h4 style="color: #f59e0b; margin-top: 10px;"><i class="fas fa-exclamation-triangle"></i> Runtime YAML View</h4>
-          <p style="color: #e2e8f0; font-size: 0.9em;">You are viewing the <strong>active runtime configuration</strong>. It contains any Ad-Hoc nodes or DNAT rules added while the lab was running. Stopping the lab will revert back to the base configuration.</p>
-        </div>
-        <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
-          <pre><code class="language-yaml"><%= ERB::Util.h(@active_yaml) %></code></pre>
-        </div>
-      </div>
-    <% else %>
-      <div class="w3-container">
-        <div class="w3-container w3-card-4 w3-2021-inkwell" style="max-width: 100%; max-height: 100%; overflow: auto;">
-          <pre><code class="language-yaml"><%= File.file?(CONFIG) ? ERB::Util.h(File.read(CONFIG)) : "Error: No Configuration found!" %></code></pre>
-        </div>
-      </div>
-    <% end %>
+<div class="w3-container w3-margin-bottom">
+  <% if @active_yaml %>
+    <div class="w3-panel w3-round-large" style="background-color: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-top: 0;">
+      <h4 style="color: #f59e0b; margin-top: 10px;"><i class="fas fa-exclamation-triangle"></i> Runtime YAML View</h4>
+      <p style="color: #e2e8f0; font-size: 0.9em;">You are viewing the <strong>active runtime configuration</strong>. It contains any Ad-Hoc nodes or DNAT rules added while the lab was running. Stopping the lab will revert back to the base configuration.</p>
+    </div>
+  <% end %>
+
+  <div class="w3-card-4 w3-round-large" style="border: 1px solid #475569; overflow: hidden; background-color: #0f172a;">
+    <% yaml_content = @active_yaml ? @active_yaml : (File.file?(CONFIG) ? File.read(CONFIG) : "# Error: No Configuration found!") %>
+    <textarea id="config-yaml-viewer"><%= ERB::Util.h(yaml_content) %></textarea>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Wait for labs.js to load, then use our universal factory!
+    if (typeof window.initCodeEditor === 'function') {
+      const viewer = window.initCodeEditor('config-yaml-viewer', 'yaml');
+      
+      if (viewer) {
+        // 1. Make it read-only
+        viewer.setOption('readOnly', true);
+        
+        // 2. Remove the rigid modal heights so it can fill the screen
+        viewer.getWrapperElement().style.minHeight = "auto";
+        viewer.getWrapperElement().style.height = "auto";
+        
+        // 3. Force CodeMirror to redraw its canvas
+        setTimeout(() => viewer.refresh(), 100);
+      }
+    } else {
+        console.error("Critical Error: labs.js failed to load!");
+    }
+  });
+</script>

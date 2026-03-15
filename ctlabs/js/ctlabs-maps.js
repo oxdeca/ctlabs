@@ -107,6 +107,52 @@ function attachCustomTooltips(svgObject) {
 
     el.style.cursor = 'pointer';
 
+    // --- SMART TOOLTIP POSITIONING ---
+    const updateTooltipPosition = (e) => {
+      const rect = svgObject.getBoundingClientRect();
+      const offset = 15; // Distance from cursor
+      
+      // Calculate base cursor position relative to the screen
+      const cursorX = e.clientX + rect.left;
+      const cursorY = e.clientY + rect.top;
+      
+      // Get the actual dimensions of the tooltip box
+      const tWidth = tooltip.offsetWidth;
+      const tHeight = tooltip.offsetHeight;
+      
+      // Default to bottom-right of the cursor
+      let posX = cursorX + offset;
+      let posY = cursorY + offset;
+      
+      // COLLISION DETECTION: Right Edge
+      if (posX + tWidth > window.innerWidth) {
+          posX = cursorX - tWidth - offset; // Flip to the left side
+      }
+      
+      // COLLISION DETECTION: Bottom Edge
+      if (posY + tHeight > window.innerHeight) {
+          posY = cursorY - tHeight - offset; // Flip to the top side
+      }
+      
+      // Safety clamp so it never goes off the left/top edges either
+      posX = Math.max(10, posX);
+      posY = Math.max(10, posY);
+      
+      tooltip.style.left = posX + 'px';
+      tooltip.style.top = posY + 'px';
+    };
+
+    el.addEventListener('mouseover', (e) => {
+      tooltip.innerHTML = formattedText;
+      tooltip.style.display = 'block'; // Must display first to calculate width!
+      updateTooltipPosition(e);
+    });
+
+    el.addEventListener('mousemove', (e) => {
+      updateTooltipPosition(e);
+    });
+
+/*
     el.addEventListener('mouseover', (e) => {
       tooltip.innerHTML = formattedText;
       tooltip.style.display = 'block';
@@ -120,6 +166,7 @@ function attachCustomTooltips(svgObject) {
       tooltip.style.left = (e.clientX + rect.left + 15) + 'px';
       tooltip.style.top = (e.clientY + rect.top + 15) + 'px';
     });
+*/
 
     el.addEventListener('mouseout', () => {
       tooltip.style.display = 'none';
@@ -132,14 +179,6 @@ function attachCustomTooltips(svgObject) {
 
       const nodeName = cleanText.split('\n')[0].split(/\s+/)[0].trim().toLowerCase();
       const isNode = el.classList.contains('node') || (el.closest && el.closest('.node'));
-
-//      if (nodeName && isNode) {
-//        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
-//        const w = 900, h = 600;
-//        const top  = window.top.outerHeight / 2 + window.top.screenY - ( h / 2);
-//        const left = window.top.outerWidth  / 2 + window.top.screenX - ( w / 2);
-//        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
-//      }
 
       if (nodeName && isNode) {
         menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
@@ -183,12 +222,45 @@ function attachCustomTooltips(svgObject) {
       }
 
       contextMenu.innerHTML = menuHtml;
+      
+      // 1. Show the menu FIRST so the browser can calculate its physical dimensions
+      contextMenu.style.display = 'block'; 
+
+      const rect = svgObject.getBoundingClientRect();
+      let cursorX = e.clientX + rect.left;
+      let cursorY = e.clientY + rect.top;
+
+      const menuWidth = contextMenu.offsetWidth;
+      const menuHeight = contextMenu.offsetHeight;
+
+      // 2. COLLISION DETECTION: Right Edge
+      if (cursorX + menuWidth > window.innerWidth) {
+          cursorX = cursorX - menuWidth; // Flip to the left of the cursor
+      }
+
+      // 3. COLLISION DETECTION: Bottom Edge
+      if (cursorY + menuHeight > window.innerHeight) {
+          cursorY = cursorY - menuHeight; // Flip above the cursor
+      }
+
+      // 4. Safety clamp so it never goes off the top or left edges
+      cursorX = Math.max(10, cursorX);
+      cursorY = Math.max(10, cursorY);
+
+      contextMenu.style.left = cursorX + 'px';
+      contextMenu.style.top = cursorY + 'px';
+    });
+  });
+
+/*
+      contextMenu.innerHTML = menuHtml;
       const rect = svgObject.getBoundingClientRect();
       contextMenu.style.left = (e.clientX + rect.left) + 'px';
       contextMenu.style.top = (e.clientY + rect.top) + 'px';
       contextMenu.style.display = 'block';
     });
   });
+*/
 
   let customStyle = svgDoc.getElementById('custom-dark-controls');
   if (!customStyle) {
@@ -204,8 +276,7 @@ function attachCustomTooltips(svgObject) {
   }
 }
 
-
-// --- LAZY LOAD ENGINE ---
+// --- LAZY LOAD ENGINE & SVG PATCHER ---
 function initMap(objId, panZoomVarName) {
     const obj = document.getElementById(objId);
     
@@ -213,6 +284,16 @@ function initMap(objId, panZoomVarName) {
         return; // Will catch it later via load event
     }
 
+    // 1. Strip Graphviz's hardcoded dimensions so it scales natively
+    const svgElement = obj.contentDocument.querySelector('svg');
+    if (svgElement) {
+        svgElement.removeAttribute('width');
+        svgElement.removeAttribute('height');
+        svgElement.style.width = '100%';
+        svgElement.style.height = '100%';
+    }
+
+    // 2. If it's already initialized, just recalculate
     if (window[panZoomVarName]) {
         window[panZoomVarName].resize();
         window[panZoomVarName].fit();
@@ -220,6 +301,7 @@ function initMap(objId, panZoomVarName) {
         return;
     }
 
+    // 3. Initialize fresh
     window[panZoomVarName] = svgPanZoom(obj, { zoomEnabled: true, controlIconsEnabled: true, fit: true, center: true, minZoom: 0.1, maxZoom: 10 });
     attachCustomTooltips(obj);
 }
@@ -258,3 +340,22 @@ window.openMapTab = function(evt, tabName) {
         else if (tabName === 'MgmtNet') initMap('mgmt-topo-obj', 'panZoomMgmt');
     }, 50);
 };
+
+// --- GLOBAL RESIZE LISTENER ---
+let resizeTimeout;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(function() {
+        // Recalculate both maps if they exist!
+        if (window.panZoomData) {
+            window.panZoomData.resize();
+            window.panZoomData.fit();
+            window.panZoomData.center();
+        }
+        if (window.panZoomMgmt) {
+            window.panZoomMgmt.resize();
+            window.panZoomMgmt.fit();
+            window.panZoomMgmt.center();
+        }
+    }, 150); // 150ms debounce
+});

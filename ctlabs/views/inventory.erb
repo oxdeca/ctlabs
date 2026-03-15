@@ -7,6 +7,7 @@
 -->
 
 <script src="/js/inventory.js"></script>
+<script src="/js/labs.js"></script>
 
 <% inv_contents = fetch_inventory_contents %>
 
@@ -28,8 +29,8 @@
         <h4 style="color: #38bdf8; margin-top: 10px;"><i class="fas fa-info-circle"></i> Management Network (eth0)</h4>
         <p style="color: #e2e8f0; font-size: 0.9em;">This inventory connects to the infrastructure over the isolated management plane.</p>
       </div>
-      <div class="w3-card-4 w3-round-large" style="background-color: #0f172a; border: 1px solid #334155; padding: 15px; overflow: auto; max-height: 60vh;">
-        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(inv_contents[:mgmt]) %></code></pre>
+      <div class="w3-card-4 w3-round-large" style="border: 1px solid #475569; overflow: hidden; background-color: #0f172a;">
+        <textarea id="mgmt-inv-viewer"><%= ERB::Util.h(inv_contents[:mgmt]) %></textarea>
       </div>
     </div>
 
@@ -38,7 +39,42 @@
         <h4 style="color: #10b981; margin-top: 10px;"><i class="fas fa-info-circle"></i> Data Network (eth1 / ipv4)</h4>
         <p style="color: #e2e8f0; font-size: 0.9em;">This inventory allows targeted configuration of data-plane services directly over the simulated network.</p>
       </div>
-      <div class="w3-card-4 w3-round-large" style="background-color: #0f172a; border: 1px solid #334155; padding: 15px; overflow: auto; max-height: 60vh;">
-        <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(inv_contents[:data]) %></code></pre>
+      <div class="w3-card-4 w3-round-large" style="border: 1px solid #475569; overflow: hidden; background-color: #0f172a;">
+        <textarea id="data-inv-viewer"><%= ERB::Util.h(inv_contents[:data]) %></textarea>
       </div>
     </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+          if (typeof window.initCodeEditor === 'function') {
+              // 1. Initialize Management Inventory Editor
+              const mgmtViewer = window.initCodeEditor('mgmt-inv-viewer', 'properties');
+              if (mgmtViewer) {
+                  mgmtViewer.setOption('readOnly', true);
+                  mgmtViewer.getWrapperElement().style.minHeight = "auto";
+                  mgmtViewer.getWrapperElement().style.height = "auto";
+              }
+
+              // 2. Initialize Data Inventory Editor
+              const dataViewer = window.initCodeEditor('data-inv-viewer', 'properties');
+              if (dataViewer) {
+                  dataViewer.setOption('readOnly', true);
+                  dataViewer.getWrapperElement().style.minHeight = "auto";
+                  dataViewer.getWrapperElement().style.height = "auto";
+              }
+
+              // 3. Fix the "Hidden Tab" CodeMirror Glitch
+              // When the user clicks a tab, wait 50ms for it to become visible, then tell the editor to redraw
+              document.querySelectorAll('.tablink').forEach(btn => {
+                  btn.addEventListener('click', (e) => {
+                      setTimeout(() => {
+                          if (window.cmEditors['mgmt-inv-viewer']) window.cmEditors['mgmt-inv-viewer'].refresh();
+                          if (window.cmEditors['data-inv-viewer']) window.cmEditors['data-inv-viewer'].refresh();
+                      }, 50);
+                  });
+              });
+          } else {
+              console.error("Critical Error: labs.js factory failed to load!");
+          }
+      });
+    </script>

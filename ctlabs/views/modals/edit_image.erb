@@ -16,12 +16,27 @@
             <div class="w3-col s6" style="padding: 0 8px;"><input type="text" id="edit-img-kind" class="w3-input w3-small w3-round" placeholder="linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
           </div>
         </div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Image Reference</label><input type="text" id="edit-img-ref" class="w3-input w3-small w3-round" placeholder="ctlabs/c9/base" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Capabilities (caps) - Comma separated</label><input type="text" id="edit-img-caps" class="w3-input w3-small w3-round" placeholder="SYS_PTRACE, IPC_LOCK" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (env) - One per line</label><textarea id="edit-img-env" class="w3-input w3-small w3-round" rows="2" placeholder="VAR=value" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Extra Attributes (YAML formatting)</label><textarea id="edit-img-extras" class="w3-input w3-small w3-round" rows="3" placeholder="ports: 18&#10;privileged: true" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Image Reference</label>
+          <input type="text" id="edit-img-ref" class="w3-input w3-small w3-round" placeholder="ctlabs/c9/base" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Capabilities (caps) - Comma separated</label>
+          <input type="text" id="edit-img-caps" class="w3-input w3-small w3-round" placeholder="SYS_PTRACE, IPC_LOCK" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (env) - One per line</label>
+          <textarea id="edit-img-env" class="w3-input w3-small w3-round" rows="2" placeholder="VAR=value" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea>
+        </div>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Extra Attributes (YAML formatting)</label>
+          <textarea id="edit-img-extras" class="w3-input w3-small w3-round" rows="3" placeholder="ports: 18&#10;privileged: true" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea>
+        </div>
         <div id="image-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
       </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+        <button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+        <button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
+      </footer>
     </div>
   </div>

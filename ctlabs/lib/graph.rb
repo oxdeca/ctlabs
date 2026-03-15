@@ -95,7 +95,7 @@ class Graph
               group = node.type
               
               border_color = "#10b981" 
-              n_icon = "🎛️"
+              n_icon = "🎛️ "
               case node.type
                 when 'host', 'vhost' 
                   border_color = "#38bdf8"
@@ -204,7 +204,7 @@ class Graph
               group = node.type
               
               border_color = "#10b981" 
-              n_icon = "🎛️"
+              n_icon = "🎛️ "
               case node.type
                 when 'host', 'vhost'
                   border_color = "#38bdf8"
@@ -346,7 +346,7 @@ class Graph
                 end
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️<%= node.name %></font></b>>]
+        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -440,7 +440,7 @@ class Graph
               nodes.each do |node|
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️<%= node.name %></font></b>>]
+        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>

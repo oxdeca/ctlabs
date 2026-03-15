@@ -17,7 +17,14 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/dracula.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/material-ocean.min.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/yaml/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/simple.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/dockerfile/dockerfile.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/properties/properties.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ini.min.js"></script>
@@ -87,6 +94,28 @@
     
     /* Code Blocks */
     pre, code { border-radius: 8px; }
+    /* --- BULLETPROOF CODEMIRROR DARK THEME --- */
+    .CodeMirror { 
+      background-color: #0f172a !important; 
+      border: 1px solid #475569 !important; 
+      border-radius: 6px !important;
+      min-height: 400px !important;
+    }
+    .CodeMirror-scroll {
+      min-height: 400px !important; 
+    }
+    .CodeMirror-gutters { 
+      background-color: #0f172a !important; 
+      border-right: 1px solid #334155 !important; 
+    }
+    .CodeMirror-scrollbar-filler, .CodeMirror-gutter-filler { 
+      background-color: #0f172a !important; 
+      border: none !important; 
+    }
+    .CodeMirror-hscrollbar, .CodeMirror-vscrollbar {
+      border: none !important;
+    }
+    /* ----------------------------------------- */
   </style>
 </head>
 <body>

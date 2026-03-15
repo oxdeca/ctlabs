@@ -17,7 +17,7 @@ get '/terminal/:node_name' do
     node_name = params[:node_name]
     
     if node_name == 'ctlabs_host'
-      cmd = ['bash']
+      cmd = ['env', 'TERM=linux', 'bash']
     else
       # 1. Smart Lookup: Check the active lab YAML for custom terminal configurations
       custom_term = nil
