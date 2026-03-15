@@ -5,55 +5,52 @@
 # -----------------------------------------------------------------------------
 -->
 
-<style>
-  /* Sleek, floating custom tooltip */
-  #custom-html-tooltip {
-    position: fixed;
-    display: none;
-    background: rgba(15, 23, 42, 0.95);
-    color: #f8fafc;
-    border: 1px solid #38bdf8;
-    border-radius: 8px;
-    padding: 12px;
-    font-family: 'Helvetica', 'Arial', sans-serif;
-    font-size: 14px;
-    line-height: 1.4;
-    z-index: 10000;
-    pointer-events: none;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    white-space: pre-wrap;
-    backdrop-filter: blur(4px);
-  }
-
-  /* Right-Click Context Menu */
-  #custom-context-menu {
-    position: fixed;
-    display: none;
-    background: #0f172a;
-    color: #cbd5e1;
-    border: 1px solid #334155;
-    border-radius: 6px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-    z-index: 10002;
-    min-width: 180px;
-    overflow: hidden;
-    font-family: 'Helvetica', 'Arial', sans-serif;
-    font-size: 13px;
-  }
-  .context-menu-item {
-    padding: 10px 15px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: background 0.2s;
-  }
-  .context-menu-item:hover {
-    background: #1e293b;
-    color: #38bdf8;
-  }
-  .context-menu-item i {
-    width: 16px;
-    text-align: center;
-  }
-</style>
+/* Sleek, floating custom tooltip */
+#custom-html-tooltip {
+  position:        fixed;
+  display:         none;
+  background:      rgba(15, 23, 42, 0.95);
+  color:           #f8fafc;
+  border:          1px solid #38bdf8;
+  border-radius:   8px;
+  padding:         12px;
+  font-family:     'Helvetica', 'Arial', sans-serif;
+  font-size:       14px;
+  line-height:     1.4;
+  z-index:         10000;
+  pointer-events:  none;
+  box-shadow:      0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  white-space:     pre-wrap;
+  backdrop-filter: blur(4px);
+}
+/* Right-Click Context Menu */
+#custom-context-menu {
+  position:      fixed;
+  display:       none;
+  background:    #0f172a;
+  color:         #cbd5e1;
+  border:        1px solid #334155;
+  border-radius: 6px;
+  box-shadow:    0 10px 15px -3px rgba(0, 0, 0, 0.7);
+  z-index:       10002;
+  min-width:     180px;
+  overflow:      hidden;
+  font-family:   'Helvetica', 'Arial', sans-serif;
+  font-size:     13px;
+}
+.context-menu-item {
+  padding:     10px 15px;
+  cursor:      pointer;
+  display:     flex;
+  align-items: center;
+  gap:         10px;
+  transition:  background 0.2s;
+}
+.context-menu-item:hover {
+  background: #1e293b;
+  color:      #38bdf8;
+}
+.context-menu-item i {
+  width:      16px;
+  text-align: center;
+}

@@ -17,32 +17,14 @@
     <% safe_images_map = (info_hash[:images_map] || {}).to_json %>
     <% routers_list = (info_hash[:nodes] || []).select { |n| n[:type] == 'router' }.map { |n| n[:name] }.to_json %>
     <% switches_list = (info_hash[:switches] || []).to_json %>
-    
-    <% 
-      switch_gw_map = {}
-      nodes_by_name = (info_hash[:nodes] || []).each_with_object({}) { |n, h| h[n[:name]] = n }
-
-      (info_hash[:links] || []).each do |l|
-        n1, n2 = nodes_by_name[l[:node_a]], nodes_by_name[l[:node_b]]
-        next unless n1 && n2
-
-        # If Node 1 is a router and Node 2 is a switch
-        if ['router', 'gateway', 'controller'].include?(n1[:type]) && n2[:type] == 'switch'
-          ip_with_cidr = n1[:nics] && n1[:nics][l[:int_a]]
-          switch_gw_map[n2[:name]] = ip_with_cidr.split('/').first if ip_with_cidr
-        # If Node 2 is a router and Node 1 is a switch
-        elsif ['router', 'gateway', 'controller'].include?(n2[:type]) && n1[:type] == 'switch'
-          ip_with_cidr = n2[:nics] && n2[:nics][l[:int_b]]
-          switch_gw_map[n1[:name]] = ip_with_cidr.split('/').first if ip_with_cidr
-        end
-      end
-    %>
+    <% switch_gw_map = generate_switch_gw_map(info_hash[:lab_path], info_hash[:links]) %>
 
     <div id="lab-running-state" data-is-running="<%= is_running %>" style="display:none;"></div>
     <div id="lab-dynamic-data" 
          data-images-map="<%= Rack::Utils.escape_html(safe_images_map) %>" 
          data-routers="<%= Rack::Utils.escape_html(routers_list) %>"
          data-switches="<%= Rack::Utils.escape_html(switches_list) %>"
+         data-switch-gws="<%= Rack::Utils.escape_html(switch_gw_map.to_json) %>"
          style="display:none;">
     </div>
 
@@ -106,183 +88,12 @@
     </div>
   </div>
 
-  <div id="add-node-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add Node</h4></header>
-      <form id="add-node-form" onsubmit="window.submitCombinedNode(event)">
-        <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
-          <input type="hidden" name="lab_name" id="add-node-lab-name">
-          <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;"><i class="fas fa-info-circle"></i> If the lab is running, the node will automatically boot. If stopped, it will be saved to the YAML.</div>
-          <div class="w3-row-padding" style="margin: 0 -8px;">
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required></div>
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value, 'add-node-kind'); window.updateNodeFormFields(this.value);" required><option value="" disabled selected>-- Select Type --</option><% (info_hash[:images_map] || {}).keys.each do |t| %><option value="<%= t %>"><%= t %></option><% end %></select>
-            </div>
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required><option value="" disabled selected>-- Select Kind --</option></select>
-            </div>
-            <div class="w3-col m12 w3-margin-bottom"><label id="add-node-connect-label" style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (eth1)</label><select name="switch" id="add-node-connect-select" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateGatewayForSwitch(this.value)"><option value="" selected>-- None (Mgmt Only) --</option><% (info_hash[:switches] || []).each do |sw| %><option value="<%= sw %>"><%= sw %></option><% end %></select>
-            </div>
-            <div class="w3-col m6 w3-margin-bottom" id="add-node-ip-container"><label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (eth1)</label><input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-            </div>
-            <div class="w3-col m6 w3-margin-bottom" id="add-node-gw-container"><label style="font-size: 0.85em; color: #94a3b8;">Gateway (Select or Type Override)</label><input type="text" name="gw" list="gw-options" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><datalist id="gw-options"><% (info_hash[:gateways] || []).each do |g| %><option value="<%= g %>"><% end %></datalist>
-            </div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Additional NICs (key=val)</label><textarea name="nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="eth2=10.0.0.1/24"></textarea></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label><input type="text" name="info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" name="term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label><textarea name="urls_text" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="Walkthrough|https://docs.local/..."></textarea></div>
-          </div>
-          <div id="add-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
-        </div>
-        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save Node</button></footer>
-      </form>
-    </div>
-  </div>
+  <%= erb :'modals/add_node', locals: { info_hash: info_hash } %>
+  <%= erb :'modals/edit_node' %>
+  <%= erb :'modals/add_image' %>
+  <%= erb :'modals/edit_image' %>
+  <%= erb :'modals/build_image' %>
+  <%= erb :'modals/ansible_editor' %>
+  <%= erb :'modals/link_editor' %>
 
-  <div id="node-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-edit"></i> Configure Node: <span id="editor-node-name" style="color: #38bdf8;"></span></h4></header>
-      <div class="w3-container w3-padding">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;"><i class="fas fa-info-circle"></i> If the lab is running, edits apply as an <strong>override</strong>. If stopped, they save permanently to the <strong>base YAML</strong>.</div>
-        <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #475569;"><button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic Form</b></button><button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button></div>
-        <div id="FormEdit" class="editor-tab">
-          <div class="w3-row-padding" style="margin: 0 -8px;">
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select id="edit-type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><option value="host">host</option><option value="router">router</option><option value="switch">switch</option><option value="controller">controller</option><option value="gateway">gateway</option></select></div>
-            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><input type="text" id="edit-kind" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Gateway (gw)</label><input type="text" id="edit-gw" class="w3-input w3-small w3-round" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Network Interfaces (nics)</label><textarea id="edit-nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="eth1=192.168.10.11/24\neth2=10.0.0.1/24"></textarea></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label><input type="text" id="edit-info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" id="edit-term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label><textarea id="edit-urls" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="Flashcards|https://quizlet.com/...&#10;Walkthrough|https://docs.local/..."></textarea></div>
-          </div>
-        </div>
-        <div id="YamlEdit" class="editor-tab" style="display:none"><textarea id="node-yaml-editor" class="w3-input w3-round w3-small" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 250px; resize: vertical; white-space: pre;"></textarea></div>
-        <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save Override</button></footer>
-    </div>
-  </div>
-
-  <div id="add-local-image-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 450px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-        <span onclick="document.getElementById('add-local-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-        <h4 style="margin: 0;"><i class="fas fa-box w3-text-orange"></i> Add / Import Image</h4>
-      </header>
-      <form onsubmit="window.submitNewLocalImage(event)">
-        <div class="w3-container w3-padding">
-          <label style="font-size: 0.9em; color: #38bdf8; font-weight: bold;"><i class="fas fa-folder-plus"></i> Create Local Dockerfile</label>
-          <p style="font-size: 0.8em; color: #94a3b8; margin: 4px 0 8px 0;">Creates a new blank folder structure in ../images/</p>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" name="image_path" class="w3-input w3-small w3-round" placeholder="e.g. category/os/kind" required style="flex: 1; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-            <button type="submit" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;">Create</button>
-          </div>
-        </div>
-      </form>
-      <hr style="border-color: #334155; margin: 0;">
-      <form onsubmit="window.submitPullImage(event)">
-        <div class="w3-container w3-padding w3-margin-bottom">
-          <label style="font-size: 0.9em; color: #a855f7; font-weight: bold;"><i class="fas fa-cloud-download-alt"></i> Pull External Image</label>
-          <p style="font-size: 0.8em; color: #94a3b8; margin: 4px 0 8px 0;">Downloads an image directly into the registry</p>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" name="image_name" class="w3-input w3-small w3-round" placeholder="e.g. nginx:latest or alpine" required style="flex: 1; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-            <button type="submit" class="w3-button w3-deep-purple w3-round w3-small" style="white-space: nowrap;">Pull Image</button>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="image-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 400px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-box-open"></i> Add/Edit Profile</h4></header>
-      <div class="w3-container w3-padding">
-        <div class="w3-margin-bottom">
-          <label style="font-size: 0.85em; color: #94a3b8;">Node Type & Kind</label>
-          <div class="w3-row-padding" style="margin: 0 -8px;">
-            <div class="w3-col s6" style="padding: 0 8px;"><input type="text" id="edit-img-type" class="w3-input w3-small w3-round" placeholder="host, router..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-            <div class="w3-col s6" style="padding: 0 8px;"><input type="text" id="edit-img-kind" class="w3-input w3-small w3-round" placeholder="linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-          </div>
-        </div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Image Reference</label><input type="text" id="edit-img-ref" class="w3-input w3-small w3-round" placeholder="ctlabs/c9/base" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Capabilities (caps) - Comma separated</label><input type="text" id="edit-img-caps" class="w3-input w3-small w3-round" placeholder="SYS_PTRACE, IPC_LOCK" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (env) - One per line</label><textarea id="edit-img-env" class="w3-input w3-small w3-round" rows="2" placeholder="VAR=value" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Extra Attributes (YAML formatting)</label><textarea id="edit-img-extras" class="w3-input w3-small w3-round" rows="3" placeholder="ports: 18&#10;privileged: true" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;"></textarea></div>
-        <div id="image-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
-    </div>
-  </div>
-
-  <div id="build-image-modal" class="w3-modal" style="z-index: 9999;">
-    <style>
-      .code-font { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important; }
-      .docker-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
-      .docker-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
-      .docker-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f172a; }
-      .docker-scroll::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
-      .editor-container { position: relative; min-height: 450px; background: #0f172a; border: 1px solid #475569; border-radius: 4px; }
-      .editor-layer { position: absolute; top: 0; left: 0; width: 100%; padding: 12px; margin: 0; border: none; font-size: 13px; line-height: 1.5; white-space: pre !important; box-sizing: border-box; tab-size: 4; }
-      #raw-highlight-pre { z-index: 1; overflow-x: auto !important; overflow-y: hidden !important; color: #e2e8f0; -ms-overflow-style: none; scrollbar-width: none; }
-      #raw-highlight-pre::-webkit-scrollbar { display: none; }
-      #raw-highlight { background: transparent !important; padding: 0 !important; margin: 0 !important; }
-      #build-dockerfile { z-index: 2; color: transparent !important; background: transparent !important; caret-color: #38bdf8; outline: none; resize: none; overflow-x: auto !important; overflow-y: hidden !important; }
-      #build-dockerfile::selection { background: rgba(56, 189, 248, 0.3) !important; color: transparent !important; }
-    </style>
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 1400px; width: 90%;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-        <span onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-        <h4 style="margin: 0;"><i class="fas fa-file-code w3-text-orange"></i> Edit Dockerfile: <span id="build-img-name" style="color: #38bdf8;"></span></h4>
-      </header>
-      <div class="w3-container w3-padding">
-        <input type="hidden" id="build-img-ref">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px;">
-          <label style="font-size: 0.85em; color: #94a3b8; font-weight: bold;"><i class="fas fa-tag"></i> Image Version / Tag:</label>
-          <input type="text" id="build-img-version" class="w3-input w3-small w3-round" style="width: 150px; background-color: #0f172a; color: #10b981; border: 1px solid #475569; font-family: monospace; font-weight: bold;">
-        </div>
-        <div class="editor-container w3-margin-top">
-          <pre id="raw-highlight-pre" class="editor-layer"><code id="raw-highlight" class="language-dockerfile code-font"></code></pre>
-          <textarea id="build-dockerfile" class="editor-layer docker-scroll code-font" spellcheck="false" oninput="window.updateDockerHighlight();" onscroll="window.syncDockerScroll(this);"></textarea>
-        </div>
-        <div id="build-image-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-        <button type="button" onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-        <div>
-          <button type="button" onclick="window.saveDockerfileOnly()" class="w3-button w3-blue w3-round w3-small" style="margin-right: 8px;"><i class="fas fa-save"></i> Save File</button>
-          <button type="button" onclick="window.triggerImageBuild(event)" class="w3-button w3-orange w3-round w3-small"><i class="fas fa-hammer"></i> Build Image</button>
-        </div>
-      </footer>
-    </div>
-  </div>
-
-  <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4></header>
-      <div class="w3-container w3-padding">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;"><i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong> for the current run.</div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label><input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label><input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label><textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea></div>
-        <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
-    </div>
-  </div>
-
-  <div id="link-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span><h4 style="margin: 0;"><i class="fas fa-project-diagram"></i> Configure Network Link</h4></header>
-      <div class="w3-container w3-padding">
-        <input type="hidden" id="edit-link-old-ep1"><input type="hidden" id="edit-link-old-ep2">
-        <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node A</label><input type="text" id="edit-link-node-a" class="w3-input w3-small w3-round" placeholder="e.g. h1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface A</label><input type="text" id="edit-link-int-a" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        </div>
-        <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node B</label><input type="text" id="edit-link-node-b" class="w3-input w3-small w3-round" placeholder="e.g. sw1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface B</label><input type="text" id="edit-link-int-b" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        </div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveLinkConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
-    </div>
-  </div>
 <% end %>

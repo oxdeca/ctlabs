@@ -4,13 +4,18 @@
 # -----------------------------------------------------------------------------
 
 module LabHelper
+
+  # ---------------------------------------------------------------------------
   # Helper to safely resolve the lab file path (Runtime vs Base)
+  # ---------------------------------------------------------------------------
   def get_lab_file_path(lab_name)
     runtime_path = "#{LOCK_DIR}/#{lab_name.gsub('/', '_')}.yml"
     (Lab.running? && Lab.current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(LABS_DIR, lab_name)
   end
 
+  # ---------------------------------------------------------------------------
   # Maps switches to their connected router's gateway IP
+  # ---------------------------------------------------------------------------
   def generate_switch_gw_map(lab_path, links)
     switch_gw_map = {}
     begin
@@ -38,7 +43,9 @@ module LabHelper
     switch_gw_map
   end
 
+  # ---------------------------------------------------------------------------
   # Safely resolves and reads the contents of the Ansible inventory files
+  # ---------------------------------------------------------------------------
   def fetch_inventory_contents
     mgmt_path = 'public/inventory.ini'
     data_path = 'public/inventory_data.ini'
@@ -62,5 +69,51 @@ module LabHelper
       mgmt: File.file?(mgmt_path) ? File.read(mgmt_path) : "Management inventory not generated.\nRun './ctlabs.rb -i' to generate.",
       data: File.file?(data_path) ? File.read(data_path) : "Data inventory not generated.\nRun './ctlabs.rb -i' to generate."
     }
+  end
+
+  # ---------------------------------------------------------------------------
+  # 
+  # ---------------------------------------------------------------------------
+  def fetch_latest_log_info
+    latest_log_path = Dir.glob(File.join(LOG_DIR, "*.log")).max_by { |f| File.mtime(f) }
+    return nil unless latest_log_path
+
+    latest_log_file = File.basename(latest_log_path)
+    lab_name        = "Unknown"
+    action_name     = "action"
+
+    if match = latest_log_file.match(/^ctlabs_\d+_(.+)_([a-zA-Z]+)\.log$/)
+      lab_name    = match[1]
+      action_name = match[2]
+    end
+
+    { path: latest_log_path, lab: lab_name, action: action_name }
+  end
+
+  # ---------------------------------------------------------------------------
+  # Parses a log filename into a clean, display-ready hash
+  # ---------------------------------------------------------------------------
+  def parse_log_metadata(log_path)
+    basename = File.basename(log_path, '.log')
+    
+    if basename.start_with?('build_')
+      parts = basename.split('_')
+      lab_name = parts[1..-2].join('_') rescue 'Unknown Image'
+      timestamp = parts.last.to_i rescue 0
+      action = 'Build'
+    else
+      parts = basename.split('_')
+      timestamp = parts[1].to_i rescue 0
+      lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
+      action = case parts.last
+               when 'up' then 'Start'
+               when 'down' then 'Stop'
+               when 'adhoc' then 'AdHoc'
+               else parts.last.to_s.capitalize
+               end
+    end
+
+    time_str = timestamp > 0 ? Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') : 'Unknown time'
+    { lab_name: lab_name, action: action, time_str: time_str }
   end
 end

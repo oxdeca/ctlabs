@@ -1,76 +1,73 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/logs_index.erb
-# Description : logs view
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
 
-<%= HEADER %>
-<div class="w3-panel w3-green">
-  <h2>🧾 Lab Logs</h2>
+<div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
+  <h2><i class="fas fa-terminal"></i> Lab Logs</h2>
 </div>
-<div class="w3-container w3-2021-inkwell">
+
+<div class="w3-container w3-card-4 w3-padding w3-2021-inkwell" style="border: 1px solid #334155; border-radius: 12px; background-color: #1e293b !important; margin-bottom: 20px;">
   
   <% if @running_lab %>
-    <div class="w3-panel w3-green">
-      <strong>Currently running:</strong> <code><%= @running_lab %></code>
+    <div class="w3-panel w3-round" style="background-color: rgba(56, 189, 248, 0.1); border-left: 4px solid #38bdf8; padding: 12px; margin-top: 0;">
+      <strong style="color: #38bdf8;"><i class="fas fa-play-circle"></i> Currently running:</strong> <code><%= @running_lab %></code>
       <% latest_log = LabLog.latest_for_running_lab %>
       <% if latest_log %>
         <a href="/logs?file=<%= URI.encode_www_form_component(latest_log) %>"
-           class="w3-button w3-small w3-white w3-margin-left">
-          ▶ View Live Log
+           class="w3-button w3-small w3-blue w3-round w3-margin-left" style="padding: 4px 10px;">
+          <i class="fas fa-eye"></i> View Live Log
         </a>
       <% end %>
     </div>
   <% end %>
   
-  <h3>Recent Logs</h3>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; margin-bottom: 15px; border-bottom: 1px solid #334155; padding-bottom: 10px;">
+    <h3 style="margin: 0; color: #f8fafc;"><i class="fas fa-history"></i> Recent Logs</h3>
+    <% if @log_files.any? %>
+      <form method="post" action="/logs/delete-all" style="margin: 0;" onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
+        <button type="submit" class="w3-button w3-red w3-round w3-small">
+          <i class="fas fa-trash-alt"></i> Delete All Logs
+        </button>
+      </form>
+    <% end %>
+  </div>
+
   <% if @log_files.empty? %>
-    <p>No logs found.</p>
+    <div class="w3-panel w3-round" style="background-color: #0f172a; border: 1px solid #334155; color: #94a3b8; text-align: center; padding: 30px;">
+      <i class="fas fa-folder-open w3-xxlarge w3-margin-bottom" style="opacity: 0.5;"></i>
+      <p style="margin: 0;">No logs found.</p>
+    </div>
   <% else %>
-    <ul class="w3-ul w3-card-4 w3-hoverable w3-2021-inkwell">
+    <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: hidden;">
       <% @log_files.each do |log_path| %>
-        <%
-          basename    = File.basename(log_path, '.log')
-          parts       = basename.split('_')
-          timestamp   = parts[1].to_i rescue 0
-          lab_name    = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
-          action_part = parts.last
-          action      = case action_part
-                        when 'up' then 'Start'
-                        when 'down' then 'Stop'
-                        when 'adhoc' then 'AdHoc'
-                        else 'Unknown'
-                        end
-          time_str    = Time.at(timestamp).strftime('%Y-%m-%d %H:%M:%S') rescue 'Unknown time'
-        %>
-        <li style="display: flex; justify-content: space-between; align-items: center;">
+        <% meta = parse_log_metadata(log_path) %>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #334155; transition: background 0.2s;" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" onmouseout="this.style.backgroundColor='transparent'">
           <div>
-            <strong><%= lab_name %></strong>
-            (<%= action %>) — <%= time_str %>
+            <strong style="color: #38bdf8; font-size: 1.05em;"><%= meta[:lab_name] %></strong>
+            <span style="color: #94a3b8; margin-left: 12px; font-size: 0.9em;">
+              <i class="fas fa-tag"></i> <%= meta[:action] %> &nbsp;|&nbsp; 
+              <i class="fas fa-clock"></i> <%= meta[:time_str] %>
+            </span>
           </div>
-          <div>
-            <a href="/logs?file=<%= URI.encode_www_form_component(log_path) %>"
-               class="w3-button w3-tiny w3-blue w3-round">View</a>
-            <form method="post" action="/logs/delete" style="display: inline;"
-                  onsubmit="return confirm('Delete this log?')">
+          <div style="display: flex; gap: 8px;">
+            <a href="/logs?file=<%= URI.encode_www_form_component(log_path) %>" class="w3-button w3-small w3-transparent w3-text-blue w3-hover-text-light-coral" title="View Log" style="padding: 4px 10px;">
+              <i class="fas fa-eye fa-lg"></i>
+            </a>
+            <form method="post" action="/logs/delete" style="margin: 0;" onsubmit="return confirm('Delete this log?')">
               <input type="hidden" name="file" value="<%= URI.encode_www_form_component(log_path) %>">
-              <button type="submit" class="w3-button w3-tiny w3-red w3-round">🗑️</button>
+              <button type="submit" class="w3-button w3-small w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Log" style="padding: 4px 10px;">
+                <i class="fas fa-trash fa-lg"></i>
+              </button>
             </form>
           </div>
-        </li>
+        </div>
+        
       <% end %>
-    </ul>
+    </div>
   <% end %>
-  
-  <% if @log_files.any? %>
-    <form method="post" action="/logs/delete-all" style="margin-bottom: 15px;"
-          onsubmit="return confirm('Delete ALL logs? This cannot be undone.')">
-      <button type="submit" class="w3-button w3-red w3-tiny w3-round w3-right">
-        🗑️ Delete All Logs
-      </button>
-    </form>
-  <% end %>
+
 </div>
-<%= FOOTER %>

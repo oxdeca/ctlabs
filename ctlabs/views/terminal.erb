@@ -1,7 +1,6 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/terminal.erb
-# Description : labs view
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
@@ -14,75 +13,37 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* Use Flexbox to dynamically fill the height */
     body, html {
-      margin: 0; padding: 0; height: 100%;
-      background: #0f172a; color: #f8fafc;
+      margin:      0; padding: 0; height: 100%;
+      background:  #0f172a; color: #f8fafc;
       font-family: sans-serif; overflow: hidden;
-      display: flex; flex-direction: column;
+      display:     flex; flex-direction: column;
     }
-
-    /* Header slimmed down for maximum terminal space */
     #header {
-      background: #1e293b; 
-      padding: 4px 12px; /* Reduced from 10px 20px */
+      background:    #1e293b; 
+      padding:       4px 12px;
       border-bottom: 1px solid #334155;
-      display: flex; justify-content: space-between; align-items: center;
-      flex-shrink: 0;
-      font-size: 0.85em; /* Slightly smaller text overall */
+      display:       flex; justify-content: space-between; align-items: center;
+      flex-shrink:   0; font-size: 0.85em;
     }
-
-    .status { 
-      color: #10b981; 
-      font-size: 0.85em; /* Shrink the status text a bit more */
-    }
+    .status { color: #10b981; font-size: 0.85em; }
     .status.disconnected { color: #ef4444; }
-
-    /* Target xterm.js's internal scrolling viewport directly */
-    .xterm-viewport::-webkit-scrollbar {
-      width: 8px; /* Slims down the reserved gap! */
-    }
-
-    .xterm-viewport::-webkit-scrollbar-track {
-      background: transparent; /* Lets the terminal background show through */
-    }
-
-    .xterm-viewport::-webkit-scrollbar-thumb {
-      background: #334155;
-      border-radius: 4px;
-    }
-
-    .xterm-viewport::-webkit-scrollbar-thumb:hover {
-      background: #38bdf8;
-    }
-
-    /* For Firefox compatibility */
-    .xterm-viewport {
-      scrollbar-width: thin;
-      scrollbar-color: #334155 transparent;
-    }
-
-    /* Terminal container dynamically fills the rest of the window */
+    
+    .xterm-viewport::-webkit-scrollbar { width: 8px; }
+    .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+    .xterm-viewport::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .xterm-viewport::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
+    .xterm-viewport { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+    
     #terminal-container {
-      width: 100%;
-      flex: 1 1 0;
-      height: 0;
-      min-height: 0;
-      padding: 2px;
-      box-sizing: border-box;
-      overflow: hidden;
+      width: 100%; flex: 1 1 0; height: 0; min-height: 0;
+      padding: 2px; box-sizing: border-box; overflow: hidden;
     }
-
-    /* Force xterm to respect the container's height */
-    .xterm {
-      height: 100%;
-    }
-
-    .status { color: #10b981; font-size: 0.9em; }
-    .status.disconnected { color: #ef4444; }
+    .xterm { height: 100%; }
   </style>
 </head>
-<body>
+<body data-node-name="<%= ERB::Util.html_escape(@node_name) %>">
+  
   <div id="header">
     <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
     <span id="status" class="status"><i class="fas fa-circle"></i> Connecting...</span>
@@ -92,100 +53,59 @@
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <script>
-    const term = new Terminal({
-      //theme: { background: '#0f172a', foreground: '#e2e8f0', cursor: '#38bdf8' },
-      //theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(255, 255, 255, 0.3)' },
-      theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
-      //theme: { background: '#282a36', foreground: '#f8f8f2', cursor: '#ff79c6', selectionBackground: 'rgba(68, 71, 90, 0.5)' },
-      fontFamily: '"Courier New", Courier, monospace',
-      cursorBlink: true,
-      fontSize: 14
-    });
+    document.addEventListener('DOMContentLoaded', () => {
+      const container = document.getElementById('terminal-container');
+      const nodeName = document.body.dataset.nodeName;
 
-    term.onSelectionChange(() => {
-        const selection = term.getSelection();
-        if (selection) {
-            navigator.clipboard.writeText(selection);
-        }
-    });
+      const term = new Terminal({
+        theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
+        fontFamily: '"Courier New", Courier, monospace',
+        cursorBlink: true, fontSize: 14
+      });
 
-/*
-    // --- NEW: OSC 52 CLIPBOARD HANDLER ---
-    term.onCustomSequence(e => {
-      if (e.protocol === 'osc' && e.data.startsWith('52;')) {
-        const parts = e.data.split(';');
-        if (parts.length < 3) return;
-        
-        try {
-          // Decode the base64 data sent by tmux
-          const decoded = atob(parts[2]);
-          // Use the Browser Clipboard API
-          navigator.clipboard.writeText(decoded).then(() => {
-            console.log('Clipboard updated via OSC 52');
-          });
-        } catch (err) {
-          console.error('OSC 52 Error:', err);
-        }
-      }
-    });
-*/
+      term.onSelectionChange(() => {
+          const selection = term.getSelection();
+          if (selection) navigator.clipboard.writeText(selection);
+      });
 
-    const fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(document.getElementById('terminal-container'));
-    
-    // Give the popup window time to physically render before measuring!
-    setTimeout(() => {
-      fitAddon.fit();
-      // Send the initial dimensions to the server now that it's sized correctly
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-      }
-    }, 100);
-
-    // Setup WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-    const wsUrl = protocol + window.location.host + '/terminal/<%= ERB::Util.url_encode(@node_name) %>';
-    const ws = new WebSocket(wsUrl);
-
-    const statusEl = document.getElementById('status');
-
-    ws.onopen = () => {
-      statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
-      term.focus();
+      const fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+      term.open(container);
       
-      // NEW: Send the initial terminal size to the server as soon as we connect
-    //  ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-    };
+      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+      const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName);
+      const ws = new WebSocket(wsUrl);
+      const statusEl = document.getElementById('status');
 
-    ws.onmessage = (event) => {
-      term.write(event.data);
-    };
+      setTimeout(() => {
+        fitAddon.fit();
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        }
+      }, 100);
 
-    ws.onclose = () => {
-      statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-      statusEl.classList.add('disconnected');
-      term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
-    };
+      ws.onopen = () => {
+        statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+        term.focus();
+      };
 
-    // MODIFIED: Wrap keystrokes in a JSON packet before sending
-    term.onData(data => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'input', data: data }));
-      }
-    });
+      ws.onmessage = (event) => term.write(event.data);
 
-    // NEW: Listen for xterm.js resize events and tell the backend
-    term.onResize(size => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
-      }
-    });
+      ws.onclose = () => {
+        statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+        statusEl.classList.add('disconnected');
+        term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+      };
 
-    // When the browser window resizes, trigger xterm's fitAddon
-    // (This automatically triggers the term.onResize event above!)
-    window.addEventListener('resize', () => { 
-      fitAddon.fit(); 
+      term.onData(data => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
+      });
+
+      term.onResize(size => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
+      });
+
+      window.addEventListener('resize', () => fitAddon.fit());
     });
   </script>
 </body>

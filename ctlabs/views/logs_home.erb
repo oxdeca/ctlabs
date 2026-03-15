@@ -6,49 +6,14 @@
 # -----------------------------------------------------------------------------
 -->
 
-<%= HEADER %>
+<script src="/js/logs_home.js"></script>
+
 <div class="w3-panel w3-green">
-  <h2>🧾 Lab Logs</h2>
-</div>
-<div class="w3-container w3-2021-inkwell">
-  <p id="status">Checking for active log session...</p>
+  <h2><i class="fas fa-terminal"></i> Lab Logs</h2>
 </div>
 
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const lastLog = localStorage.getItem('ctlabs_last_log');
-    const statusEl = document.getElementById('status');
-
-    if (lastLog) {
-      try {
-        const { file, lab, action } = JSON.parse(lastLog);
-        // Optional: expire old logs (>1 hour)
-        if (Date.now() - (new Date(lastLog.timestamp)).getTime() > 3600000) {
-          localStorage.removeItem('ctlabs_last_log');
-          statusEl.textContent = "No recent active log session.";
-          return;
-        }
-
-        const url = `/logs?file=${encodeURIComponent(file)}&lab=${encodeURIComponent(lab)}&action=${encodeURIComponent(action)}`;
-        
-        // Auto-redirect after a brief delay (for UX feedback)
-        statusEl.innerHTML = `
-          <strong>Resuming active log...</strong><br>
-          Lab: <code>${lab}</code> (${action === 'up' ? 'Starting' : 'Stopping'})
-        `;
-        
-        setTimeout(() => {
-          window.location.href = url;
-        }, 800); // 0.8 second delay so user sees message
-
-      } catch (e) {
-        console.warn('Failed to resume log:', e);
-        localStorage.removeItem('ctlabs_last_log');
-        statusEl.textContent = "No valid log session found.";
-      }
-    } else {
-      statusEl.textContent = "No active log session.";
-    }
-  });
-</script>
-<%= FOOTER %>
+<div class="w3-container w3-2021-inkwell w3-round w3-padding-16">
+  <p id="status" style="font-size: 1.1em; color: #e2e8f0;">
+    <i class="fas fa-spinner fa-spin"></i> Checking for active log session...
+  </p>
+</div>

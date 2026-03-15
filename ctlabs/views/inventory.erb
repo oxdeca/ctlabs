@@ -6,7 +6,6 @@
 # -----------------------------------------------------------------------------
 -->
 
-<%= HEADER %>
 <script src="/js/inventory.js"></script>
 
 <% inv_contents = fetch_inventory_contents %>
@@ -43,6 +42,3 @@
         <pre style="margin: 0;"><code class="language-ini" style="color: #f8fafc; font-family: 'Courier New', monospace;"><%= ERB::Util.h(inv_contents[:data]) %></code></pre>
       </div>
     </div>
-
-<%= SCRIPT %>
-<%= FOOTER %>

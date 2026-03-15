@@ -6,7 +6,6 @@
 # -----------------------------------------------------------------------------
 -->
 
-<%= HEADER %>
 <div class="w3-panel <%= @success ? 'w3-green' : 'w3-red' %>">
   <h2><%= @success ? 'Success' : 'Error' %></h2>
 </div>
@@ -14,4 +13,3 @@
   <pre><%= @output.gsub(/</, '&lt;').gsub(/>/, '&gt;') %></pre>
 </div>
 <br>
-<%= FOOTER %>

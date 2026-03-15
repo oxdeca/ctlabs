@@ -1,14 +1,10 @@
 /*
  -----------------------------------------------------------------------------
  File        : ctlabs/public/js/ctlabs-maps.js
- Description : con and topology view
+ Description : topology view
  License     : MIT License
  -----------------------------------------------------------------------------
 */
-
-// --- GLOBAL MAP STATE ---
-window.panZoomData = null;
-window.panZoomMgmt = null;
 
 // --- GLOBAL MAP STATE ---
 window.panZoomData = null;
@@ -137,11 +133,35 @@ function attachCustomTooltips(svgObject) {
       const nodeName = cleanText.split('\n')[0].split(/\s+/)[0].trim().toLowerCase();
       const isNode = el.classList.contains('node') || (el.closest && el.closest('.node'));
 
+//      if (nodeName && isNode) {
+//        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
+//        const w = 900, h = 600;
+//        const top  = window.top.outerHeight / 2 + window.top.screenY - ( h / 2);
+//        const left = window.top.outerWidth  / 2 + window.top.screenX - ( w / 2);
+//        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
+//      }
+
       if (nodeName && isNode) {
         menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
-        const w = 900, h = 600;
-        const top = window.top.outerHeight / 2 + window.top.screenY - ( h / 2);
-        const left = window.top.outerWidth / 2 + window.top.screenX - ( w / 2);
+        
+        // --- BULLETPROOF POPUP CENTERING ---
+        const w = 900;
+        const h = 600;
+        
+        // We MUST use window.top because this code runs inside an SVG <object>
+        const topWin = window.top || window;
+        
+        const dualScreenLeft = topWin.screenLeft !== undefined ? topWin.screenLeft : topWin.screenX;
+        const dualScreenTop = topWin.screenTop !== undefined ? topWin.screenTop : topWin.screenY;
+        
+        const winWidth = topWin.outerWidth || topWin.innerWidth;
+        const winHeight = topWin.outerHeight || topWin.innerHeight;
+        
+        // Calculate center, and prevent negative coordinates which force top-left spawning
+        const left = Math.max(0, Math.round(dualScreenLeft + (winWidth - w) / 2));
+        const top = Math.max(0, Math.round(dualScreenTop + (winHeight - h) / 2));
+        // -----------------------------------
+
         menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
       }
 

@@ -1,0 +1,37 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/add_node.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div id="add-node-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-plus-circle"></i> Add Node</h4></header>
+      <form id="add-node-form" onsubmit="window.submitCombinedNode(event)">
+        <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
+          <input type="hidden" name="lab_name" id="add-node-lab-name">
+          <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;"><i class="fas fa-info-circle"></i> If the lab is running, the node will automatically boot. If stopped, it will be saved to the YAML.</div>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node Name</label><input type="text" name="node_name" placeholder="e.g. h3" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required></div>
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Type</label><select name="type" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateKindOptions(this.value, 'add-node-kind'); window.updateNodeFormFields(this.value);" required><option value="" disabled selected>-- Select Type --</option><% (info_hash[:images_map] || {}).keys.each do |t| %><option value="<%= t %>"><%= t %></option><% end %></select>
+            </div>
+            <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Kind</label><select name="kind" id="add-node-kind" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required><option value="" disabled selected>-- Select Kind --</option></select>
+            </div>
+            <div class="w3-col m12 w3-margin-bottom"><label id="add-node-connect-label" style="font-size: 0.85em; color: #94a3b8;">Connect to Switch (eth1)</label><select name="switch" id="add-node-connect-select" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.updateGatewayForSwitch(this.value)"><option value="" selected>-- None (Mgmt Only) --</option><% (info_hash[:switches] || []).each do |sw| %><option value="<%= sw %>"><%= sw %></option><% end %></select>
+            </div>
+            <div class="w3-col m6 w3-margin-bottom" id="add-node-ip-container"><label style="font-size: 0.85em; color: #94a3b8;">Data IP Address (eth1)</label><input type="text" name="ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col m6 w3-margin-bottom" id="add-node-gw-container"><label style="font-size: 0.85em; color: #94a3b8;">Gateway (Select or Type Override)</label><input type="text" name="gw" list="gw-options" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"><datalist id="gw-options"><% (info_hash[:gateways] || []).each do |g| %><option value="<%= g %>"><% end %></datalist>
+            </div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Additional NICs (key=val)</label><textarea name="nics" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="eth2=10.0.0.1/24"></textarea></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-info-circle"></i> Node Info (Description)</label><input type="text" name="info" class="w3-input w3-small w3-round" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-terminal"></i> Terminal / SSH Link</label><input type="text" name="term" class="w3-input w3-small w3-round" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+            <div class="w3-col m12 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label><textarea name="urls_text" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="2" placeholder="Walkthrough|https://docs.local/..."></textarea></div>
+          </div>
+          <div id="add-node-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+        </div>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('add-node-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save Node</button></footer>
+      </form>
+    </div>
+  </div>

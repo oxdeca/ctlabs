@@ -1,0 +1,69 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/edit_lab.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div id="edit-lab-modal" class="w3-modal" style="z-index: 9999;">
+    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+        <span onclick="document.getElementById('edit-lab-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+        <h4 style="margin: 0;"><i class="fas fa-edit"></i> Edit Lab Configuration</h4>
+      </header>
+      <form onsubmit="window.submitEditLab(event)">
+        <input type="hidden" id="edit-lab-path" name="lab_path">
+        <div class="w3-container w3-padding" style="max-height: 60vh; overflow-y: auto;">
+          
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-top: 0;">Global Settings</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Name</label>
+              <input type="text" id="edit-lab-name" name="name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Description</label>
+              <input type="text" id="edit-lab-desc" name="desc" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px;">Topology (VM)</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VM Name</label>
+              <input type="text" id="edit-lab-vm-name" name="vm_name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VM DNS (Comma separated)</label>
+              <input type="text" id="edit-lab-vm-dns" name="vm_dns" placeholder="1.1.1.1, 8.8.8.8" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <h6 style="color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 4px;">Management Network</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">VRF ID</label>
+              <input type="number" id="edit-lab-mgmt-vrfid" name="mgmt_vrfid" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Mgmt DNS (Comma separated)</label>
+              <input type="text" id="edit-lab-mgmt-dns" name="mgmt_dns" placeholder="1.1.1.1, 8.8.8.8" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Network (e.g., 192.168.99.0/24)</label>
+              <input type="text" id="edit-lab-mgmt-net" name="mgmt_net" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col s6 w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Gateway</label>
+              <input type="text" id="edit-lab-mgmt-gw" name="mgmt_gw" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+          <div id="edit-lab-result" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;" class="w3-round"></div>
+        </div>
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+          <button type="button" onclick="document.getElementById('edit-lab-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+          <button type="submit" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save Changes</button>
+        </footer>
+      </form>
+    </div>
+  </div>

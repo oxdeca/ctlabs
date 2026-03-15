@@ -5,8 +5,6 @@
 # -----------------------------------------------------------------------------
 -->
 
-<%= HEADER %>
-
 <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
 <link rel="stylesheet" href="/css/ctlabs-maps.css">
 <script src="/js/ctlabs-maps.js"></script>
@@ -24,13 +22,10 @@
   </button>
 </div>
 
-<div id="DataNet" class="w3-card-4 w3-margin-bottom map-tab" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 230px);">
+<div id="DataNet" class="w3-card-4 w3-margin-bottom map-tab" style="background-color: #0f172a; border: 1px solid #334155; border-radius: 5px; padding: 5px; height: calc(100vh - 224px);">
   <object id="topo-obj" type="image/svg+xml" data="<%= @file_prefix %>.svg" style="width: 100%; height: 100%;"></object>
 </div>
 
-<div id="MgmtNet" class="w3-card-4 w3-margin-bottom map-tab" style="display:none; background-color: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px; height: calc(100vh - 230px);">
+<div id="MgmtNet" class="w3-card-4 w3-margin-bottom map-tab" style="display:none; background-color: #0f172a; border: 1px solid #334155; border-radius: 5px; padding: 5px; height: calc(100vh - 224px);">
   <object id="mgmt-topo-obj" type="image/svg+xml" data="mgmt_<%= @file_prefix %>.svg" style="width: 100%; height: 100%;"></object>
 </div>
-
-<%= SCRIPT %>
-<%= FOOTER %>

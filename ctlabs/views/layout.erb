@@ -1,0 +1,158 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/layout.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>🔬 CTLABS</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+  <link rel="stylesheet" href="https://www.w3schools.com/lib/w3-colors-2021.css">
+  <link rel="stylesheet" href="/asciinema-player.css" type="text/css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/base16/dracula.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/ini.min.js"></script>
+  <script>hljs.highlightAll();</script>
+  <script src="https://www.w3schools.com/lib/w3.js"></script>
+
+  <style>
+    /* Global Modern Typography */
+    body, h1, h2, h3, h4, h5, h6, button, input, select, textarea {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+    
+    /* Sleek Slate Dark Theme */
+    body { background-color: #0f172a; color: #e2e8f0; }
+    
+    /* Frosted Glass Navbar */
+    .w3-top .w3-bar { 
+      background-color: rgba(15, 23, 42, 0.85) !important; 
+      backdrop-filter: blur(12px); 
+      border-bottom: 1px solid #1e293b; 
+      box-shadow: none;
+    }
+    .w3-bar-item.w3-button:hover { background-color: rgba(255,255,255,0.1) !important; border-radius: 6px; }
+
+    /* Modernized Cards and Panels */
+    .w3-card-4, .w3-panel, .w3-2021-inkwell { 
+      background-color: #1e293b !important; 
+      color: #f8fafc !important; 
+      border-radius: 12px; 
+      border: 1px solid #334155; 
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important; 
+    }
+    
+    /* Page Titles */
+    .w3-panel.w3-green {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+      color: white !important;
+      border: none;
+    }
+
+    /* Buttons */
+    .w3-button { border-radius: 6px; transition: all 0.2s ease-in-out; font-weight: 500; }
+    .w3-button.w3-green { background-color: #10b981 !important; }
+    .w3-button.w3-green:hover { background-color: #059669 !important; transform: translateY(-1px); }
+    .w3-button.w3-blue { background-color: #3b82f6 !important; }
+    .w3-button.w3-blue:hover { background-color: #2563eb !important; transform: translateY(-1px); }
+    .w3-button.w3-red { background-color: #ef4444 !important; }
+    .w3-button.w3-red:hover { background-color: #dc2626 !important; transform: translateY(-1px); }
+
+    /* Inputs & Selects */
+    .w3-select, .w3-input { 
+      border-radius: 6px; 
+      background-color: #0f172a !important; 
+      color: #e2e8f0 !important; 
+      border: 1px solid #475569 !important;
+    }
+    .w3-select:focus, .w3-input:focus { border-color: #3b82f6 !important; outline: none; }
+
+    /* Tables */
+    .w3-table td, .w3-table th { border-bottom: 1px solid #334155 !important; }
+    .w3-striped tbody tr:nth-child(even) { background-color: rgba(255,255,255,0.03) !important; }
+    
+    #log-content span { font-weight: normal; }
+    .svg-container { width: 100%; height: auto; position: relative; overflow: auto; display: flex; justify-content: center; align-items: flex-start; }
+    .responsive-embed { width: 100%; height: auto; min-height: 100px; display: block; max-width: 100%; max-height: 70vh; }
+    .responsive-embed.zooming { transition: transform 0.2s ease; }
+    
+    /* Code Blocks */
+    pre, code { border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <div class="w3-top w3-bar w3-padding-small">
+    <a href="/"          class="w3-bar-item w3-button w3-margin-right"><b>🔬 CTLABS</b></a>
+    <a href="/topo"      class="w3-bar-item w3-button"><i class="fas fa-sitemap w3-margin-right"></i>Topology</a>
+    <a href="/con"       class="w3-bar-item w3-button"><i class="fas fa-network-wired w3-margin-right"></i>Connections</a>
+    <a href="/inventory" class="w3-bar-item w3-button"><i class="fas fa-list w3-margin-right"></i>Inventory</a>
+    <a href="/config"    class="w3-bar-item w3-button"><i class="fas fa-cogs w3-margin-right"></i>Configuration</a>
+    <a href="/logs"      class="w3-bar-item w3-button"><i class="fas fa-terminal w3-margin-right"></i>Logs</a>
+    <a href="/flashcards" class="w3-bar-item w3-button"><i class="fas fa-layer-group w3-margin-right"></i>Flashcards</a>
+    <a href="/demo"      class="w3-bar-item w3-button"><i class="fas fa-video w3-margin-right"></i>Walkthrough</a>
+  </div>
+  
+  <div id="ctlabs" style="height: 70px;"></div>
+
+  <%= yield %>
+
+  <script>
+    function updateSVGScale(embedId, percent) {
+      const embed = document.getElementById(embedId);
+      if (!embed) return;
+
+      const scale = percent / 100;
+      embed.style.transform = `scale(${scale})`;
+      embed.style.transformOrigin = 'top left';
+      embed.classList.add('zooming');
+
+      const labelId = `zoom-value-${embedId.replace('-embed', '')}`;
+      const label = document.getElementById(labelId);
+      if (label) label.textContent = percent;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const sliders = document.querySelectorAll('.zoom-slider');
+      sliders.forEach(slider => {
+        slider.addEventListener('input', function () {
+          const embedId = this.getAttribute('data-embed-id');
+          const percent = this.value;
+          updateSVGScale(embedId, percent);
+        });
+      });
+
+      document.querySelectorAll('.responsive-embed').forEach(embed => {
+        if (!embed.getAttribute('src')) return;
+      });
+    });
+
+    function fitToContainer(embed) {
+      const container = embed.parentElement;
+      const svgDoc = embed.getSVGDocument?.();
+      if (!svgDoc) return;
+
+      const svg = svgDoc.documentElement;
+      const vb = svg.viewBox.baseVal;
+      if (vb && vb.width > 0) {
+        const containerWidth = container.clientWidth;
+        const scale = Math.min(1, containerWidth / vb.width);
+        embed.style.transform = `scale(${scale})`;
+        embed.dataset.initialScale = scale;
+      }
+    }
+
+    document.querySelectorAll('.responsive-embed').forEach(embed => {
+      embed.onload = () => fitToContainer(embed);
+    });
+  </script>
+</body>
+</html>
