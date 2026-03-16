@@ -47,6 +47,9 @@
           <button class="w3-bar-item w3-button lab-tab-btn w3-round w3-margin-bottom" style="text-align: left; background-color: #38bdf8; color: #0f172a; font-weight: bold;" onclick="openLabTab(event, 'tab-overview')">
             <i class="fas fa-info-circle" style="width: 20px;"></i> Overview
           </button>
+          <button class="w3-bar-item w3-button lab-tab-btn w3-round w3-margin-bottom" style="text-align: left; background-color: #cbd5e1;" onclick="openLabTab(event, 'tab-automation')">
+            <i class="fas fa-robot"></i> Automation
+          </button>
           <button class="w3-bar-item w3-button lab-tab-btn w3-round w3-margin-bottom w3-hover-deep-purple" style="text-align: left; color: #cbd5e1;" onclick="openLabTab(event, 'tab-nodes')">
             <i class="fas fa-server" style="width: 20px;"></i> Nodes
           </button>
@@ -66,6 +69,10 @@
         
         <div id="tab-overview" class="lab-tab-content" style="flex: 1; min-height: 0; flex-direction: column; overflow-y: auto;">
           <%= erb :'cards/overview', locals: { info_hash: info_hash } %>
+        </div>
+
+         <div id="tab-automation" class="lab-tab-content" style="display: none; flex: 1; min-height: 0; flex-direction: column; overflow-y: hidden;">
+          <%= erb :'cards/automation', locals: { info_hash: info_hash } %>
         </div>
         
         <div id="tab-nodes" class="lab-tab-content" style="display: none; flex: 1; min-height: 0; flex-direction: column; overflow-y: hidden;">
@@ -94,6 +101,7 @@
   <%= erb :'modals/edit_image' %>
   <%= erb :'modals/build_image' %>
   <%= erb :'modals/ansible_editor' %>
+  <%= erb :'modals/terraform_editor' %>
   <%= erb :'modals/link_editor' %>
 
 <% end %>

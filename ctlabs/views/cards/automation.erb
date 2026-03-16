@@ -1,0 +1,50 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/automation.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-code-branch"></i> Ansible Playbook</span>
+    <div>
+      <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
+        <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) rescue false %>
+        <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
+          <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
+        </button>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small">
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Playbook:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= info_hash[:ansible][:playbook] %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Environment:</td><td><% (info_hash[:ansible][:environment] || []).each do |e| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div><% end %></td></tr>
+      <tr><td style="color: #94a3b8;">Tags:</td><td><% (info_hash[:ansible][:tags] || []).each do |t| %><span class="w3-badge w3-tiny w3-round" style="background-color: #10b981; margin-right: 4px;"><%= t %></span><% end %></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-cubes"></i> Terraform Configuration</span>
+    <div>
+      <button type="button" onclick="window.openTerraformEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] %>
+        <% tf_running = Lab.terraform_running?(info_hash[:lab_path]) rescue false %>
+        <button type="button" onclick="window.runTerraform(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= tf_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= tf_running ? 'disabled' : '' %>>
+          <i class="fas <%= tf_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= tf_running ? 'Running...' : 'Apply Terraform' %>
+        </button>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small">
+    <% tf_cfg = info_hash[:terraform] || {} %>
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= tf_cfg[:workspace] && tf_cfg[:workspace] != '' ? tf_cfg[:workspace] : 'default' %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Variables:</td><td><% (tf_cfg[:vars] || []).each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %></td></tr>
+    </table>
+  </div>
+</div>

@@ -933,3 +933,87 @@ post '/labs/*/playbook' do
   content_type :json
   { success: true }.to_json
 end
+
+
+# ---------------------------------------------------
+# TERRAFORM
+# ---------------------------------------------------
+# Fetch Terraform config for the Editor
+get '/labs/*/node/terraform' do
+  content_type :json
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path)
+    # Locate the controller node
+    controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' }
+    raise "No controller node found in topology" unless controller_node_name
+    
+    base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
+    tf = base_data['terraform'] || {}
+    
+    { json: { tf: tf } }.to_json
+  rescue => e
+    status 400
+    { error: e.message }.to_json
+  end
+end
+
+# Edit Terraform Configuration
+post '/labs/*/terraform/edit' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path)
+    
+    # Locate the controller node
+    controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' }
+    raise "No controller node found in topology" unless controller_node_name
+    
+    base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
+    tf_cfg = base_data['terraform'] || {}
+    
+    # 1. Update Workspace
+    params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
+    
+    # 2. Update Variables
+    if params[:vars] && !params[:vars].strip.empty?
+      tf_cfg['vars'] = params[:vars].split("\n").map(&:strip).reject(&:empty?)
+    else
+      tf_cfg.delete('vars')
+    end
+
+    # Save it back
+    base_data['terraform'] = tf_cfg
+    full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
+    write_formatted_yaml(lab_path, full_yaml)
+
+    content_type :json
+    { success: true, message: "Terraform configuration updated." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# Run Terraform
+post '/labs/*/terraform' do
+  lab_name = params[:splat].first
+  halt 400, { error: "No lab is running" }.to_json unless get_running_lab == lab_name
+  halt 400, { error: "Terraform already running!" }.to_json if Lab.terraform_running?(lab_name) rescue false
+
+  log_path = LabLog.latest_for_running_lab
+  Thread.new do
+    begin
+      lab_instance = Lab.new(cfg: get_lab_file_path(lab_name), relative_path: lab_name)
+      File.open(log_path, 'a') { |f| f.puts "\n--- Manual Terraform apply triggered ---\n" }
+      lab_instance.run_terraform(nil, log_path) # You will need to implement this method in your Lab model!
+    rescue => e
+      File.open(log_path, 'a') { |f| f.puts "\n⚠️ Terraform failed: #{e.message}\n" }
+    end
+  end
+  content_type :json
+  { success: true }.to_json
+end

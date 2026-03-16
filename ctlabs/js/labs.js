@@ -868,6 +868,78 @@
       }
   };
 
+  // --- TERRAFORM ---
+  window.openTerraformEditor = async function(labName) {
+      window.currentEditLab = labName;
+      const resultDiv = document.getElementById('terraform-editor-result');
+      if (resultDiv) resultDiv.style.display = 'none';
+
+      try {
+          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+          const res = await fetch(`/labs/${safeLab}/node/terraform`);
+          if (!res.ok) throw new Error("Could not fetch terraform node configuration");
+          const data = await res.json();
+
+          let tf = data.json.tf || {};
+          
+          document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
+          document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
+          
+          document.getElementById('terraform-editor-modal').style.display = 'block';
+      } catch (err) { alert("Error: " + err.message); }
+  };
+
+  window.saveTerraformConfig = async function() {
+      const resultDiv = document.getElementById('terraform-editor-result');
+      const formData = new URLSearchParams({
+          workspace: document.getElementById('edit-terraform-workspace').value,
+          vars: document.getElementById('edit-terraform-vars').value
+      });
+
+      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      try {
+          const res = await fetch(`/labs/${safeLab}/terraform/edit`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formData.toString()
+          });
+          const data = await res.json();
+          if (res.ok) {
+              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+              resultDiv.textContent = '✅ ' + data.message;
+              setTimeout(() => location.reload(), 800);
+          } else throw new Error(data.error);
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+          resultDiv.textContent = '❌ ' + err.message;
+      }
+  };
+
+  window.runTerraform = async function(event, labName) {
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+      btn.classList.replace('w3-green', 'w3-grey');
+
+      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      try {
+          const res = await fetch(`/labs/${safeLab}/terraform`, { method: 'POST' });
+          if (res.ok) window.location.href = '/logs/current';
+          else {
+              const data = await res.json();
+              alert("Error: " + (data.error || 'Failed to start Terraform'));
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fas fa-play"></i> Apply Terraform';
+              btn.classList.replace('w3-grey', 'w3-green');
+          }
+      } catch (err) {
+          alert("Error: " + err.message);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-play"></i> Apply Terraform';
+          btn.classList.replace('w3-grey', 'w3-green');
+      }
+  };
+
   // --- SAVE ACTIVE LAB ---
   window.saveActiveLab = async function() {
       const labSelector = document.getElementById('lab-selector');
