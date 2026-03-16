@@ -76,6 +76,9 @@ require_relative 'routes/main'
 require_relative 'routes/terminal'
 require_relative 'routes/images'
 require_relative 'routes/logs'
+require_relative 'routes/misc'
+require_relative 'routes/automation'
+require_relative 'routes/topology'
 require_relative 'routes/labs'
 
 # ------------------------------------------------------------------------------
