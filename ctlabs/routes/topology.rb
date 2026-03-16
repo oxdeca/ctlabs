@@ -84,7 +84,7 @@ post '/labs/*/node' do
   end
 end
 
-post '/labs/*/node/:node_name/edit' do
+post '/labs/*/node_edit/:node_name' do
   lab_name = params[:splat].first
   node_name = params[:node_name]
   lab_path = get_lab_file_path(lab_name)

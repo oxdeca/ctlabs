@@ -450,7 +450,7 @@
 
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(window.currentEditNode)}/edit`, {
+          const res = await fetch(`/labs/${safeLab}/node_edit/${encodeURIComponent(window.currentEditNode)}`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
@@ -1179,51 +1179,6 @@
           // Focus the last opened file tab, or fallback to Settings
           const fileTabs = document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)');
           if (fileTabs.length > 0) {
-  window.saveAnsibleConfig = async function() {
-      const resultDiv = document.getElementById('ansible-editor-result');
-      const filesData = {};
-      document.querySelectorAll('.ans-tab[data-filepath]').forEach(tab => {
-          const filepath = tab.getAttribute('data-filepath');
-          const taId = tab.querySelector('textarea').id;
-          filesData[filepath] = window.cmEditors[taId].getValue();
-      });
-
-      const formData = new URLSearchParams({
-          book: document.getElementById('edit-ansible-book').value,
-          inv: document.getElementById('edit-ansible-inv').value,
-          custom_inv: document.getElementById('edit-ansible-custom-inv').value,
-          tags: document.getElementById('edit-ansible-tags').value,
-          env: document.getElementById('edit-ansible-env').value,
-          ans_files: JSON.stringify(filesData)
-      });
-
-      resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
-      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration and files...';
-
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
-      try {
-          const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: formData.toString()
-          });
-          
-          if (res.ok) {
-              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
-              resultDiv.textContent = '✅ All files saved successfully.';
-              setTimeout(() => location.reload(), 800);
-          } else {
-              // Safely handle HTML vs JSON error responses
-              const errText = await res.text();
-              let errMsg = errText;
-              try { errMsg = JSON.parse(errText).error; } catch(e) {} // Fallback to raw text if not JSON
-              throw new Error(errMsg);
-          }
-      } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
-          resultDiv.innerHTML = '❌ ' + err.message; // Will render Sinatra's HTML error directly in the box!
-      }
-  };
               fileTabs[fileTabs.length - 1].click();
           }
 
