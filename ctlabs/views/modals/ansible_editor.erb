@@ -5,43 +5,117 @@
 # -----------------------------------------------------------------------------
 -->
 
-<div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 900px;">
-    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+<style>
+  /* Custom Slim Scrollbar for Modal */
+  .slim-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .slim-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  
+  /* Target CodeMirror's exact floating scrollbar containers */
+  .CodeMirror-vscrollbar::-webkit-scrollbar,
+  .CodeMirror-hscrollbar::-webkit-scrollbar { 
+      width: 8px; 
+      height: 8px; 
+  }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-track,
+  .CodeMirror-hscrollbar::-webkit-scrollbar-track { 
+      background: #0f172a; 
+      border-radius: 4px; 
+  }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb { 
+      background: #475569; 
+      border-radius: 4px; 
+  }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover,
+  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover { 
+      background: #64748b; 
+  }
+  
+  /* Blends the corner square where vertical and horizontal scrollbars meet */
+  .CodeMirror-scrollbar-filler { 
+      background-color: #0f172a !important; 
+      border: none;
+  }
+</style>
+
+<div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column;">
+    
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
       <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4>
     </header>
 
-    <div class="w3-bar" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto;">
-      <button class="w3-bar-item w3-button ans-tablink w3-text-blue" onclick="window.openAnsTab(event, 'AnsSettings')" style="flex-shrink: 0;"><i class="fas fa-sliders-h"></i> Settings</button>
-      <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.promptAndLoadAnsibleFile()" title="Open a File" style="flex-shrink: 0;"><i class="fas fa-folder-open"></i></button>
+    <div class="w3-bar slim-scroll" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
+      <button class="w3-bar-item w3-button ans-tablink w3-text-blue" data-target-tab="AnsSettings" onclick="window.openAnsTab('AnsSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
+      <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('ansible')" title="Browse Workspace"><i class="fas fa-plus"></i></button>
     </div>
 
-    <div class="w3-container w3-padding" id="ans-editors-container" style="min-height: 450px;">
+    <div class="w3-container w3-padding slim-scroll" id="ans-editors-container" style="flex: 1; overflow-y: auto; min-height: 400px;">
+      
       <div id="AnsSettings" class="ans-tab">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;"><i class="fas fa-info-circle"></i> Edits to the playbook configuration apply to the current run.</div>
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
+          <i class="fas fa-info-circle"></i> Edits to the playbook configuration apply to the current run.
+        </div>
         
-        <label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label>
-        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-          <input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. ctlabs.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-          <button type="button" onclick="window.loadActivePlaybook()" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;"><i class="fas fa-file-code"></i> Edit Playbook</button>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label>
+          <input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Auto-Generated Inventory File (Read-Only)</label>
+          <input type="text" id="edit-ansible-inv" class="w3-input w3-small w3-round" readonly title="This is calculated dynamically when the lab starts" style="background-color: #1e293b; color: #94a3b8; border: 1px solid #334155; cursor: not-allowed;">
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Custom Inventory File (Appended to auto-generated inventory)</label>
+          <input type="text" id="edit-ansible-custom-inv" class="w3-input w3-small w3-round" placeholder="e.g. custom_hosts.ini or dyn_inv.py" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
         </div>
 
         <div class="w3-margin-bottom">
           <label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label>
           <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
         </div>
+
         <div class="w3-margin-bottom">
           <label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label>
-          <textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea>
+          <textarea id="edit-ansible-env" class="w3-input w3-small w3-round slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea>
         </div>
       </div>
       
       <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
     </div>
-    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-      <button onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-      <button onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
+
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+      <div>
+        <button type="button" id="ans-delete-file-btn" onclick="window.deleteActiveAnsibleFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
+      </div>
+      <div>
+        <button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+        <button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
+      </div>
     </footer>
   </div>
 </div>
+
+<div id="ans-file-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 15vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('ans-file-browser-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-folder-open"></i> Open / Create File</h4>
+    </header>
+    <div class="w3-container w3-padding">
+      <label style="font-size: 0.85em; color: #94a3b8;">Select existing or type new path (e.g. roles/web/tasks/main.yml)</label>
+      <input type="text" id="ans-file-browser-input" list="ans-files-datalist" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; margin-top: 8px;" placeholder="Double-click to browse files...">
+      <datalist id="ans-files-datalist"></datalist>
+    </div>
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button onclick="document.getElementById('ans-file-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button onclick="window.confirmAnsibleFileBrowser()" class="w3-button w3-blue w3-round w3-small">Open File</button>
+    </footer>
+  </div>
+</div>
+

@@ -5,6 +5,19 @@
 # -----------------------------------------------------------------------------
 -->
 
+<%
+  # Cache the local registry images so we only run the shell commands once per page load!
+  unless @local_built_images
+    @local_built_images = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    @local_built_images += `docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    @local_built_images.map! do |img|
+      img.sub(%r{^localhost/}, '').sub(%r{^docker\.io/library/}, '').sub(%r{^docker\.io/}, '').sub(%r{^quay\.io/}, '')
+    end
+    @local_built_images.uniq!
+    @local_built_images.reject! { |img| img == "<none>:<none>" || img.empty? }
+  end
+%>
+
 <div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-layer-group w3-text-orange"></i> Image Profiles (Lab Specific)</span>
@@ -30,12 +43,28 @@
         </thead>
         <tbody>
           <% (info_hash[:images] || []).each do |img| %>
+            <%
+              # Determine if this specific profile's image exists in the registry
+              target_image = img[:image].to_s.strip
+              is_built = false
+              unless target_image.empty?
+                target_image += ":latest" unless target_image.include?(':')
+                is_built = @local_built_images.include?(target_image)
+              end
+            %>
             <tr>
               <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:type] %></span></td>
               <td style="vertical-align: middle;"><%= img[:kind] %></td>
-              <td style="color: #cbd5e1; vertical-align: middle;"><%= img[:image] %></td>
+              
+              <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
+                <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry (Must be built/imported)' %>" style="margin-right: 4px;">
+                  <i class="fas fa-cube <%= is_built ? 'w3-text-green' : '' %>" <%= is_built ? '' : 'style="color: #475569;"' %>></i>
+                </span>
+                <%= img[:image] %>
+              </td>
+
               <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
-                <button type="button" onclick="window.editImageConfig('<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras]) %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image Profile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
+                <button type="button" onclick="window.editImageConfig('<%= info_hash[:lab_path] %>', '<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras] || "") %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image Profile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
                 <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Profile" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
               </td>
             </tr>

@@ -1,0 +1,37 @@
+<!--                                                                                                                                               # -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/file-browserr.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------                                                                    -->
+
+<style>
+  .file-list-item { cursor: pointer; padding: 6px 12px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
+  .file-list-item:hover { background-color: #334155; }
+  .file-list-item.selected { background-color: #0284c7; color: white; }
+</style>
+
+<div id="unified-file-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 10vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px; display: flex; flex-direction: column; max-height: 80vh;">
+    
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
+      <span onclick="document.getElementById('unified-file-browser-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-search"></i> Browse Workspace Files</h4>
+    </header>
+
+    <div class="w3-container w3-padding" style="flex-shrink: 0; background-color: #0f172a;">
+      <input type="text" id="unified-file-search" class="w3-input w3-small w3-round" placeholder="Search files (e.g. main.yml)..." onkeyup="window.filterUnifiedFileBrowser()" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569;">
+    </div>
+
+    <div id="unified-file-list" class="slim-scroll" style="flex: 1; overflow-y: auto; background-color: #0f172a; border-top: 1px solid #334155; border-bottom: 1px solid #334155;">
+      </div>
+
+    <div class="w3-container w3-padding" style="flex-shrink: 0;">
+      <label style="font-size: 0.85em; color: #94a3b8;">Selected Path (or type a new path to create):</label>
+      <input type="text" id="unified-file-input" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; margin-top: 4px;" placeholder="e.g. scripts/new_script.sh">
+    </div>
+
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right; flex-shrink: 0;">
+      <button onclick="document.getElementById('unified-file-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button onclick="window.confirmUnifiedFileBrowser()" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-folder-open"></i> Open / Create</button>
+    </footer>
+  </div>
+</div>

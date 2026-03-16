@@ -110,53 +110,51 @@ end
 
 # -----------------------------------
 
-# Add or Edit a Defined Image
 post '/labs/*/image/edit' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
 
   begin
-    full_yaml = YAML.load_file(lab_path) || {}
+    full_yaml = YAML.load_file(lab_path)
+    
+    # 1. Initialize the new 'images' block if it doesn't exist
     full_yaml['defaults'] ||= {}
     
     type = params[:type].to_s.strip
     kind = params[:kind].to_s.strip
     
-    raise "Type and Kind are required." if type.empty? || kind.empty?
+    halt 400, { error: "Type and Kind are required" }.to_json if type.empty? || kind.empty?
 
+    # 2. Build the profile data
+    profile = {}
+    profile['image'] = params[:image].strip unless params[:image].to_s.strip.empty?
+    
+    caps = params[:caps].to_s.split(',').map(&:strip).reject(&:empty?)
+    profile['caps'] = caps unless caps.empty?
+    
+    env = params[:env].to_s.split(/\r?\n/).map(&:strip).reject(&:empty?)
+    profile['env'] = env unless env.empty?
+    
+    if params[:extras] && !params[:extras].strip.empty?
+      begin
+        # Merge extra YAML attributes directly into the profile
+        profile.merge!(YAML.safe_load(params[:extras]))
+      rescue => e
+        raise "Invalid YAML in Extras: #{e.message}"
+      end
+    end
+
+    # 3. Save into the new clean structure!
     full_yaml['defaults'][type] ||= {}
-    img_cfg = full_yaml['defaults'][type][kind] || {}
-    
-    img_cfg['image'] = params[:image].strip unless params[:image].to_s.strip.empty?
+    full_yaml['defaults'][type][kind] = profile
 
-    # Parse capabilities
-    params[:caps].to_s.strip.empty? ? img_cfg.delete('caps') : img_cfg['caps'] = params[:caps].split(',').map(&:strip)
-    
-    # Parse environment variables
-    if params[:env] && !params[:env].strip.empty?
-      img_cfg['env'] = params[:env].split("\n").map(&:strip).reject(&:empty?)
-    else
-      img_cfg.delete('env')
-    end
-
-    # Process Extra Arbitrary Attributes (ports, privileged, etc.)
-    # 1. Clean out old extra keys first
-    core_keys = ['image', 'caps', 'env']
-    img_cfg.keys.each { |k| img_cfg.delete(k) unless core_keys.include?(k) }
-    
-    # 2. Safely merge the new ones
-    if params[:extra_attrs] && !params[:extra_attrs].strip.empty?
-      parsed_extras = YAML.safe_load(params[:extra_attrs])
-      img_cfg.merge!(parsed_extras) if parsed_extras.is_a?(Hash)
-    end
-
-    full_yaml['defaults'][type][kind] = img_cfg
     write_formatted_yaml(lab_path, full_yaml)
 
     content_type :json
-    { success: true, message: "Image configuration saved." }.to_json
-  rescue => e
+    { success: true }.to_json
+  rescue Exception => e
     status 400
+    content_type :json
     { success: false, error: e.message }.to_json
   end
 end

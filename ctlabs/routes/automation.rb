@@ -9,7 +9,7 @@
 ANS_BASE_DIR = '/root/ctlabs-ansible'.freeze
 
 # Fetch Ansible config for the Editor
-get '/labs/*/node/ansible' do
+get '/labs/*/ansible/config' do
   content_type :json
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -50,7 +50,30 @@ get '/labs/*/ansible/file' do
   end
 end
 
-# Edit Ansible Config AND write dynamic files
+# Scan the directory to populate the File Browser Dropdown
+get '/labs/*/ansible/tree' do
+  content_type :json
+  begin
+    files = []
+    if Dir.exist?(ANS_BASE_DIR)
+      # Recursively search the entire directory
+      Dir.glob(File.join(ANS_BASE_DIR, "**", "*")).each do |file|
+        next if File.directory?(file)
+        
+        # Ignore noisy hidden folders so the dropdown is clean
+        next if file.include?('/.git/') || file.include?('/__pycache__/') || file.include?('/.idea/')
+        
+        # Add relative path to array (e.g., "playbooks/main.yml")
+        files << file.sub(ANS_BASE_DIR + '/', '')
+      end
+    end
+    files.sort.to_json
+  rescue => e
+    status 400
+    { error: e.message }.to_json
+  end
+end
+
 post '/labs/*/ansible/edit' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -64,35 +87,46 @@ post '/labs/*/ansible/edit' do
     play_cfg = base_data['play'] || {}
     play_cfg = {} if play_cfg.is_a?(String)
     
-    # Update Settings (removed work_dir)
     params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
-    params[:env] && !params[:env].strip.empty? ? play_cfg['env'] = params[:env].split("\n").map(&:strip).reject(&:empty?) : play_cfg.delete('env')
-    params[:tags] && !params[:tags].strip.empty? ? play_cfg['tags'] = params[:tags].split(",").map(&:strip).reject(&:empty?) : play_cfg.delete('tags')
+    params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
+    
+    if params[:custom_inv] && !params[:custom_inv].to_s.strip.empty?
+      play_cfg['custom_inv'] = params[:custom_inv].to_s.strip
+    else
+      play_cfg.delete('custom_inv')
+    end
+    
+    # Safely parse Environment Variables across different OS line-endings
+    env_str = params[:env].to_s.strip
+    if env_str.empty?
+      play_cfg.delete('env')
+    else
+      play_cfg['env'] = env_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
+    end
+
+    params[:tags] && !params[:tags].to_s.strip.empty? ? play_cfg['tags'] = params[:tags].to_s.split(",").map(&:strip).reject(&:empty?) : play_cfg.delete('tags')
 
     base_data['play'] = play_cfg
     full_yaml['topology'][0]['nodes'][ansible_node_name] = base_data
     write_formatted_yaml(lab_path, full_yaml)
 
-    # Decode and save all dynamically edited files
     ans_files = JSON.parse(params[:ans_files] || '{}')
-
     ans_files.each do |filepath, content|
-      # Security constraints
       next if filepath.include?('..') || filepath.start_with?('/')
-      
       full_path = File.join(ANS_BASE_DIR, filepath)
-      
-      # Ensure the subdirectory exists (e.g., creating roles/my_role/tasks/ if it doesn't exist)
       FileUtils.mkdir_p(File.dirname(full_path))
-      
       File.write(full_path, content)
+      FileUtils.chmod("+x", full_path) if filepath.end_with?('.py') || filepath.end_with?('.sh')
     end
 
     content_type :json
     { success: true, message: "Configuration and files updated successfully." }.to_json
-  rescue => e
+  
+  # Catch ALL exceptions to guarantee JSON response instead of HTML crash pages
+  rescue Exception => e
     status 400
-    { success: false, error: e.message }.to_json
+    content_type :json
+    { success: false, error: "Backend error: #{e.message}" }.to_json
   end
 end
 
@@ -142,7 +176,7 @@ end
 # ===================================================
 TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
-get '/labs/*/node/terraform' do
+get '/labs/*/terraform/config' do
   content_type :json
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -159,6 +193,42 @@ get '/labs/*/node/terraform' do
   end
 end
 
+# Recursive Tree for Terraform
+get '/labs/*/terraform/tree' do
+  content_type :json
+  begin
+    files = []
+    if Dir.exist?(TF_BASE_DIR)
+      Dir.glob(File.join(TF_BASE_DIR, "**", "*")).each do |file|
+        next if File.directory?(file)
+        next if file.include?('/.terraform/') || file.include?('/.git/') || file.end_with?('.tfstate') || file.end_with?('.tfstate.backup')
+        files << file.sub(TF_BASE_DIR + '/', '')
+      end
+    end
+    files.sort.to_json
+  rescue => e
+    status 400
+    { error: e.message }.to_json
+  end
+end
+
+# Fetch by exact path
+get '/labs/*/terraform/file' do
+  content_type :json
+  filepath = params[:path].to_s.strip
+  halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
+
+  begin
+    full_path = File.join(TF_BASE_DIR, filepath)
+    content = File.file?(full_path) ? File.read(full_path) : "# New file: #{filepath}\n"
+    { content: content }.to_json
+  rescue => e
+    status 400
+    { error: e.message }.to_json
+  end
+end
+
+# Fetch file contents directly from the Host VM's bind mount (Batch Load)
 get '/labs/*/terraform/files' do
   content_type :json
   work_dir = params[:work_dir].to_s.strip
@@ -167,7 +237,7 @@ get '/labs/*/terraform/files' do
   begin
     target_dir = File.join(TF_BASE_DIR, work_dir)
     response = {}
-    
+
     # 1. Provide default blank templates if the directory doesn't exist yet
     ['config.yml', 'main.tf', 'provider.tf'].each { |f| response[f] = "" }
 
@@ -198,56 +268,53 @@ post '/labs/*/terraform/edit' do
   begin
     full_yaml = YAML.load_file(lab_path)
     controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' || k == 'ansible' }
-    raise "No controller node found in topology" unless controller_node_name
     
     base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
     tf_cfg = base_data['terraform'] || {}
     
     params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
     params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
-    params[:vars] && !params[:vars].strip.empty? ? tf_cfg['vars'] = params[:vars].split("\n").map(&:strip).reject(&:empty?) : tf_cfg.delete('vars')
+    
+    # Safely parse Variables
+    vars_str = params[:vars].to_s.strip
+    if vars_str.empty?
+      tf_cfg.delete('vars')
+    else
+      tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
+    end
 
     base_data['terraform'] = tf_cfg
     full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
     write_formatted_yaml(lab_path, full_yaml)
 
-    # Decode the dynamic files payload
     tf_files = JSON.parse(params[:tf_files] || '{}')
-    work_dir = params[:work_dir].to_s.strip
-
-    if !work_dir.empty? && !work_dir.include?('..')
-      target_dir = File.join(TF_BASE_DIR, work_dir)
-      FileUtils.mkdir_p(target_dir)
-      
-      tf_files.each do |filename, content|
-        # Security: Prevent escaping out of the work directory via filename
-        next if filename.include?('..') || filename.include?('/') 
-        File.write(File.join(target_dir, filename), content)
-      end
+    tf_files.each do |filepath, content|
+      next if filepath.include?('..') || filepath.start_with?('/') 
+      full_path = File.join(TF_BASE_DIR, filepath)
+      FileUtils.mkdir_p(File.dirname(full_path))
+      File.write(full_path, content)
     end
 
     content_type :json
     { success: true, message: "Configuration and all files saved successfully." }.to_json
-  rescue => e
+  
+  # Catch ALL exceptions to guarantee JSON response
+  rescue Exception => e
     status 400
-    { success: false, error: e.message }.to_json
+    content_type :json
+    { success: false, error: "Backend error: #{e.message}" }.to_json
   end
 end
 
-# Delete a specific Terraform file
+# Delete by exact path
 post '/labs/*/terraform/file/delete' do
   content_type :json
-  work_dir = params[:work_dir].to_s.strip
-  filename = params[:filename].to_s.strip
-  
-  # Security constraints
-  halt 400, { error: "Invalid path" }.to_json if work_dir.empty? || work_dir.include?('..') || filename.empty? || filename.include?('/') || filename.include?('..')
+  filepath = params[:filepath].to_s.strip
+  halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
   
   begin
-    full_path = File.join(TF_BASE_DIR, work_dir, filename)
-    
+    full_path = File.join(TF_BASE_DIR, filepath)
     File.delete(full_path) if File.exist?(full_path)
-    
     { success: true }.to_json
   rescue => e
     status 400

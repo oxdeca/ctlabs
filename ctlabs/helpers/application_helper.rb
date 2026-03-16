@@ -167,19 +167,25 @@ module ApplicationHelper
     info[:gateways] = lab.nodes.map { |n| n.gw }.compact.reject { |g| g.to_s.strip.empty? }.uniq
 
     # Ansible
-    ansible_info = { playbook: 'N/A', environment: [], tags: [], roles: [] }
+    ansible_info = { playbook: 'N/A', inventory: 'N/A', environment: [], tags: [], roles: [] }
     ctrl = lab.find_node("ansible")
     if ctrl && !ctrl.play.nil?
       if ctrl.play.is_a?(Hash)
+        # Calculate Default Inventory Name (e.g. net01.ini) if not explicitly set
+        default_inv = "#{File.basename(yaml_file_path, '.yml')}.ini"
+        ansible_info[:inventory]   = ctrl.play['inv'] && !ctrl.play['inv'].empty? ? ctrl.play['inv'] : default_inv
+        
         ansible_info[:playbook]    = ctrl.play['book']  || 'N/A'
         ansible_info[:environment] = ctrl.play['env']   || []
         ansible_info[:tags]        = ctrl.play['tags']  || []
         ansible_info[:roles]       = ctrl.play['roles'] || ctrl.play['tags'] || []
       else
         ansible_info[:playbook]    = ctrl.play.to_s
+        ansible_info[:inventory]   = "#{File.basename(yaml_file_path, '.yml')}.ini"
       end
     end
     info[:ansible] = ansible_info
+
 
     # Terraform
     terraform_info = { workspace: 'default', work_dir: 'N/A', vars: [] }
