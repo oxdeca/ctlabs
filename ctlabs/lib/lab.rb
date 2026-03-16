@@ -178,6 +178,23 @@ class Lab
     end
   end
 
+  # Check if Terraform is currently running for a specific lab (used by the UI to disable the button)
+  def self.terraform_running?(lab_path)
+    # Simple check: see if a terraform process is running inside the lab's controller container
+    # You may need to adjust the container naming convention based on how your CTLABS script names them!
+    lab_base_name = File.basename(lab_path, '.yml')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    
+    # Check running processes in the controller (assuming the container name contains the lab name and 'ansible' or 'controller')
+    # This is a safe, non-blocking check
+    cmd = "#{engine} ps --format '{{.Names}}' | grep #{lab_base_name} | head -n 1"
+    container_name = `#{cmd}`.strip
+    return false if container_name.empty?
+
+    # Check if 'terraform' is in the process list of that container
+    `#{engine} exec #{container_name} ps aux | grep -v grep | grep terraform`.strip != ""
+  end
+
   def init_nodes(vm_name)
     @log.write "#{__method__}(): vm=#{vm_name}", "debug"
 
@@ -387,92 +404,92 @@ class Lab
   end
 
 
-def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
-  @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
-
-  chain = "#{@name.upcase}-DNAT"
-  vmip  = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
-
-  node = find_node(node_name)
-  raise "Node '#{node_name}' not found" if node.nil?
-
-  if node.type == 'controller'
-    # === MGMT NETWORK PATH (implicit via ro0) ===
-    router = find_node('ro0')
-    raise "'ro0' router not found for controller DNAT" if router.nil?
-    raise "'ro0' missing eth1" unless router.nics.key?('eth1')
-
-    mgmt_via = router.nics['eth1'].split('/')[0]
-    target_ip = node.nics['eth0']&.split('/')&.first
-    raise "Controller node missing eth0" if target_ip.nil?
-
-    # Rule 1: Host → ro0 (mgmt gateway)
-    rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
-    rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
-
-    unless system(rule1_check)
-      @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}", "debug"
-      raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+  def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
+    @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
+  
+    chain = "#{@name.upcase}-DNAT"
+    vmip  = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
+  
+    node = find_node(node_name)
+    raise "Node '#{node_name}' not found" if node.nil?
+  
+    if node.type == 'controller'
+      # === MGMT NETWORK PATH (implicit via ro0) ===
+      router = find_node('ro0')
+      raise "'ro0' router not found for controller DNAT" if router.nil?
+      raise "'ro0' missing eth1" unless router.nics.key?('eth1')
+  
+      mgmt_via = router.nics['eth1'].split('/')[0]
+      target_ip = node.nics['eth0']&.split('/')&.first
+      raise "Controller node missing eth0" if target_ip.nil?
+  
+      # Rule 1: Host → ro0 (mgmt gateway)
+      rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
+      rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
+  
+      unless system(rule1_check)
+        @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}", "debug"
+        raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+      end
+  
+      router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
+      # Rule 2: Inside ro0 netns → final controller
+      rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+      rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+  
+      unless system(rule2_check)
+        @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}", "debug"
+        raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
+      end
+  
+      @log.info "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+  
+    elsif node.type == 'host'
+      # === DATA NETWORK PATH (via natgw) ===
+      natgw = find_node('natgw')
+      raise "No 'natgw' node found (required for host DNAT)" if natgw.nil?
+      raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
+  
+      parts = natgw.dnat.to_s.split(':')
+      raise "Invalid natgw.dnat format" unless parts.length == 2
+      router_name, nic = parts
+      raise "Empty router/interface in natgw.dnat" if router_name.empty? || nic.empty?
+  
+      router = find_node(router_name)
+      raise "Router '#{router_name}' not found" if router.nil?
+      raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
+  
+      via = router.nics[nic].split('/')[0]
+      target_ip = node.nics['eth1']&.split('/')&.first
+      raise "Host node missing eth1" if target_ip.nil?
+  
+      # Rule 1: Host → natgw internal IP (same port)
+      rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
+      rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
+  
+      unless system(rule1_check)
+        @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}", "debug"
+        raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+      end
+  
+      router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
+      # Rule 2: Inside router netns → final host
+      rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+      rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+  
+      unless system(rule2_check)
+        @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}", "debug"
+        raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
+      end
+  
+      @log.info "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
+  
+    else
+      raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
     end
-
-    router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-    # Rule 2: Inside ro0 netns → final controller
-    rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-    rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-
-    unless system(rule2_check)
-      @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}", "debug"
-      raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
-    end
-
-    @log.info "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-
-  elsif node.type == 'host'
-    # === DATA NETWORK PATH (via natgw) ===
-    natgw = find_node('natgw')
-    raise "No 'natgw' node found (required for host DNAT)" if natgw.nil?
-    raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
-
-    parts = natgw.dnat.to_s.split(':')
-    raise "Invalid natgw.dnat format" unless parts.length == 2
-    router_name, nic = parts
-    raise "Empty router/interface in natgw.dnat" if router_name.empty? || nic.empty?
-
-    router = find_node(router_name)
-    raise "Router '#{router_name}' not found" if router.nil?
-    raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
-
-    via = router.nics[nic].split('/')[0]
-    target_ip = node.nics['eth1']&.split('/')&.first
-    raise "Host node missing eth1" if target_ip.nil?
-
-    # Rule 1: Host → natgw internal IP (same port)
-    rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
-    rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
-
-    unless system(rule1_check)
-      @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}", "debug"
-      raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
-    end
-
-    router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-    # Rule 2: Inside router netns → final host
-    rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-    rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-
-    unless system(rule2_check)
-      @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}", "debug"
-      raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
-    end
-
-    @log.info "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-
-  else
-    raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
+  
+    return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
   end
-
-  return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
-end
 
   def add_adhoc_node(node_name, node_cfg, target_switch = nil)
     @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
@@ -663,92 +680,6 @@ end
     end
   end
 
-  #
-  # runs ansible playbook, given via
-  # 1. command args
-  # 2. defined in lab configuration
-  #
-  def run_playbook_old(play, output="shell")
-    @log.write "#{__method__}(): ", "debug"
-    cmd    = nil
-    ctrl   = find_node('ansible')
-    domain = find_vm(@vm_name)['domain'] || @domain
-
-    if play.class == String && !play.empty?
-      play_cmd = "#{play} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
-    elsif ctrl.play.class == String && !ctrl.play.empty?
-      play_cmd = "#{ctrl.play} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
-    elsif ctrl.play['book'].class == String
-      play_inv  = " -i ./inventories/#{ctrl.play['inv'] || @name + ".ini"}" || " -i ./inventories/#{@name}.ini"
-      play_env  = " -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip} #{(ctrl.play['env'] || []).map{|e| " -e#{e}" }.join}"
-      play_book = " ./playbooks/#{ctrl.play['book']}"
-      play_tags = " -t#{ctrl.play['tags'].join(",")}"
-      play_cmd  = "ansible-playbook #{play_inv} #{play_book} #{play_tags} #{play_env} "
-    end
-
-    if play_cmd.class == String
-      @log.info "Playbook found: #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}"
-      #system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && #{cmd} -eCTLABS_DOMAIN=#{domain} -eCTLABS_HOST=#{@server_ip}'")
-      @log.info "Playbook found: #{play_cmd}"
-      if output == "shell"
-        system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
-      else
-        stream_docker_exec(ctrl.name, play_cmd, output)
-      end
-    else
-      @log.write "#{__method__}(): No Playbook found."
-      @log.info "No Playbook found."
-    end
-  end
-
-  def run_playbook_old1(play = nil, log_file_path = nil)
-    @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
-    
-    # VALIDATION: Lab must be running
-    unless self.class.running? && self.class.current_name == @relative_path
-      raise "Cannot run playbook: Lab '#{@relative_path}' is not running. Start it first with --up"
-    end
-    
-    ctrl = find_node('ansible')
-    raise "No 'ansible' controller node found in topology" if ctrl.nil?
-    
-    domain = (@cfg['domain'] || @domain)
-    
-    # Determine playbook command (same logic as before)
-    if play.is_a?(String) && !play.strip.empty?
-      play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-    elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
-      play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-    elsif ctrl.play.is_a?(Hash) && ctrl.play['book'].is_a?(String)
-      inv_file  = ctrl.play['inv'] || "#{@name}.ini"
-      play_inv  = " -i ./inventories/#{inv_file}"
-      play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-      play_env += " #{(ctrl.play['env'] || []).map { |e| " -e #{e}" }.join}"
-      play_book = " ./playbooks/#{ctrl.play['book']}"
-      play_tags = ctrl.play['tags'] ? " -t #{ctrl.play['tags'].join(',')}" : ''
-      play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
-    else
-      raise "No playbook specified and no default playbook configured for 'ansible' node"
-    end
-    
-    @log.info "Executing playbook: #{play_cmd}"
-    
-    # Execute with proper output handling
-    if log_file_path
-      # Stream directly to log file (realtime visibility in web UI)
-      stream_docker_exec(ctrl.name, play_cmd, log_file_path)
-    else
-      # Fallback to shell output
-      success = system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
-      unless success
-        @log.info "Playbook execution failed (exit code: #{$?.exitstatus})"
-        raise "Playbook execution failed"
-      end
-    end
-    
-    @log.info "Playbook execution completed"
-  end
-
   def run_playbook(play = nil, log_file_path = nil)
     @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
     
@@ -805,40 +736,73 @@ end
     end
   end
 
-  def stream_docker_exec_old(container_name, play_cmd, log_file_path = nil)
-    inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
-    cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
-  
-    Open3.popen3(*cmd) do |stdin, stdout, stderr, wait_thr|
-      stdin.close
-  
-      # Optional: write to log file
-      log_file = log_file_path ? File.open(log_file_path, 'a') : nil
-  
-      # Stream both stdout and stderr as they arrive
-      begin
-        while (line = stdout.gets)
-          # Yield or process line in real time
-          yield line if block_given?
-          log_file&.write(line)
-          log_file&.flush
-        end
-  
-        # Drain any remaining stderr (in case of late errors)
-        while (err_line = stderr.gets)
-          yield err_line if block_given?
-          log_file&.write(err_line)
-          log_file&.flush
-        end
-      rescue => e
-        error_msg = "Error during streaming: #{e.message}\n"
-        yield error_msg if block_given?
-        log_file&.write(error_msg)
-      ensure
-        log_file&.close
-        exit_status = wait_thr.value.exitstatus
-        yield "[Command exited with status: #{exit_status}]\n" if block_given?
+  # The main execution block
+  def run_terraform(target_node_name = nil, log_path = nil)
+    @log.write "#{__method__}(): target=#{target_node_name.inspect}, log_path=#{log_path}", "debug"
+
+    # 1. Use your built-in methods to find the target node
+    ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
+    raise "No controller node found in topology to run Terraform." unless ctrl
+
+    # 2. Extract config directly from the already-parsed @cfg memory object
+    node_cfg  = @cfg['topology'][0]['nodes'][ctrl.name] || {}
+    tf_cfg    = node_cfg['terraform'] || {}
+    
+    workspace = tf_cfg['workspace'].to_s.strip
+    workspace = 'default' if workspace.empty?
+    
+    vars      = tf_cfg['vars'] || []
+    var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
+
+    # 3. Construct the Execution Command
+    work_dir = "/root/ctlabs-terraform" 
+    
+    tf_command = <<~CMD.gsub("\n", " ").strip
+      cd #{work_dir} && 
+      (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+      terraform init -upgrade && 
+      terraform apply -auto-approve #{var_args}
+    CMD
+
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    full_cmd = "#{engine} exec #{ctrl.name} bash -c \"#{tf_command}\""
+
+    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}"
+
+    # 4. Stream the output
+    if log_path
+      File.open(log_path, 'a') do |f|
+        f.puts "\n" + "="*50
+        f.puts "🚀 TERRAFORM EXECUTION STARTED"
+        f.puts "="*50
+        f.puts "Target Node : #{ctrl.name}"
+        f.puts "Workspace   : #{workspace}"
+        f.puts "Variables   : #{vars.empty? ? 'None' : vars.join(', ')}"
+        f.puts "-"*50 + "\n"
       end
+    end
+
+    IO.popen("#{full_cmd} 2>&1") do |io|
+      File.open(log_path, 'a') do |f|
+        io.each_line do |line|
+          $stdout.print(line) # Mirror to backend CLI
+          $stdout.flush
+          f.puts line
+          f.flush # Force write so the UI picks it up instantly
+        end
+      end if log_path
+    end
+
+    # 5. Check Exit Status
+    if $?.success?
+      msg = "\n✅ Terraform execution completed successfully.\n"
+      @log.info msg.strip
+      File.open(log_path, 'a') { |f| f.puts msg } if log_path
+    else
+      msg = "\n⚠️ Terraform execution failed.\n"
+      @log.info msg.strip
+      File.open(log_path, 'a') { |f| f.puts msg } if log_path
+      raise "Terraform process returned a non-zero exit code."
     end
   end
 
