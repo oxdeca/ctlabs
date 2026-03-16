@@ -8,6 +8,50 @@
   // --- GLOBAL CODEMIRROR REGISTRY ---
   window.cmEditors = {};
 
+  // --- CUSTOM TERRAFORM HIGHLIGHTER ---
+  if (typeof CodeMirror.defineSimpleMode === 'function') {
+    CodeMirror.defineSimpleMode("terraform", {
+      start: [
+        // Core Terraform Blocks & Keywords
+        {regex: /(?:resource|data|provider|variable|output|module|locals|terraform|backend)\b/, token: "keyword"},
+        // Built-in functions and types
+        {regex: /(?:string|number|bool|list|map|any|object|tuple)\b/, token: "builtin"},
+        // Booleans & Null
+        {regex: /true|false|null\b/, token: "atom"},
+        // Double-quoted Strings (supports escaped quotes)
+        {regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string"},
+        // Multi-line Strings / Heredoc (<<EOF)
+        {regex: /<<-?\s*[A-Za-z0-9_]+/, token: "string", next: "heredoc"},
+        // Numbers
+        {regex: /0x[a-f\d]+|[-+]?(?:\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/i, token: "number"},
+        // Comments (Hash, Double Slash, and Multi-line)
+        {regex: /\#.*/, token: "comment"},
+        {regex: /\/\/.*/, token: "comment"},
+        {regex: /\/\*/, token: "comment", next: "comment"},
+        // Operators
+        {regex: /[-+\/*=<>!]+/, token: "operator"},
+        // Brackets
+        {regex: /[\{\}\[\]\(\)]/, token: "bracket"},
+        // Variables and Properties
+        {regex: /[a-zA-Z_][a-zA-Z0-9_\-]*\b/, token: "variable-2"}
+      ],
+      comment: [
+        {regex: /.*?\*\//, token: "comment", next: "start"},
+        {regex: /.*/, token: "comment"}
+      ],
+      heredoc: [
+        // Safely end heredoc blocks (simple approximation)
+        {regex: /^[A-Za-z0-9_]+$/, token: "string", next: "start"},
+        {regex: /.*/, token: "string"}
+      ],
+      meta: {
+        lineComment: "#",
+        blockCommentStart: "/*",
+        blockCommentEnd: "*/"
+      }
+    });
+  }
+
   // --- UNIVERSAL EDITOR FACTORY ---
   window.initCodeEditor = function(textAreaId, langMode) {
       // If it already exists, just return it!
@@ -543,6 +587,34 @@
       }
   };
 
+  // --- CONTAINER IMAGES FILTER ---
+  window.filterContainerImages = function() {
+    const input = document.getElementById('image-filter-input');
+    if (!input) return;
+
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById('container-images-table');
+    if (!table) return;
+    
+    // Get all rows with class 'image-row'
+    const trs = table.getElementsByClassName('image-row');
+
+    for (let i = 0; i < trs.length; i++) {
+      let tds = trs[i].getElementsByTagName('td');
+      let textValue = "";
+      // Grab text from the first 4 columns (Name, Category, OS, Version)
+      for (let j = 0; j < 4; j++) {
+        if (tds[j]) textValue += (tds[j].textContent || tds[j].innerText) + " ";
+      }
+      
+      if (textValue.toUpperCase().indexOf(filter) > -1) {
+        trs[i].style.display = "";
+      } else {
+        trs[i].style.display = "none";
+      }
+    }
+  };
+
   // --- CODEMIRROR RAW IMAGE EDITOR ---
   window.openBuildModal = async function(imageEnc) {
       const decodedImg = decodeURIComponent(imageEnc);
@@ -650,7 +722,7 @@
 
   // --- NEW IMAGE MANAGEMENT ACTIONS ---
 
-  // Open the Global Manage Images Modal
+  // Open the Container Manage Images Modal
   window.openManageImagesModal = function() {
       document.getElementById('manage-images-modal').style.display = 'block';
   };
@@ -792,37 +864,147 @@
   };
 
   // --- ANSIBLE ---
+  window.openAnsTab = function(evt, tabId) {
+      let x = document.getElementsByClassName("ans-tab");
+      for (let i = 0; i < x.length; i++) x[i].style.display = "none";
+      
+      let tablinks = document.getElementsByClassName("ans-tablink");
+      for (let i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
+      
+      document.getElementById(tabId).style.display = "block";
+      if (evt && evt.currentTarget) evt.currentTarget.className += " w3-text-blue";
+
+      const taId = 'editor-' + tabId;
+      if (window.cmEditors[taId]) {
+          setTimeout(() => window.cmEditors[taId].refresh(), 50);
+      }
+  };
+
+  // Helper to fetch a single file from the backend and create a tab
+  window.fetchAnsibleFile = async function(filepath) {
+      const resultDiv = document.getElementById('ansible-editor-result');
+      
+      try {
+          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const res = await fetch(`/labs/${safeLab}/ansible/file?path=${encodeURIComponent(filepath)}`);
+          if (!res.ok) throw new Error((await res.json()).error);
+          
+          const data = await res.json();
+          window.addAnsibleFileTab(filepath, data.content);
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
+      }
+  };
+
+  window.promptAndLoadAnsibleFile = function() {
+      const filepath = prompt("Enter file path to open/create (e.g., playbooks/main.yml, inventories/hosts.ini):");
+      if (filepath && filepath.trim() !== "") {
+          window.fetchAnsibleFile(filepath.trim());
+      }
+  };
+
+  window.loadActivePlaybook = function() {
+      const book = document.getElementById('edit-ansible-book').value.trim();
+      if (!book) { alert("Please enter a playbook filename first."); return; }
+      window.fetchAnsibleFile(`playbooks/${book}`);
+  };
+
+  window.addAnsibleFileTab = function(filepath, content = "") {
+      // Create a DOM-safe ID from the filepath
+      const tabId = 'ans-tab-' + filepath.replace(/[^a-zA-Z0-9_-]/g, '-');
+      
+      if (document.getElementById(tabId)) {
+          document.querySelector(`button[onclick*="${tabId}"]`).click();
+          return;
+      }
+
+      // Create Tab Button (Shows only the basename for cleaner UI)
+      const basename = filepath.split('/').pop();
+      const btn = document.createElement('button');
+      btn.className = "w3-bar-item w3-button ans-tablink";
+      btn.innerHTML = `<i class="fas fa-file-code"></i> ${basename}`;
+      btn.title = filepath; // Hover to see full path
+      btn.onclick = (e) => window.openAnsTab(e, tabId);
+      
+      const tabBar = document.getElementById('ans-tab-bar');
+      tabBar.insertBefore(btn, tabBar.lastElementChild);
+
+      // Create Editor Container
+      const div = document.createElement('div');
+      div.id = tabId;
+      div.className = "ans-tab";
+      div.style.display = "none";
+      div.style.height = "100%";
+      div.setAttribute('data-filepath', filepath);
+      div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
+      
+      const container = document.getElementById('ans-editors-container');
+      container.insertBefore(div, document.getElementById('ansible-editor-result'));
+
+      let mode = 'yaml';
+      if (filepath.endsWith('.ini') || filepath.endsWith('hosts')) mode = 'properties';
+      else if (filepath.endsWith('.json')) mode = 'javascript';
+      else if (filepath.endsWith('.sh')) mode = 'shell';
+      else if (filepath.endsWith('.j2')) mode = 'jinja2';
+
+      const editor = window.initCodeEditor(`editor-${tabId}`, mode);
+      editor.setValue(content);
+      btn.click();
+  };
+
   window.openAnsibleEditor = async function(labName) {
       window.currentEditLab = labName;
-      document.getElementById('ansible-editor-result').style.display = 'none';
+      const resultDiv = document.getElementById('ansible-editor-result');
+      if (resultDiv) resultDiv.style.display = 'none';
+
+      document.querySelector('.ans-tablink').click();
 
       try {
           const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/node/ansible`);
+          const res = await fetch(`/labs/${safeLab}/node/ansible?t=${Date.now()}`);
           if (!res.ok) throw new Error("Could not fetch ansible node configuration");
+          
           const data = await res.json();
-
           let play = data.json.play || {};
-          if (typeof play === 'string') {
-              document.getElementById('edit-ansible-book').value = play;
-              document.getElementById('edit-ansible-tags').value = '';
-              document.getElementById('edit-ansible-env').value = '';
-          } else {
-              document.getElementById('edit-ansible-book').value = play.book || '';
-              document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
-              document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
-          }
+          if (typeof play === 'string') play = { book: play };
+          
+          document.getElementById('edit-ansible-book').value = play.book || '';
+          document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
+          document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
+          
           document.getElementById('ansible-editor-modal').style.display = 'block';
+
+          // Cleanup dynamic tabs from previous sessions
+          document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+          document.querySelectorAll('.ans-tab[data-filepath]').forEach(e => {
+              const taId = e.querySelector('textarea')?.id;
+              if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+              e.remove();
+          });
+
       } catch (err) { alert("Error: " + err.message); }
   };
 
   window.saveAnsibleConfig = async function() {
       const resultDiv = document.getElementById('ansible-editor-result');
+      
+      const filesData = {};
+      document.querySelectorAll('.ans-tab[data-filepath]').forEach(tab => {
+          const filepath = tab.getAttribute('data-filepath');
+          const taId = tab.querySelector('textarea').id;
+          filesData[filepath] = window.cmEditors[taId].getValue();
+      });
+
       const formData = new URLSearchParams({
           book: document.getElementById('edit-ansible-book').value,
           tags: document.getElementById('edit-ansible-tags').value,
-          env: document.getElementById('edit-ansible-env').value
+          env: document.getElementById('edit-ansible-env').value,
+          ans_files: JSON.stringify(filesData)
       });
+
+      resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
+      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration and files...';
 
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
@@ -831,16 +1013,87 @@
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
           });
-          const data = await res.json();
           if (res.ok) {
-              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-              resultDiv.textContent = '✅ ' + data.message;
+              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
+              resultDiv.textContent = '✅ All files saved successfully.';
               setTimeout(() => location.reload(), 800);
-          } else throw new Error(data.error);
+          } else throw new Error((await res.json()).error);
       } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + err.message;
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
       }
+  };
+
+  // --- ANSIBLE TAB MANAGEMENT ---
+  window.closeAnsibleTab = async function(e, tabId, filepath) {
+      e.stopPropagation();
+      if (!confirm(`Close this tab and permanently DELETE '${filepath}' from disk?`)) return;
+
+      const tabBtn = e.currentTarget.closest('button');
+      if (tabBtn) tabBtn.remove();
+      
+      const tabDiv = document.getElementById(tabId);
+      if (tabDiv) {
+          const taId = tabDiv.querySelector('textarea')?.id;
+          if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+          tabDiv.remove();
+      }
+      
+      document.querySelector('.ans-tablink').click();
+
+      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      fetch(`/labs/${safeLab}/ansible/file/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ filepath: filepath }).toString()
+      }).catch(err => console.error("Failed to delete file from disk:", err));
+  };
+
+  window.addAnsibleFileTab = function(filepath, content = "") {
+      const tabId = 'ans-tab-' + filepath.replace(/[^a-zA-Z0-9_-]/g, '-');
+      
+      if (document.getElementById(tabId)) {
+          document.querySelector(`button[onclick*="${tabId}"]`).click();
+          return;
+      }
+
+      const basename = filepath.split('/').pop();
+      const btn = document.createElement('button');
+      btn.className = "w3-bar-item w3-button ans-tablink";
+      btn.title = filepath;
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.gap = "8px";
+      
+      btn.innerHTML = `
+        <span onclick="window.openAnsTab(event, '${tabId}')"><i class="fas fa-file-code"></i> ${basename}</span>
+        <i class="fas fa-times w3-text-gray w3-hover-text-red" onclick="window.closeAnsibleTab(event, '${tabId}', '${filepath}')" style="font-size: 1.1em; margin-top: 1px;"></i>
+      `;
+      
+      const tabBar = document.getElementById('ans-tab-bar');
+      tabBar.insertBefore(btn, tabBar.lastElementChild);
+
+      const div = document.createElement('div');
+      div.id = tabId;
+      div.className = "ans-tab";
+      div.style.display = "none";
+      div.style.height = "100%";
+      div.setAttribute('data-filepath', filepath);
+      div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
+      
+      const container = document.getElementById('ans-editors-container');
+      container.insertBefore(div, document.getElementById('ansible-editor-result'));
+
+      let mode = 'yaml';
+      if (filepath.endsWith('.ini') || filepath.endsWith('hosts')) mode = 'properties';
+      else if (filepath.endsWith('.json')) mode = 'javascript';
+      else if (filepath.endsWith('.sh')) mode = 'shell';
+      else if (filepath.endsWith('.j2')) mode = 'jinja2';
+
+      const editor = window.initCodeEditor(`editor-${tabId}`, mode);
+      editor.setValue(content);
+      
+      btn.querySelector('span').click();
   };
 
   window.runAnsiblePlaybook = async function(event, labName) {
@@ -868,33 +1121,169 @@
       }
   };
 
+
   // --- TERRAFORM ---
+  window.openTfTab = function(evt, tabId) {
+      let x = document.getElementsByClassName("tf-tab");
+      for (let i = 0; i < x.length; i++) x[i].style.display = "none";
+      
+      let tablinks = document.getElementsByClassName("tf-tablink");
+      for (let i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
+      
+      document.getElementById(tabId).style.display = "block";
+      if (evt && evt.currentTarget) evt.currentTarget.className += " w3-text-blue";
+
+      // Refresh CodeMirror if it exists in this tab so it renders correctly
+      const taId = 'editor-' + tabId;
+      if (window.cmEditors[taId]) {
+          setTimeout(() => window.cmEditors[taId].refresh(), 50);
+      }
+  };
+
+  // Dynamically adds a new file tab and editor
+  window.addTerraformFileTab = function(filename, content = "") {
+      if (!filename) {
+          filename = prompt("Enter new filename (e.g., variables.tf, script.sh):");
+          if (!filename || filename.trim() === "") return;
+          filename = filename.trim();
+      }
+
+      const tabId = 'tf-tab-' + filename.replace(/[^a-zA-Z0-9_-]/g, '-');
+      
+      // Don't duplicate tabs if file already exists
+      if (document.getElementById(tabId)) {
+          document.querySelector(`button[onclick*="${tabId}"]`).click();
+          return;
+      }
+
+      // 1. Create the Tab Button
+      const btn = document.createElement('button');
+      btn.className = "w3-bar-item w3-button tf-tablink";
+      btn.innerHTML = `<i class="fas fa-file-code"></i> ${filename}`;
+      btn.onclick = (e) => window.openTfTab(e, tabId);
+      
+      const tabBar = document.getElementById('tf-tab-bar');
+      tabBar.insertBefore(btn, tabBar.lastElementChild); // Insert before the '+' button
+
+      // 2. Create the Editor Container
+      const div = document.createElement('div');
+      div.id = tabId;
+      div.className = "tf-tab";
+      div.style.display = "none";
+      div.style.height = "100%";
+      div.setAttribute('data-filename', filename); // Critical for saving later!
+      div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
+      
+      // Insert before the result panel
+      const container = document.getElementById('tf-editors-container');
+      container.insertBefore(div, document.getElementById('terraform-editor-result'));
+
+      // 3. Initialize CodeMirror with Smart Syntax Highlighting
+      let mode = 'terraform';
+      if (filename.endsWith('.yml') || filename.endsWith('.yaml')) mode = 'yaml';
+      else if (filename.endsWith('.json')) mode = 'javascript';
+      else if (filename.endsWith('.sh')) mode = 'shell';
+
+      const editor = window.initCodeEditor(`editor-${tabId}`, mode);
+      editor.setValue(content);
+
+      // Switch to the newly created tab
+      btn.click();
+  };
+
   window.openTerraformEditor = async function(labName) {
       window.currentEditLab = labName;
       const resultDiv = document.getElementById('terraform-editor-result');
       if (resultDiv) resultDiv.style.display = 'none';
 
+      document.querySelector('.tf-tablink').click(); // Reset to Settings
+
       try {
           const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/node/terraform`);
-          if (!res.ok) throw new Error("Could not fetch terraform node configuration");
+          const res = await fetch(`/labs/${safeLab}/node/terraform?t=${Date.now()}`);
+          if (!res.ok) throw new Error("Could not fetch terraform config");
+          
           const data = await res.json();
-
           let tf = data.json.tf || {};
           
+          document.getElementById('edit-terraform-workdir').value = tf.work_dir || '';
           document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
           document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
           
           document.getElementById('terraform-editor-modal').style.display = 'block';
+
+          // Cleanup dynamically generated tabs from previous lab sessions
+          document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+          document.querySelectorAll('.tf-tab[data-filename]').forEach(e => {
+              const taId = e.querySelector('textarea')?.id;
+              if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+              e.remove();
+          });
+
+          if (tf.work_dir && tf.work_dir.trim() !== '') window.loadTerraformFiles();
       } catch (err) { alert("Error: " + err.message); }
+  };
+
+  window.loadTerraformFiles = async function() {
+      const workDir = document.getElementById('edit-terraform-workdir').value.trim();
+      const resultDiv = document.getElementById('terraform-editor-result');
+      if (!workDir) { alert("Please enter a Working Directory."); return; }
+
+      resultDiv.style.cssText = 'background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8; display: block; margin-top: 15px; padding: 8px;';
+      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering and loading files...';
+
+      try {
+          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const res = await fetch(`/labs/${safeLab}/terraform/files?work_dir=${encodeURIComponent(workDir)}`);
+          if (!res.ok) throw new Error((await res.json()).error);
+          
+          const data = await res.json();
+
+          // Clear existing dynamic tabs again just in case they clicked load multiple times
+          document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+          document.querySelectorAll('.tf-tab[data-filename]').forEach(e => {
+              const taId = e.querySelector('textarea')?.id;
+              if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+              e.remove();
+          });
+
+          // Generate a tab for every file returned by the backend!
+          for (const [filename, content] of Object.entries(data)) {
+              window.addTerraformFileTab(filename, content);
+          }
+
+          // Automatically focus the first file tab (usually main.tf or config.yml)
+          const firstFileBtn = document.querySelectorAll('.tf-tablink')[1];
+          if (firstFileBtn) firstFileBtn.click();
+
+          resultDiv.style.display = 'none';
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
+      }
   };
 
   window.saveTerraformConfig = async function() {
       const resultDiv = document.getElementById('terraform-editor-result');
-      const formData = new URLSearchParams({
-          workspace: document.getElementById('edit-terraform-workspace').value,
-          vars: document.getElementById('edit-terraform-vars').value
+      const workDir = document.getElementById('edit-terraform-workdir').value.trim();
+      
+      // Harvest all code from dynamic tabs
+      const filesData = {};
+      document.querySelectorAll('.tf-tab[data-filename]').forEach(tab => {
+          const filename = tab.getAttribute('data-filename');
+          const taId = tab.querySelector('textarea').id;
+          filesData[filename] = window.cmEditors[taId].getValue();
       });
+
+      const formData = new URLSearchParams({
+          work_dir: workDir,
+          workspace: document.getElementById('edit-terraform-workspace').value,
+          vars: document.getElementById('edit-terraform-vars').value,
+          tf_files: JSON.stringify(filesData) // Send all files as a single JSON payload
+      });
+
+      resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
+      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving files...';
 
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
@@ -903,16 +1292,97 @@
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
           });
-          const data = await res.json();
           if (res.ok) {
-              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-              resultDiv.textContent = '✅ ' + data.message;
+              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
+              resultDiv.textContent = '✅ All files saved successfully.';
               setTimeout(() => location.reload(), 800);
-          } else throw new Error(data.error);
+          } else throw new Error((await res.json()).error);
       } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-          resultDiv.textContent = '❌ ' + err.message;
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
       }
+  };
+
+  // --- TERRAFORM TAB MANAGEMENT ---
+  window.closeTerraformTab = async function(e, tabId, filename) {
+      e.stopPropagation(); // Prevent the tab from switching
+      if (!confirm(`Close this tab and permanently DELETE '${filename}' from disk?`)) return;
+
+      // 1. Remove from UI
+      const tabBtn = e.currentTarget.closest('button');
+      if (tabBtn) tabBtn.remove();
+      
+      const tabDiv = document.getElementById(tabId);
+      if (tabDiv) {
+          const taId = tabDiv.querySelector('textarea')?.id;
+          if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+          tabDiv.remove();
+      }
+      
+      // 2. Switch back to Settings tab
+      document.querySelector('.tf-tablink').click();
+
+      // 3. Tell backend to delete the file
+      const workDir = document.getElementById('edit-terraform-workdir').value.trim();
+      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      
+      fetch(`/labs/${safeLab}/terraform/file/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ work_dir: workDir, filename: filename }).toString()
+      }).catch(err => console.error("Failed to delete file from disk:", err));
+  };
+
+  window.addTerraformFileTab = function(filename, content = "") {
+      if (!filename) {
+          filename = prompt("Enter new filename (e.g., variables.tf, script.sh):");
+          if (!filename || filename.trim() === "") return;
+          filename = filename.trim();
+      }
+
+      const tabId = 'tf-tab-' + filename.replace(/[^a-zA-Z0-9_-]/g, '-');
+      
+      if (document.getElementById(tabId)) {
+          document.querySelector(`button[onclick*="${tabId}"]`).click();
+          return;
+      }
+
+      const btn = document.createElement('button');
+      btn.className = "w3-bar-item w3-button tf-tablink";
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.gap = "8px";
+      
+      // Add the filename and the close icon
+      btn.innerHTML = `
+        <span onclick="window.openTfTab(event, '${tabId}')"><i class="fas fa-file-code"></i> ${filename}</span>
+        <i class="fas fa-times w3-text-gray w3-hover-text-red" onclick="window.closeTerraformTab(event, '${tabId}', '${filename}')" style="font-size: 1.1em; margin-top: 1px;"></i>
+      `;
+      
+      const tabBar = document.getElementById('tf-tab-bar');
+      tabBar.insertBefore(btn, tabBar.lastElementChild);
+
+      const div = document.createElement('div');
+      div.id = tabId;
+      div.className = "tf-tab";
+      div.style.display = "none";
+      div.style.height = "100%";
+      div.setAttribute('data-filename', filename);
+      div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
+      
+      const container = document.getElementById('tf-editors-container');
+      container.insertBefore(div, document.getElementById('terraform-editor-result'));
+
+      let mode = 'terraform';
+      if (filename.endsWith('.yml') || filename.endsWith('.yaml')) mode = 'yaml';
+      else if (filename.endsWith('.json')) mode = 'javascript';
+      else if (filename.endsWith('.sh')) mode = 'shell';
+
+      const editor = window.initCodeEditor(`editor-${tabId}`, mode);
+      editor.setValue(content);
+
+      // Programmatically click the inner span to open the tab without triggering the close button
+      btn.querySelector('span').click();
   };
 
   window.runTerraform = async function(event, labName) {

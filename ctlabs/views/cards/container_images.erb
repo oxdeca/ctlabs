@@ -1,14 +1,18 @@
 <!--
 # -----------------------------------------------------------------------------
-# File        : ctlabs/views/cards/global_images.erb
+# File        : ctlabs/views/cards/container_images.erb
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
 
 <div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-box w3-text-orange"></i> Global Image Registry</span>
+    <span><i class="fas fa-box w3-text-orange"></i> Container Images</span>
     <button type="button" onclick="window.openAddLocalImageModal()" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add / Import</button>
+  </div>
+
+  <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
+    <input type="text" id="image-filter-input" onkeyup="window.filterContainerImages()" placeholder="🔍 Filter by name, category, OS, or version..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
   <% 
@@ -21,7 +25,7 @@
     local_built_images.uniq!
     local_built_images.reject! { |img| img == "<none>:<none>" || img.empty? }
 
-    global_images = []
+    container_images = []
     claimed_registry_tags = []
 
     Dir.glob(File.join("..", "images", "**", "Dockerfile")).each do |df|
@@ -59,24 +63,24 @@
         end
       end
       
-      global_images << { path: rel_path, category: category, os: os, version: version, built: is_built, imported: false, full_tag: target_exact }
+      container_images << { path: rel_path, category: category, os: os, version: version, built: is_built, imported: false, full_tag: target_exact }
     end
 
     unclaimed_images = local_built_images - claimed_registry_tags
     unclaimed_images.each do |tag|
       repo, ver = tag.split(':', 2)
       ver ||= "latest"
-      global_images << { path: repo, category: "imported", os: "-", version: ver, built: true, imported: true, full_tag: tag }
+      container_images << { path: repo, category: "imported", os: "-", version: ver, built: true, imported: true, full_tag: tag }
     end
 
-    global_images.sort_by! { |img| [img[:imported] ? 1 : 0, img[:path]] }
+    container_images.sort_by! { |img| [img[:imported] ? 1 : 0, img[:path]] }
   %>
   
   <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
-    <% if global_images.empty? %>
+    <% if container_images.empty? %>
       <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No images detected.</p></div>
     <% else %>
-      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+      <table id="container-images-table" class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
         <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
           <tr style="color: #94a3b8;">
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
@@ -87,8 +91,8 @@
           </tr>
         </thead>
         <tbody>
-          <% global_images.each do |img| %>
-            <tr>
+          <% container_images.each do |img| %>
+            <tr class="image-row">
               <td style="vertical-align: middle;">
                 <strong style="color: <%= img[:imported] ? '#cbd5e1' : '#38bdf8' %>;"><%= img[:path] %></strong>
               </td>
@@ -100,7 +104,11 @@
                 <% end %>
               </td>
               <td style="vertical-align: middle;"><%= img[:os] == '-' ? '-' : "<span class='w3-badge w3-tiny w3-round' style='background-color: #64748b;'>#{img[:os]}</span>" %></td>
-              <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-green"><%= img[:version] %></span></td>
+              
+              <td style="vertical-align: middle;">
+                <span style="color:#f59e0b; font-size:0.85em; font-weight: bold;"><%= img[:version] %></span>
+              </td>
+              
               <td style="vertical-align: middle;">
                 <div style="display: flex; justify-content: flex-end; align-items: center; gap: 6px;">
                   <span title="<%= img[:built] ? 'Ready in local registry' : 'Source only' %>" style="margin-right: 4px;">
@@ -128,3 +136,31 @@
     <% end %>
   </div>
 </div>
+
+<script>
+  // Real-time table filter logic
+  window.filterContainerImages = function() {
+    const input = document.getElementById('image-filter-input');
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById('container-images-table');
+    if (!table) return;
+    
+    // Get all rows with class 'image-row'
+    const trs = table.getElementsByClassName('image-row');
+
+    for (let i = 0; i < trs.length; i++) {
+      let tds = trs[i].getElementsByTagName('td');
+      let textValue = "";
+      // Grab text from the first 4 columns (Name, Category, OS, Version)
+      for (let j = 0; j < 4; j++) {
+        if (tds[j]) textValue += (tds[j].textContent || tds[j].innerText) + " ";
+      }
+      
+      if (textValue.toUpperCase().indexOf(filter) > -1) {
+        trs[i].style.display = "";
+      } else {
+        trs[i].style.display = "none";
+      }
+    }
+  };
+</script>

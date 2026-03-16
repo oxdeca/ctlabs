@@ -171,15 +171,27 @@ module ApplicationHelper
     ctrl = lab.find_node("ansible")
     if ctrl && !ctrl.play.nil?
       if ctrl.play.is_a?(Hash)
-        ansible_info[:playbook]    = ctrl.play['book'] || 'N/A'
-        ansible_info[:environment] = ctrl.play['env'] || []
-        ansible_info[:tags]        = ctrl.play['tags'] || []
+        ansible_info[:playbook]    = ctrl.play['book']  || 'N/A'
+        ansible_info[:environment] = ctrl.play['env']   || []
+        ansible_info[:tags]        = ctrl.play['tags']  || []
         ansible_info[:roles]       = ctrl.play['roles'] || ctrl.play['tags'] || []
       else
         ansible_info[:playbook]    = ctrl.play.to_s
       end
     end
     info[:ansible] = ansible_info
+
+    # Terraform
+    terraform_info = { workspace: 'default', work_dir: 'N/A', vars: [] }
+    ctrl = lab.find_node("ansible")
+    
+    if ctrl && ctrl.respond_to?(:terraform) && !ctrl.terraform.nil?
+      terraform_info[:workspace] = ctrl.terraform['workspace'] || 'default'
+      terraform_info[:work_dir]  = ctrl.terraform['work_dir']  || 'N/A'
+      terraform_info[:vars]      = ctrl.terraform['vars']      || []
+    end
+    info[:terraform] = terraform_info
+
 
     # DNAT (With Diffing)
     vip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip

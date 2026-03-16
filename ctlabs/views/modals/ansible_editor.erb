@@ -6,15 +6,42 @@
 -->
 
 <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span><h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4></header>
-      <div class="w3-container w3-padding">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;"><i class="fas fa-info-circle"></i> Edits are saved as an <strong>ad-hoc override</strong> for the current run.</div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label><input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. main.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label><input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-        <div class="w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label><textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea></div>
-        <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
-      </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 900px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4>
+    </header>
+
+    <div class="w3-bar" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto;">
+      <button class="w3-bar-item w3-button ans-tablink w3-text-blue" onclick="window.openAnsTab(event, 'AnsSettings')" style="flex-shrink: 0;"><i class="fas fa-sliders-h"></i> Settings</button>
+      <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.promptAndLoadAnsibleFile()" title="Open a File" style="flex-shrink: 0;"><i class="fas fa-folder-open"></i></button>
     </div>
+
+    <div class="w3-container w3-padding" id="ans-editors-container" style="min-height: 450px;">
+      <div id="AnsSettings" class="ans-tab">
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;"><i class="fas fa-info-circle"></i> Edits to the playbook configuration apply to the current run.</div>
+        
+        <label style="font-size: 0.85em; color: #94a3b8;">Playbook File</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="text" id="edit-ansible-book" class="w3-input w3-small w3-round" placeholder="e.g. ctlabs.yml" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+          <button type="button" onclick="window.loadActivePlaybook()" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;"><i class="fas fa-file-code"></i> Edit Playbook</button>
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Tags (Comma separated)</label>
+          <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round" placeholder="e.g. setup, web, db" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Environment Variables (One per line)</label>
+          <textarea id="edit-ansible-env" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;" rows="3" placeholder="APP_ENV=production&#10;DEBUG=true"></textarea>
+        </div>
+      </div>
+      
+      <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
+    </div>
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
+    </footer>
   </div>
+</div>

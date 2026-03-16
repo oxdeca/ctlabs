@@ -755,7 +755,9 @@ class Lab
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
     # 3. Construct the Execution Command
-    work_dir = "/root/ctlabs-terraform" 
+    # Combine the root terraform folder with the custom working directory
+    tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
+    work_dir = "/root/ctlabs-terraform/#{tf_work_dir}"
     
     tf_command = <<~CMD.gsub("\n", " ").strip
       cd #{work_dir} && 

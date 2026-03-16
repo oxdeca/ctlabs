@@ -43,8 +43,16 @@
   <div class="w3-padding w3-small">
     <% tf_cfg = info_hash[:terraform] || {} %>
     <table class="w3-table">
-      <tr><td style="color: #94a3b8; width: 120px;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= tf_cfg[:workspace] && tf_cfg[:workspace] != '' ? tf_cfg[:workspace] : 'default' %></code></td></tr>
-      <tr><td style="color: #94a3b8;">Variables:</td><td><% (tf_cfg[:vars] || []).each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %></td></tr>
+      <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= tf_cfg[:work_dir] && tf_cfg[:work_dir] != '' ? tf_cfg[:work_dir] : '(root)' %></code></td></tr>
+      
+      <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= tf_cfg[:workspace] && tf_cfg[:workspace] != '' ? tf_cfg[:workspace] : 'default' %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Variables:</td><td>
+        <% if (tf_cfg[:vars] || []).empty? %>
+          <span style="color: #64748b; font-style: italic;">None</span>
+        <% else %>
+          <% (tf_cfg[:vars] || []).each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %>
+        <% end %>
+      </td></tr>
     </table>
   </div>
 </div>

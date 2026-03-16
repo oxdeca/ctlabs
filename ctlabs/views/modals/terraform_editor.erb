@@ -6,23 +6,37 @@
 -->
 
 <div id="terraform-editor-modal" class="w3-modal" style="z-index: 9999;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 900px;">
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('terraform-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-cubes"></i> Edit Terraform Config</h4>
     </header>
-    <div class="w3-container w3-padding">
-      <label style="font-size: 0.85em; color: #94a3b8;">Workspace (Default: default)</label>
-      <input type="text" id="edit-terraform-workspace" class="w3-input w3-small w3-round w3-margin-bottom" placeholder="default" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+
+    <div class="w3-bar" id="tf-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto;">
+      <button class="w3-bar-item w3-button tf-tablink w3-text-blue" onclick="window.openTfTab(event, 'TfSettings')" style="flex-shrink: 0;"><i class="fas fa-sliders-h"></i> Settings</button>
+      <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.addTerraformFileTab()" title="Add New File" style="flex-shrink: 0;"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <div class="w3-container w3-padding" id="tf-editors-container" style="min-height: 450px;">
+      <div id="TfSettings" class="tf-tab">
+        <label style="font-size: 0.85em; color: #94a3b8;">Working Directory (Relative to ctlabs-terraform)</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="text" id="edit-terraform-workdir" class="w3-input w3-small w3-round" placeholder="e.g., 05a_shared-vpc/gcp" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+          <button type="button" onclick="window.loadTerraformFiles()" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;"><i class="fas fa-sync-alt"></i> Load Files</button>
+        </div>
+
+        <label style="font-size: 0.85em; color: #94a3b8;">Workspace (Default: default)</label>
+        <input type="text" id="edit-terraform-workspace" class="w3-input w3-small w3-round w3-margin-bottom" placeholder="default" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        
+        <label style="font-size: 0.85em; color: #94a3b8;">Variables (One per line: key=value)</label>
+        <textarea id="edit-terraform-vars" class="w3-input w3-small w3-round w3-margin-bottom" rows="4" placeholder="project_id=my-gcp-project&#10;region=us-central1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; resize: vertical;"></textarea>
+      </div>
       
-      <label style="font-size: 0.85em; color: #94a3b8;">Variables (One per line: key=value)</label>
-      <textarea id="edit-terraform-vars" class="w3-input w3-small w3-round w3-margin-bottom" rows="4" placeholder="project_id=my-gcp-project&#10;region=us-central1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; resize: vertical;"></textarea>
-      
-      <div id="terraform-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
+      <div id="terraform-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
     </div>
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
       <button onclick="document.getElementById('terraform-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-      <button onclick="window.saveTerraformConfig()" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-save"></i> Save</button>
+      <button onclick="window.saveTerraformConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
     </footer>
   </div>
 </div>
