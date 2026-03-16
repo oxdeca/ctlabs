@@ -1,0 +1,247 @@
+# -----------------------------------------------------------------------------
+# File        : ctlabs/routes/topology.rb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+
+# ===================================================
+# NODES
+# ===================================================
+get '/labs/*/node/:node_name' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+
+  node_cfg = nil
+  if File.file?(lab_path)
+    data = YAML.load_file(lab_path)
+    node_cfg = data['topology'][0]['nodes'][node_name] if data['topology'] && data['topology'][0]
+  end
+
+  node_cfg ||= { 'type' => 'host', 'kind' => 'linux', 'gw' => '', 'nics' => { 'eth1' => '' } }
+  
+  yaml_str = node_cfg.to_yaml
+  yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}, #{$4}]\n" }
+  yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}]\n" }
+
+  content_type :json
+  { yaml: yaml_str, json: node_cfg }.to_json
+end
+
+post '/labs/*/node/new' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path) || {}
+    node_name = params[:node_name].strip
+    raise "Node name is required." if node_name.empty?
+    
+    yaml['topology'] ||= [{}]
+    yaml['topology'][0] ||= {}
+    yaml['topology'][0]['nodes'] ||= {}
+    raise "Node '#{node_name}' already exists!" if yaml['topology'][0]['nodes'].key?(node_name)
+
+    yaml['topology'][0]['nodes'][node_name] = { 'type' => params[:type], 'kind' => params[:kind] }
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/node' do
+  lab_name = params[:splat].first
+  halt 400, "AdHoc Nodes only allowed on the running lab" unless get_running_lab == lab_name
+  node_name = params[:node_name]
+
+  node_cfg = { 'type' => params[:type] || 'host', 'kind' => params[:kind] || 'linux' }
+  node_cfg['gw'] = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
+  node_cfg['nics'] = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
+
+  begin
+    lab_path = get_lab_file_path(lab_name)
+    lab = Lab.new(cfg: lab_path)
+    cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch])
+
+    data = YAML.load_file(lab_path)
+    data['topology'][0]['nodes'][node_name] = cfg_out
+    data['topology'][0]['links'] ||= []
+    
+    if data_link
+      data['topology'][0]['links'] << data_link
+      sw_name = params[:switch].strip
+      sw_port = data_link[0].split(':eth').last.to_i
+      sw_node = data['topology'][0]['nodes'][sw_name]
+      sw_node['ports'] = sw_port if sw_node && sw_port > (sw_node['ports'] || 4)
+    end
+    
+    write_formatted_yaml(lab_path, data)
+    content_type :json
+    { success: true, message: "AdHoc Node '#{node_name}' started" }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/node/:node_name/edit' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    full_yaml = YAML.load_file(lab_path)
+    base_data = full_yaml['topology'][0]['nodes'][node_name] || {}
+
+    if params[:format] == 'form'
+      new_cfg = base_data.dup
+      new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
+      params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
+      params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
+      params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]
+      params[:term].to_s.empty? ? new_cfg.delete('term') : new_cfg['term'] = params[:term]
+
+      if params[:nics] && !params[:nics].strip.empty?
+        new_cfg['nics'] = params[:nics].split("\n").map { |l| l.split('=').map(&:strip) }.to_h.reject { |k,v| k.nil? || v.nil? }
+      else
+        new_cfg.delete('nics')
+      end
+
+      if params[:urls_text] && !params[:urls_text].strip.empty?
+        urls_hash = {}
+        params[:urls_text].split("\n").each do |line|
+          title, link = line.split('|', 2)
+          urls_hash[title.strip] = link.strip if title && !title.strip.empty? && link && !link.strip.empty?
+        end
+        new_cfg['urls'] = urls_hash unless urls_hash.empty?
+      else
+        new_cfg.delete('urls')
+      end
+    else
+      new_cfg = YAML.safe_load(params[:yaml_data])
+    end
+
+    full_yaml['topology'][0]['nodes'][node_name] = new_cfg
+    write_formatted_yaml(lab_path, full_yaml)
+
+    content_type :json
+    { success: true, message: "Node configuration saved." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/node/:node_name/delete' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+  
+  begin
+    if Lab.running? && Lab.current_name == lab_name
+      lab = Lab.new(cfg: lab_path, log: LabLog.null)
+      target_node = lab.find_node(node_name)
+      target_node.stop if target_node
+    end
+
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['nodes'].delete(node_name)
+    yaml['topology'][0]['links']&.reject! do |l|
+      l.is_a?(Array) && (l[0].start_with?("#{node_name}:") || l[1].start_with?("#{node_name}:"))
+    end
+
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Node deleted and orphaned links removed." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ===================================================
+# LINKS
+# ===================================================
+post '/labs/*/link/save' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['links'] ||= []
+
+    ep1 = "#{params[:node_a]}:#{params[:int_a]}"
+    ep2 = "#{params[:node_b]}:#{params[:int_b]}"
+    new_link = [ep1, ep2]
+
+    if params[:old_ep1] && params[:old_ep2] && !params[:old_ep1].empty?
+      idx = yaml['topology'][0]['links'].find_index { |l| l.is_a?(Array) && l.include?(params[:old_ep1]) && l.include?(params[:old_ep2]) }
+      idx ? (yaml['topology'][0]['links'][idx] = new_link) : (yaml['topology'][0]['links'] << new_link)
+    else
+      yaml['topology'][0]['links'] << new_link
+    end
+
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Link saved successfully." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/link/delete' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    yaml['topology'][0]['links']&.reject! { |l| l.is_a?(Array) && l.include?(params[:ep1]) && l.include?(params[:ep2]) }
+    write_formatted_yaml(lab_path, yaml)
+    { success: true, message: "Link deleted." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+# ===================================================
+# DNAT
+# ===================================================
+post '/labs/*/dnat' do
+  lab_name = params[:splat].first
+  halt 400, "AdHoc DNAT only allowed on the running lab" unless get_running_lab == lab_name
+
+  begin
+    lab_path = get_lab_file_path(lab_name)
+    lab = Lab.new(cfg: lab_path)
+    rule = lab.add_adhoc_dnat(params[:node], params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase)
+
+    data = YAML.load_file(lab_path)
+    data['topology'][0]['nodes'][params[:node]]['dnat'] ||= []
+    data['topology'][0]['nodes'][params[:node]]['dnat'] << [params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase]
+    
+    write_formatted_yaml(lab_path, data)
+    content_type :json
+    { success: true, message: "AdHoc DNAT rule added" }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/dnat/delete' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  begin
+    yaml = YAML.load_file(lab_path)
+    node = params[:node]
+    dnat_rules = yaml['topology'][0]['nodes'][node]['dnat'] rescue nil
+    
+    if dnat_rules
+      dnat_rules.reject! { |r| r[0].to_s == params[:ext].to_s && r[1].to_s == params[:int].to_s && (r[2] || 'tcp').to_s == params[:proto].to_s }
+      yaml['topology'][0]['nodes'][node].delete('dnat') if dnat_rules.empty?
+      write_formatted_yaml(lab_path, yaml)
+    end
+    { success: true, message: "DNAT rule deleted." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
