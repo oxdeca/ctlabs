@@ -67,12 +67,26 @@
           <input type="text" id="edit-terraform-workspace" class="w3-input w3-small w3-round" placeholder="default" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
         </div>
 
+        <div class="w3-margin-bottom w3-padding w3-round" style="background-color: rgba(16, 185, 129, 0.05); border: 1px solid #334155;">
+          <h6 style="margin-top: 0; color: #10b981; font-weight: bold;"><i class="fas fa-lock"></i> Vault GCP Dynamic Secrets</h6>
+          <div class="w3-row-padding" style="margin: 0 -8px;">
+            <div class="w3-col m6">
+              <label style="font-size: 0.85em; color: #94a3b8;">GCP Project ID</label>
+              <input type="text" id="edit-terraform-vault-project" class="w3-input w3-small w3-round" placeholder="Leave blank to disable" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-col m6">
+              <label style="font-size: 0.85em; color: #94a3b8;">Vault Roleset</label>
+              <input type="text" id="edit-terraform-vault-roleset" class="w3-input w3-small w3-round" placeholder="e.g., terraform-runner" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+        </div>
+
         <div class="w3-margin-bottom">
           <label style="font-size: 0.85em; color: #94a3b8;">Variables (One per line: key=value)</label>
           <textarea id="edit-terraform-vars" class="w3-input w3-small w3-round slim-scroll" rows="4" placeholder="project_id=my-gcp-project&#10;region=us-central1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;"></textarea>
         </div>
       </div>
-      
+
       <div id="terraform-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
     </div>
     

@@ -737,16 +737,16 @@ class Lab
   end
 
   # The main execution block
-  def run_terraform(target_node_name = nil, log_path = nil)
-    @log.write "#{__method__}(): target=#{target_node_name.inspect}, log_path=#{log_path}", "debug"
+  # Notice we added web_v_token and web_v_addr to the arguments!
+  def run_terraform(target_node_name = nil, log_path = nil, web_v_token = nil, web_v_addr = nil)
+    @log.write "#{__method__}(): target=#{target_node_name.inspect}", "debug"
 
-    # 1. Use your built-in methods to find the target node
     ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
     raise "No controller node found in topology to run Terraform." unless ctrl
 
-    # 2. Extract config directly from the already-parsed @cfg memory object
     node_cfg  = @cfg['topology'][0]['nodes'][ctrl.name] || {}
     tf_cfg    = node_cfg['terraform'] || {}
+    vault_cfg = tf_cfg['vault'] || {}
     
     workspace = tf_cfg['workspace'].to_s.strip
     workspace = 'default' if workspace.empty?
@@ -754,20 +754,43 @@ class Lab
     vars      = tf_cfg['vars'] || []
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
-    # 3. Construct the Execution Command
-    # Combine the root terraform folder with the custom working directory
     tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
     work_dir = "/root/ctlabs-terraform/#{tf_work_dir}"
     
-    tf_command = <<~CMD.gsub("\n", " ").strip
+    base_tf_cmd = <<~CMD.gsub("\n", " ").strip
       cd #{work_dir} && 
       (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
       terraform init -upgrade && 
       terraform apply -auto-approve #{var_args}
     CMD
 
+    v_project = vault_cfg['project'].to_s.strip
+    v_roleset = vault_cfg['roleset'].to_s.strip
+    v_roleset = 'terraform-runner' if v_roleset.empty?
+
+    if !v_project.empty?
+      # Fail fast if the web session doesn't have a token!
+      if web_v_token.nil? || web_v_token.empty?
+        error_msg = "\n❌ ERROR: Vault GCP integration enabled for '#{v_project}', but you are not logged in.\n👉 Please use the Vault Login button in the UI.\n"
+        File.open(log_path, 'a') { |f| f.puts error_msg } if log_path
+        raise "Missing Vault Token for GCP Authentication."
+      end
+      
+      # Wrap the TF workflow inside the Python CLI tool in the container
+      vault_bin = "vault-gcp"
+      tf_command = "#{vault_bin} exec #{v_project} #{v_roleset} -- bash -c \"#{base_tf_cmd.gsub('"', '\"')}\""
+    else
+      tf_command = base_tf_cmd
+    end
+
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    full_cmd = "#{engine} exec #{ctrl.name} bash -c \"#{tf_command}\""
+    
+    # Inject the session credentials straight into the container environment!
+    exec_env = ""
+    exec_env += "-e VAULT_ADDR='#{web_v_addr}' " if web_v_addr && !web_v_addr.empty?
+    exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
+
+    full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command}'"
 
     @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}"
 

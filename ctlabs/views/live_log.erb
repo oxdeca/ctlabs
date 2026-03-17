@@ -5,6 +5,31 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  /* Force dark-themed scrollbars for BOTH vertical and horizontal axes */
+  .log-terminal::-webkit-scrollbar {
+    width: 12px;  /* Vertical scrollbar width */
+    height: 12px; /* Horizontal scrollbar height */
+  }
+  .log-terminal::-webkit-scrollbar-track {
+    background: #0f172a; 
+    border-radius: 8px;
+  }
+  .log-terminal::-webkit-scrollbar-thumb {
+    background: #334155; 
+    border-radius: 8px;
+    border: 3px solid #0f172a; /* Creates a nice padding effect */
+  }
+  .log-terminal::-webkit-scrollbar-thumb:hover {
+    background: #475569; 
+  }
+  /* Firefox Fallback */
+  .log-terminal {
+    scrollbar-width: auto;
+    scrollbar-color: #334155 #0f172a;
+  }
+</style>
+
 <script src="/js/live_log.js"></script>
 
 <div id="log-data-container" 
@@ -13,9 +38,15 @@
      data-action="<%= ERB::Util.html_escape(@action) %>"
      style="display: contents;">
 
-  <div class="w3-panel w3-<%= @action == 'up' ? 'green' : 'red' %>" style="margin-top: 0; margin-bottom: 16px;">
+  <div class="w3-panel w3-<%= @action == 'up' ? 'green' : (@action == 'build' ? 'blue' : 'red') %>" style="margin-top: 0; margin-bottom: 16px;">
     <h2>
-      <%= @action == 'up' ? '🚀 Starting' : '⏹ Stopping' %> Lab: 
+      <% if @action == 'up' %>
+        <i class="fas fa-rocket"></i> Starting Lab: 
+      <% elsif @action == 'build' %>
+        <i class="fas fa-cube"></i> Building: 
+      <% else %>
+        <i class="fas fa-stop-circle"></i> Stopping Lab: 
+      <% end %>
       <code><%= @lab_name %></code>
     </h2>
   </div>
@@ -23,9 +54,16 @@
   <div class="w3-container" style="height: calc(100vh - 170px); display: flex; flex-direction: column; padding-bottom: 16px;">
     <div class="w3-container w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 16px;">
       
-      <pre id="log-content" style="flex: 1; resize: none; overflow: auto; min-height: 150px; background: #0f172a; color: #e2e8f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: 1px solid #334155; border-radius: 8px; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);"></pre>
+      <pre id="log-content" class="log-terminal" style="flex: 1; resize: none; overflow: auto; min-height: 150px; background: #0f172a; color: #e2e8f0; padding: 1em; white-space: pre-wrap; font-family: monospace; margin: 0; border: 1px solid #334155; border-radius: 8px; box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);"></pre>
       
-      <div id="scroll-status" style="font-size: 0.8em; color: #94a3b8; margin-top: 8px; height: 16px;"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; height: 16px;">
+        <div id="scroll-status" style="font-size: 0.8em; color: #94a3b8;"></div>
+        
+        <button type="button" onclick="const p = document.getElementById('log-content'); if(p.style.whiteSpace === 'pre-wrap') { p.style.whiteSpace = 'pre'; this.innerHTML = '<i class=\'fas fa-align-left\'></i> Enable Word Wrap'; } else { p.style.whiteSpace = 'pre-wrap'; this.innerHTML = '<i class=\'fas fa-align-justify\'></i> Disable Word Wrap'; }" class="w3-button w3-tiny w3-transparent w3-text-gray w3-hover-text-white" style="padding: 0 4px;" title="Toggle Word Wrap">
+          <i class="fas fa-align-justify"></i> Disable Word Wrap
+        </button>
+      </div>
+
     </div>
   </div>
 

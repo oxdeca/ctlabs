@@ -531,10 +531,17 @@
           filesData[filepath] = window.cmEditors[taId].getValue();
       });
 
+      // --- EXTRACT VAULT CONFIG ---
+      const vProject = document.getElementById('edit-terraform-vault-project').value.trim();
+      const vRoleset = document.getElementById('edit-terraform-vault-roleset').value.trim();
+
       const formData = new URLSearchParams({
           work_dir: workDir,
           workspace: document.getElementById('edit-terraform-workspace').value,
           vars: document.getElementById('edit-terraform-vars').value,
+          // Append the Vault fields to the payload!
+          vault_project: vProject,
+          vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '', 
           tf_files: JSON.stringify(filesData)
       });
 

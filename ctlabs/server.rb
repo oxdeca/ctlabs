@@ -26,6 +26,7 @@ require 'link'
 require 'graph'
 require 'lablog'
 require 'ws_socket_wrapper' # <--- Your extracted class!
+require 'vault_auth'
 
 # --- Sinatra Settings ---
 disable :logging
@@ -80,6 +81,7 @@ require_relative 'routes/misc'
 require_relative 'routes/automation'
 require_relative 'routes/topology'
 require_relative 'routes/labs'
+require_relative 'routes/vault'
 
 # ------------------------------------------------------------------------------
 # SECURE PUMA BOOTLOADER

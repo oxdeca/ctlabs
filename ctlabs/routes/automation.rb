@@ -283,6 +283,19 @@ post '/labs/*/terraform/edit' do
       tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
     end
 
+    # --- NEW: PARSE VAULT CONFIG ---
+    v_project = params[:vault_project].to_s.strip
+    v_roleset = params[:vault_roleset].to_s.strip
+    
+    if v_project.empty?
+      tf_cfg.delete('vault')
+    else
+      tf_cfg['vault'] = {
+        'project' => v_project,
+        'roleset' => v_roleset.empty? ? 'terraform-runner' : v_roleset
+      }
+    end
+
     base_data['terraform'] = tf_cfg
     full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
     write_formatted_yaml(lab_path, full_yaml)
@@ -332,7 +345,12 @@ post '/labs/*/terraform' do
     begin
       lab_instance = Lab.new(cfg: get_lab_file_path(lab_name), relative_path: lab_name)
       File.open(log_path, 'a') { |f| f.puts "\n--- Manual Terraform apply triggered ---\n" }
-      lab_instance.run_terraform(nil, log_path)
+      lab_instance.run_terraform(
+        params[:node_name], 
+        log_path, 
+        session[:vault_token], # <-- Pass the web session token
+        session[:vault_addr]   # <-- Pass the web session address
+      )
     rescue => e
       File.open(log_path, 'a') { |f| f.puts "\n⚠️ Terraform failed: #{e.message}\n" }
     end

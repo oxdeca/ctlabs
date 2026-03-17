@@ -42,16 +42,61 @@
     </div>
   </div>
   <div class="w3-padding w3-small">
-    <% tf_cfg = info_hash[:terraform] || {} %>
-    <table class="w3-table">
-      <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= tf_cfg[:work_dir] && tf_cfg[:work_dir] != '' ? tf_cfg[:work_dir] : '(root)' %></code></td></tr>
+    <% 
+      # --- BULLETPROOF YAML SYNCHRONIZATION FOR TERRAFORM ---
+      # Bypass the stale memory state and read straight from the YAML!
+      lab_name = info_hash[:lab_path].to_s
       
-      <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= tf_cfg[:workspace] && tf_cfg[:workspace] != '' ? tf_cfg[:workspace] : 'default' %></code></td></tr>
+      possible_paths = [
+        (respond_to?(:get_lab_file_path) ? get_lab_file_path(lab_name) : nil),
+        File.join('..', 'labs', lab_name),
+        File.join('labs', lab_name),
+        lab_name
+      ].compact
+    
+      real_path = possible_paths.find { |p| File.exist?(p) }
+      tf_cfg = {}
+      
+      if real_path
+        begin
+          yaml_data = YAML.load_file(real_path)
+          nodes = yaml_data['topology'][0]['nodes'] || {}
+          ctrl_node = nodes.values.find { |n| n['type'] == 'controller' } || nodes['ansible'] || {}
+          tf_cfg = ctrl_node['terraform'] || {}
+        rescue
+        end
+      end
+      
+      # Fallback to memory state just in case YAML parsing failed
+      tf_cfg = info_hash[:terraform] if tf_cfg.empty? && info_hash[:terraform]
+      
+      work_dir  = tf_cfg['work_dir'] || tf_cfg[:work_dir]
+      workspace = tf_cfg['workspace'] || tf_cfg[:workspace]
+      vars      = tf_cfg['vars'] || tf_cfg[:vars] || []
+      
+      vault_cfg = tf_cfg['vault'] || tf_cfg[:vault] || {}
+      v_project = vault_cfg['project'] || vault_cfg[:project]
+      v_roleset = vault_cfg['roleset'] || vault_cfg[:roleset] || 'terraform-runner'
+    %>
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= work_dir && work_dir != '' ? work_dir : '(root)' %></code></td></tr>
+      
+      <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= workspace && workspace != '' ? workspace : 'default' %></code></td></tr>
+
+      <tr><td style="color: #94a3b8;">Vault Auth:</td><td>
+        <% if v_project && !v_project.to_s.empty? %>
+          <span class="w3-badge w3-tiny w3-round w3-green" style="margin-right: 4px;"><i class="fas fa-lock"></i> GCP JIT</span>
+          <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v_project %> : <%= v_roleset %></code>
+        <% else %>
+          <span style="color: #64748b; font-style: italic;">Disabled (Using Local Config)</span>
+        <% end %>
+      </td></tr>
+
       <tr><td style="color: #94a3b8;">Variables:</td><td>
-        <% if (tf_cfg[:vars] || []).empty? %>
+        <% if vars.empty? %>
           <span style="color: #64748b; font-style: italic;">None</span>
         <% else %>
-          <% (tf_cfg[:vars] || []).each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %>
+          <% vars.each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %>
         <% end %>
       </td></tr>
     </table>
