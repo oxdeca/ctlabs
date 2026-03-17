@@ -6,7 +6,6 @@
 -->
 
 <%
-  # Cache the local registry images so we only run the shell commands once per page load!
   unless @local_built_images
     @local_built_images = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
     @local_built_images += `docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
@@ -20,21 +19,24 @@
 
 <div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-layer-group w3-text-orange"></i> Image Profiles (Lab Specific)</span>
+    <span><i class="fas fa-project-diagram w3-text-orange"></i> Node Profiles (Lab Specific)</span>
     <div>
       <button type="button" onclick="window.openImageEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Profile</button>
     </div>
   </div>
   
+  <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
+    <input type="text" id="profile-filter-input" onkeyup="window.filterNodeProfiles()" placeholder=" Filter profiles by name, type, or image..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
+  </div>
+
   <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
     <% if (info_hash[:images] || []).empty? %>
-      <div class="w3-padding">
-        <p style="color: #94a3b8; font-style: italic;">No image profiles defined</p>
-      </div>
+      <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No node profiles defined</p></div>
     <% else %>
-      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+      <table class="w3-table w3-striped w3-small" id="node-profiles-table" style="margin: 0; font-size: 13px;">
         <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
           <tr style="color: #94a3b8;">
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Kind</th>
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Mapped Image</th>
@@ -44,28 +46,42 @@
         <tbody>
           <% (info_hash[:images] || []).each do |img| %>
             <%
-              # Determine if this specific profile's image exists in the registry
               target_image = img[:image].to_s.strip
               is_built = false
               unless target_image.empty?
                 target_image += ":latest" unless target_image.include?(':')
                 is_built = @local_built_images.include?(target_image)
               end
+
+              node_icon = 'fa-server'
+              node_prefix = 'node'
+              case img[:type].to_s.downcase
+                when 'router' then node_icon = 'fa-route'; node_prefix = 'ro'
+                when 'switch' then node_icon = 'fa-exchange-alt'; node_prefix = 'sw'
+                when 'firewall' then node_icon = 'fa-shield-alt'; node_prefix = 'fw'
+                when 'host' then node_icon = 'fa-laptop'; node_prefix = 'host'
+                when 'server' then node_icon = 'fa-server'; node_prefix = 'srv'
+                when 'controller' then node_icon = 'fa-cogs'; node_prefix = 'ctrl'
+                when 'gateway' then node_icon = 'fa-door-open'; node_prefix = 'gw'
+                else node_icon = 'fa-server'; node_prefix = img[:type].to_s[0..3]
+              end
             %>
-            <tr>
+            <tr class="profile-row">
+              <td style="vertical-align: middle; white-space: nowrap;">
+                <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
+                <strong style="color: #a855f7;"><%= node_prefix %>:<%= img[:kind] %></strong>
+              </td>
               <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:type] %></span></td>
               <td style="vertical-align: middle;"><%= img[:kind] %></td>
-              
               <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
-                <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry (Must be built/imported)' %>" style="margin-right: 4px;">
+                <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry' %>" style="margin-right: 4px;">
                   <i class="fas fa-cube <%= is_built ? 'w3-text-green' : '' %>" <%= is_built ? '' : 'style="color: #475569;"' %>></i>
                 </span>
                 <%= img[:image] %>
               </td>
-
               <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
-                <button type="button" onclick="window.editImageConfig('<%= info_hash[:lab_path] %>', '<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras] || "") %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Image Profile" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
-                <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Image Profile" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
+                <button type="button" onclick="window.editImageConfig('<%= info_hash[:lab_path] %>', '<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras] || '') %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node Profile"><i class="fas fa-edit fa-lg"></i></button>
+                <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node Profile"><i class="fas fa-trash fa-lg"></i></button>
               </td>
             </tr>
           <% end %>
@@ -74,3 +90,13 @@
     <% end %>
   </div>
 </div>
+
+<script>
+  window.filterNodeProfiles = function() {
+    const filter = document.getElementById('profile-filter-input').value.toUpperCase();
+    const rows = document.getElementById('node-profiles-table')?.getElementsByClassName('profile-row') || [];
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    }
+  };
+</script>

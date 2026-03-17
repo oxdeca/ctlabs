@@ -6,19 +6,68 @@
 -->
 
 <div id="link-editor-modal" class="w3-modal" style="z-index: 9999;">
-    <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-      <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;"><span onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span><h4 style="margin: 0;"><i class="fas fa-project-diagram"></i> Configure Network Link</h4></header>
-      <div class="w3-container w3-padding">
-        <input type="hidden" id="edit-link-old-ep1"><input type="hidden" id="edit-link-old-ep2">
-        <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node A</label><input type="text" id="edit-link-node-a" class="w3-input w3-small w3-round" placeholder="e.g. h1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface A</label><input type="text" id="edit-link-int-a" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-project-diagram"></i> Configure Network Link</h4>
+    </header>
+    
+    <div class="w3-container w3-padding">
+      <input type="hidden" id="edit-link-old-ep1">
+      <input type="hidden" id="edit-link-old-ep2">
+      
+      <datalist id="link-nodes-list">
+        <% 
+          if defined?(info_hash) && info_hash && info_hash[:nodes]
+            info_hash[:nodes].map { |n| n[:name] }.sort.each do |node_name| 
+        %>
+          <option value="<%= node_name %>"><%= node_name %></option>
+        <% 
+            end
+          end
+        %>
+      </datalist>
+
+      <datalist id="link-ints-list">
+        <% (1..12).each do |i| %>
+          <option value="eth<%= i %>">eth<%= i %></option>
+        <% end %>
+      </datalist>
+
+      <div class="w3-row-padding" style="margin: 0 -8px;">
+        
+        <div class="w3-col m6">
+          <div class="w3-margin-bottom" style="background-color: rgba(56, 189, 248, 0.05); padding: 8px; border-radius: 8px; border: 1px solid #334155;">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #38bdf8; font-weight: bold;"><i class="fas fa-plug"></i> Node A</label>
+              <input type="text" id="edit-link-node-a" list="link-nodes-list" class="w3-input w3-small w3-round" placeholder="Select node..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div>
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-ethernet"></i> Interface A</label>
+              <input type="text" id="edit-link-int-a" list="link-ints-list" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
         </div>
-        <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Node B</label><input type="text" id="edit-link-node-b" class="w3-input w3-small w3-round" placeholder="e.g. sw1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
-          <div class="w3-col m6 w3-margin-bottom"><label style="font-size: 0.85em; color: #94a3b8;">Interface B</label><input type="text" id="edit-link-int-b" class="w3-input w3-small w3-round" placeholder="e.g. eth1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;"></div>
+        
+        <div class="w3-col m6">
+          <div class="w3-margin-bottom" style="background-color: rgba(16, 185, 129, 0.05); padding: 8px; border-radius: 8px; border: 1px solid #334155;">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #10b981; font-weight: bold;"><i class="fas fa-plug"></i> Node B</label>
+              <input type="text" id="edit-link-node-b" list="link-nodes-list" class="w3-input w3-small w3-round" placeholder="Select node..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div>
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-ethernet"></i> Interface B</label>
+              <input type="text" id="edit-link-int-b" list="link-ints-list" class="w3-input w3-small w3-round" placeholder="e.g. eth2" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
         </div>
+
       </div>
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;"><button type="button" onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button><button type="button" onclick="window.saveLinkConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button></footer>
     </div>
+    
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button type="button" onclick="document.getElementById('link-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button type="button" onclick="window.saveLinkConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
+    </footer>
   </div>
+</div>

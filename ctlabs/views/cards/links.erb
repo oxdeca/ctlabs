@@ -5,22 +5,97 @@
 # -----------------------------------------------------------------------------
 -->
 
-<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+<%
+  lab_name = info_hash[:lab_path].to_s
+  
+  possible_paths = [
+    (respond_to?(:get_lab_file_path) ? get_lab_file_path(lab_name) : nil),
+    File.join('..', 'labs', lab_name),
+    File.join('labs', lab_name),
+    lab_name
+  ].compact
+
+  real_path = possible_paths.find { |p| File.exist?(p) }
+
+  if real_path
+    begin
+      yaml_data = YAML.load_file(real_path)
+      yaml_links = yaml_data['topology'][0]['links'] || []
+      
+      info_hash[:links] = []
+      yaml_links.each do |yl|
+        next unless yl.is_a?(Array) && yl.size >= 2
+        ep1, ep2 = yl[0].to_s.strip, yl[1].to_s.strip
+        node_a, int_a = ep1.split(':', 2)
+        node_b, int_b = ep2.split(':', 2)
+        
+        info_hash[:links] << { node_a: node_a, int_a: int_a, node_b: node_b, int_b: int_b, ep1: ep1, ep2: ep2 }
+      end
+    rescue
+    end
+  end
+%>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-project-diagram w3-text-green"></i> Network Links</span>
     <button type="button" onclick="window.openLinkEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Link</button>
   </div>
-  <div class="w3-padding">
+  
+  <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
+    <input type="text" id="link-filter-input" onkeyup="window.filterLinks()" placeholder=" Filter links by node or interface..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
+  </div>
+
+  <div class="docker-scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;">
     <% if (info_hash[:links] || []).empty? %>
-      <p style="color: #94a3b8; font-style: italic;">No links defined</p>
+      <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No links defined</p></div>
     <% else %>
-      <table class="w3-table w3-striped w3-small">
-        <thead><tr style="color: #94a3b8;"><th>Endpoint A</th><th>Endpoint B</th><th style="text-align:right;">Actions</th></tr></thead>
+      <table class="w3-table w3-striped w3-small" id="network-links-table" style="margin: 0;">
+        <thead style="position: sticky; top: 0; background-color: #0f172a; z-index: 1;">
+          <tr style="color: #94a3b8;">
+            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important;">Endpoint A</th>
+            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important;">Endpoint B</th>
+            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important; text-align:right;">Actions</th>
+          </tr>
+        </thead>
         <tbody>
+          <% 
+            get_icon = ->(type) {
+              case type.to_s.downcase
+                when 'router' then 'fa-route'
+                when 'switch' then 'fa-exchange-alt'
+                when 'firewall' then 'fa-shield-alt'
+                when 'host' then 'fa-laptop'
+                when 'server' then 'fa-server'
+                when 'controller' then 'fa-cogs'
+                when 'gateway' then 'fa-door-open'
+                else 'fa-server'
+              end
+            }
+          %>
           <% info_hash[:links].each do |l| %>
-            <tr>
-              <td style="vertical-align: middle;"><strong style="color: #38bdf8;"><%= l[:node_a] %></strong> <span style="color: #64748b;">[<%= l[:int_a] %>]</span></td>
-              <td style="vertical-align: middle;"><strong style="color: #38bdf8;"><%= l[:node_b] %></strong> <span style="color: #64748b;">[<%= l[:int_b] %>]</span></td>
+            <%
+              node_a_data = (info_hash[:nodes] || []).find { |n| n[:name] == l[:node_a] } || {}
+              node_b_data = (info_hash[:nodes] || []).find { |n| n[:name] == l[:node_b] } || {}
+              
+              icon_a = get_icon.call(node_a_data[:type])
+              icon_b = get_icon.call(node_b_data[:type])
+
+              is_adhoc_link = node_a_data[:adhoc] || node_b_data[:adhoc]
+            %>
+            <tr class="link-row" style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if is_adhoc_link %>">
+              <td style="vertical-align: middle; white-space: nowrap;">
+                <i class="fas <%= icon_a %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 4px;" title="<%= node_a_data[:type] || 'Unknown' %>"></i>
+                <strong style="color: #38bdf8;"><%= l[:node_a] %></strong> 
+                <% if node_a_data[:adhoc] %><span style="color:#f59e0b; font-size:0.75em; margin-left:2px; font-weight: bold;">(adhoc)</span><% end %>
+                <span style="color: #64748b; margin-left: 4px;">[<%= l[:int_a] %>]</span>
+              </td>
+              <td style="vertical-align: middle; white-space: nowrap;">
+                <i class="fas <%= icon_b %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 4px;" title="<%= node_b_data[:type] || 'Unknown' %>"></i>
+                <strong style="color: #38bdf8;"><%= l[:node_b] %></strong> 
+                <% if node_b_data[:adhoc] %><span style="color:#f59e0b; font-size:0.75em; margin-left:2px; font-weight: bold;">(adhoc)</span><% end %>
+                <span style="color: #64748b; margin-left: 4px;">[<%= l[:int_b] %>]</span>
+              </td>
               <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
                 <button type="button" onclick="window.editLinkConfig('<%= info_hash[:lab_path] %>', '<%= l[:node_a] %>', '<%= l[:int_a] %>', '<%= l[:node_b] %>', '<%= l[:int_b] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Link" style="padding: 2px 6px;"><i class="fas fa-edit fa-lg"></i></button>
                 <button type="button" onclick="window.deleteLink('<%= info_hash[:lab_path] %>', '<%= l[:ep1] %>', '<%= l[:ep2] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Link" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button>
