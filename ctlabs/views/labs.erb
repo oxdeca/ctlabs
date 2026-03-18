@@ -11,6 +11,7 @@
 <script src="/js/links.js"></script>
 <script src="/js/code_editor.js"></script>
 <script src="/js/file_browser.js"></script>
+<script src="/js/dockerfile.js"></script>
 <script src="/js/automation.js"></script>
 <script src="/js/nodes.js"></script>
 <script src="/js/vault.js"></script>
@@ -72,17 +73,10 @@
         </span>
       </button>
 
-      <% if session[:vault_token] && !session[:vault_token].empty? %>
-        <button onclick="window.submitVaultLogout()" class="w3-button w3-round w3-small w3-hover-red" style="background-color: transparent; border: 1px solid #ef4444; color: #ef4444;" title="Logout of Vault">
-          <i class="fas fa-sign-out-alt"></i>
-        </button>
-      <% end %>
-      <button type="button" class="w3-button w3-deep-purple w3-round" onclick="document.getElementById('save-as-modal').style.display='block'" title="Clone current state to a new lab">
-        <i class="fas fa-copy"></i> Save As
-      </button>
-      <button type="button" class="w3-button w3-teal w3-round" onclick="window.saveActiveLab()" title="Save Runtime Overrides to Base YAML">
+      <button type="button" class="w3-button w3-teal w3-round" onclick="window.openUnifiedSaveModal()" title="Save or Clone Lab">
         <i class="fas fa-save"></i> Save Lab
       </button>
+      
       <button type="button" class="w3-button w3-blue w3-round" onclick="document.getElementById('new-lab-modal').style.display='block'">
         <i class="fas fa-folder-plus"></i> New Lab
       </button>
@@ -125,7 +119,89 @@
 <br>
 
 <%= erb :'modals/new_lab' %>
-<%= erb :'modals/save_as' %>
 <%= erb :'modals/edit_lab' %>
-<%= erb :'modals/file_browser' %>
 <%= erb :'modals/vault_login' %>
+<%= erb :'modals/file_browser' %>
+
+
+<div id="unified-save-modal" class="w3-modal" style="z-index: 9999;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 450px;">
+    
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('unified-save-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-save w3-text-teal"></i> Save Lab Configuration</h4>
+    </header>
+    
+    <div class="w3-container w3-padding">
+      <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
+        <i class="fas fa-info-circle"></i> <b>Tip:</b> Keep the current name to save your changes, or type a new name to clone this lab!
+      </div>
+      
+      <label style="font-size: 0.85em; color: #94a3b8; font-weight: bold;">Lab Name / Directory:</label>
+      <input type="text" id="unified-save-name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; margin-top: 4px;" required>
+    </div>
+    
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button onclick="document.getElementById('unified-save-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button id="unified-save-btn" onclick="window.executeUnifiedSave()" class="w3-button w3-teal w3-round w3-small"><i class="fas fa-check"></i> Save Lab</button>
+    </footer>
+    
+  </div>
+</div>
+
+<script>
+  window.openUnifiedSaveModal = function() {
+    const currentLab = document.getElementById('lab-selector').value;
+    if (!currentLab) return alert("No lab selected.");
+    
+    // Reset the button state
+    const btn = document.getElementById('unified-save-btn');
+    btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
+    btn.disabled = false;
+    
+    document.getElementById('unified-save-name').value = currentLab;
+    document.getElementById('unified-save-modal').style.display = 'block';
+  };
+
+  window.executeUnifiedSave = async function() {
+    const currentLab = document.getElementById('lab-selector').value;
+    const targetName = document.getElementById('unified-save-name').value.trim();
+    
+    if (!targetName) return alert("Lab name cannot be empty.");
+    
+    const btn = document.getElementById('unified-save-btn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    btn.disabled = true;
+    
+    if (currentLab === targetName) {
+      // OVERWRITE EXISTING LAB (Calls the function already in your labs.js)
+      document.getElementById('unified-save-modal').style.display = 'none';
+      window.saveActiveLab();
+    } else {
+      // CLONE TO NEW LAB (Save As)
+      const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+      const formData = new URLSearchParams({ new_lab_name: targetName });
+      
+      try {
+        const res = await fetch(`/labs/${safeLab}/save_as`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formData.toString()
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+          document.getElementById('unified-save-modal').style.display = 'none';
+          localStorage.setItem('ctlabs_last_selected_lab', data.new_lab);
+          window.location.href = window.location.pathname; 
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (err) {
+        alert("Error: " + err.message);
+        btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
+        btn.disabled = false;
+      }
+    }
+  };
+</script>

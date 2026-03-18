@@ -8,33 +8,37 @@
 // ----------------------------------------------------------------------------
 // --- ANSIBLE ---
 // ----------------------------------------------------------------------------
-  window.openAnsTab = function(tabId) {
-      document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
+window.openAnsTab = function(tabId) {
+  document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
       
-      document.querySelectorAll(".ans-tablink").forEach(btn => {
-          btn.classList.remove("w3-text-blue");
-          btn.style.backgroundColor = "transparent";
-          btn.style.borderBottom = "none";
+  document.querySelectorAll(".ans-tablink").forEach(btn => {
+    btn.classList.remove("w3-text-blue");
+    btn.style.backgroundColor = "transparent";
+    btn.style.borderBottom = "none";
           
-          // Highlight the matching tab button instantly
-          if (btn.getAttribute("data-target-tab") === tabId) {
-              btn.classList.add("w3-text-blue");
-              btn.style.backgroundColor = "#1e293b";
-              btn.style.borderBottom = "2px solid #38bdf8";
-          }
-      });
+    if (btn.getAttribute("data-target-tab") === tabId) {
+      btn.classList.add("w3-text-blue");
+      btn.style.backgroundColor = "#1e293b";
+      btn.style.borderBottom = "2px solid #38bdf8";
+    }
+  });
       
-      const activeTab = document.getElementById(tabId);
-      if (activeTab) activeTab.style.display = "block";
+  const activeTab = document.getElementById(tabId);
+  if (activeTab) activeTab.style.display = "block";
 
-      const deleteBtn = document.getElementById('ans-delete-file-btn');
-      if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings') ? 'none' : 'inline-block';
+  const deleteBtn = document.getElementById('ans-delete-file-btn');
+  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings') ? 'none' : 'inline-block';
 
-      const taId = 'editor-' + tabId;
-      if (window.cmEditors[taId]) {
-          setTimeout(() => window.cmEditors[taId].refresh(), 50);
-      }
-  };
+  const taId = 'editor-' + tabId;
+  if (window.cmEditors[taId]) {
+    setTimeout(() => window.cmEditors[taId].refresh(), 50);
+  }
+      
+  // --- NEW: Remember the actively clicked tab! ---
+  if (window.currentEditLab) {
+    localStorage.setItem('ans_active_tab_' + window.currentEditLab, tabId);
+  }
+};
 
   // INNER FILE BROWSER LOGIC
   window.openAnsibleFileBrowser = async function() {
@@ -160,66 +164,69 @@
       window.updateAnsibleOpenTabs();
   };
 
-  window.openAnsibleEditor = async function(labName) {
-      window.currentEditLab = labName;
-      const resultDiv = document.getElementById('ansible-editor-result');
-      if (resultDiv) resultDiv.style.display = 'none';
+window.openAnsibleEditor = async function(labName) {
+    window.currentEditLab = labName;
+    // --- READ MEMORY FIRST! ---
+    const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
 
-      document.querySelector('.ans-tablink').click();
-
-      try {
-          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/ansible/config?t=${Date.now()}`);
-          if (!res.ok) throw new Error("Could not fetch ansible node configuration");
+    const resultDiv = document.getElementById('ansible-editor-result');
+    if (resultDiv) resultDiv.style.display = 'none';
+    document.querySelector('.ans-tablink').click();
+    try {
+        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+        const res = await fetch(`/labs/${safeLab}/ansible/config?t=${Date.now()}`);
+        if (!res.ok) throw new Error("Could not fetch ansible node configuration");
+        
+        const data = await res.json();
+        let play = data.json.play || {};
+        if (typeof play === 'string') play = { book: play };
+        
+        const book = play.book || 'main.yml';
+        const defaultInv = play.inv || window.currentEditLab.split('/').pop().replace('.yml', '.ini');
+        const customInv = play.custom_inv || '';
+        document.getElementById('edit-ansible-book').value = book;
+        document.getElementById('edit-ansible-inv').value = defaultInv;
+        document.getElementById('edit-ansible-custom-inv').value = customInv;
+        document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
+        document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
+        
+        document.getElementById('ansible-editor-modal').style.display = 'block';
+        document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+        document.querySelectorAll('.ans-tab[data-filepath]').forEach(e => {
+            const taId = e.querySelector('textarea')?.id;
+            if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
+            e.remove();
+        });
+        
+        // 🔥 RESTORE TABS FROM MEMORY 🔥
+        const savedTabsStr = localStorage.getItem('ansible_tabs_' + window.currentEditLab);
+        let savedTabs = savedTabsStr ? JSON.parse(savedTabsStr) : null;
           
-          const data = await res.json();
-          let play = data.json.play || {};
-          if (typeof play === 'string') play = { book: play };
-          
-          const book = play.book || 'main.yml';
-          const defaultInv = play.inv || window.currentEditLab.split('/').pop().replace('.yml', '.ini');
-          const customInv = play.custom_inv || '';
 
-          document.getElementById('edit-ansible-book').value = book;
-          document.getElementById('edit-ansible-inv').value = defaultInv;
-          document.getElementById('edit-ansible-custom-inv').value = customInv;
-          document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
-          document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
-          
-          document.getElementById('ansible-editor-modal').style.display = 'block';
-
-          document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
-          document.querySelectorAll('.ans-tab[data-filepath]').forEach(e => {
-              const taId = e.querySelector('textarea')?.id;
-              if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
-              e.remove();
-          });
-
-          // 🔥 RESTORE TABS FROM MEMORY 🔥
-          const savedTabsStr = localStorage.getItem('ansible_tabs_' + window.currentEditLab);
-          let savedTabs = savedTabsStr ? JSON.parse(savedTabsStr) : null;
-
-          if (savedTabs && savedTabs.length > 0) {
-              for (const filepath of savedTabs) {
-                  await window.fetchAnsibleFile(filepath);
-              }
-          } else {
-              // Only load defaults if no tabs were saved
-              await window.fetchAnsibleFile(book.includes('/') ? book : `playbooks/${book}`);
-              await window.fetchAnsibleFile(defaultInv.includes('/') ? defaultInv : `inventories/${defaultInv}`);
-              if (customInv !== '') {
-                  await window.fetchAnsibleFile(customInv.includes('/') ? customInv : `inventories/${customInv}`);
-              }
+        if (savedTabs && savedTabs.length > 0) {
+          for (const filepath of savedTabs) {
+            await window.fetchAnsibleFile(filepath);
           }
+        } else {
+          // Only load defaults if no tabs were saved
+          await window.fetchAnsibleFile(book.includes('/') ? book : `playbooks/${book}`);
+          await window.fetchAnsibleFile(defaultInv.includes('/') ? defaultInv : `inventories/${defaultInv}`);
+          if (customInv !== '') {
+            await window.fetchAnsibleFile(customInv.includes('/') ? customInv : `inventories/${customInv}`);
+          }
+        }
 
-          // Focus the last opened file tab, or fallback to Settings
+        // --- NEW: Restore the exact active tab, or fallback to the right-most tab ---
+        if (savedActiveTab && document.getElementById(savedActiveTab)) {
+              window.openAnsTab(savedActiveTab);
+        } else {
           const fileTabs = document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)');
           if (fileTabs.length > 0) {
-              fileTabs[fileTabs.length - 1].click();
+            fileTabs[fileTabs.length - 1].click();
           }
-
-      } catch (err) { alert("Error: " + err.message); }
-  };
+        }
+    } catch (err) { alert("Error: " + err.message); }
+};
 
   window.saveAnsibleConfig = async function() {
       const resultDiv = document.getElementById('ansible-editor-result');
@@ -350,32 +357,37 @@
 // --- TERRAFORM ---
 // ----------------------------------------------------------------------------
 
-  window.openTfTab = function(tabId) {
-      document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
+window.openTfTab = function(tabId) {
+  document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
       
-      document.querySelectorAll(".tf-tablink").forEach(btn => {
-          btn.classList.remove("w3-text-blue");
-          btn.style.backgroundColor = "transparent";
-          btn.style.borderBottom = "none";
+  document.querySelectorAll(".tf-tablink").forEach(btn => {
+    btn.classList.remove("w3-text-blue");
+    btn.style.backgroundColor = "transparent";
+    btn.style.borderBottom = "none";
           
-          if (btn.getAttribute("data-target-tab") === tabId) {
-              btn.classList.add("w3-text-blue");
-              btn.style.backgroundColor = "#1e293b";
-              btn.style.borderBottom = "2px solid #38bdf8";
-          }
-      });
+    if (btn.getAttribute("data-target-tab") === tabId) {
+      btn.classList.add("w3-text-blue");
+      btn.style.backgroundColor = "#1e293b";
+      btn.style.borderBottom = "2px solid #38bdf8";
+    }
+  });
       
-      const activeTab = document.getElementById(tabId);
-      if (activeTab) activeTab.style.display = "block";
+  const activeTab = document.getElementById(tabId);
+  if (activeTab) activeTab.style.display = "block";
 
-      const deleteBtn = document.getElementById('tf-delete-file-btn');
-      if (deleteBtn) deleteBtn.style.display = (tabId === 'TfSettings') ? 'none' : 'inline-block';
+  const deleteBtn = document.getElementById('tf-delete-file-btn');
+  if (deleteBtn) deleteBtn.style.display = (tabId === 'TfSettings') ? 'none' : 'inline-block';
 
-      const taId = 'editor-' + tabId;
-      if (window.cmEditors[taId]) {
-          setTimeout(() => window.cmEditors[taId].refresh(), 50);
-      }
-  };
+  const taId = 'editor-' + tabId;
+  if (window.cmEditors[taId]) {
+    setTimeout(() => window.cmEditors[taId].refresh(), 50);
+  }
+      
+  // --- NEW: Remember the actively clicked tab! ---
+  if (window.currentEditLab) {
+    localStorage.setItem('tf_active_tab_' + window.currentEditLab, tabId);
+  }
+};
 
   window.addTerraformFileTab = function(filepath, content = "") {
       const tabId = 'tf-tab-' + filepath.replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -428,6 +440,9 @@
 
   window.openTerraformEditor = async function(labName) {
       window.currentEditLab = labName;
+      // --- READ MEMORY FIRST! Before any clicks overwrite it! ---
+      const savedActiveTab = localStorage.getItem('tf_active_tab_' + window.currentEditLab);
+
       const resultDiv = document.getElementById('terraform-editor-result');
       if (resultDiv) resultDiv.style.display = 'none';
 
@@ -444,6 +459,15 @@
           document.getElementById('edit-terraform-workdir').value = tf.work_dir || '';
           document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
           document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
+
+          // --- LOAD VAULT FIELDS INTO UI ---
+          if (tf.vault) {
+              document.getElementById('edit-terraform-vault-project').value = tf.vault.project || '';
+              document.getElementById('edit-terraform-vault-roleset').value = tf.vault.roleset || '';
+          } else {
+              document.getElementById('edit-terraform-vault-project').value = '';
+              document.getElementById('edit-terraform-vault-roleset').value = '';
+          }
           
           document.getElementById('terraform-editor-modal').style.display = 'block';
 
@@ -455,7 +479,7 @@
               e.remove();
           });
 
-          // 🔥 RESTORE TABS FROM MEMORY 🔥
+         // 🔥 RESTORE TABS FROM MEMORY 🔥
           const savedTabsStr = localStorage.getItem('terraform_tabs_' + window.currentEditLab);
           let savedTabs = savedTabsStr ? JSON.parse(savedTabsStr) : null;
 
@@ -463,9 +487,14 @@
               for (const filepath of savedTabs) {
                   await window.fetchTerraformFile(filepath);
               }
-              const fileTabs = document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)');
-              if (fileTabs.length > 0) {
-                  fileTabs[fileTabs.length - 1].click();
+              
+              if (savedActiveTab && document.getElementById(savedActiveTab)) {
+                  window.openTfTab(savedActiveTab);
+              } else {
+                  const fileTabs = document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)');
+                  if (fileTabs.length > 0) {
+                      fileTabs[fileTabs.length - 1].click();
+                  }
               }
           } else if (tf.work_dir && tf.work_dir.trim() !== '') {
               window.loadTerraformFiles();
@@ -539,7 +568,6 @@
           work_dir: workDir,
           workspace: document.getElementById('edit-terraform-workspace').value,
           vars: document.getElementById('edit-terraform-vars').value,
-          // Append the Vault fields to the payload!
           vault_project: vProject,
           vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '', 
           tf_files: JSON.stringify(filesData)

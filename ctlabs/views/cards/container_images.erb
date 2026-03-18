@@ -5,6 +5,14 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  /* Custom Slim Dark Scrollbar specifically for the Container Images Table */
+  .container-images-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .container-images-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .container-images-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .container-images-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+</style>
+
 <div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-box w3-text-orange"></i> Container Images</span>
@@ -12,7 +20,7 @@
   </div>
 
   <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
-    <input type="text" id="image-filter-input" onkeyup="window.filterContainerImages()" placeholder="🔍 Filter by name, category, OS, or version..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
+    <input type="text" id="image-filter-input" onkeyup="window.filterContainerImages()" placeholder=" Filter by name, category, OS, or version..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
   <% 
@@ -76,7 +84,7 @@
     container_images.sort_by! { |img| [img[:imported] ? 1 : 0, img[:path]] }
   %>
   
-  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
+  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="container-images-scroll">
     <% if container_images.empty? %>
       <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No images detected.</p></div>
     <% else %>

@@ -80,38 +80,6 @@ window.initCodeEditor = function(textAreaId, langMode) {
     return editor;
 };
 
-// --- CODEMIRROR RAW IMAGE EDITOR ---
-window.openBuildModal = async function(imageEnc) {
-    const decodedImg = decodeURIComponent(imageEnc);
-    document.getElementById('build-img-name').textContent       = decodedImg;
-    document.getElementById('build-img-ref').value              = decodedImg;
-    document.getElementById('build-img-version').value          = "Loading...";
-    document.getElementById('build-image-result').style.display = 'none';
-    document.getElementById('build-dockerfile').value           = "Loading...";
-    document.getElementById('build-image-modal').style.display  = 'block';
-    try {
-        const res = await fetch(`/images/dockerfile?image=${encodeURIComponent(decodedImg)}`);
-        let data;
-        try { data = await res.json(); } 
-        catch (e) { throw new Error("Backend did not return valid JSON. Dockerfile missing?"); }
-        if (res.ok) {
-            document.getElementById('build-dockerfile').value  = data.dockerfile;
-            document.getElementById('build-img-version').value = data.version || "latest";
-            
-            // --- UNIVERSAL CODEMIRROR INJECTION ---
-            const editor = window.initCodeEditor('build-dockerfile', 'dockerfile');
-            editor.setValue(data.dockerfile);
-        } else {
-            const errText = `# Error: ${data.error}`;
-            document.getElementById('build-dockerfile').value = errText;
-            if (window.cmEditors['build-dockerfile']) window.cmEditors['build-dockerfile'].setValue(errText);
-        }
-    } catch (err) {
-        const errText = `# Fetch Error:\n# ${err.message}`;
-        document.getElementById('build-dockerfile').value = errText;
-        if (window.cmEditors['build-dockerfile']) window.cmEditors['build-dockerfile'].setValue(errText);
-    }
-};
 
 // --- PERFECT LAYOUT RESIZER ---
 window.autoResizeLayout = function() {

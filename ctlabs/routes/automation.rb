@@ -176,23 +176,42 @@ end
 # ===================================================
 TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
+# get '/labs/*/terraform/config' do
+#   content_type :json
+#   lab_name = params[:splat].first
+#   lab_path = get_lab_file_path(lab_name)
+# 
+#   begin
+#     lab = Lab.new(cfg: lab_path, log: LabLog.null)
+#     ctrl = lab.find_node('ansible') || lab.nodes.find { |n| n.type == 'controller' }
+#     raise "No controller node found in topology" unless ctrl
+#     
+#     { json: { tf: ctrl.terraform || {} } }.to_json
+#   rescue => e
+#     status 400
+#     { error: e.message }.to_json
+#   end
+# end
+
 get '/labs/*/terraform/config' do
   content_type :json
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
 
   begin
-    lab = Lab.new(cfg: lab_path, log: LabLog.null)
-    ctrl = lab.find_node('ansible') || lab.nodes.find { |n| n.type == 'controller' }
-    raise "No controller node found in topology" unless ctrl
+    # Bypass memory and read directly from YAML to preserve the vault block!
+    full_yaml = YAML.load_file(lab_path)
+    nodes = full_yaml['topology'][0]['nodes'] || {}
+    ctrl_node = nodes.values.find { |n| n['type'] == 'controller' } || nodes['ansible'] || {}
+    tf_cfg = ctrl_node['terraform'] || {}
     
-    { json: { tf: ctrl.terraform || {} } }.to_json
+    { json: { tf: tf_cfg } }.to_json
   rescue => e
     status 400
     { error: e.message }.to_json
   end
 end
-
+ 
 # Recursive Tree for Terraform
 get '/labs/*/terraform/tree' do
   content_type :json
@@ -261,6 +280,64 @@ get '/labs/*/terraform/files' do
   end
 end
 
+#post '/labs/*/terraform/edit' do
+#  lab_name = params[:splat].first
+#  lab_path = get_lab_file_path(lab_name)
+#
+#  begin
+#    full_yaml = YAML.load_file(lab_path)
+#    controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' || k == 'ansible' }
+#    
+#    base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
+#    tf_cfg = base_data['terraform'] || {}
+#    
+#    params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
+#    params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
+#    
+#    # Safely parse Variables
+#    vars_str = params[:vars].to_s.strip
+#    if vars_str.empty?
+#      tf_cfg.delete('vars')
+#    else
+#      tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
+#    end
+#
+#    # --- NEW: PARSE VAULT CONFIG ---
+#    v_project = params[:vault_project].to_s.strip
+#    v_roleset = params[:vault_roleset].to_s.strip
+#    
+#    if v_project.empty?
+#      tf_cfg.delete('vault')
+#    else
+#      tf_cfg['vault'] = {
+#        'project' => v_project,
+#        'roleset' => v_roleset.empty? ? 'terraform-runner' : v_roleset
+#      }
+#    end
+#
+#    base_data['terraform'] = tf_cfg
+#    full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
+#    write_formatted_yaml(lab_path, full_yaml)
+#
+#    tf_files = JSON.parse(params[:tf_files] || '{}')
+#    tf_files.each do |filepath, content|
+#      next if filepath.include?('..') || filepath.start_with?('/') 
+#      full_path = File.join(TF_BASE_DIR, filepath)
+#      FileUtils.mkdir_p(File.dirname(full_path))
+#      File.write(full_path, content)
+#    end
+#
+#    content_type :json
+#    { success: true, message: "Configuration and all files saved successfully." }.to_json
+#  
+#  # Catch ALL exceptions to guarantee JSON response
+#  rescue Exception => e
+#    status 400
+#    content_type :json
+#    { success: false, error: "Backend error: #{e.message}" }.to_json
+#  end
+#end
+
 post '/labs/*/terraform/edit' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -275,7 +352,6 @@ post '/labs/*/terraform/edit' do
     params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
     params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
     
-    # Safely parse Variables
     vars_str = params[:vars].to_s.strip
     if vars_str.empty?
       tf_cfg.delete('vars')
@@ -310,8 +386,6 @@ post '/labs/*/terraform/edit' do
 
     content_type :json
     { success: true, message: "Configuration and all files saved successfully." }.to_json
-  
-  # Catch ALL exceptions to guarantee JSON response
   rescue Exception => e
     status 400
     content_type :json

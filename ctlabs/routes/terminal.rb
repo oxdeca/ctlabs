@@ -17,7 +17,10 @@ get '/terminal/:node_name' do
     node_name = params[:node_name]
     
     if node_name == 'ctlabs_host'
-      cmd = ['env', 'TERM=linux', 'bash']
+      cmd = ['env', 'TERM=linux']
+      cmd.push("VAULT_TOKEN=#{session[:vault_token]}") if session[:vault_token]
+      cmd.push("VAULT_ADDR=#{session[:vault_addr]}") if session[:vault_addr]
+      cmd.push('bash')
     else
       # 1. Smart Lookup: Check the active lab YAML for custom terminal configurations
       custom_term = nil
@@ -48,9 +51,18 @@ get '/terminal/:node_name' do
         user = uri.user || 'root'
         host = uri.host
         cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', "#{user}@#{host}"]
+        # Note: SSH strips custom env vars by default, so Vault vars won't easily pass through SSH here.
       else
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-        cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color', node_name, 'bash']
+        cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color']
+        
+        ## --- NEW: INJECT VAULT CREDENTIALS ---
+        #if session[:vault_token] && session[:vault_addr] && node_cfg['type'] == 'controller'
+        #  cmd.push('-e', "VAULT_TOKEN=#{session[:vault_token]}")
+        #  cmd.push('-e', "VAULT_ADDR=#{session[:vault_addr]}")
+        #end
+        
+        cmd.push(node_name, 'bash')
       end
     end
     

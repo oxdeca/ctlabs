@@ -6,60 +6,84 @@
 -->
 
 <div id="vault-login-modal" class="w3-modal" style="z-index: 9999;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 450px;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
     
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('vault-login-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-      <h4 style="margin: 0;"><i class="fas fa-lock w3-text-green"></i> HashiCorp Vault Login</h4>
+      <h4 style="margin: 0;"><i class="fas fa-lock w3-text-green"></i> HashiCorp Vault</h4>
     </header>
     
-    <form id="vault-login-form" onsubmit="window.submitVaultLogin(event)">
-      <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
-        
-        <div class="w3-margin-bottom">
-          <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-server"></i> Vault Server Address</label>
-          <input type="url" id="vault-addr" name="addr" placeholder="https://vault.domain.com" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-id-badge"></i> Authentication Method</label>
-          <select id="vault-method" name="method" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.toggleVaultAuthFields(this.value)" required>
-            <option value="userpass" selected>Username & Password (Userpass)</option>
-            <option value="ldap">LDAP / Active Directory</option>
-            <option value="approle">Machine AppRole</option>
-          </select>
-        </div>
-        
-        <div id="vault-human-fields">
-          <div class="w3-margin-bottom">
-            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user"></i> Username</label>
-            <input type="text" id="vault-username" name="username" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-          </div>
-          <div class="w3-margin-bottom">
-            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-key"></i> Password</label>
-            <input type="password" id="vault-password" name="password" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-          </div>
-        </div>
-
-        <div id="vault-machine-fields" style="display: none;">
-          <div class="w3-margin-bottom">
-            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-robot"></i> Role ID</label>
-            <input type="text" id="vault-role-id" name="role_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-          </div>
-          <div class="w3-margin-bottom">
-            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user-secret"></i> Secret ID</label>
-            <input type="password" id="vault-secret-id" name="secret_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-          </div>
-        </div>
-
-        <div id="vault-login-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+    <div id="vault-auth-state" class="w3-container w3-padding w3-center" style="display: none; margin: 30px 0;">
+      <i class="fas fa-check-circle w3-text-green" style="font-size: 3em; margin-bottom: 15px;"></i>
+      <h4 style="margin: 0;">Authenticated</h4>
+      
+      <div id="vault-session-info" class="w3-panel w3-round" style="background-color: #0f172a; text-align: left; padding: 12px; margin-top: 15px; border: 1px solid #334155; font-size: 0.9em; min-height: 100px;">
+        <div style="color: #94a3b8; text-align: center; margin-top: 25px;"><i class="fas fa-spinner fa-spin"></i> Fetching session info...</div>
       </div>
       
-      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-        <button type="button" onclick="document.getElementById('vault-login-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-        <button type="submit" id="vault-login-btn" class="w3-button w3-green w3-round w3-small"><i class="fas fa-sign-in-alt"></i> Authenticate</button>
-      </footer>
-    </form>
-    
+      <button onclick="window.submitVaultLogout();" class="w3-button w3-red w3-round w3-margin-top">
+        <i class="fas fa-sign-out-alt"></i> Disconnect / Logout
+      </button>
+    </div>
+
+    <div id="vault-login-state" style="display: none;">
+      <form id="vault-login-form" onsubmit="event.preventDefault(); window.handleVaultSubmit(event);">
+        <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
+          
+          <div class="w3-margin-bottom">
+            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-server"></i> Vault Server Address</label>
+            <input type="url" id="vault-addr" name="addr" placeholder="https://vault.domain.com" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" required>
+          </div>
+
+          <div class="w3-margin-bottom">
+            <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-id-badge"></i> Authentication Method</label>
+            <select id="vault-method" name="method" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" onchange="window.toggleVaultAuthFields(this.value)" required>
+              <option value="userpass" selected>Username & Password (Userpass)</option>
+              <option value="ldap">LDAP / Active Directory</option>
+              <option value="approle">Machine AppRole</option>
+            </select>
+          </div>
+          
+          <div id="vault-human-fields">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user"></i> Username</label>
+              <input type="text" id="vault-username" name="username" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-key"></i> Password</label>
+              <input type="password" id="vault-password" name="password" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <div id="vault-machine-fields" style="display: none;">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-robot"></i> Role ID</label>
+              <input type="text" id="vault-role-id" name="role_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user-secret"></i> Secret ID</label>
+              <input type="password" id="vault-secret-id" name="secret_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <div id="vault-login-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+        </div>
+        
+        <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+          <button type="button" onclick="document.getElementById('vault-login-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+          <button type="submit" id="vault-login-btn" class="w3-button w3-green w3-round w3-small"><i class="fas fa-sign-in-alt"></i> Authenticate</button>
+        </footer>
+      </form>
+    </div>
+
   </div>
 </div>
+
+<script>
+  window.handleVaultSubmit = function(e) {
+    localStorage.setItem('ctlabs_vault_addr', document.getElementById('vault-addr').value);
+    if (typeof window.submitVaultLogin === 'function') {
+        window.submitVaultLogin(e);
+    }
+  };
+</script>

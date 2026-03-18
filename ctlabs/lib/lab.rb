@@ -768,6 +768,8 @@ class Lab
     v_roleset = vault_cfg['roleset'].to_s.strip
     v_roleset = 'terraform-runner' if v_roleset.empty?
 
+    exec_env = ""
+
     if !v_project.empty?
       # Fail fast if the web session doesn't have a token!
       if web_v_token.nil? || web_v_token.empty?
@@ -776,23 +778,28 @@ class Lab
         raise "Missing Vault Token for GCP Authentication."
       end
       
-      # Wrap the TF workflow inside the Python CLI tool in the container
-      vault_bin = "vault-gcp"
-      tf_command = "#{vault_bin} exec #{v_project} #{v_roleset} -- bash -c \"#{base_tf_cmd.gsub('"', '\"')}\""
-    else
-      tf_command = base_tf_cmd
+      # --- THE NEW ARCHITECTURE: Fetch GCP token in Ruby! ---
+      begin
+        gcp_token = VaultAuth.get_gcp_token(web_v_addr, web_v_token, v_project, v_roleset)
+        
+        # Inject the raw Google Token directly into Terraform's environment
+        exec_env += "-e GOOGLE_OAUTH_ACCESS_TOKEN='#{gcp_token}' "
+        exec_env += "-e CLOUDSDK_AUTH_ACCESS_TOKEN='#{gcp_token}' " # For good measure
+      rescue => e
+        error_msg = "\n❌ ERROR: Could not generate GCP credentials from Vault: #{e.message}\n"
+        File.open(log_path, 'a') { |f| f.puts error_msg } if log_path
+        raise e
+      end
     end
+
+    # No more Python wrappers! Just pure Terraform.
+    tf_command = base_tf_cmd
 
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     
-    # Inject the session credentials straight into the container environment!
-    exec_env = ""
-    exec_env += "-e VAULT_ADDR='#{web_v_addr}' " if web_v_addr && !web_v_addr.empty?
-    exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
+    full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 
-    full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command}'"
-
-    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}"
+    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}" 
 
     # 4. Stream the output
     if log_path

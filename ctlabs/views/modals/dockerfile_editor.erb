@@ -1,0 +1,89 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/dockerfile_editor.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<style>
+  /* Custom Slim Scrollbar for Modal & CodeMirror */
+  .slim-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .slim-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  
+  .CodeMirror-vscrollbar::-webkit-scrollbar, .CodeMirror-hscrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-track, .CodeMirror-hscrollbar::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb, .CodeMirror-hscrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover, .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  .CodeMirror-scrollbar-filler { background-color: #0f172a !important; border: none; }
+</style>
+
+<div id="build-image-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column;">
+    
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
+      <span onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-hammer w3-text-orange"></i> Edit Image Context: <span id="build-img-name" style="color: #38bdf8;"></span></h4>
+    </header>
+
+    <div class="w3-bar slim-scroll" id="build-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
+      <button class="w3-bar-item w3-button build-tablink w3-text-blue" data-target-tab="BuildSettings" onclick="window.openBuildTab('BuildSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
+      
+      <button class="w3-bar-item w3-button build-tablink" data-target-tab="BuildFile-Dockerfile" onclick="window.openBuildTab('BuildFile-Dockerfile')" style="flex-shrink: 0; display: flex; align-items: center; gap: 8px;">
+        <i class="fab fa-docker w3-text-blue"></i> Dockerfile
+      </button>
+      
+      <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openBuildFileBrowser()" title="Browse Build Context" style="flex-shrink: 0;"><i class="fas fa-plus"></i></button>
+    </div>
+
+    <div class="w3-container w3-padding slim-scroll" id="build-editors-container" style="flex: 1; overflow-y: auto; min-height: 400px;">
+      
+      <div id="BuildSettings" class="build-tab">
+        <input type="hidden" id="build-img-ref">
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
+          <i class="fas fa-info-circle"></i> Use the <b>+</b> button in the tab bar to add configuration files and scripts to this image's build context.
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+          <label style="font-size: 0.85em; color: #94a3b8; font-weight: bold;"><i class="fas fa-tag"></i> Image Version / Tag:</label>
+          <input type="text" id="build-img-version" class="w3-input w3-small w3-round" style="width: 150px; background-color: #0f172a; color: #10b981; border: 1px solid #475569; font-family: monospace; font-weight: bold;">
+        </div>
+      </div>
+
+      <div id="BuildFile-Dockerfile" class="build-tab" style="display: none; height: 100%;">
+        <textarea id="editor-BuildFile-Dockerfile"></textarea>
+      </div>
+
+      <div id="build-image-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
+    </div>
+    
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+      <div>
+        <button type="button" id="build-delete-file-btn" onclick="window.deleteActiveBuildFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
+      </div>
+      <div>
+        <button type="button" onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+        <button type="button" onclick="window.saveDockerConfig()" class="w3-button w3-blue w3-round w3-small" style="margin-right: 8px;"><i class="fas fa-save"></i> Save Context</button>
+        <button type="button" onclick="window.triggerImageBuild(event)" class="w3-button w3-orange w3-round w3-small"><i class="fas fa-hammer"></i> Build Image</button>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<div id="build-file-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 15vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('build-file-browser-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-folder-open"></i> Open / Create Context File</h4>
+    </header>
+    <div class="w3-container w3-padding">
+      <label style="font-size: 0.85em; color: #94a3b8;">Path relative to Dockerfile (e.g. scripts/entrypoint.sh)</label>
+      <input type="text" id="build-file-browser-input" list="build-files-datalist" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; margin-top: 8px;" placeholder="Double-click to browse files...">
+      <datalist id="build-files-datalist"></datalist>
+    </div>
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button onclick="document.getElementById('build-file-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button onclick="window.confirmBuildFileBrowser()" class="w3-button w3-blue w3-round w3-small">Open File</button>
+    </footer>
+  </div>
+</div>
