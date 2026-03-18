@@ -24,19 +24,19 @@ get '/terminal/:node_name' do
     else
       # 1. Smart Lookup: Check the active lab YAML for custom terminal configurations
       custom_term = nil
+      node_cfg = {}
+
       if Lab.running?
         runtime_path = File.join(LOCK_DIR, "#{Lab.current_name.gsub('/', '_')}.yml")
         if File.file?(runtime_path)
           begin
             yaml = YAML.load_file(runtime_path)
-            node_cfg = yaml.dig('topology', 0, 'nodes', node_name)
+            node_cfg = yaml.dig('topology', 0, 'nodes', node_name) || {}
             
-            if node_cfg
-              custom_term = node_cfg['term']
+            if custom_term = node_cfg['term']
               # Fallback for external nodes that might just have an ipv4 defined
-              if (!custom_term || custom_term.empty?) && node_cfg['type'] == 'external' && node_cfg['ipv4']
+            elsif (!custom_term || custom_term.empty?) && node_cfg['type'] == 'external' && node_cfg['ipv4']
                 custom_term = "ssh://root@#{node_cfg['ipv4'].split('/').first}"
-              end
             end
           rescue
             # Safely ignore YAML parsing errors and fallback to Docker
@@ -56,12 +56,30 @@ get '/terminal/:node_name' do
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
         cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color']
         
-        ## --- NEW: INJECT VAULT CREDENTIALS ---
-        #if session[:vault_token] && session[:vault_addr] && node_cfg['type'] == 'controller'
-        #  cmd.push('-e', "VAULT_TOKEN=#{session[:vault_token]}")
-        #  cmd.push('-e', "VAULT_ADDR=#{session[:vault_addr]}")
-        #end
-        
+        if session[:vault_token] && session[:vault_addr] && node_cfg['type'] == 'controller'
+          
+          # 1. Always inject the base Vault credentials
+          #cmd.push('-e', "VAULT_TOKEN=#{session[:vault_token]}")
+          #cmd.push('-e', "VAULT_ADDR=#{session[:vault_addr]}")
+          #cmd.push('-e', "VAULT_SKIP_VERIFY=true")
+
+          # 2. Inject GCP credentials if configured
+          v_project = node_cfg.dig('terraform', 'vault', 'project').to_s.strip
+          v_roleset = node_cfg.dig('terraform', 'vault', 'roleset').to_s.strip
+          v_roleset = 'terraform-runner' if v_roleset.empty?
+
+          if !v_project.empty?
+            begin
+              gcp_token = VaultAuth.get_gcp_token(session[:vault_addr], session[:vault_token], v_project, v_roleset)
+              if gcp_token
+                cmd.push('-e', "GOOGLE_OAUTH_ACCESS_TOKEN=#{gcp_token}")
+                cmd.push('-e', "CLOUDSDK_AUTH_ACCESS_TOKEN=#{gcp_token}")
+              end
+            rescue => e
+              puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
+            end
+          end
+        end
         cmd.push(node_name, 'bash')
       end
     end
