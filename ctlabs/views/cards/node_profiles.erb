@@ -5,6 +5,13 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  /* Custom Slim Dark Scrollbar specifically for the Container Images Table */
+  .profile-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .profile-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .profile-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .profile-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+</style>
 <%
   unless @local_built_images
     @local_built_images = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
@@ -29,7 +36,7 @@
     <input type="text" id="profile-filter-input" onkeyup="window.filterNodeProfiles()" placeholder=" Filter profiles by name, type, or image..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
-  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="docker-scroll">
+  <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="profile-scroll">
     <% if (info_hash[:images] || []).empty? %>
       <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No node profiles defined</p></div>
     <% else %>

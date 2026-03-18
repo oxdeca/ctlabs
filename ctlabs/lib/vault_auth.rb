@@ -110,14 +110,15 @@ class VaultAuth
       if response.is_a?(Net::HTTPSuccess) && data['data']
         gcp_token = data['data']['token_oauth2_secret'] || data['data']['token']
         
-        # 2. Extract Vault's exact TTL (usually 3600 seconds for GCP tokens)
-        raw_ttl = data['lease_duration'] || data.dig('data', 'token_ttl') || 3600
+        # 2. Extract Vault's exact TTL safely, ignoring 0s!
+        # Vault returns lease_duration: 0 for OAuth tokens, so we MUST check token_ttl instead.
+        ttls = [data['lease_duration'], data.dig('data', 'token_ttl')].map(&:to_i).reject { |v| v == 0 }
+        raw_ttl = ttls.first || 3600
         
         # 3. Subtract 60 seconds as a safety buffer so we don't use dying tokens
-        safe_ttl = [raw_ttl.to_i - 60, 60].max
+        safe_ttl = [raw_ttl - 60, 60].max
         
         # 4. Save to the cache
-        # 4. Save to the cache (Now tracking the metadata!)
         @gcp_cache[cache_key] = {
           token: gcp_token,
           expires_at: Time.now.to_i + safe_ttl,
