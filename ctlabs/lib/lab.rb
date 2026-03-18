@@ -736,9 +736,7 @@ class Lab
     end
   end
 
-  # The main execution block
-  # Notice we added web_v_token and web_v_addr to the arguments!
-  def run_terraform(target_node_name = nil, log_path = nil, web_v_token = nil, web_v_addr = nil)
+  def run_terraform(target_node_name = nil, log_path = nil, web_v_token = nil, web_v_addr = nil, action = 'apply')
     @log.write "#{__method__}(): target=#{target_node_name.inspect}", "debug"
 
     ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
@@ -757,12 +755,33 @@ class Lab
     tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
     work_dir = "/root/ctlabs-terraform/#{tf_work_dir}"
     
-    base_tf_cmd = <<~CMD.gsub("\n", " ").strip
-      cd #{work_dir} && 
-      (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
-      terraform init -upgrade && 
-      terraform apply -auto-approve #{var_args}
-    CMD
+    custom_script = tf_cfg['commands'].to_s.strip
+
+    # --- NEW: Smart Execution Router ---
+    if action == 'destroy'
+      # 1. DESTROY ALWAYS WINS (Ignores custom scripts)
+      base_tf_cmd = <<~CMD.gsub("\n", " ").strip
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+        terraform init -upgrade && 
+        terraform destroy -auto-approve #{var_args}
+      CMD
+    elsif !custom_script.empty?
+      # 2. CUSTOM SCRIPT (Only runs if action is apply)
+      base_tf_cmd = <<~CMD.strip
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+        #{custom_script}
+      CMD
+    else
+      # 3. STANDARD APPLY
+      base_tf_cmd = <<~CMD.gsub("\n", " ").strip
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+        terraform init -upgrade && 
+        terraform apply -auto-approve #{var_args}
+      CMD
+    end
 
     v_project = vault_cfg['project'].to_s.strip
     v_roleset = vault_cfg['roleset'].to_s.strip

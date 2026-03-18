@@ -50,6 +50,7 @@
 
     <div class="w3-bar slim-scroll" id="tf-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
       <button class="w3-bar-item w3-button tf-tablink w3-text-blue" data-target-tab="TfSettings" onclick="window.openTfTab('TfSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
+      <button class="w3-bar-item w3-button tf-tablink w3-text-purple" data-target-tab="TfCommands" onclick="window.openTfTab('TfCommands')" style="flex-shrink: 0;"><i class="fas fa-terminal"></i> Execution Script</button>
       <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('terraform')" title="Browse Workspace" style="flex-shrink: 0;"><i class="fas fa-plus"></i></button>
     </div>
 
@@ -83,9 +84,20 @@
           </div>
         </div>
 
-        <div class="w3-margin-bottom">
-          <label style="font-size: 0.85em; color: #94a3b8;">Variables (One per line: key=value)</label>
-          <textarea id="edit-terraform-vars" class="w3-input w3-small w3-round slim-scroll" rows="4" placeholder="project_id=my-gcp-project&#10;region=us-central1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;"></textarea>
+        <div class="w3-row-padding" style="margin: 0 -8px;">
+          <div class="w3-margin-bottom">
+            <label style="font-size: 0.85em; color: #94a3b8;">Variables (One per line: key=value)</label>
+            <textarea id="edit-terraform-vars" class="w3-input w3-small w3-round slim-scroll" rows="6" placeholder="project_id=my-gcp-project&#10;region=us-central1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div id="TfCommands" class="tf-tab" style="display:none; height:100%; flex-direction:column;">
+        <div class="w3-padding w3-small" style="background-color: #0f172a; border-bottom: 1px solid #334155; color: #94a3b8; flex-shrink: 0;">
+          <i class="fas fa-info-circle"></i> Enter custom shell commands to override the standard <code>terraform init && terraform apply</code> workflow. Leave blank to use the default execution.
+        </div>
+        <div style="flex-grow: 1; height: 100%;">
+          <textarea id="edit-terraform-commands"></textarea>
         </div>
       </div>
 

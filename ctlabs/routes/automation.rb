@@ -359,6 +359,15 @@ post '/labs/*/terraform/edit' do
       tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
     end
 
+    # --- NEW: PARSE COMMANDS (EXECUTION SCRIPT) ---
+    commands_str = params[:commands].to_s.strip
+    if commands_str.empty?
+      tf_cfg.delete('commands')
+    else
+      # We use literal strings or multi-line blocks in YAML so it preserves the bash formatting
+      tf_cfg['commands'] = commands_str 
+    end
+
     # --- NEW: PARSE VAULT CONFIG ---
     v_project = params[:vault_project].to_s.strip
     v_roleset = params[:vault_roleset].to_s.strip
@@ -411,6 +420,8 @@ end
 
 post '/labs/*/terraform' do
   lab_name = params[:splat].first
+  action   = params[:action] || 'apply'
+
   halt 400, { error: "No lab is running" }.to_json unless get_running_lab == lab_name
   halt 400, { error: "Terraform already running!" }.to_json if Lab.terraform_running?(lab_name) rescue false
 
@@ -422,8 +433,9 @@ post '/labs/*/terraform' do
       lab_instance.run_terraform(
         params[:node_name], 
         log_path, 
-        session[:vault_token], # <-- Pass the web session token
-        session[:vault_addr]   # <-- Pass the web session address
+        session[:vault_token],
+        session[:vault_addr],
+        action
       )
     rescue => e
       File.open(log_path, 'a') { |f| f.puts "\n⚠️ Terraform failed: #{e.message}\n" }

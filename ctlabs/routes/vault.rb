@@ -32,13 +32,6 @@ post '/api/vault/login' do
   end
 end
 
-post '/api/vault/logout' do
-  session.delete(:vault_token)
-  session.delete(:vault_addr)
-  content_type :json
-  { success: true, message: "Logged out of Vault successfully." }.to_json
-end
-
 # Fetch active Vault Session Info
 get '/vault/info' do
   content_type :json
@@ -81,10 +74,29 @@ get '/vault/info' do
   end
 end
 
+post '/api/vault/logout' do
+  content_type :json
+  
+  # Safely try to wipe the GCP cache, but never crash the route if it fails
+  VaultAuth.clear_gcp_cache(session[:vault_addr]) rescue nil
+
+  session.delete(:vault_token)
+  session.delete(:vault_addr)
+  session.delete(:vault_expires)
+  
+  { success: true, message: "Successfully logged out." }.to_json
+end
+
 # Secure Logout
 post '/vault/logout' do
   content_type :json
+  
+  # Safely try to wipe the GCP cache, but never crash the route if it fails
+  VaultAuth.clear_gcp_cache(session[:vault_addr]) rescue nil
+
   session.delete(:vault_token)
   session.delete(:vault_addr)
+  session.delete(:vault_expires)
+  
   { success: true }.to_json
 end

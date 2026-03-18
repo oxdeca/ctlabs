@@ -13,7 +13,7 @@ window.openVaultLoginModal = async function() {
 
     try {
         const savedAddr = localStorage.getItem('ctlabs_vault_addr') || '';
-        const res = await fetch(`/vault/info?addr=${encodeURIComponent(savedAddr)}`);
+        const res = await fetch(`/vault/info?addr=${encodeURIComponent(savedAddr)}&t=${Date.now()}`);
         const data = await res.json();
 
         if (res.ok && data.success && data.info) {

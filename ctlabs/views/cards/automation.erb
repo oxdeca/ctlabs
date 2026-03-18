@@ -1,10 +1,3 @@
-<!--
-# -----------------------------------------------------------------------------
-# File        : ctlabs/views/cards/automation.erb
-# License     : MIT License
-# -----------------------------------------------------------------------------
--->
-
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-code-branch"></i> Ansible</span>
@@ -33,10 +26,16 @@
     <span><i class="fas fa-cubes"></i> Terraform</span>
     <div>
       <button type="button" onclick="window.openTerraformEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      
       <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] %>
         <% tf_running = Lab.terraform_running?(info_hash[:lab_path]) rescue false %>
+        
+        <button type="button" onclick="window.destroyTerraform(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-red w3-hover-dark-red" style="padding: 2px 8px; margin-right: 4px;" <%= tf_running ? 'disabled' : '' %> title="Destroy Terraform Resources">
+          <i class="fas fa-trash-alt"></i> Destroy
+        </button>
+
         <button type="button" onclick="window.runTerraform(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= tf_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= tf_running ? 'disabled' : '' %>>
-          <i class="fas <%= tf_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= tf_running ? 'Running...' : 'Apply Terraform' %>
+          <i class="fas <%= tf_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= tf_running ? 'Running...' : 'Run Terraform' %>
         </button>
       <% end %>
     </div>
@@ -44,7 +43,6 @@
   <div class="w3-padding w3-small">
     <% 
       # --- BULLETPROOF YAML SYNCHRONIZATION FOR TERRAFORM ---
-      # Bypass the stale memory state and read straight from the YAML!
       lab_name = info_hash[:lab_path].to_s
       
       possible_paths = [
@@ -67,12 +65,14 @@
         end
       end
       
-      # Fallback to memory state just in case YAML parsing failed
       tf_cfg = info_hash[:terraform] if tf_cfg.empty? && info_hash[:terraform]
       
       work_dir  = tf_cfg['work_dir'] || tf_cfg[:work_dir]
       workspace = tf_cfg['workspace'] || tf_cfg[:workspace]
       vars      = tf_cfg['vars'] || tf_cfg[:vars] || []
+      
+      # Extract commands string safely
+      commands  = tf_cfg['commands'] || tf_cfg[:commands] || ''
       
       vault_cfg = tf_cfg['vault'] || tf_cfg[:vault] || {}
       v_project = vault_cfg['project'] || vault_cfg[:project]
@@ -89,6 +89,14 @@
           <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v_project %> : <%= v_roleset %></code>
         <% else %>
           <span style="color: #64748b; font-style: italic;">Disabled (Using Local Config)</span>
+        <% end %>
+      </td></tr>
+
+      <tr><td style="color: #94a3b8;">Execution:</td><td>
+        <% if commands.strip.empty? %>
+          <span style="color: #64748b; font-style: italic;">Standard (init & apply)</span>
+        <% else %>
+          <span class="w3-badge w3-tiny w3-round w3-blue" style="margin-right: 4px;"><i class="fas fa-terminal"></i> Custom Script Active</span>
         <% end %>
       </td></tr>
 

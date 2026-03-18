@@ -167,4 +167,11 @@ class VaultAuth
       return { "error" => "Network/Ruby error: #{e.class} - #{e.message}" }
     end
   end
+
+  # Safely wipe GCP tokens from memory for a specific Vault address
+  def self.clear_gcp_cache(addr)
+    @gcp_cache ||= {}
+    # Reject/delete any cache entries that belong to this server address
+    @gcp_cache.reject! { |key, data| data[:addr] == addr }
+  end
 end

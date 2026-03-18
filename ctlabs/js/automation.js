@@ -358,36 +358,49 @@ window.openAnsibleEditor = async function(labName) {
 // ----------------------------------------------------------------------------
 
 window.openTfTab = function(tabId) {
-  document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
+      document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
       
-  document.querySelectorAll(".tf-tablink").forEach(btn => {
-    btn.classList.remove("w3-text-blue");
-    btn.style.backgroundColor = "transparent";
-    btn.style.borderBottom = "none";
+      document.querySelectorAll(".tf-tablink").forEach(btn => {
+          btn.classList.remove("w3-text-blue", "w3-text-purple");
+          btn.style.backgroundColor = "transparent";
+          btn.style.borderBottom = "none";
           
-    if (btn.getAttribute("data-target-tab") === tabId) {
-      btn.classList.add("w3-text-blue");
-      btn.style.backgroundColor = "#1e293b";
-      btn.style.borderBottom = "2px solid #38bdf8";
-    }
-  });
+          if (btn.getAttribute("data-target-tab") === tabId) {
+              // Give the Execution Script tab a cool purple highlight, others blue
+              const highlightColor = tabId === 'TfCommands' ? 'purple' : 'blue';
+              const hexColor = tabId === 'TfCommands' ? '#a855f7' : '#38bdf8';
+              
+              btn.classList.add(`w3-text-${highlightColor}`);
+              btn.style.backgroundColor = "#1e293b";
+              btn.style.borderBottom = `2px solid ${hexColor}`;
+          }
+      });
       
-  const activeTab = document.getElementById(tabId);
-  if (activeTab) activeTab.style.display = "block";
+      const activeTab = document.getElementById(tabId);
+      if (activeTab) {
+          // FIX: Only apply flex to the Commands tab so we don't destroy the Settings layout!
+          if (tabId === 'TfCommands') {
+              activeTab.style.display = "flex";
+          } else {
+              activeTab.style.display = "block";
+          }
+      }
 
-  const deleteBtn = document.getElementById('tf-delete-file-btn');
-  if (deleteBtn) deleteBtn.style.display = (tabId === 'TfSettings') ? 'none' : 'inline-block';
+      const deleteBtn = document.getElementById('tf-delete-file-btn');
+      // Hide the delete button for both hardcoded tabs
+      if (deleteBtn) deleteBtn.style.display = (tabId === 'TfSettings' || tabId === 'TfCommands') ? 'none' : 'inline-block';
 
-  const taId = 'editor-' + tabId;
-  if (window.cmEditors[taId]) {
-    setTimeout(() => window.cmEditors[taId].refresh(), 50);
-  }
+      // Refresh the CodeMirror instance
+      const taId = (tabId === 'TfCommands') ? 'edit-terraform-commands' : 'editor-' + tabId;
+      if (window.cmEditors[taId]) {
+          setTimeout(() => window.cmEditors[taId].refresh(), 50);
+      }
       
-  // --- NEW: Remember the actively clicked tab! ---
-  if (window.currentEditLab) {
-    localStorage.setItem('tf_active_tab_' + window.currentEditLab, tabId);
-  }
+      if (window.currentEditLab) {
+          localStorage.setItem('tf_active_tab_' + window.currentEditLab, tabId);
+      }
 };
+
 
   window.addTerraformFileTab = function(filepath, content = "") {
       const tabId = 'tf-tab-' + filepath.replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -460,6 +473,12 @@ window.openTfTab = function(tabId) {
           document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
           document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
 
+          // --- NEW: Initialize CodeMirror for the Custom Script Tab ---
+          if (!window.cmEditors['edit-terraform-commands']) {
+              window.cmEditors['edit-terraform-commands'] = window.initCodeEditor('edit-terraform-commands', 'shell');
+          }
+          window.cmEditors['edit-terraform-commands'].setValue(tf.commands || '');
+
           // --- LOAD VAULT FIELDS INTO UI ---
           if (tf.vault) {
               document.getElementById('edit-terraform-vault-project').value = tf.vault.project || '';
@@ -471,8 +490,8 @@ window.openTfTab = function(tabId) {
           
           document.getElementById('terraform-editor-modal').style.display = 'block';
 
-          // Safely clear old tabs
-          document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+          // Safely clear old tabs, strictly ignoring our two permanent tabs! ---
+          document.querySelectorAll('.tf-tablink:not([data-target-tab="TfSettings"]):not([data-target-tab="TfCommands"])').forEach(e => e.remove());
           document.querySelectorAll('.tf-tab[data-filepath]').forEach(e => {
               const taId = e.querySelector('textarea')?.id;
               if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
@@ -491,7 +510,7 @@ window.openTfTab = function(tabId) {
               if (savedActiveTab && document.getElementById(savedActiveTab)) {
                   window.openTfTab(savedActiveTab);
               } else {
-                  const fileTabs = document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)');
+                  const fileTabs = document.querySelectorAll('.tf-tablink:not([data-target-tab="TfSettings"]):not([data-target-tab="TfCommands"])');
                   if (fileTabs.length > 0) {
                       fileTabs[fileTabs.length - 1].click();
                   }
@@ -518,7 +537,7 @@ window.openTfTab = function(tabId) {
           const data = await res.json();
 
           // Safely clear old tabs
-          document.querySelectorAll('.tf-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+          document.querySelectorAll('.tf-tablink:not([data-target-tab="TfSettings"]):not([data-target-tab="TfCommands"])').forEach(e => e.remove());
           document.querySelectorAll('.tf-tab[data-filepath]').forEach(e => {
               const taId = e.querySelector('textarea')?.id;
               if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
@@ -538,7 +557,7 @@ window.openTfTab = function(tabId) {
           }
           
           if (loadedCount > 0) {
-              const firstFileBtn = document.querySelectorAll('.tf-tablink')[1];
+              const firstFileBtn = document.querySelectorAll('.tf-tablink')[2];
               if (firstFileBtn) firstFileBtn.querySelector('span').click();
           }
 
@@ -561,13 +580,15 @@ window.openTfTab = function(tabId) {
       });
 
       // --- EXTRACT VAULT CONFIG ---
-      const vProject = document.getElementById('edit-terraform-vault-project').value.trim();
-      const vRoleset = document.getElementById('edit-terraform-vault-roleset').value.trim();
+      const vProject       = document.getElementById('edit-terraform-vault-project').value.trim();
+      const vRoleset       = document.getElementById('edit-terraform-vault-roleset').value.trim();
+      const customCommands = window.cmEditors['edit-terraform-commands'] ? window.cmEditors['edit-terraform-commands'].getValue() : '';
 
       const formData = new URLSearchParams({
           work_dir: workDir,
           workspace: document.getElementById('edit-terraform-workspace').value,
           vars: document.getElementById('edit-terraform-vars').value,
+          commands: customCommands, // <-- Add it to the form payload!
           vault_project: vProject,
           vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '', 
           tf_files: JSON.stringify(filesData)
@@ -665,6 +686,36 @@ window.openTfTab = function(tabId) {
               window.updateTerraformOpenTabs(); // Save state
           } else throw new Error((await res.json()).error);
       } catch (err) { alert("Failed to delete file: " + err.message); }
+  };
+
+  window.destroyTerraform = async function(event, labName) {
+      if (!confirm("⚠️ WARNING: This will destroy all Terraform resources managed by this configuration. Are you absolutely sure?")) {
+          return;
+      }
+
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Destroying...';
+      btn.classList.replace('w3-red', 'w3-grey');
+
+      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      try {
+          // We will pass an explicit 'action=destroy' flag to the backend
+          const res = await fetch(`/labs/${safeLab}/terraform?action=destroy`, { method: 'POST' });
+          if (res.ok) window.location.href = '/logs/current';
+          else {
+              const data = await res.json();
+              alert("Error: " + (data.error || 'Failed to start Terraform Destroy'));
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fas fa-trash-alt"></i> Destroy';
+              btn.classList.replace('w3-grey', 'w3-red');
+          }
+      } catch (err) {
+          alert("Error: " + err.message);
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-trash-alt"></i> Destroy';
+          btn.classList.replace('w3-grey', 'w3-red');
+      }
   };
 
   window.runTerraform = async function(event, labName) {
