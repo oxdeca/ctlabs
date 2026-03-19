@@ -314,11 +314,6 @@
       } catch(err) { alert("Failed to unload image: " + err.message); }
   };
 
-  // Add Image (Plus Icon)
-  window.openAddLocalImageModal = function() {
-      document.getElementById('add-local-image-modal').style.display = 'block';
-  };
-
   window.submitNewLocalImage = async function(e) {
       e.preventDefault();
       const formData = new FormData(e.target);

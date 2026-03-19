@@ -19,11 +19,11 @@
   .CodeMirror-scrollbar-filler { background-color: #0f172a !important; border: none; }
 </style>
 
-<div id="build-image-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
+<div id="dockerfile-editor" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column;">
     
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
-      <span onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <span onclick="document.getElementById('dockerfile-editor').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-hammer w3-text-orange"></i> Edit Image Context: <span id="build-img-name" style="color: #38bdf8;"></span></h4>
     </header>
 
@@ -62,7 +62,7 @@
         <button type="button" id="build-delete-file-btn" onclick="window.deleteActiveBuildFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
       </div>
       <div>
-        <button type="button" onclick="document.getElementById('build-image-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+        <button type="button" onclick="document.getElementById('dockerfile-editor').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
         <button type="button" onclick="window.saveDockerConfig()" class="w3-button w3-blue w3-round w3-small" style="margin-right: 8px;"><i class="fas fa-save"></i> Save Context</button>
         <button type="button" onclick="window.triggerImageBuild(event)" class="w3-button w3-orange w3-round w3-small"><i class="fas fa-hammer"></i> Build Image</button>
       </div>

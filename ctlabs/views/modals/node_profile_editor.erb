@@ -1,6 +1,6 @@
 <!--
 # -----------------------------------------------------------------------------
-# File        : ctlabs/views/modals/edit_image.erb
+# File        : ctlabs/views/modals/node_profile_editor.erb
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
@@ -21,10 +21,10 @@
   ctlabs_images = @local_built_images.select { |img| img.start_with?("ctlabs/") }.sort
 %>
 
-<div id="image-editor-modal" class="w3-modal" style="z-index: 9999;">
+<div id="node-profile-editor" class="w3-modal" style="z-index: 9999;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 450px;">
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
-      <span onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <span onclick="document.getElementById('node-profile-editor').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-box-open"></i> Add/Edit Profile</h4>
     </header>
     
@@ -79,7 +79,7 @@
     </div>
 
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
-      <button type="button" onclick="document.getElementById('image-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button type="button" onclick="document.getElementById('node-profile-editor').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
       <button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
     </footer>
   </div>

@@ -5,6 +5,11 @@
  -----------------------------------------------------------------------------
 */
 
+// Add/Import Container Image
+window.openAddLocalImageModal = function() {
+  document.getElementById('add-container-image').style.display = 'block';
+};
+
 // --- CODEMIRROR RAW IMAGE EDITOR ---
 window.openBuildModal = async function(imageEnc) {
     const decodedImg = decodeURIComponent(imageEnc);
@@ -16,7 +21,7 @@ window.openBuildModal = async function(imageEnc) {
     document.getElementById('build-img-ref').value              = decodedImg;
     document.getElementById('build-img-version').value          = "Loading...";
     document.getElementById('build-image-result').style.display = 'none';
-    document.getElementById('build-image-modal').style.display  = 'block';
+    document.getElementById('dockerfile-editor').style.display  = 'block';
 
     if (typeof window.openBuildTab === 'function') window.openBuildTab('BuildSettings');
 
@@ -292,7 +297,7 @@ window.triggerImageBuild = async function(event) {
         const res = await fetch(`/images/build`, { method: 'POST', body: formData });
         const data = await res.json();
         if (res.ok) {
-            document.getElementById('build-image-modal').style.display = 'none';
+            document.getElementById('dockerfile-editor').style.display = 'none';
             window.location.href = `/logs?file=${encodeURIComponent(data.log_path)}&lab=ImageBuilder&action=build`;
         } else throw new Error(data.error);
     } catch (err) {
