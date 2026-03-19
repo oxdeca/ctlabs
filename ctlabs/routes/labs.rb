@@ -163,58 +163,117 @@ post '/labs/new' do
   redirect '/labs' # Refresh the page to show the new lab in the dropdown
 end
 
+#post '/labs/*/save' do
+#  content_type :json
+#  lab_name = params[:splat].first
+#  
+#  begin
+#    # get_lab_file_path intelligently grabs the .lock file if the lab is running, 
+#    # or the base .yml if it is stopped.
+#    source_path = get_lab_file_path(lab_name)
+#    
+#    # We always want to OVERWRITE the base .yml file
+#    base_path = File.join(LABS_DIR, "#{lab_name.gsub('.yml', '')}.yml")
+#    
+#    # Read the current state and commit it to the base file
+#    yaml = YAML.load_file(source_path) || {}
+#    write_formatted_yaml(base_path, yaml)
+#    
+#    { success: true, message: "Lab overwritten successfully" }.to_json
+#  rescue => e
+#    status 500
+#    { success: false, error: "Backend Crash: #{e.message}" }.to_json
+#  end
+#end
+#
+#post '/labs/*/save_as' do
+#  lab_name = params[:splat].first
+#  new_lab_name = params[:new_lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/\.]/, '')
+#  new_desc = params[:new_desc].to_s.strip
+#  force_overwrite = params[:force] == 'true'
+#
+#  halt 400, { success: false, error: "New lab name is required" }.to_json if new_lab_name.empty?
+#
+#  new_lab_name += '.yml' unless new_lab_name.end_with?('.yml')
+#  new_lab_path = File.join(LABS_DIR, new_lab_name)
+#
+#  # --- FIX: Return a special EXISTS flag so the frontend can ask for permission ---
+#  if File.exist?(new_lab_path) && !force_overwrite
+#    halt 400, { success: false, error: "EXISTS" }.to_json
+#  end
+#
+#  begin
+#    source_path = get_lab_file_path(lab_name)
+#    yaml = YAML.load_file(source_path) || {}
+#
+#    base_name = File.basename(new_lab_name, '.yml')
+#    yaml['name'] = base_name
+#    yaml['desc'] = new_desc unless new_desc.empty?
+#
+#    FileUtils.mkdir_p(File.dirname(new_lab_path))
+#    write_formatted_yaml(new_lab_path, yaml)
+#
+#    { success: true, message: "Lab saved as #{new_lab_name}", new_lab: new_lab_name }.to_json
+#  rescue => e
+#    status 500
+#    { success: false, error: e.message }.to_json
+#  end
+#end
+
 post '/labs/*/save' do
   content_type :json
-  # Using splat handles the slash in 'dev/test.yml' perfectly
-  lab_path = params[:splat].first
-  
+  lab_name = params[:splat].first
+
   begin
-    # NOTE: Replace 'Lab.save_runtime_to_base' with whatever your actual Ruby method
-    # is for saving the lab state!
-    if Lab.save_runtime_to_base(lab_path) 
-      { message: "Lab saved successfully" }.to_json
-    else
-      status 500
-      { error: "Failed to save lab configuration to disk." }.to_json
-    end
+    source_path = get_lab_file_path(lab_name) # Gets the RUNNING state
+    base_path = File.join(LABS_DIR, "#{lab_name.gsub('.yml', '')}.yml")
+
+    yaml = YAML.load_file(source_path) || {}
+    
+    # Save running state, using base_path to steal the original header
+    write_formatted_yaml(base_path, yaml, base_path)
+
+    { success: true, message: "Lab overwritten successfully" }.to_json
   rescue => e
     status 500
-    { error: "Backend Crash: #{e.message}" }.to_json
+    { success: false, error: "Backend Crash: #{e.message}" }.to_json
   end
 end
 
 post '/labs/*/save_as' do
   lab_name = params[:splat].first
-  new_lab_name = params[:new_lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/]/, '')
+  new_lab_name = params[:new_lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/\.]/, '')
   new_desc = params[:new_desc].to_s.strip
-  
+  force_overwrite = params[:force] == 'true'
+
   halt 400, { success: false, error: "New lab name is required" }.to_json if new_lab_name.empty?
-  
+
   new_lab_name += '.yml' unless new_lab_name.end_with?('.yml')
   new_lab_path = File.join(LABS_DIR, new_lab_name)
-  
-  if File.exist?(new_lab_path)
-    halt 400, { success: false, error: "A lab with that filename already exists!" }.to_json
+
+  if File.exist?(new_lab_path) && !force_overwrite
+    halt 400, { success: false, error: "EXISTS" }.to_json
   end
-  
+
   begin
-    # get_lab_file_path automatically grabs the runtime lock file if the lab is currently running!
-    source_path = get_lab_file_path(lab_name)
-    yaml = YAML.load_file(source_path) || {}
+    source_path = get_lab_file_path(lab_name) # Gets the RUNNING state!
+    original_base_path = File.join(LABS_DIR, "#{lab_name.gsub('.yml', '')}.yml")
     
-    # Update the internal metadata for the new lab
+    yaml = YAML.load_file(source_path) || {}
+
+    # Update metadata
     base_name = File.basename(new_lab_name, '.yml')
     yaml['name'] = base_name
     yaml['desc'] = new_desc unless new_desc.empty?
-    
-    # Ensure the target directory exists (e.g. custom/my_new_lab.yml)
+
     FileUtils.mkdir_p(File.dirname(new_lab_path))
     
-    write_formatted_yaml(new_lab_path, yaml)
-    
+    # Save running state to NEW file, stealing the header from the OLD base file
+    write_formatted_yaml(new_lab_path, yaml, original_base_path)
+
     { success: true, message: "Lab saved as #{new_lab_name}", new_lab: new_lab_name }.to_json
   rescue => e
-    status 400
+    status 500
     { success: false, error: e.message }.to_json
   end
 end

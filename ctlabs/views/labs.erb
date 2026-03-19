@@ -153,52 +153,89 @@
   window.openUnifiedSaveModal = function() {
     const currentLab = document.getElementById('lab-selector').value;
     if (!currentLab) return alert("No lab selected.");
-    
-    // Reset the button state
+
     const btn = document.getElementById('unified-save-btn');
     btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
     btn.disabled = false;
-    
+
     document.getElementById('unified-save-name').value = currentLab;
     document.getElementById('unified-save-modal').style.display = 'block';
   };
 
-  window.executeUnifiedSave = async function() {
-    const currentLab = document.getElementById('lab-selector').value;
-    const targetName = document.getElementById('unified-save-name').value.trim();
-    
-    if (!targetName) return alert("Lab name cannot be empty.");
-    
-    const btn = document.getElementById('unified-save-btn');
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-    btn.disabled = true;
-    
-    if (currentLab === targetName) {
-      // OVERWRITE EXISTING LAB (Calls the function already in your labs.js)
-      document.getElementById('unified-save-modal').style.display = 'none';
-      window.saveActiveLab();
-    } else {
-      // CLONE TO NEW LAB (Save As)
+  // Notice the new forceOverwrite argument!
+  window.executeUnifiedSave = async function(forceOverwrite = false) {
+    try {
+      const currentLab = document.getElementById('lab-selector').value;
+      let targetName = document.getElementById('unified-save-name').value.trim();
+
+      if (!targetName) return alert("Lab name cannot be empty.");
+
+      targetName = targetName.replace(/\.ya?ml$/i, '');
+      const normalizedCurrent = currentLab.replace(/\.ya?ml$/i, '');
+
+      const btn = document.getElementById('unified-save-btn');
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      btn.disabled = true;
+
+      // --- 1. OVERWRITE ITSELF ---
+      if (normalizedCurrent === targetName) {
+        const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+        const res = await fetch(`/labs/${safeLab}/save`, { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok) {
+          document.getElementById('unified-save-modal').style.display = 'none';
+          const infoSection = document.getElementById('lab-info-section');
+          if (infoSection) {
+             const successDiv = document.createElement('div');
+             successDiv.className = 'w3-panel w3-green w3-round w3-margin-bottom';
+             successDiv.innerHTML = '<h4><i class="fas fa-check-circle"></i> Saved!</h4><p>Runtime changes permanently saved to base YAML.</p>';
+             infoSection.prepend(successDiv);
+          }
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          throw new Error(data.error || "Unknown backend error during overwrite");
+        }
+        return;
+      }
+
+      // --- 2. CLONE TO NEW LAB (Save As) ---
       const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
       const formData = new URLSearchParams({ new_lab_name: targetName });
       
-      try {
-        const res = await fetch(`/labs/${safeLab}/save_as`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: formData.toString()
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-          document.getElementById('unified-save-modal').style.display = 'none';
-          localStorage.setItem('ctlabs_last_selected_lab', data.new_lab);
-          window.location.href = window.location.pathname; 
-        } else {
-          throw new Error(data.error);
+      // Inject the force flag if the user confirmed the popup
+      if (forceOverwrite) formData.append('force', 'true');
+
+      const res = await fetch(`/labs/${safeLab}/save_as`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: formData.toString()
+      });
+      
+      const data = await res.json();
+
+      if (res.ok) {
+        document.getElementById('unified-save-modal').style.display = 'none';
+        localStorage.setItem('ctlabs_last_selected_lab', data.new_lab);
+        window.location.href = window.location.pathname;
+      } else {
+        // --- FIX: Catch the EXISTS block and ask the user for permission! ---
+        if (data.error === "EXISTS") {
+          if (confirm(`WARNING: A lab named '${targetName}' already exists. Do you want to permanently overwrite it?`)) {
+             return window.executeUnifiedSave(true); // Re-run with force enabled!
+          } else {
+             btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
+             btn.disabled = false;
+             return;
+          }
         }
-      } catch (err) {
-        alert("Error: " + err.message);
+        throw new Error(data.error || "Unknown backend error during clone");
+      }
+
+    } catch (err) {
+      alert("Save Failed: " + err.message);
+      const btn = document.getElementById('unified-save-btn');
+      if (btn) {
         btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
         btn.disabled = false;
       }

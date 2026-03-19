@@ -5,10 +5,23 @@
 
 module YamlHelper
   # Helper to beautifully format nested YAML arrays strictly inline
-  def write_formatted_yaml(path, data)
-    yaml_str = data.to_yaml
+  def write_formatted_yaml(path, data, original_path = nil)
+    # 1. Steal the header from the original file (if it exists)
+    header_text = ""
+    source_file = original_path || path
+    
+    if File.exist?(source_file)
+      content = File.read(source_file)
+      
+      # FIX: Match the optional '---' at the top, then grab all comments and blank lines!
+      header_match = content.match(/\A(?:---\r?\n)?(?:#.*\r?\n|\s*\r?\n)*/)
+      header_text = header_match ? header_match[0] : ""
+    end
 
-    # Clean up psych array formatting for nested 2-element or 3-element arrays
+    yaml_str = data.to_yaml
+    yaml_str.sub!(/\A---\r?\n/, '') # Strip generic '---' added by Ruby (the header text already has yours)
+
+    # 2. Clean up psych array formatting for nested 2-element or 3-element arrays
     yaml_str.gsub!(/^(\s*)-\s*-\s*(.+?)\n\1\s{2}-\s*(.+?)\n(?:\1\s{2}-\s*(.+?)\n)?/) do |match|
       indent = $1
       v1, v2, v3 = $2.strip, $3.strip, $4&.strip
@@ -33,7 +46,11 @@ module YamlHelper
     # Remove empty 'nics: {}' if it was stripped down to nothing
     yaml_str.gsub!(/\n\s*nics:\s*\{\}/, '')
 
-    File.write(path, yaml_str)
+    # 3. Inject blank lines before major sections to restore readability
+    yaml_str.gsub!(/^(defaults|topology|links):/, "\n\\1:")
+
+    # 4. Write it to disk with the original header safely glued on top!
+    File.write(path, header_text + yaml_str)
   end
 
   # Heavy text-replacement scanner for the Lab Meta Edit feature
