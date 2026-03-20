@@ -174,14 +174,14 @@
   // --- IMAGES ---
   window.openImageEditor = function(labName) {
       window.currentEditLab = labName;
-      document.getElementById('image-editor-result').style.display = 'none';
+      document.getElementById('node-profile-editor-result').style.display = 'none';
       document.getElementById('edit-img-type').value = 'host';
       document.getElementById('edit-img-kind').value = '';
       document.getElementById('edit-img-ref').value = '';
       document.getElementById('edit-img-caps').value = '';
       document.getElementById('edit-img-env').value = '';
       document.getElementById('edit-img-extras').value = '';
-      document.getElementById('image-editor-modal').style.display = 'block';
+      document.getElementById('node-profile-editor').style.display = 'block';
   };
 
   window.editImageConfig = function(labPath, type, kind, image, caps, env, extras) {
@@ -210,14 +210,14 @@
       document.getElementById('edit-img-env').value = env ? decodeURIComponent(env) : '';
       document.getElementById('edit-img-extras').value = extras ? decodeURIComponent(extras) : '';
       
-      const resDiv = document.getElementById('image-editor-result');
+      const resDiv = document.getElementById('node-profile-editor-result');
       if (resDiv) resDiv.style.display = 'none';
       
-      document.getElementById('image-editor-modal').style.display = 'block';
+      document.getElementById('node-profile-editor').style.display = 'block';
   };
 
   window.saveImageConfig = async function() {
-      const resDiv = document.getElementById('image-editor-result');
+      const resDiv = document.getElementById('node-profile-editor-result');
       
       if (!window.currentEditLab) {
           resDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; padding: 8px;';
