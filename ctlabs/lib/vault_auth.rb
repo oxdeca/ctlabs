@@ -78,9 +78,8 @@ class VaultAuth
     end
   end
 
-  # Fetch a dynamic GCP OAuth token directly from Vault (with Vault-defined TTL caching!)
+  # Fetch a dynamic GCP OAuth token directly from Vault (Supports both Dynamic & Static Paths!)
   def self.get_gcp_token(addr, token, project, roleset)
-    # --- ADD THIS LINE TO FIX THE NIL ERROR ---
     @gcp_cache ||= {} 
     
     cache_key = "#{addr}_#{project}_#{roleset}"
@@ -92,7 +91,13 @@ class VaultAuth
     end
 
     mount_point = "gcp/#{project}"
-    uri = URI.parse("#{addr.sub(/\/$/, '')}/v1/#{mount_point}/token/#{roleset}")
+    base_url = "#{addr.sub(/\/$/, '')}/v1/#{mount_point}"
+    
+    # 🌟 NEW LOGIC: Define both paths to support the billing workaround
+    dynamic_path = "#{base_url}/token/#{roleset}"
+    static_path = "#{base_url}/static-account/#{roleset}/token"
+
+    uri = URI.parse(dynamic_path)
     http = Net::HTTP.new(uri.host, uri.port)
     
     if uri.scheme == 'https'
@@ -100,25 +105,35 @@ class VaultAuth
       http.verify_mode = OpenSSL::SSL::VERIFY_NONE
     end
 
+    # 2. Attempt Dynamic Roleset Path First
     request = Net::HTTP::Get.new(uri.request_uri)
     request['X-Vault-Token'] = token
 
     begin
       response = http.request(request)
+      
+      # 3. If dynamic fails (e.g. 404 Not Found), seamlessly try the Static Account path
+      unless response.is_a?(Net::HTTPSuccess)
+        uri = URI.parse(static_path)
+        request = Net::HTTP::Get.new(uri.request_uri)
+        request['X-Vault-Token'] = token
+        response = http.request(request)
+      end
+
       data = JSON.parse(response.body)
 
       if response.is_a?(Net::HTTPSuccess) && data['data']
+        # Account for varying Vault response formats depending on engine type
         gcp_token = data['data']['token_oauth2_secret'] || data['data']['token']
         
-        # 2. Extract Vault's exact TTL safely, ignoring 0s!
-        # Vault returns lease_duration: 0 for OAuth tokens, so we MUST check token_ttl instead.
+        # 4. Extract Vault's exact TTL safely, ignoring 0s!
         ttls = [data['lease_duration'], data.dig('data', 'token_ttl')].map(&:to_i).reject { |v| v == 0 }
         raw_ttl = ttls.first || 3600
         
-        # 3. Subtract 60 seconds as a safety buffer so we don't use dying tokens
+        # 5. Subtract 60 seconds as a safety buffer so we don't use dying tokens
         safe_ttl = [raw_ttl - 60, 60].max
         
-        # 4. Save to the cache
+        # 6. Save to the cache
         @gcp_cache[cache_key] = {
           token: gcp_token,
           expires_at: Time.now.to_i + safe_ttl,
