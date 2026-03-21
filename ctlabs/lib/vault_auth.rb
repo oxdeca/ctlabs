@@ -97,7 +97,8 @@ class VaultAuth
     dynamic_path = "#{base_url}/token/#{roleset}"
     static_path = "#{base_url}/static-account/#{roleset}/token"
 
-    uri = URI.parse(dynamic_path)
+    # 2. Attempt Static Account Path FIRST (Overrides take precedence!)
+    uri = URI.parse(static_path)
     http = Net::HTTP.new(uri.host, uri.port)
     
     if uri.scheme == 'https'
@@ -105,16 +106,15 @@ class VaultAuth
       http.verify_mode = OpenSSL::SSL::VERIFY_NONE
     end
 
-    # 2. Attempt Dynamic Roleset Path First
     request = Net::HTTP::Get.new(uri.request_uri)
     request['X-Vault-Token'] = token
 
     begin
       response = http.request(request)
       
-      # 3. If dynamic fails (e.g. 404 Not Found), seamlessly try the Static Account path
+      # 3. If static fails (e.g. 404 Not Found), seamlessly fallback to Dynamic Roleset path
       unless response.is_a?(Net::HTTPSuccess)
-        uri = URI.parse(static_path)
+        uri = URI.parse(dynamic_path)
         request = Net::HTTP::Get.new(uri.request_uri)
         request['X-Vault-Token'] = token
         response = http.request(request)
@@ -190,3 +190,4 @@ class VaultAuth
     @gcp_cache.reject! { |key, data| data[:addr] == addr }
   end
 end
+
