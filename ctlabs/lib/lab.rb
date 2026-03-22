@@ -6,6 +6,7 @@
 
 require 'open3'
 require 'shellwords'
+require 'yaml'
 
 class Lab
   attr_writer :dotfile, :dtype, :diagram
