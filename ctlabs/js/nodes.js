@@ -5,256 +5,213 @@
  -----------------------------------------------------------------------------
 */
 
-// --- SMART ADD NODE LOGIC ---
-window.updateNodeFormFields = function(nodeType) {
-    const connectLabel = document.getElementById('add-node-connect-label');
-    const connectSelect = document.getElementById('add-node-connect-select');
-    const ipContainer = document.getElementById('add-node-ip-container');
-    const gwContainer = document.getElementById('add-node-gw-container');
-    if (!connectSelect) return;
-    // Default layout for Host/Router/Controller
-    let targetType = 'switches';
-    let labelText = 'Connect to Switch (eth1)';
-    let showIpGw = true;
-    // Smart Layouts
-    if (nodeType === 'switch') {
-        targetType = 'routers';
-        labelText = 'Connect to Router (eth1)';
-        showIpGw = false; // Switches are L2, no IP needed!
-    } else if (nodeType === 'rhost') {
-        targetType = 'switches';
-        labelText = 'Connect to Switch (Optional)';
-        showIpGw = true; 
+// --- RESTORED: Update Profile Kinds ---
+window.updateKindOptions = function(type, targetId) {
+    const map = window.getImagesMap ? window.getImagesMap() : (typeof window.getLabData === 'function' ? window.getLabData('images-map') : {});
+    const targetElement = document.getElementById(targetId);
+    if (!targetElement) return;
+    
+    if (targetElement.tagName === 'INPUT') {
+        const dataList = document.getElementById(targetElement.getAttribute('list'));
+        if (!dataList) return;
+        dataList.innerHTML = ''; 
+        
+        if (type === 'external' || type === 'rhost') {
+            dataList.innerHTML += `<option value="remote">remote</option>`;
+            targetElement.value = 'remote'; 
+        } else {
+            targetElement.value = ''; 
+            const kinds = map[type] || [];
+            kinds.forEach(k => { dataList.innerHTML += `<option value="${k}">${k}</option>`; });
+        }
     }
-    connectLabel.innerHTML = labelText;
-    
-    // Toggle IP visibility
-    ipContainer.style.display = showIpGw ? 'block' : 'none';
-    
-    // Hide Gateway for Switches AND External nodes
-    gwContainer.style.display = (showIpGw && nodeType !== 'external') ? 'block' : 'none';
-    
-    if (!showIpGw) {
-        ipContainer.querySelector('input').value = '';
-        gwContainer.querySelector('input').value = '';
-    }
-    connectSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
-    const optionsList = window.getLabData(targetType);
-    optionsList.forEach(opt => {
-        connectSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
-    });
-    window.updateGatewayForSwitch('');
 };
 
-// --- UNIFIED ADD NODE ---
-window.openAddNodeModal = function(labPath) {
-    document.getElementById('add-node-lab-name').value = labPath;
-    document.getElementById('add-node-form').reset();
-    
-    // Smart clear: Handle both the old select box or the new datalist input
-    const kindEl = document.getElementById('add-node-kind');
-    if (kindEl.tagName === 'SELECT') {
-        kindEl.innerHTML = '<option value="" disabled selected>-- Select Profile --</option>';
-    } else {
-        kindEl.value = ''; 
-        const dList = document.getElementById('add-node-kind-list');
-        if (dList) dList.innerHTML = ''; 
-    }
-    
-    document.getElementById('add-node-result').style.display = 'none';
-    
-    // Reset the smart form to standard view on open
-    if(typeof window.updateNodeFormFields === 'function') window.updateNodeFormFields('');
-    
-    document.getElementById('add-node-modal').style.display = 'block';
-};
-
-// Auto-fills the Gateway IP based on the Switch selected
+// --- RESTORED: Auto-fill Gateway ---
 window.updateGatewayForSwitch = function(switchName) {
-    const gwInput = document.querySelector('input[name="gw"]');
+    const gwInput = document.getElementById('edit-gw');
     if (!gwInput) return;
-    const gwMap = window.getLabData('switch-gws');
+    
+    let gwMap = {};
+    if (typeof window.getLabData === 'function') {
+        gwMap = window.getLabData('switch-gws') || {};
+    }
+
     if (switchName && gwMap && gwMap[switchName]) {
         gwInput.value = gwMap[switchName];
     } else {
-        // Optional: You can remove this else-block if you don't want 
-        // the field to automatically clear itself when "None" is selected
         gwInput.value = ''; 
     }
 };
 
-window.updateKindOptions = function(type, targetId) {
-    const map = window.getImagesMap ? window.getImagesMap() : window.getLabData('images-map');
-    const targetElement = document.getElementById(targetId);
-    if (!targetElement) return;
+// --- SMART NODE FIELD TOGGLES ---
+window.updateNodeFormFields = function(nodeType) {
+    const switchSelect = document.getElementById('edit-switch');
+    const ipInput = document.getElementById('edit-ip');
+    const gwInput = document.getElementById('edit-gw');
     
-    // If the target is an Input with a Datalist attached
-    if (targetElement.tagName === 'INPUT') {
-        const dataList = document.getElementById(targetElement.getAttribute('list'));
-        if (!dataList) return;
-        dataList.innerHTML = ''; // Clear old options
-        
-        if (type === 'external' || type === 'rhost') {
-            dataList.innerHTML += `<option value="remote">remote</option>`;
-            targetElement.value = 'remote'; // Auto-select for remotes
-        } else {
-            targetElement.value = ''; // Clear current selection
-            const kinds = map[type] || [];
-            kinds.forEach(k => { dataList.innerHTML += `<option value="${k}">${k}</option>`; });
-        }
-    } else {
-        // Legacy Select Fallback
-        targetElement.innerHTML = '<option value="remote" disabled selected>-- Select Profile --</option>';
-        if (type === 'external' || type === 'rhost') {
-            targetElement.innerHTML += `<option value="remote" selected>Remote Server</option>`;
-            return;
-        }
-        const kinds = map[type] || [];
-        kinds.forEach(k => { targetElement.innerHTML += `<option value="${k}">${k}</option>`; });
-    }
-};
+    if (!switchSelect || !ipInput || !gwInput) return;
 
-window.submitCombinedNode = async function(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    const safeLab = formData.get('lab_name').split('/').map(encodeURIComponent).join('/');
-    const nodeName = formData.get('node_name');
-    const isRunning = document.getElementById('lab-running-state').getAttribute('data-is-running') === 'true';
-    const resultDiv = document.getElementById('add-node-result');
-    const btn = form.querySelector('button[type="submit"]');
-    const originalBtnHTML = btn ? btn.innerHTML : 'Save Node';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
-    try {
-        const createUrl = isRunning ? `/labs/${safeLab}/node` : `/labs/${safeLab}/node/new`;
-        const createRes = await fetch(createUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(formData).toString()
-        });
-        // SAFELY HANDLE RAW TEXT OR JSON ERRORS
-        if (!createRes.ok) {
-            let errText = await createRes.text();
-            try { errText = JSON.parse(errText).error || errText; } catch(e) {}
-            throw new Error(errText || 'Failed to create node');
-        }
-        let finalNics = formData.get('nics') || '';
-        const ipField = formData.get('ip');
-        const typeField = formData.get('type');
-        // 1. ALWAYS assign the IP to eth1 if nics is currently empty (for both Hosts and External nodes)
-        if (!finalNics.trim() && ipField) {
-            finalNics = `eth1=${ipField}`;
-            formData.set('nics', finalNics);
-        }
-        // 2. Add the SSH terminal override specifically for External nodes
-        if (typeField === 'rhost' && ipField) {
-            const ipOnly = ipField.split('/')[0];
-            formData.set('term', `ssh://root@${ipOnly}`);
-        }
-        
-        formData.append('format', 'form');
-        const editRes = await fetch(`/labs/${safeLab}/node_edit/${encodeURIComponent(nodeName)}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(formData).toString()
-        });
-        // SAFELY HANDLE RAW TEXT OR JSON ERRORS
-        if (!editRes.ok) {
-            let errText = await editRes.text();
-            try { errText = JSON.parse(errText).error || errText; } catch(e) {}
-            throw new Error('Node created, but failed to save advanced settings: ' + errText);
-        }
-        resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-        resultDiv.textContent = '✅ Node saved successfully! (Reloading...)';
-        setTimeout(() => location.reload(), 800);
-    } catch (err) {
-        resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-        resultDiv.textContent = '❌ ' + err.message;
-        if (btn) { btn.disabled = false; btn.innerHTML = originalBtnHTML; }
-    }
-};
+    const switchContainer = switchSelect.closest('.w3-col');
+    const ipContainer = ipInput.closest('.w3-col');
+    const gwContainer = gwInput.closest('.w3-col');
+    const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
 
-window.openEditorTab = function(evt, tabName) {
-  let i, x, tablinks;
-  x = document.getElementsByClassName("editor-tab");
-  for (i = 0; i < x.length; i++) x[i].style.display = "none";
-  
-  tablinks = document.getElementsByClassName("editor-tablink");
-  for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
-  
-  document.getElementById(tabName).style.display = "block";
-  evt.currentTarget.className += " w3-text-blue";
-  // --- CODEMIRROR INITIALIZATION FOR YAML ---
-  if (tabName === 'YamlEdit') {
-      window.initCodeEditor('node-yaml-editor', 'yaml');
-  }
-};
+    let targetType = 'switches';
+    let labelText = 'Connect to Switch (eth1)';
+    let showIpGw = true;
 
-// --- NODES ---
-// Real-time filter for Active Nodes
-window.filterNodes = function() {
-    const input = document.getElementById('node-filter-input');
-    if (!input) return;
-    
-    const filter = input.value.toUpperCase();
-    const rows = document.getElementById('active-nodes-table')?.getElementsByClassName('node-row') || [];
-    
-    for (let i = 0; i < rows.length; i++) {
-        rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    if (nodeType === 'switch') {
+        targetType = 'routers';
+        labelText = 'Connect to Router (eth1)';
+        showIpGw = false;
+    } else if (nodeType === 'rhost' || nodeType === 'external') {
+        targetType = 'switches';
+        labelText = 'Connect to Switch (Optional)';
+        showIpGw = true; 
     }
-};
 
-// Real-time filter for Node Profiles
-window.filterNodeProfiles = function() {
-    const input = document.getElementById('profile-filter-input');
-    if (!input) return;
-    
-    const filter = input.value.toUpperCase();
-    const rows = document.getElementById('node-profiles-table')?.getElementsByClassName('profile-row') || [];
-    
-    for (let i = 0; i < rows.length; i++) {
-        rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    if (switchLabel) switchLabel.innerHTML = labelText;
+    if (ipContainer) ipContainer.style.display = showIpGw ? 'block' : 'none';
+    if (gwContainer) gwContainer.style.display = (showIpGw && nodeType !== 'external') ? 'block' : 'none';
+
+    if (!showIpGw) {
+        ipInput.value = '';
+        gwInput.value = '';
     }
+
+    // NATIVE GETLABDATA FOR DROPDOWNS
+    switchSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
+    let optionsList = [];
+    if (typeof window.getLabData === 'function') {
+        optionsList = window.getLabData(targetType) || [];
+    }
+
+    optionsList.forEach(opt => {
+        if (opt !== 'sw0' && opt !== 'ro0') {
+            switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+        }
+    });
 };
 
 window.editNodeConfig = async function(labName, nodeName) {
     window.currentEditLab = labName;
-    window.currentEditNode = nodeName;
-    document.getElementById('editor-node-name').textContent = nodeName;
+    window.currentEditNode = nodeName; 
+    
+    document.getElementById('node-modal-icon').className = 'fas fa-edit';
+    document.getElementById('node-modal-title').innerText = 'Configure Node: ';
+    document.getElementById('editor-node-name').innerText = nodeName;
+    document.getElementById('node-modal-save-text').innerText = 'Save Override';
+    document.getElementById('edit-node-name').value = nodeName;
+    document.getElementById('edit-node-name').disabled = true; 
     document.getElementById('node-editor-result').style.display = 'none';
+    
     try {
         const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-        const res     = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
+        const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
         if (!res.ok) throw new Error("HTTP Status " + res.status);
         const data = await res.json();
-        document.getElementById('node-yaml-editor').value = data.yaml;
-        if (window.cmEditors['node-yaml-editor']) {
-          window.cmEditors['node-yaml-editor'].setValue(data.yaml);
+        
+        document.getElementById('node-yaml-editor').value = data.yaml || '';
+        if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
+          window.cmEditors['node-yaml-editor'].setValue(data.yaml || '');
         }
-        //if (window.nodeYamlEditorInstance) {
-        //  window.nodeYamlEditorInstance.setValue(data.yaml);
-        // }
+
         if (data.json) {
-            document.getElementById('edit-type').value = data.json.type || 'host';
-            document.getElementById('edit-kind').value = data.json.kind || '';
-            document.getElementById('edit-gw').value   = data.json.gw   || '';
-            document.getElementById('edit-info').value = data.json.info || '';
-            document.getElementById('edit-term').value = data.json.term || '';
+            const nodeObj = data.json[nodeName] || data.json || {};
+            const nodeType = nodeObj.type || 'host';
+
+            // 1. SETUP UI
+            try {
+                window.updateNodeFormFields(nodeType);
+                if (typeof window.updateKindOptions === 'function') window.updateKindOptions(nodeType, 'edit-kind');
+            } catch (e) { console.error("UI Setup Error:", e); }
+
+            // 2. APPLY CORE DATA
+            document.getElementById('edit-type').value = nodeType;
+            document.getElementById('edit-info').value = nodeObj.info || '';
+            document.getElementById('edit-term').value = nodeObj.term || '';
+            document.getElementById('edit-kind').value = nodeObj.kind || (nodeType === 'host' ? 'linux' : '');
+            
+            // 3. EXTRACT IP
             let nicsStr = '';
-            if (data.json.nics) {
-                for (const [key, value] of Object.entries(data.json.nics)) {
-                    nicsStr += `${key}=${value}\n`;
+            let dataIp = '';
+            if (nodeObj.nics && typeof nodeObj.nics === 'object') {
+                for (const [key, value] of Object.entries(nodeObj.nics)) { 
+                    const cleanKey = String(key).replace(/['"]/g, '').trim();
+                    if (cleanKey === 'eth1') dataIp = value;
+                    else nicsStr += `${cleanKey}=${value}\n`; 
                 }
             }
+            document.getElementById('edit-ip').value = dataIp;
             document.getElementById('edit-nics').value = nicsStr.trim();
-            let urlStr = '';
-            if (data.json.urls && typeof data.json.urls === 'object') {
-                for (const [title, link] of Object.entries(data.json.urls)) {
-                    urlStr += `${title}|${link}\n`;
+            
+            // 4. THE FIX THAT WORKED: SCRAPE THE LINKS DIRECTLY FROM THE DASHBOARD HTML TABLE!
+            // We MUST use this because data-links does not exist in the DOM.
+            let connectedSwitch = '';
+            try {
+                const linkRows = document.querySelectorAll('#network-links-table .link-row');
+                for (const row of linkRows) {
+                    const cols = row.querySelectorAll('td');
+                    if (cols.length >= 2) {
+                        const nodeA = cols[0].querySelector('strong')?.innerText.trim();
+                        const nodeB = cols[1].querySelector('strong')?.innerText.trim();
+                        const spanA = Array.from(cols[0].querySelectorAll('span')).find(s => s.innerText.includes('['));
+                        const spanB = Array.from(cols[1].querySelectorAll('span')).find(s => s.innerText.includes('['));
+                        
+                        const intA = spanA ? spanA.innerText.replace(/[[\]]/g, '').trim() : '';
+                        const intB = spanB ? spanB.innerText.replace(/[[\]]/g, '').trim() : '';
+
+                        if (nodeA && intA && nodeB && intB) {
+                            const sideA = `${nodeA}:${intA}`;
+                            const sideB = `${nodeB}:${intB}`;
+                            const targetSearch = `${nodeName}:eth1`;
+
+                            if (sideA === targetSearch) {
+                                connectedSwitch = nodeB; break;
+                            } else if (sideB === targetSearch) {
+                                connectedSwitch = nodeA; break;
+                            }
+                        }
+                    }
                 }
+                
+                if (connectedSwitch) {
+                    const switchSelect = document.getElementById('edit-switch');
+                    if (switchSelect) {
+                        const exists = Array.from(switchSelect.options).some(o => o.value === connectedSwitch);
+                        if (!exists) switchSelect.innerHTML += `<option value="${connectedSwitch}">${connectedSwitch}</option>`;
+                        switchSelect.value = connectedSwitch;
+                    }
+                }
+            } catch (e) { console.error("DOM Link Scraper Error:", e); }
+            
+            // 5. SET GATEWAY (Using the restored function!)
+            document.getElementById('edit-gw').value = nodeObj.gw || '';
+            if (!nodeObj.gw && connectedSwitch && typeof window.updateGatewayForSwitch === 'function') {
+                try { window.updateGatewayForSwitch(connectedSwitch); } catch(e) {}
             }
-            document.getElementById('edit-urls').value = urlStr.trim();
+            
+            // 6. POPULATE ADVANCED MULTILINE
+            try {
+                let urlStr = '';
+                if (nodeObj.urls && typeof nodeObj.urls === 'object') {
+                    for (const [title, link] of Object.entries(nodeObj.urls)) urlStr += `${title}|${link}\n`;
+                }
+                document.getElementById('edit-urls').value = urlStr.trim();
+                document.getElementById('edit-vols').value = Array.isArray(nodeObj.vols) ? nodeObj.vols.join('\n') : (nodeObj.vols || '');
+                document.getElementById('edit-env').value  = Array.isArray(nodeObj.env)  ? nodeObj.env.join('\n')  : (nodeObj.env || '');
+                document.getElementById('edit-devs').value = Array.isArray(nodeObj.devs) ? nodeObj.devs.join('\n') : (nodeObj.devs || '');
+                
+                setTimeout(() => {
+                    document.querySelectorAll('#AdvancedEdit textarea').forEach(ta => {
+                       ta.style.height = '56px'; 
+                       ta.style.height = Math.max(ta.scrollHeight, 56) + 'px'; 
+                    });
+                }, 10);
+            } catch (e) { console.error("Advanced Fields Error:", e); }
         }
+        
         document.getElementById('defaultTab').click();
         document.getElementById('node-editor-modal').style.display = 'block';
     } catch (err) {
@@ -262,42 +219,170 @@ window.editNodeConfig = async function(labName, nodeName) {
     }
 };
 
+window.openAddNodeModal = function(labPath) {
+    window.currentEditLab = labPath;
+    window.currentEditNode = null; 
+
+    document.getElementById('node-modal-icon').className = 'fas fa-plus-circle';
+    document.getElementById('node-modal-title').innerText = 'Add Node';
+    document.getElementById('editor-node-name').innerText = '';
+    document.getElementById('node-modal-save-text').innerText = 'Add Node';
+
+    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+
+    // --- RESTORED: CLEAR THE RAW YAML EDITOR ---
+    document.getElementById('node-yaml-editor').value = '';
+    if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
+        window.cmEditors['node-yaml-editor'].setValue('');
+    }
+
+    document.getElementById('edit-node-name').disabled = false;
+    document.getElementById('node-editor-result').style.display = 'none';
+    
+    window.updateNodeFormFields('');
+    document.getElementById('defaultTab').click();
+    document.getElementById('node-editor-modal').style.display = 'block';
+};
+
 window.saveNodeConfig = async function() {
     const resultDiv = document.getElementById('node-editor-result');
+    const btn = document.getElementById('node-modal-save-btn');
+    const origBtnHtml = btn.innerHTML;
+    
+    const isAdding = !window.currentEditNode;
+    const nodeName = isAdding ? document.getElementById('edit-node-name').value.trim() : window.currentEditNode;
+    
+    if (!nodeName) return alert("Node Name is required.");
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    
     const formData  = new URLSearchParams();
     const isYaml    = document.getElementById('YamlEdit').style.display === 'block';
-    if (isYaml) {
+    
+    let typeField = document.getElementById('edit-type').value;
+    let ipField   = document.getElementById('edit-ip').value.trim();
+    let finalNics = document.getElementById('edit-nics').value.trim();
+    let finalTerm = document.getElementById('edit-term').value.trim();
+
+    let nicsArray = finalNics ? finalNics.split('\n') : [];
+    if (ipField) {
+        nicsArray = nicsArray.filter(n => !n.startsWith('eth1='));
+        nicsArray.unshift(`eth1=${ipField}`); 
+    }
+    finalNics = nicsArray.join('\n');
+
+    if (isAdding) {
+        formData.append('node_name', nodeName);
+        formData.append('switch', document.getElementById('edit-switch').value);
+        formData.append('ip', ipField);
+        
+        if (typeField === 'rhost' && ipField && !finalTerm) {
+            const ipOnly = ipField.split('/')[0];
+            finalTerm = `ssh://root@${ipOnly}`;
+        }
+    } else {
+        formData.append('switch', document.getElementById('edit-switch').value);
+    }
+
+    if (isYaml && !isAdding) {
         formData.append('format', 'yaml');
-        // USE CODEMIRROR VALUE IF IT EXISTS
-        const yamlValue = window.cmEditors['node-yaml-editor'] ? window.cmEditors['node-yaml-editor'].getValue() : document.getElementById('node-yaml-editor').value;
+        const yamlValue = window.cmEditors && window.cmEditors['node-yaml-editor'] ? window.cmEditors['node-yaml-editor'].getValue() : document.getElementById('node-yaml-editor').value;
         formData.append('yaml_data', yamlValue);
     } else {
         formData.append('format', 'form');
-        formData.append('type', document.getElementById('edit-type').value);
+        formData.append('type', typeField);
         formData.append('kind', document.getElementById('edit-kind').value);
-        formData.append('gw', document.getElementById('edit-gw').value);
-        formData.append('nics', document.getElementById('edit-nics').value);
+        formData.append('gw',   document.getElementById('edit-gw').value);
+        formData.append('nics', finalNics);
         formData.append('info', document.getElementById('edit-info').value);
         formData.append('urls_text', document.getElementById('edit-urls').value);
-        formData.append('term', document.getElementById('edit-term').value);
+        formData.append('term', finalTerm);
+        formData.append('vols', document.getElementById('edit-vols').value);
+        formData.append('env',  document.getElementById('edit-env').value);
+        formData.append('devs', document.getElementById('edit-devs').value);
     }
+    
     const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+    
     try {
-        const res = await fetch(`/labs/${safeLab}/node_edit/${encodeURIComponent(window.currentEditNode)}`, {
+        if (isAdding) {
+            const labStateEl = document.getElementById('lab-running-state');
+            const isRunning = labStateEl && labStateEl.getAttribute('data-is-running') === 'true';
+            const createUrl = isRunning ? `/labs/${safeLab}/node` : `/labs/${safeLab}/node/new`;
+            
+            const createRes = await fetch(createUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            });
+            
+            if (!createRes.ok) throw new Error(await createRes.text());
+        }
+        
+        const editRes = await fetch(`/labs/${safeLab}/node_edit/${encodeURIComponent(nodeName)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString()
         });
-        const data = await res.json();
-        if (res.ok) {
-            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
-            resultDiv.textContent = '✅ ' + data.message + ' (Reloading...)';
+        const data = await editRes.json();
+        
+        if (editRes.ok) {
+            resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; display: block; padding: 8px;';
+            resultDiv.textContent = ' Node saved successfully! (Reloading...)';
             setTimeout(() => location.reload(), 800);
         } else {
-            throw new Error(data.error || 'Failed to save configuration');
+            throw new Error(data.error);
         }
     } catch (err) {
-        resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
-        resultDiv.textContent = '❌ ' + err.message;
+        resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; display: block; padding: 8px;';
+        resultDiv.textContent = 'L ' + err.message;
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+    }
+};
+
+window.openEditorTab = function(evt, tabName) {
+    let i, x, tablinks;
+    x = document.getElementsByClassName("editor-tab");
+    for (i = 0; i < x.length; i++) x[i].style.display = "none";
+    tablinks = document.getElementsByClassName("editor-tablink");
+    for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
+    document.getElementById(tabName).style.display = "block";
+    evt.currentTarget.className += " w3-text-blue";
+    
+    if (tabName === 'YamlEdit') {
+        window.initCodeEditor('node-yaml-editor', 'yaml');
+        
+        // RESTORED: Helpful visual cue so users know the tabs don't sync.
+        if (!window.currentEditNode && window.cmEditors && window.cmEditors['node-yaml-editor']) {
+            const cm = window.cmEditors['node-yaml-editor'];
+            if (cm.getValue().trim() === '') {
+                cm.setValue("# Note: The Form and Raw YAML tabs do not sync in real-time.\n# Whichever tab you are viewing when you click 'Save Node'\n# is the data that will be saved to your lab.");
+            }
+        }
+    }
+};
+
+window.filterNodes = function() {
+    const input = document.getElementById('node-filter-input');
+    if (!input) return;
+    const filter = input.value.toUpperCase();
+    const rows = document.getElementById('active-nodes-table')?.getElementsByClassName('node-row') || [];
+    for (let i = 0; i < rows.length; i++) {
+        rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
+    }
+};
+
+window.filterNodeProfiles = function() {
+    const input = document.getElementById('profile-filter-input');
+    if (!input) return;
+    const filter = input.value.toUpperCase();
+    const rows = document.getElementById('node-profiles-table')?.getElementsByClassName('profile-row') || [];
+    for (let i = 0; i < rows.length; i++) {
+        rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
     }
 };

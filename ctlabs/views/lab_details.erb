@@ -95,8 +95,7 @@
     </div>
   </div>
 
-  <%= erb :'modals/add_node', locals: { info_hash: info_hash } %>
-  <%= erb :'modals/edit_node'           %>
+  <%= erb :'modals/node_editor', locals: { info_hash: info_hash }  %>
   <%= erb :'modals/add_container_image' %>
   <%= erb :'modals/node_profile_editor' %>
   <%= erb :'modals/link_editor'         %>
