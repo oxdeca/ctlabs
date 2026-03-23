@@ -40,7 +40,11 @@ post '/labs/*/node/new' do
     yaml['topology'][0]['nodes'] ||= {}
     raise "Node '#{node_name}' already exists!" if yaml['topology'][0]['nodes'].key?(node_name)
 
-    yaml['topology'][0]['nodes'][node_name] = { 'type' => params[:type], 'kind' => params[:kind] }
+    new_node          = { 'type' => params[:type] }
+    new_node['plane'] = params[:plane] unless params[:plane].to_s.empty?
+    new_node['kind']  = params[:kind] unless params[:kind].to_s.empty?
+
+    yaml['topology'][0]['nodes'][node_name] = new_node
     write_formatted_yaml(lab_path, yaml)
     { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
   rescue => e
@@ -55,6 +59,7 @@ post '/labs/*/node' do
   node_name = params[:node_name]
 
   node_cfg = { 'type' => params[:type] || 'host', 'kind' => params[:kind] || 'linux' }
+  node_cfg['plane'] = params[:plane] unless params[:plane].to_s.empty?
   node_cfg['gw'] = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
   node_cfg['nics'] = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
 
@@ -96,6 +101,7 @@ post '/labs/*/node_edit/:node_name' do
     if params[:format] == 'form'
       new_cfg = base_data.dup
       new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
+      params[:plane].to_s.empty? ? new_cfg.delete('plane') : new_cfg['plane'] = params[:plane]
       params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
       params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
       params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]
@@ -117,6 +123,17 @@ post '/labs/*/node_edit/:node_name' do
       else
         new_cfg.delete('urls')
       end
+
+      # --- ADDED: Properly parse Advanced Array fields ---
+      ['vols', 'env', 'devs'].each do |field|
+        if params[field] && !params[field].strip.empty?
+          new_cfg[field] = params[field].split("\n").map(&:strip).reject(&:empty?)
+        else
+          new_cfg.delete(field)
+        end
+      end
+      # ---------------------------------------------------
+
     else
       new_cfg = YAML.safe_load(params[:yaml_data])
     end

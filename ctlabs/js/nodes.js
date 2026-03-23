@@ -5,7 +5,6 @@
  -----------------------------------------------------------------------------
 */
 
-// --- RESTORED: Update Profile Kinds ---
 window.updateKindOptions = function(type, targetId) {
     const map = window.getImagesMap ? window.getImagesMap() : (typeof window.getLabData === 'function' ? window.getLabData('images-map') : {});
     const targetElement = document.getElementById(targetId);
@@ -27,43 +26,50 @@ window.updateKindOptions = function(type, targetId) {
     }
 };
 
-// --- RESTORED: Auto-fill Gateway ---
 window.updateGatewayForSwitch = function(switchName) {
     const gwInput = document.getElementById('edit-gw');
     if (!gwInput) return;
     
+    if (!switchName) {
+        gwInput.value = ''; 
+        return;
+    }
+
     let gwMap = {};
     if (typeof window.getLabData === 'function') {
         gwMap = window.getLabData('switch-gws') || {};
     }
 
-    if (switchName && gwMap && gwMap[switchName]) {
+    if (gwMap && gwMap[switchName]) {
         gwInput.value = gwMap[switchName];
-    } else {
-        gwInput.value = ''; 
     }
 };
 
-// --- SMART NODE FIELD TOGGLES ---
-window.updateNodeFormFields = function(nodeType) {
+window.updateNodeFormFields = function(nodeType, nodePlane) {
     const switchSelect = document.getElementById('edit-switch');
     const ipInput = document.getElementById('edit-ip');
     const gwInput = document.getElementById('edit-gw');
+    const planeSelect = document.getElementById('edit-plane');
     
     if (!switchSelect || !ipInput || !gwInput) return;
+
+    if (!nodePlane) {
+        nodePlane = planeSelect ? planeSelect.value : 'data';
+    }
 
     const switchContainer = switchSelect.closest('.w3-col');
     const ipContainer = ipInput.closest('.w3-col');
     const gwContainer = gwInput.closest('.w3-col');
     const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
 
+    let primaryNic = (nodeType === 'controller') ? 'eth0' : 'eth1';
     let targetType = 'switches';
-    let labelText = 'Connect to Switch (eth1)';
+    let labelText = `Connect to Switch (${primaryNic})`;
     let showIpGw = true;
 
     if (nodeType === 'switch') {
         targetType = 'routers';
-        labelText = 'Connect to Router (eth1)';
+        labelText = `Connect to Router (${primaryNic})`;
         showIpGw = false;
     } else if (nodeType === 'rhost' || nodeType === 'external') {
         targetType = 'switches';
@@ -80,7 +86,6 @@ window.updateNodeFormFields = function(nodeType) {
         gwInput.value = '';
     }
 
-    // NATIVE GETLABDATA FOR DROPDOWNS
     switchSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
     let optionsList = [];
     if (typeof window.getLabData === 'function') {
@@ -88,8 +93,22 @@ window.updateNodeFormFields = function(nodeType) {
     }
 
     optionsList.forEach(opt => {
-        if (opt !== 'sw0' && opt !== 'ro0') {
-            switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+        // PREVENT SELF-CONNECTION BUG: A node can never connect to itself
+        if (opt === window.currentEditNode) return;
+
+        if (nodePlane === 'mgmt') {
+            // FIX: If we need a router in Mgmt Plane, ONLY show ro0 (not sw0)
+            if (targetType === 'routers') {
+                if (opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+            } else {
+                // If we need a switch in Mgmt plane, show sw0 or ro0
+                if (opt === 'sw0' || opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+            }
+        } else {
+            // Data/Edge Plane: Hide sw0 and ro0
+            if (opt !== 'sw0' && opt !== 'ro0') {
+                switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
+            }
         }
     });
 };
@@ -120,34 +139,38 @@ window.editNodeConfig = async function(labName, nodeName) {
         if (data.json) {
             const nodeObj = data.json[nodeName] || data.json || {};
             const nodeType = nodeObj.type || 'host';
+            const nodePlane = nodeObj.plane || 'data';
+            const primaryNic = (nodeType === 'controller') ? 'eth0' : 'eth1';
 
-            // 1. SETUP UI
             try {
-                window.updateNodeFormFields(nodeType);
+                window.updateNodeFormFields(nodeType, nodePlane);
                 if (typeof window.updateKindOptions === 'function') window.updateKindOptions(nodeType, 'edit-kind');
             } catch (e) { console.error("UI Setup Error:", e); }
 
-            // 2. APPLY CORE DATA
             document.getElementById('edit-type').value = nodeType;
+            
+            const planeEl = document.getElementById('edit-plane');
+            if(planeEl) planeEl.value = nodePlane;
+            
             document.getElementById('edit-info').value = nodeObj.info || '';
             document.getElementById('edit-term').value = nodeObj.term || '';
-            document.getElementById('edit-kind').value = nodeObj.kind || (nodeType === 'host' ? 'linux' : '');
             
-            // 3. EXTRACT IP
+            // FIX: Gracefully default switches, routers, gateways to 'linux' if missing.
+            const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
+            document.getElementById('edit-kind').value = nodeObj.kind || (needsLinuxFallback ? 'linux' : '');
+            
             let nicsStr = '';
             let dataIp = '';
             if (nodeObj.nics && typeof nodeObj.nics === 'object') {
                 for (const [key, value] of Object.entries(nodeObj.nics)) { 
                     const cleanKey = String(key).replace(/['"]/g, '').trim();
-                    if (cleanKey === 'eth1') dataIp = value;
+                    if (cleanKey === primaryNic) dataIp = value;
                     else nicsStr += `${cleanKey}=${value}\n`; 
                 }
             }
             document.getElementById('edit-ip').value = dataIp;
             document.getElementById('edit-nics').value = nicsStr.trim();
             
-            // 4. THE FIX THAT WORKED: SCRAPE THE LINKS DIRECTLY FROM THE DASHBOARD HTML TABLE!
-            // We MUST use this because data-links does not exist in the DOM.
             let connectedSwitch = '';
             try {
                 const linkRows = document.querySelectorAll('#network-links-table .link-row');
@@ -165,7 +188,7 @@ window.editNodeConfig = async function(labName, nodeName) {
                         if (nodeA && intA && nodeB && intB) {
                             const sideA = `${nodeA}:${intA}`;
                             const sideB = `${nodeB}:${intB}`;
-                            const targetSearch = `${nodeName}:eth1`;
+                            const targetSearch = `${nodeName}:${primaryNic}`;
 
                             if (sideA === targetSearch) {
                                 connectedSwitch = nodeB; break;
@@ -175,24 +198,27 @@ window.editNodeConfig = async function(labName, nodeName) {
                         }
                     }
                 }
-                
-                if (connectedSwitch) {
-                    const switchSelect = document.getElementById('edit-switch');
-                    if (switchSelect) {
-                        const exists = Array.from(switchSelect.options).some(o => o.value === connectedSwitch);
-                        if (!exists) switchSelect.innerHTML += `<option value="${connectedSwitch}">${connectedSwitch}</option>`;
-                        switchSelect.value = connectedSwitch;
-                    }
-                }
             } catch (e) { console.error("DOM Link Scraper Error:", e); }
+
+            if (!connectedSwitch && nodePlane === 'mgmt') {
+                connectedSwitch = (nodeType === 'switch') ? 'ro0' : 'sw0';
+            }
             
-            // 5. SET GATEWAY (Using the restored function!)
+            if (connectedSwitch) {
+                const switchSelect = document.getElementById('edit-switch');
+                if (switchSelect) {
+                    // Force inject if not present, to ensure the UI successfully reflects reality
+                    const exists = Array.from(switchSelect.options).some(o => o.value === connectedSwitch);
+                    if (!exists) switchSelect.innerHTML += `<option value="${connectedSwitch}">${connectedSwitch}</option>`;
+                    switchSelect.value = connectedSwitch;
+                }
+            }
+            
             document.getElementById('edit-gw').value = nodeObj.gw || '';
             if (!nodeObj.gw && connectedSwitch && typeof window.updateGatewayForSwitch === 'function') {
                 try { window.updateGatewayForSwitch(connectedSwitch); } catch(e) {}
             }
             
-            // 6. POPULATE ADVANCED MULTILINE
             try {
                 let urlStr = '';
                 if (nodeObj.urls && typeof nodeObj.urls === 'object') {
@@ -228,12 +254,14 @@ window.openAddNodeModal = function(labPath) {
     document.getElementById('editor-node-name').innerText = '';
     document.getElementById('node-modal-save-text').innerText = 'Add Node';
 
-    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls'].forEach(id => {
+    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls', 'edit-plane'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
+    
+    const planeEl = document.getElementById('edit-plane');
+    if (planeEl) planeEl.value = 'data';
 
-    // --- RESTORED: CLEAR THE RAW YAML EDITOR ---
     document.getElementById('node-yaml-editor').value = '';
     if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
         window.cmEditors['node-yaml-editor'].setValue('');
@@ -242,7 +270,7 @@ window.openAddNodeModal = function(labPath) {
     document.getElementById('edit-node-name').disabled = false;
     document.getElementById('node-editor-result').style.display = 'none';
     
-    window.updateNodeFormFields('');
+    window.updateNodeFormFields('', 'data');
     document.getElementById('defaultTab').click();
     document.getElementById('node-editor-modal').style.display = 'block';
 };
@@ -264,14 +292,18 @@ window.saveNodeConfig = async function() {
     const isYaml    = document.getElementById('YamlEdit').style.display === 'block';
     
     let typeField = document.getElementById('edit-type').value;
+    let planeEl = document.getElementById('edit-plane');
+    let planeField = planeEl ? planeEl.value : 'data';
+    
+    let primaryNic = (typeField === 'controller') ? 'eth0' : 'eth1';
     let ipField   = document.getElementById('edit-ip').value.trim();
     let finalNics = document.getElementById('edit-nics').value.trim();
     let finalTerm = document.getElementById('edit-term').value.trim();
 
     let nicsArray = finalNics ? finalNics.split('\n') : [];
     if (ipField) {
-        nicsArray = nicsArray.filter(n => !n.startsWith('eth1='));
-        nicsArray.unshift(`eth1=${ipField}`); 
+        nicsArray = nicsArray.filter(n => !n.startsWith(`${primaryNic}=`));
+        nicsArray.unshift(`${primaryNic}=${ipField}`); 
     }
     finalNics = nicsArray.join('\n');
 
@@ -295,6 +327,7 @@ window.saveNodeConfig = async function() {
     } else {
         formData.append('format', 'form');
         formData.append('type', typeField);
+        formData.append('plane', planeField);
         formData.append('kind', document.getElementById('edit-kind').value);
         formData.append('gw',   document.getElementById('edit-gw').value);
         formData.append('nics', finalNics);
@@ -332,14 +365,15 @@ window.saveNodeConfig = async function() {
         
         if (editRes.ok) {
             resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; display: block; padding: 8px;';
-            resultDiv.textContent = ' Node saved successfully! (Reloading...)';
+            // FIX: Safe HTML injected icon, immune to encoding corruption!
+            resultDiv.innerHTML = '<i class="w3-text-green fas fa-check-circle"></i> Node saved successfully! (Reloading...)';
             setTimeout(() => location.reload(), 800);
         } else {
             throw new Error(data.error);
         }
     } catch (err) {
         resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; display: block; padding: 8px;';
-        resultDiv.textContent = 'L ' + err.message;
+        resultDiv.innerHTML = '<i class="w3-text-red fas fa-times-circle"></i> ' + err.message;
         btn.disabled = false;
         btn.innerHTML = origBtnHtml;
     }
@@ -357,7 +391,6 @@ window.openEditorTab = function(evt, tabName) {
     if (tabName === 'YamlEdit') {
         window.initCodeEditor('node-yaml-editor', 'yaml');
         
-        // RESTORED: Helpful visual cue so users know the tabs don't sync.
         if (!window.currentEditNode && window.cmEditors && window.cmEditors['node-yaml-editor']) {
             const cm = window.cmEditors['node-yaml-editor'];
             if (cm.getValue().trim() === '') {
