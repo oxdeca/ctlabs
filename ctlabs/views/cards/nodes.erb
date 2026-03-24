@@ -64,7 +64,11 @@
           %>
           <tr class="node-row" style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
             <td style="text-align: center; vertical-align: middle;">
-              <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
+              <% if ['rhost', 'external'].include?(node[:type].to_s.downcase) %>
+                <i class="fas fa-circle-notch fa-spin w3-text-gray rhost-status-icon" data-lab="<%= info_hash[:lab_path] %>" data-node="<%= node[:name] %>" style="font-size: 0.8em;" title="Checking reachability..."></i>
+              <% else %>
+                <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
+              <% end %>
             </td>
             
             <td style="vertical-align: middle; white-space: nowrap;">

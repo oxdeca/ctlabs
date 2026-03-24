@@ -60,24 +60,43 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
     const switchContainer = switchSelect.closest('.w3-col');
     const ipContainer = ipInput.closest('.w3-col');
     const gwContainer = gwInput.closest('.w3-col');
+    
     const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
+    const ipLabel = ipContainer ? ipContainer.querySelector('label') : null;
+    const gwLabel = gwContainer ? gwContainer.querySelector('label') : null;
 
-    let primaryNic = (nodeType === 'controller') ? 'eth0' : 'eth1';
+    // --- DYNAMIC NIC & LABELS BASED ON NODE TYPE ---
+    let primaryNic = 'eth1';
+    if (nodeType === 'controller') primaryNic = 'eth0';
+    if (nodeType === 'rhost') primaryNic = 'tun0';
+
     let targetType = 'switches';
     let labelText = `Connect to Switch (${primaryNic})`;
     let showIpGw = true;
+    let ipLabelText = 'Data IP / Public IP Address';
+    let gwLabelText = 'Gateway (gw)';
 
     if (nodeType === 'switch') {
         targetType = 'routers';
         labelText = `Connect to Router (${primaryNic})`;
         showIpGw = false;
-    } else if (nodeType === 'rhost' || nodeType === 'external') {
+    } else if (nodeType === 'rhost') {
+        // VPN / Remote Host specific overrides
+        targetType = 'routers';
+        labelText = `Connect to Router (${primaryNic})`;
+        showIpGw = true; 
+        ipLabelText = 'Tunnel / Data IP (tun0)';
+        gwLabelText = 'Public Mgmt IP (for SSH)';
+    } else if (nodeType === 'external') {
         targetType = 'switches';
         labelText = 'Connect to Switch (Optional)';
         showIpGw = true; 
     }
 
     if (switchLabel) switchLabel.innerHTML = labelText;
+    if (ipLabel) ipLabel.innerHTML = ipLabelText;
+    if (gwLabel) gwLabel.innerHTML = gwLabelText;
+    
     if (ipContainer) ipContainer.style.display = showIpGw ? 'block' : 'none';
     if (gwContainer) gwContainer.style.display = (showIpGw && nodeType !== 'external') ? 'block' : 'none';
 
@@ -93,19 +112,15 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
     }
 
     optionsList.forEach(opt => {
-        // PREVENT SELF-CONNECTION BUG: A node can never connect to itself
         if (opt === window.currentEditNode) return;
 
         if (nodePlane === 'mgmt') {
-            // FIX: If we need a router in Mgmt Plane, ONLY show ro0 (not sw0)
             if (targetType === 'routers') {
                 if (opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
             } else {
-                // If we need a switch in Mgmt plane, show sw0 or ro0
                 if (opt === 'sw0' || opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
             }
         } else {
-            // Data/Edge Plane: Hide sw0 and ro0
             if (opt !== 'sw0' && opt !== 'ro0') {
                 switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
             }
@@ -140,7 +155,10 @@ window.editNodeConfig = async function(labName, nodeName) {
             const nodeObj = data.json[nodeName] || data.json || {};
             const nodeType = nodeObj.type || 'host';
             const nodePlane = nodeObj.plane || 'data';
-            const primaryNic = (nodeType === 'controller') ? 'eth0' : 'eth1';
+            
+            let primaryNic = 'eth1';
+            if (nodeType === 'controller') primaryNic = 'eth0';
+            if (nodeType === 'rhost') primaryNic = 'tun0';
 
             try {
                 window.updateNodeFormFields(nodeType, nodePlane);
@@ -155,7 +173,6 @@ window.editNodeConfig = async function(labName, nodeName) {
             document.getElementById('edit-info').value = nodeObj.info || '';
             document.getElementById('edit-term').value = nodeObj.term || '';
             
-            // FIX: Gracefully default switches, routers, gateways to 'linux' if missing.
             const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
             document.getElementById('edit-kind').value = nodeObj.kind || (needsLinuxFallback ? 'linux' : '');
             
@@ -207,7 +224,6 @@ window.editNodeConfig = async function(labName, nodeName) {
             if (connectedSwitch) {
                 const switchSelect = document.getElementById('edit-switch');
                 if (switchSelect) {
-                    // Force inject if not present, to ensure the UI successfully reflects reality
                     const exists = Array.from(switchSelect.options).some(o => o.value === connectedSwitch);
                     if (!exists) switchSelect.innerHTML += `<option value="${connectedSwitch}">${connectedSwitch}</option>`;
                     switchSelect.value = connectedSwitch;
@@ -295,10 +311,20 @@ window.saveNodeConfig = async function() {
     let planeEl = document.getElementById('edit-plane');
     let planeField = planeEl ? planeEl.value : 'data';
     
-    let primaryNic = (typeField === 'controller') ? 'eth0' : 'eth1';
+    let primaryNic = 'eth1';
+    if (typeField === 'controller') primaryNic = 'eth0';
+    if (typeField === 'rhost') primaryNic = 'tun0';
+
     let ipField   = document.getElementById('edit-ip').value.trim();
+    let gwField   = document.getElementById('edit-gw').value.trim();
     let finalNics = document.getElementById('edit-nics').value.trim();
     let finalTerm = document.getElementById('edit-term').value.trim();
+
+    // AUTO-GENERATE SSH LINK FOR RHOST USING THE PUBLIC MGMT IP
+    if (typeField === 'rhost' && !finalTerm && gwField) {
+        const ipOnly = gwField.split('/')[0];
+        finalTerm = `ssh://root@${ipOnly}`;
+    }
 
     let nicsArray = finalNics ? finalNics.split('\n') : [];
     if (ipField) {
@@ -311,11 +337,6 @@ window.saveNodeConfig = async function() {
         formData.append('node_name', nodeName);
         formData.append('switch', document.getElementById('edit-switch').value);
         formData.append('ip', ipField);
-        
-        if (typeField === 'rhost' && ipField && !finalTerm) {
-            const ipOnly = ipField.split('/')[0];
-            finalTerm = `ssh://root@${ipOnly}`;
-        }
     } else {
         formData.append('switch', document.getElementById('edit-switch').value);
     }
@@ -329,7 +350,7 @@ window.saveNodeConfig = async function() {
         formData.append('type', typeField);
         formData.append('plane', planeField);
         formData.append('kind', document.getElementById('edit-kind').value);
-        formData.append('gw',   document.getElementById('edit-gw').value);
+        formData.append('gw',   gwField);
         formData.append('nics', finalNics);
         formData.append('info', document.getElementById('edit-info').value);
         formData.append('urls_text', document.getElementById('edit-urls').value);
@@ -365,15 +386,14 @@ window.saveNodeConfig = async function() {
         
         if (editRes.ok) {
             resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; display: block; padding: 8px;';
-            // FIX: Safe HTML injected icon, immune to encoding corruption!
-            resultDiv.innerHTML = '<i class="w3-text-green fas fa-check-circle"></i> Node saved successfully! (Reloading...)';
+            resultDiv.innerHTML = '<i class="fas fa-check-circle w3-text-green"></i> Node saved successfully! (Reloading...)';
             setTimeout(() => location.reload(), 800);
         } else {
             throw new Error(data.error);
         }
     } catch (err) {
         resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; display: block; padding: 8px;';
-        resultDiv.innerHTML = '<i class="w3-text-red fas fa-times-circle"></i> ' + err.message;
+        resultDiv.innerHTML = '<i class="fas fa-times-circle w3-text-red"></i> ' + err.message;
         btn.disabled = false;
         btn.innerHTML = origBtnHtml;
     }
@@ -419,3 +439,52 @@ window.filterNodeProfiles = function() {
         rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
     }
 };
+
+
+// ===================================================
+// REMOTE HOST LIVENESS WATCHER
+// ===================================================
+window.checkRemoteHosts = async function() {
+    // Only target icons that are still spinning (unprocessed)
+    const icons = document.querySelectorAll('.rhost-status-icon.fa-spin');
+    if (icons.length === 0) return; // Nothing new to check
+
+    console.log(`[Ping] Found ${icons.length} unprocessed remote hosts.`);
+
+    for (let el of icons) {
+        const rawLab = el.getAttribute('data-lab');
+        if (!rawLab) continue;
+
+        const safeLab = rawLab.split('/').map(encodeURIComponent).join('/');
+        const node = encodeURIComponent(el.getAttribute('data-node'));
+
+        // Instantly remove the spin class so we don't check it twice next loop
+        el.classList.remove('fa-circle-notch', 'fa-spin', 'w3-text-gray');
+        el.classList.add('fa-circle');
+
+        console.log(`[Ping] Sending request to backend for node: ${decodeURIComponent(node)}...`);
+
+        try {
+            const res = await fetch(`/labs/${safeLab}/node/${node}/ping`);
+            const data = await res.json();
+
+            if (res.ok && data.alive) {
+                console.log(`[Ping] ${decodeURIComponent(node)} is ALIVE!`);
+                el.style.color = '#10b981'; // Green
+                el.title = "Reachable via SSH";
+            } else {
+                console.warn(`[Ping] ${decodeURIComponent(node)} is OFFLINE:`, data.error || "Timeout");
+                el.style.color = '#ef4444'; // Red
+                el.title = data.error ? `Error: ${data.error}` : "Unreachable (Timeout)";
+            }
+        } catch (e) {
+            console.error(`[Ping] Network/Fetch error for ${decodeURIComponent(node)}:`, e);
+            el.style.color = '#ef4444';
+            el.title = "Network error checking status";
+        }
+    }
+};
+
+// Start a background watcher that runs every 2 seconds. 
+// Whenever the dashboard dynamically reloads the nodes.erb card, this will instantly catch it!
+setInterval(window.checkRemoteHosts, 2000);

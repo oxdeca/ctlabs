@@ -407,91 +407,94 @@ class Lab
 
   def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
-  
+
     chain = "#{@name.upcase}-DNAT"
     vmip  = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
-  
+
     node = find_node(node_name)
     raise "Node '#{node_name}' not found" if node.nil?
-  
+
     if node.type == 'controller'
       # === MGMT NETWORK PATH (implicit via ro0) ===
       router = find_node('ro0')
       raise "'ro0' router not found for controller DNAT" if router.nil?
       raise "'ro0' missing eth1" unless router.nics.key?('eth1')
-  
+
       mgmt_via = router.nics['eth1'].split('/')[0]
       target_ip = node.nics['eth0']&.split('/')&.first
       raise "Controller node missing eth0" if target_ip.nil?
-  
+
       # Rule 1: Host → ro0 (mgmt gateway)
       rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
       rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
-  
+
       unless system(rule1_check)
         @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}", "debug"
         raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
       end
-  
+
       router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
       # Rule 2: Inside ro0 netns → final controller
       rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
       rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-  
+
       unless system(rule2_check)
         @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}", "debug"
         raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
       end
-  
+
       @log.info "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-  
-    elsif node.type == 'host'
-      # === DATA NETWORK PATH (via natgw) ===
+
+    elsif ['host', 'server', 'router', 'gateway'].include?(node.type)
+      # === DATA/EDGE NETWORK PATH (via natgw) ===
       natgw = find_node('natgw')
-      raise "No 'natgw' node found (required for host DNAT)" if natgw.nil?
+      raise "No 'natgw' node found (required for #{node.type} DNAT)" if natgw.nil?
       raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
-  
+
       parts = natgw.dnat.to_s.split(':')
       raise "Invalid natgw.dnat format" unless parts.length == 2
       router_name, nic = parts
       raise "Empty router/interface in natgw.dnat" if router_name.empty? || nic.empty?
-  
+
       router = find_node(router_name)
       raise "Router '#{router_name}' not found" if router.nil?
       raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
-  
+
       via = router.nics[nic].split('/')[0]
-      target_ip = node.nics['eth1']&.split('/')&.first
-      raise "Host node missing eth1" if target_ip.nil?
-  
+      
+      # Target IP: Smart fallback. Try eth1 (data), then eth0 (mgmt/edge), then tun0
+      target_ip = node.nics['eth1']&.split('/')&.first || node.nics['eth0']&.split('/')&.first || node.nics['tun0']&.split('/')&.first
+      raise "Node #{node.name} missing suitable network interface (eth1, eth0, or tun0)" if target_ip.nil?
+
       # Rule 1: Host → natgw internal IP (same port)
       rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
       rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
-  
+
       unless system(rule1_check)
         @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}", "debug"
         raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
       end
-  
+
       router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
       # Rule 2: Inside router netns → final host
       rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
       rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-  
+
       unless system(rule2_check)
         @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}", "debug"
         raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
       end
-  
+
       @log.info "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-  
+
     else
-      raise "AdHoc DNAT only supported for 'host' and 'controller' nodes"
+      raise "AdHoc DNAT only supported for 'host', 'controller', 'router', 'server', and 'gateway' nodes"
     end
-  
+
     return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
   end
 
+    
   def add_adhoc_node(node_name, node_cfg, target_switch = nil)
     @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
     raise "Node '#{node_name}' already exists" if find_node(node_name)
@@ -507,30 +510,35 @@ class Lab
     # 2. Determine explicitly vs implicitly managed networks
     type = node_cfg['type']
     kind = node_cfg['kind']
-    is_explicit_mgmt = (type == 'controller' || (type == 'router' && kind == 'mgmt'))
-    needs_implicit_mgmt = (['host', 'switch'].include?(type) || (type == 'router' && kind != 'mgmt'))
+    plane = node_cfg['plane'] || 'data'
+
+    # Remote hosts don't get implicit local docker mgmt networks
+    is_remote = ['rhost', 'external'].include?(type)
+
+    is_explicit_mgmt = (type == 'controller' || plane == 'mgmt' || (type == 'router' && kind == 'mgmt'))
+    needs_implicit_mgmt = !is_remote && (['host', 'switch', 'server'].include?(type) || (type == 'router' && kind != 'mgmt'))
 
     # Calculate next available Mgmt IP safely
     vm_name = @vm_name || @cfg['topology'][0]['name']
     cfg_vm  = find_vm(vm_name)
     mgmt    = cfg_vm['mgmt'] || @mgmt || {}
     net     = mgmt['net'] || "192.168.40.0/24"
-    
+
     tmp  = net.split('/')
     mask = tmp[1]
-    net_prefix = tmp[0].split('.')[0..2].join('.') + '.' 
-    
-    used_ips = @nodes.map do |n| 
+    net_prefix = tmp[0].split('.')[0..2].join('.') + '.'
+
+    used_ips = @nodes.map do |n|
       n.nics['eth0'].to_s.split('/')[0].to_s.split('.').last.to_i if n.nics && !n.nics['eth0'].to_s.strip.empty?
     end.compact
-    
+
     mgmt_ip = "#{net_prefix}#{(used_ips.max || 20) + 1}/#{mask}"
 
     # 3. Create Runtime Configuration
     runtime_cfg = Marshal.load(Marshal.dump(node_cfg)) # Deep clone
     runtime_cfg['nics'] ||= {}
-    
-    if is_explicit_mgmt
+
+    if is_explicit_mgmt && !is_remote
       # Explicit mgmt nodes MUST have eth0 explicitly in the YAML
       if runtime_cfg['nics']['eth0'].nil? || runtime_cfg['nics']['eth0'].strip.empty?
         runtime_cfg['nics']['eth0'] = mgmt_ip
@@ -542,7 +550,7 @@ class Lab
       runtime_cfg['nics']['eth0'] = mgmt_ip
       node_cfg['nics'].delete('eth0') if node_cfg['nics']
     end
-    
+
     node_cfg['adhoc'] = true # Tag for UI
 
     # 4. Instantiate Node with RUNTIME config
@@ -556,20 +564,22 @@ class Lab
     }.merge(runtime_cfg))
 
     @nodes << node
-    node.run
+    
+    # Do not try to run a local container for a remote host!
+    node.run unless is_remote 
 
     # 5. Connect Mgmt Interface to sw0 sequentially
-    if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
+    if !is_remote && !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
       sw0 = find_node('sw0')
       if sw0
-        used_sw0 = @links.map do |l| 
+        used_sw0 = @links.map do |l|
           if l[0] =~ /^sw0:eth(\d+)$/
             $1.to_i
           elsif l[1] =~ /^sw0:eth(\d+)$/
             $1.to_i
           end
         end.compact
-        
+
         next_sw0_port = 1
         next_sw0_port += 1 while used_sw0.include?(next_sw0_port)
 
@@ -583,20 +593,27 @@ class Lab
     data_link = nil
     if target_switch && !target_switch.to_s.strip.empty?
       if target_sw_node = find_node(target_switch)
-        used_sw = @links.map do |l| 
+        used_sw = @links.map do |l|
           if l[0] =~ /^#{target_switch}:eth(\d+)$/
             $1.to_i
           elsif l[1] =~ /^#{target_switch}:eth(\d+)$/
             $1.to_i
           end
         end.compact
-        
+
         next_port = 1
         next_port += 1 while used_sw.include?(next_port)
 
-        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:eth1"]
+        # Smart primary NIC selection based on the new types
+        primary_nic = 'eth1'
+        primary_nic = 'eth0' if type == 'controller'
+        primary_nic = 'tun0' if type == 'rhost'
+
+        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:#{primary_nic}"]
         @links << data_link
-        Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
+        
+        # Do not try to build a local veth pair for a remote host!
+        Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt) unless is_remote 
       end
     end
 
@@ -609,23 +626,43 @@ class Lab
       File.open(runtime_file, 'a') do |f|
         clean_cfg = Marshal.load(Marshal.dump(node_cfg))
         clean_cfg.delete('adhoc')
-        
+
         # 8 spaces for node name
         yaml_str = "      #{node_name}:\n"
         # 10 spaces for attributes
-        yaml_str << "        type : #{clean_cfg['type']}\n" if clean_cfg['type']
-        yaml_str << "        kind : #{clean_cfg['kind']}\n" if clean_cfg['kind'] && !clean_cfg['kind'].to_s.empty?
-        yaml_str << "        gw   : #{clean_cfg['gw']}\n" if clean_cfg['gw'] && !clean_cfg['gw'].to_s.empty?
-        
-        # NEVER save explicit nics for switches. Strip eth0 for all others.
-        if clean_cfg['type'] != 'switch' && clean_cfg['nics'] && clean_cfg['nics'].any? { |k,v| k != 'eth0' }
-          yaml_str << "        nics :\n"
-          clean_cfg['nics'].each { |nic, ip| yaml_str << "          #{nic}: #{ip}\n" unless nic == 'eth0' }
+        yaml_str << "        type: #{clean_cfg['type']}\n" if clean_cfg['type']
+        yaml_str << "        plane: #{clean_cfg['plane']}\n" if clean_cfg['plane'] && !clean_cfg['plane'].to_s.empty?
+        yaml_str << "        kind: #{clean_cfg['kind']}\n" if clean_cfg['kind'] && !clean_cfg['kind'].to_s.empty?
+        yaml_str << "        gw: #{clean_cfg['gw']}\n" if clean_cfg['gw'] && !clean_cfg['gw'].to_s.empty?
+        yaml_str << "        info: \"#{clean_cfg['info']}\"\n" if clean_cfg['info'] && !clean_cfg['info'].to_s.empty?
+        yaml_str << "        term: \"#{clean_cfg['term']}\"\n" if clean_cfg['term'] && !clean_cfg['term'].to_s.empty?
+
+        # Safely extract array blocks (vols, env, devs)
+        ['vols', 'env', 'devs'].each do |arr_key|
+          if clean_cfg[arr_key] && clean_cfg[arr_key].is_a?(Array) && !clean_cfg[arr_key].empty?
+            yaml_str << "        #{arr_key}:\n"
+            clean_cfg[arr_key].each { |val| yaml_str << "        - \"#{val}\"\n" }
+          end
         end
-        
+
+        # Safely extract url dictionary
+        if clean_cfg['urls'] && clean_cfg['urls'].is_a?(Hash) && !clean_cfg['urls'].empty?
+          yaml_str << "        urls:\n"
+          clean_cfg['urls'].each { |k, v| yaml_str << "          #{k}: \"#{v}\"\n" }
+        end
+
+        # Carefully extract NICs, dropping eth0 ONLY if it was auto-generated for implicit mgmt
+        if clean_cfg['nics'] && !clean_cfg['nics'].empty?
+          yaml_str << "        nics:\n"
+          clean_cfg['nics'].each do |nic, ip|
+            next if nic == 'eth0' && needs_implicit_mgmt
+            yaml_str << "          #{nic}: #{ip}\n"
+          end
+        end
+
         f.puts "===NODE==="
-        f.puts yaml_str.chomp # Chomp removes the trailing newline for cleaner injection
-        
+        f.puts yaml_str.chomp 
+
         if data_link
           f.puts "===LINK==="
           f.puts "      - [ \"#{data_link[0]}\",  \"#{data_link[1]}\" ]\n"
@@ -637,7 +674,6 @@ class Lab
 
     [node_cfg, data_link]
   end
-    
 
   def del_dnat
     @log.write "#{__method__}(): ", "debug"

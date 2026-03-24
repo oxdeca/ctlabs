@@ -3,6 +3,9 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'socket'
+require 'timeout'
+
 # ===================================================
 # NODES
 # ===================================================
@@ -169,6 +172,42 @@ post '/labs/*/node/:node_name/delete' do
 
     write_formatted_yaml(lab_path, yaml)
     { success: true, message: "Node deleted and orphaned links removed." }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+
+#
+# ASYNC LIVENESS CHECK
+#
+get '/labs/*/node/:node_name/ping' do
+  lab_name = params[:splat].first
+  node_name = params[:node_name]
+  lab_path = get_lab_file_path(lab_name)
+
+  begin
+    data = YAML.load_file(lab_path)
+    node_cfg = data['topology'][0]['nodes'][node_name]
+    
+    # Extract Public Mgmt IP from the 'gw' field
+    target_ip = node_cfg['gw'].to_s.split('/').first
+
+    if target_ip.nil? || target_ip.strip.empty?
+      halt 400, { success: false, error: "No IP defined in gw field" }.to_json
+    end
+
+    is_alive = false
+    begin
+      # Native TCP connection with a strict 1-second timeout to port 22
+      Socket.tcp(target_ip, 22, connect_timeout: 1) { |sock| is_alive = true }
+    rescue StandardError
+      is_alive = false
+    end
+
+    content_type :json
+    { success: true, alive: is_alive }.to_json
   rescue => e
     status 400
     { success: false, error: e.message }.to_json

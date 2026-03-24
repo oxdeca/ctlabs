@@ -31,7 +31,17 @@
       <h6 style="color: #94a3b8; font-weight: 600; margin-top: 0;"><i class="fas fa-plus"></i> Add AdHoc DNAT Rule</h6>
       <form id="adhoc-dnat-form" onsubmit="window.submitAdhocDnat(event)" class="w3-row-padding" style="margin:0 -8px;">
         <input type="hidden" name="lab_name" value="<%= info_hash[:lab_path] %>">
-        <div class="w3-col s12 m4 l4 w3-margin-bottom" style="padding:0 4px;"><select name="node" class="w3-select w3-small" required><option value="" disabled selected>-- Node --</option><% (info_hash[:nodes] || []).each do |n| %><% if n[:type] == 'host' || n[:type] == 'controller' %><option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option><% end %><% end %></select></div>
+        <div class="w3-col s12 m4 l4 w3-margin-bottom" style="padding:0 4px;">
+          <select name="node" class="w3-select w3-small" required>
+            <option value="" disabled selected>-- Node --</option>
+            <% (info_hash[:nodes] || []).each do |n| %>
+              <%# --- FIX: Added router, server, and gateway to the allowed types --- %>
+              <% if ['host', 'controller', 'router', 'server', 'gateway'].include?(n[:type].to_s.downcase) %>
+                <option value="<%= n[:name] %>"><%= n[:name] %> (<%= n[:type] %>)</option>
+              <% end %>
+            <% end %>
+          </select>
+        </div>
         <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="external_port" placeholder="Ext" min="1" max="65535" class="w3-input w3-small" required></div>
         <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><input type="number" name="internal_port" placeholder="Int" min="1" max="65535" class="w3-input w3-small" required></div>
         <div class="w3-col s6 m2 l2 w3-margin-bottom" style="padding:0 4px;"><select name="protocol" class="w3-select w3-small"><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
