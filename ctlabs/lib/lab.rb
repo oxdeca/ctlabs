@@ -494,6 +494,54 @@ class Lab
     return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
   end
 
+  # Generates a dedicated SSH key pair for the lab and distributes it
+  def setup_lab_ssh_keys
+    @log.info "Setting up Lab-wide Bootstrap SSH keys..."
+    
+    FileUtils.mkdir_p('/var/run/ctlabs/keys')
+    safe_name = @relative_path.gsub('/', '_')
+    priv_key = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
+    pub_key_path = "#{priv_key}.pub"
+
+    # Generate the key pair if it doesn't already exist for this session
+    unless File.exist?(priv_key)
+      system("ssh-keygen -t ed25519 -f #{priv_key} -N '' -q -C 'lab-#{safe_name}'")
+    end
+
+    pub_key = File.read(pub_key_path).strip
+
+    @nodes.each do |node|
+      inject_ssh_key_to_node(node, priv_key, pub_key_path, pub_key)
+    end
+  end
+
+  # Mounts the keys into a specific container via Docker Exec
+  def inject_ssh_key_to_node(node, priv_key, pub_key_path, pub_key)
+    # Skip remote hosts since we don't have local docker exec access to them
+    return if ['rhost', 'external'].include?(node.type)
+
+    begin
+      # Ensure .ssh directory exists
+      system("docker exec #{node.name} mkdir -p /root/.ssh")
+      system("docker exec #{node.name} chmod 700 /root/.ssh")
+
+      # The controller gets the PRIVATE key so it can SSH into other nodes/GCP
+      if node.type == 'controller'
+        system("docker cp #{priv_key} #{node.name}:/root/.ssh/id_ed25519")
+        system("docker cp #{pub_key_path} #{node.name}:/root/.ssh/id_ed25519.pub")
+        system("docker exec #{node.name} chmod 600 /root/.ssh/id_ed25519")
+        system("docker exec #{node.name} chmod 644 /root/.ssh/id_ed25519.pub")
+      end
+
+      # ALL nodes get the PUBLIC key in their authorized_keys
+      system("docker exec #{node.name} sh -c \"echo '#{pub_key}' >> /root/.ssh/authorized_keys\"")
+      system("docker exec #{node.name} chmod 600 /root/.ssh/authorized_keys")
+      
+    rescue => e
+      @log.write("Failed to inject SSH keys to #{node.name}: #{e.message}", "error")
+    end
+  end
+
     
   def add_adhoc_node(node_name, node_cfg, target_switch = nil)
     @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
@@ -567,6 +615,15 @@ class Lab
     
     # Do not try to run a local container for a remote host!
     node.run unless is_remote 
+
+    unless is_remote
+      safe_name = @relative_path.gsub('/', '_')
+      priv_key = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
+      if File.exist?(priv_key)
+        pub_key = File.read("#{priv_key}.pub").strip
+        inject_ssh_key_to_node(node, priv_key, "#{priv_key}.pub", pub_key)
+      end
+    end
 
     # 5. Connect Mgmt Interface to sw0 sequentially
     if !is_remote && !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
@@ -706,6 +763,8 @@ class Lab
       @log.info "DNAT:"
       add_dnat
     end
+
+    setup_lab_ssh_keys
 
     # Copy lab-specific flashcards if they exist
     lab_flashcards    = File.join(File.dirname(@cfg_file), 'flashcards.json')

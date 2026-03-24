@@ -36,17 +36,30 @@ class Graph
       tt << "ℹ️ #{node.info}"
       tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
     end
-    
-    tt << "🌐 IPv4: #{node.ipv4}" unless node.ipv4.to_s.empty?
-    
+
+    if ['rhost', 'external'].include?(node.type) && node.gw && !node.gw.empty?
+      tt << "🌐 Mgmt (GW): #{node.gw}"
+    elsif node.ipv4 && !node.ipv4.to_s.empty?
+      tt << "🌐 IPv4: #{node.ipv4}"
+    end
+
     if node.nics && !node.nics.empty?
-      tt << "🔌 Interfaces:"
-      node.nics.each do |k, v| 
+      has_valid_nics = false
+      nic_lines = []
+      node.nics.each do |k, v|
         next if v.to_s.strip.empty?
-        tt << "   ▪ #{k}  ➔  #{v}"
+        # Hide the invalid eth0 from remote host tooltips
+        next if ['rhost', 'external'].include?(node.type) && k == 'eth0'
+        nic_lines << "   ▪ #{k}  ➔  #{v}"
+        has_valid_nics = true
+      end
+      
+      if has_valid_nics
+        tt << "🔌 Interfaces:"
+        tt += nic_lines
       end
     end
-    
+
     if node.dnat && !node.dnat.empty?
       tt << "🔀 Port Forwarding:"
       if node.dnat.is_a?(Array)
@@ -71,11 +84,14 @@ class Graph
 
     if node.respond_to?(:term) && node.term && !node.term.empty?
       tt << "[TERM:#{node.term}]"
+    elsif ['rhost', 'external'].include?(node.type) && node.gw && !node.gw.to_s.empty?
+      ip_only = node.gw.split('/').first
+      tt << "[TERM:ssh://root@#{ip_only}]"
     elsif node.ipv4 && !node.ipv4.to_s.empty?
       ip_only = node.ipv4.split('/').first
       tt << "[TERM:ssh://root@#{ip_only}]"
     end
-    
+
     tt.join('&#10;')
   end
 
@@ -130,11 +146,14 @@ class Graph
               </tr>
         <%- end -%>
               <tr>
-        <%-   if node.nics.empty? -%>
+        <%-   
+              valid_nics = node.nics.reject { |k, _| ['rhost', 'external'].include?(group) && k == 'eth0' }
+              if valid_nics.empty? 
+        -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
         <%-   else -%>
-        <%-     node.nics.each do |nic| -%>
-                <td port="<%= nic[0] %>" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= nic[0].to_s.empty? ? '&nbsp;' : nic[0] %> </font></td>
+        <%-     valid_nics.each do |k, v| -%>
+                <td port="<%= k %>" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= k.to_s.empty? ? '&nbsp;' : k %> </font></td>
         <%-     end -%>
         <%-   end -%>
               </tr>
@@ -238,11 +257,14 @@ class Graph
               </tr>
         <%- end -%>
               <tr>
-        <%-   if node.nics.empty? -%>
+        <%-   
+              valid_nics = node.nics.reject { |k, _| ['rhost', 'external'].include?(group) && k == 'eth0' }
+              if valid_nics.empty? 
+        -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
         <%-   else -%>
-        <%-     node.nics.each do |nic| -%>
-                <td PORT="<%= nic[0] %>" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= nic[0].to_s.empty? ? '&nbsp;' : nic[0] %> </font></td>
+        <%-     valid_nics.each do |k, v| -%>
+                <td port="<%= k %>" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= k.to_s.empty? ? '&nbsp;' : k %> </font></td>
         <%-     end -%>
         <%-   end -%>
               </tr>
@@ -319,7 +341,9 @@ class Graph
         <%-     if node.type == 'host' || node.type == 'vhost' -%>
         <%=       node.name.sub(/.-/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16">💻 <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
         <%-     elsif node.type == 'external' || node.type == 'rhost' -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="#0ea5e9", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#0ea5e9" point-size="16">☁️ <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
+        <%-       data_ip = node.nics.is_a?(Hash) ? (node.nics['tun0'] || node.nics['eth1']) : nil -%>
+        <%-       data_ip_str = data_ip.to_s.strip.empty? ? '&nbsp;' : data_ip.to_s.split('/').first -%>
+        <%=       node.name.sub(/.-/, "_") %> [color="#0ea5e9", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#0ea5e9" point-size="16">☁️ <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= data_ip_str %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -401,14 +425,13 @@ class Graph
         graph [pad="0.5", esep="0.5", ranksep="1.4", overlap=false, splines=polyline, layout=neato, bgcolor="#1e293b", fontname="Helvetica, Arial, sans-serif", fontsize="16"]
         node  [shape=rect, style="rounded,filled", fillcolor="#0f172a", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.25,0.15"]
         edge  [color="#64748b", penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12", fontcolor="#94a3b8"]
-
         <%- @cfg['topology'].each do |vm| -%>
         <%-   nodes = init_nodes(vm['name']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if ['host', 'vhost', 'controller', 'external', 'rhost'].include?(node.type)
                   server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
                   node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
-                  
+
                   if node.type == 'controller'
                     node_color = '#ef4444'
                     n_icon = '⚙️ '
@@ -419,8 +442,11 @@ class Graph
                     node_color = '#38bdf8'
                     n_icon = '💻 '
                   end
+                  
+                  # Use gw for remote hosts, eth0 for local hosts
+                  mgmt_ip = ['external', 'rhost'].include?(node.type) ? node.gw : node.nics['eth0']
         -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= n_icon %><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth0'].to_s.empty? ? '&nbsp;' : node.nics['eth0'] %></font></td></tr></table> >]
+        <%=       node.name.sub(/.-/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= n_icon %><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= mgmt_ip.to_s.empty? ? '&nbsp;' : mgmt_ip %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -519,14 +545,22 @@ class Graph
 
 [hosts]
   <%- @nodes.each do |node| -%>
-  <%-   if (node.type == 'host' || node.type == 'vhost' || node.type == 'external' || node.type == 'rhost') and !node.nics['eth0'].to_s.empty? -%>
+  <%-   if ['host', 'vhost', 'server'].include?(node.type) and node.nics && !node.nics['eth0'].to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
-[all:vars]
-  <%= "ansible_user".ljust(24)         + "= root" %>
-  <%= "ansible_ssh_password".ljust(24) + "= secret" %>
+[rhosts]
+  <%- @nodes.each do |node| -%>
+  <%-   if ['rhost', 'external'].include?(node.type) -%>
+  <%-     # For remote nodes, 'gw' is the Public Management IP -%>
+  <%-     mgmt_ip = (node.gw && !node.gw.to_s.strip.empty?) ? node.gw : (node.nics && node.nics['eth0']) -%>
+  <%-     if mgmt_ip && !mgmt_ip.to_s.empty? -%>
+  <%=       node.name.ljust(24) %> ansible_host=<%= mgmt_ip.to_s.split('/')[0] %>
+  <%-     end -%>
+  <%-   end -%>
+  <%- end -%>
+
     }
   end
 
@@ -559,14 +593,22 @@ class Graph
 
 [hosts]
   <%- @nodes.each do |node| -%>
-  <%-   if (node.type == 'host' || node.type == 'vhost' || node.type == 'external' || node.type == 'rhost') and node.nics && !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%-   is_target = ['host', 'vhost', 'server'].include?(node.type) -%>
+  <%-   data_ip = node.nics ? (node.nics['eth1'] || node.nics['tun0']) : nil -%>
+  <%-   if is_target && data_ip && !data_ip.to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
-[all:vars]
-  <%= "ansible_user".ljust(24)         + "= root" %>
-  <%= "ansible_ssh_password".ljust(24) + "= secret" %>
+[rhosts]
+  <%- @nodes.each do |node| -%>
+  <%-   is_rhost = ['rhost', 'external'].include?(node.type) -%>
+  <%-   data_ip = node.nics ? (node.nics['tun0'] || node.nics['eth1']) : nil -%>
+  <%-   if is_rhost && data_ip && !data_ip.to_s.empty? -%>
+  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
+  <%-   end -%>
+  <%- end -%>
+
     }
   end
 

@@ -6,6 +6,7 @@ require 'net/http'
 require 'uri'
 require 'json'
 require 'openssl'
+require 'tempfile'
 
 class VaultAuth
   # Handles both pure Userpass and LDAP based on the mount parameter
@@ -189,5 +190,94 @@ class VaultAuth
     # Reject/delete any cache entries that belong to this server address
     @gcp_cache.reject! { |key, data| data[:addr] == addr }
   end
+
+  # Signs an SSH Public Key using a Vault SSH CA Engine
+  # Mount defaults to 'ssh' but can be 'ssh/ca-dev', etc.
+  def self.sign_ssh_key(addr, token, mount, role, public_key, valid_principals = nil)
+    # Ensure mount path is formatted correctly
+    safe_mount = mount.to_s.sub(/^\//, '').sub(/\/$/, '')
+    uri = URI.parse("#{addr.sub(/\/$/, '')}/v1/#{safe_mount}/sign/#{role}")
+    
+    http = Net::HTTP.new(uri.host, uri.port)
+
+    if uri.scheme == 'https'
+      http.use_ssl = true
+      http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    end
+
+    request = Net::HTTP::Post.new(uri.request_uri, { 'Content-Type' => 'application/json' })
+    request['X-Vault-Token'] = token
+
+    # Build the payload
+    payload = { "public_key" => public_key }
+    
+    # If specific principals (like 'ubuntu' or 'root') are requested, pass them
+    # Otherwise, Vault will use the default_user defined in the role
+    if valid_principals && !valid_principals.to_s.strip.empty?
+      payload["valid_principals"] = valid_principals
+    end
+
+    request.body = payload.to_json
+
+    begin
+      response = http.request(request)
+      data = JSON.parse(response.body)
+
+      if response.is_a?(Net::HTTPSuccess) && data['data'] && data['data']['signed_key']
+        return data['data']['signed_key']
+      else
+        error_msg = data['errors'] ? data['errors'].join(', ') : response.message
+        raise "Vault SSH Signing Error: #{error_msg}"
+      end
+    rescue => e
+      raise "Failed to sign SSH key via Vault: #{e.message}"
+    end
+  end
+
+  # Introspects a Vault-signed OpenSSH Certificate string using the local ssh-keygen utility
+  def self.get_ssh_cert_info(cert_string)
+    return { "error" => "No certificate provided" } if cert_string.nil? || cert_string.empty?
+
+    begin
+      parsed_info = { principals: [] }
+      
+      # Write the certificate to a temporary file so ssh-keygen can read it
+      Tempfile.create(['vault_cert', '.pub']) do |f|
+        f.write(cert_string)
+        f.flush
+        
+        # Run ssh-keygen and capture both stdout and stderr
+        output = `ssh-keygen -L -f #{f.path} 2>&1`
+        
+        unless $?.success?
+          return { "error" => "ssh-keygen failed: #{output.strip}" }
+        end
+        
+        parsing_principals = false
+        
+        output.each_line do |line|
+          line = line.strip
+          if line.start_with?("Key ID:")
+            parsed_info[:key_id] = line.split(":", 2)[1].strip.delete('"')
+          elsif line.start_with?("Valid:")
+            parsed_info[:valid] = line.split(":", 2)[1].strip
+          elsif line.start_with?("Principals:")
+            parsing_principals = true
+          elsif parsing_principals
+            if line.start_with?("Critical Options:") || line.start_with?("Extensions:")
+              parsing_principals = false
+            elsif !line.empty? && line != "(none)"
+              parsed_info[:principals] << line
+            end
+          end
+        end
+      end
+      
+      return parsed_info
+    rescue => e
+      return { "error" => "Ruby error parsing SSH certificate: #{e.message}" }
+    end
+  end
+
 end
 
