@@ -5,6 +5,13 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  label             { font-size: 0.85em; color: #94a3b8; }
+  input.w3-input    { font-family: monospace !important; }
+  textarea.w3-input { font-family: monospace !important; }
+  select.w3-select  { font-family: monospace !important; }
+</style>
+
 <div id="vault-login-modal" class="w3-modal" style="z-index: 9999;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px;">
     
@@ -47,22 +54,22 @@
           <div id="vault-human-fields">
             <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user"></i> Username</label>
-              <input type="text" id="vault-username" name="username" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              <input type="text" id="vault-username" name="username" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
             <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-key"></i> Password</label>
-              <input type="password" id="vault-password" name="password" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              <input type="password" id="vault-password" name="password" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
           </div>
 
           <div id="vault-machine-fields" style="display: none;">
             <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-robot"></i> Role ID</label>
-              <input type="text" id="vault-role-id" name="role_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              <input type="text" id="vault-role-id" name="role_id" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
             <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;"><i class="fas fa-user-secret"></i> Secret ID</label>
-              <input type="password" id="vault-secret-id" name="secret_id" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+              <input type="password" id="vault-secret-id" name="secret_id" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
           </div>
 
