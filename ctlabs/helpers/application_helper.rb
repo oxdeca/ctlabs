@@ -204,20 +204,23 @@ module ApplicationHelper
     exposed_ports = []
     if lab.nodes
       lab.nodes.each do |node|
-        if (defined? node.dnat) && ! node.dnat.nil? && (node.type.include?('host') || node.type.include?('controller'))
+        # FIX: Ensure node.dnat is actually an Array before trying to loop through it!
+        if (defined? node.dnat) && !node.dnat.nil? && node.dnat.is_a?(Array) && ['host', 'controller', 'router', 'server', 'gateway'].include?(node.type.to_s.downcase)
           node.dnat.each do |p|
-            
+
             # Check if this exact rule exists in the base YAML
-            base_rule_exists = base_dnats[node.name] && base_dnats[node.name].any? { |bp| p[0].to_s == bp[0].to_s && p[1].to_s == bp[1].to_s && (p[2] || 'tcp').to_s == (bp[2] || 'tcp').to_s }
+            base_rule_exists = base_dnats[node.name] && base_dnats[node.name].is_a?(Array) && base_dnats[node.name].any? { |bp| p[0].to_s == bp[0].to_s && p[1].to_s == bp[1].to_s && (p[2] || 'tcp').to_s == (bp[2] || 'tcp').to_s }
             is_adhoc_dnat = !base_rule_exists
 
+            # Smart IP fallback mapping
             rip = ""
             if node.type == 'controller'
-              rip = node.nics['eth0'].split('/').first if node.nics && node.nics['eth0']
+              rip = node.nics['eth0']&.split('/')&.first
             else
-              rip = node.nics['eth1'].split('/').first if node.nics && node.nics['eth1']
+              # Try eth1 (data), fallback to eth0 (mgmt/edge), fallback to tun0 (vpn)
+              rip = node.nics['eth1']&.split('/')&.first || node.nics['eth0']&.split('/')&.first || node.nics['tun0']&.split('/')&.first
             end
-            
+
             node_info = {
               node: node.name,
               type: node.type,
@@ -225,8 +228,8 @@ module ApplicationHelper
               external_port: "#{vip}:#{p[0]}",
               internal_port: "#{rip || 'N/A'}:#{p[1]}",
               adhoc: is_adhoc_dnat,
-              raw_ext: p[0],   # NEW
-              raw_int: p[1]    # NEW
+              raw_ext: p[0],   
+              raw_int: p[1]    
             }
             exposed_ports << node_info
           end
