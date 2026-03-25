@@ -22,24 +22,35 @@ get '/terminal/:node_name' do
       cmd.push("VAULT_ADDR=#{session[:vault_addr]}") if session[:vault_addr]
       cmd.push('bash')
     else
-      # 1. Smart Lookup: Check the active lab YAML for custom terminal configurations
+      # 1. Smart Lookup: Use the Lab class to automatically flatten v2.0 planes!
       custom_term = nil
-      node_cfg = {}
+      node_type = nil
+      tf_vault_project = nil
+      tf_vault_roleset = nil
 
       if Lab.running?
         runtime_path = File.join(LOCK_DIR, "#{Lab.current_name.gsub('/', '_')}.yml")
         if File.file?(runtime_path)
           begin
-            yaml = YAML.load_file(runtime_path)
-            node_cfg = yaml.dig('topology', 0, 'nodes', node_name) || {}
-            
-            if custom_term = node_cfg['term']
-              # Fallback for external nodes that might just have an ipv4 defined
-            elsif (!custom_term || custom_term.empty?) && node_cfg['type'] == 'external' && node_cfg['ipv4']
-                custom_term = "ssh://root@#{node_cfg['ipv4'].split('/').first}"
+            lab = Lab.new(cfg: runtime_path, log: LabLog.null)
+            if node = lab.find_node(node_name)
+              node_type = node.type
+              custom_term = node.term
+              
+              # Magic Fallback: If it's a remote node and no custom term is defined, auto-generate the SSH link!
+              if (!custom_term || custom_term.empty?) && node.remote?
+                ip_target = node.gw || node.ipv4 || (node.nics && node.nics.values.first)
+                custom_term = "ssh://root@#{ip_target.split('/').first}" if ip_target
+              end
+              
+              # Extract Vault vars for the execution context
+              if node.terraform && node.terraform['vault']
+                tf_vault_project = node.terraform['vault']['project']
+                tf_vault_roleset = node.terraform['vault']['roleset']
+              end
             end
-          rescue
-            # Safely ignore YAML parsing errors and fallback to Docker
+          rescue => e
+            puts "[Terminal Lookup Error] #{e.message}"
           end
         end
       end
@@ -55,17 +66,17 @@ get '/terminal/:node_name' do
       else
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
         cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color']
-        
-        if session[:vault_token] && session[:vault_addr] && node_cfg['type'] == 'controller'
-          
+
+        if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
+
           # 1. Always inject the base Vault credentials
           #cmd.push('-e', "VAULT_TOKEN=#{session[:vault_token]}")
           #cmd.push('-e', "VAULT_ADDR=#{session[:vault_addr]}")
           #cmd.push('-e', "VAULT_SKIP_VERIFY=true")
 
           # 2. Inject GCP credentials if configured
-          v_project = node_cfg.dig('terraform', 'vault', 'project').to_s.strip
-          v_roleset = node_cfg.dig('terraform', 'vault', 'roleset').to_s.strip
+          v_project = tf_vault_project.to_s.strip
+          v_roleset = tf_vault_roleset.to_s.strip
           v_roleset = 'terraform-runner' if v_roleset.empty?
 
           if !v_project.empty?

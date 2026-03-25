@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider
   attr_writer :nics
   attr_accessor :is_running
 
@@ -20,6 +20,8 @@ class Node
     @dns        = args['dns'  ]     || []
     @mgmt       = args['mgmt' ]
     @type       = args['type' ]
+    @plane      = args['plane']     || (args['type'] == 'controller' ? 'mgmt' : 'data')
+    @provider   = args['provider']  || 'local'
     @eos        = args['eos'  ]     || 'linux'
     @kind       = args['kind' ]     || 'linux'
     @kvm        = args['kvm'  ]     || false
@@ -79,6 +81,10 @@ class Node
           end
         end
     end
+  end
+
+  def remote?
+    ['gcp', 'external', 'aws', 'azure'].include?(@provider.to_s.downcase) || ['rhost', 'external'].include?(@type.to_s.downcase)
   end
 
   # CLASS METHOD: Solves the N+1 problem by doing one master check

@@ -26,6 +26,20 @@ class Graph
       '#a855f7', '#06b6d4', '#f97316', '#ec4899', 
       '#84cc16', '#6366f1', '#14b8a6', '#d946ef'
     ]
+
+    # --- AUTO-PORT INJECTOR ---
+    # Prevents Graphviz "port unrecognized" warnings when users link interfaces not explicitly defined in 'nics'
+    (@links || []).each do |l|
+      next unless l.is_a?(Array) && l.size >= 2
+      n_a_name, int_a = l[0].to_s.split(':')
+      n_b_name, int_b = l[1].to_s.split(':')
+
+      n_a = @nodes.find { |n| n.name == n_a_name }
+      n_b = @nodes.find { |n| n.name == n_b_name }
+
+      n_a.nics[int_a] = '' if n_a && int_a && !n_a.nics.key?(int_a)
+      n_b.nics[int_b] = '' if n_b && int_b && !n_b.nics.key?(int_b)
+    end
   end
 
   def build_tooltip(node)
@@ -37,7 +51,7 @@ class Graph
       tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
     end
 
-    if ['rhost', 'external'].include?(node.type) && node.gw && !node.gw.empty?
+    if node.remote? && node.gw && !node.gw.empty?
       tt << "🌐 Mgmt (GW): #{node.gw}"
     elsif node.ipv4 && !node.ipv4.to_s.empty?
       tt << "🌐 IPv4: #{node.ipv4}"
@@ -49,7 +63,7 @@ class Graph
       node.nics.each do |k, v|
         next if v.to_s.strip.empty?
         # Hide the invalid eth0 from remote host tooltips
-        next if ['rhost', 'external'].include?(node.type) && k == 'eth0'
+        next if node.remote? && k == 'eth0'
         nic_lines << "   ▪ #{k}  ➔  #{v}"
         has_valid_nics = true
       end
@@ -84,7 +98,7 @@ class Graph
 
     if node.respond_to?(:term) && node.term && !node.term.empty?
       tt << "[TERM:#{node.term}]"
-    elsif ['rhost', 'external'].include?(node.type) && node.gw && !node.gw.to_s.empty?
+    elsif node.remote? && node.gw && !node.gw.to_s.empty?
       ip_only = node.gw.split('/').first
       tt << "[TERM:ssh://root@#{ip_only}]"
     elsif node.ipv4 && !node.ipv4.to_s.empty?
@@ -99,55 +113,58 @@ class Graph
     @log.write "#{__method__}():  ", "debug"
 
     %{
-        graph <%= @name.sub(/.-/, "_") %> {
+        graph <%= @name.gsub(/[.-]/, "_") %> {
           graph [pad="0.5", nodesep="0.8", ranksep="1.8", overlap=false, splines=true, layout=dot, rankdir=TB, bgcolor="#1e293b", fontname="Helvetica, Arial, sans-serif", fontsize="16"]
           edge  [penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12"]
 
         <%-
             @nodes.each do |node|
-              if node.kind == "mgmt" || node.type == "controller" || (node.type == 'gateway' && node.dnat.nil?)
+              if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller" || (!node.remote? && node.type == 'gateway' && node.dnat.nil?)
                 next
               end
               group = node.type
               
               border_color = "#10b981" 
               n_icon = "🎛️ "
-              case node.type
-                when 'host', 'vhost' 
-                  border_color = "#38bdf8"
-                  n_icon = "💻 "
-                when 'router' 
-                  border_color = "#f59e0b"
-                  n_icon = "🔀 "
-                when 'gateway' 
-                  border_color = "#a855f7"
-                  n_icon = "🚪 "
-                when 'controller' 
-                  border_color = "#ef4444"
-                  n_icon = "⚙️ "
-                when 'external', 'rhost' 
-                  border_color = "#0ea5e9"
-                  n_icon = "☁️ "
-              end
               
+              if node.remote?
+                border_color = "#0ea5e9"
+                n_icon = "☁️ "
+              else
+                case node.type
+                  when 'host', 'vhost' 
+                    border_color = "#38bdf8"
+                    n_icon = "💻 "
+                  when 'router' 
+                    border_color = "#f59e0b"
+                    n_icon = "🔀 "
+                  when 'gateway' 
+                    border_color = "#a855f7"
+                    n_icon = "🚪 "
+                  when 'controller' 
+                    border_color = "#ef4444"
+                    n_icon = "⚙️ "
+                end
+              end
+
               server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-              node_link = node.dnat.nil? || node.type == 'gateway' ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+              node_link = (node.dnat.nil? || !node.dnat.is_a?(Array)) ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
               col_span = node.nics.size == 0 ? 1 : node.nics.size
         -%>
 
-          subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
+          subgraph cluster_<%= node.name.gsub(/[.-]/, "_") %> {
             graph[style="invis", group="<%= group %>"]
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
-            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
+            <%= node.name.gsub(/[.-]/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
         <%- if !['host', 'vhost', 'external', 'rhost'].include?(group) -%>
               <tr>
-                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name %></font></b></td>
+                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
               <tr>
         <%-   
-              valid_nics = node.nics.reject { |k, _| ['rhost', 'external'].include?(group) && k == 'eth0' }
+              valid_nics = node.nics.reject { |k, _| node.remote? && k == 'eth0' }
               if valid_nics.empty? 
         -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
@@ -159,28 +176,30 @@ class Graph
               </tr>
         <%- if ['host', 'vhost', 'external', 'rhost'].include?(group) -%>
               <tr>
-                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name %></font></b></td>
+                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
             </table> >]
           }
         <%- end -%>
 
-        <%- ext_names = @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.map(&:name) -%>
+        <%- ext_names = @nodes.select { |n| n.remote? }.map(&:name) -%>
         <%- i = 0
             @links.each do |l|
-              node_a = l[0].split(':')[0]
-              node_b = l[1].split(':')[0]
+              node_a, int_a = l[0].split(':')
+              node_b, int_b = l[1].split(':')
               if node_a != 'sw0' && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)
+                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+                link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
-        <%=     l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n [color="<%= @graph.colors[i] %>"]
+        <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
         <%-     i = (i + 1) % @graph.colors.size -%>
         <%-   end -%>
         <%- end -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
           subgraph cluster_ctlabs_host {
@@ -194,10 +213,10 @@ class Graph
           }
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
-          ctlabs_host:eth0:s -- <%= target_node.name %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.each do |ext_node| 
+          ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| 
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
-          <%= ext_node.name.sub(/.-/, "_") %>:<%= ext_port %>:s -- <%= target_node.name %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
+          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 
@@ -214,7 +233,7 @@ class Graph
     @log.write "#{__method__}():  ", "debug"
 
     %{
-        graph <%= @name.sub(/.-/, "_") %> {
+        graph <%= @name.gsub(/[.-]/, "_") %> {
           graph [pad="0.5", nodesep="0.8", ranksep="1.8", overlap=false, splines=true, layout=dot, rankdir=TB, bgcolor="#1e293b", fontname="Helvetica, Arial, sans-serif", fontsize="16"]
           edge  [penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12"]
 
@@ -224,41 +243,44 @@ class Graph
               
               border_color = "#10b981" 
               n_icon = "🎛️ "
-              case node.type
-                when 'host', 'vhost'
-                  border_color = "#38bdf8"
-                  n_icon = "💻 "
-                when 'router'
-                  border_color = "#f59e0b"
-                  n_icon = "🔀 "
-                when 'gateway'
-                  border_color = "#a855f7"
-                  n_icon = "🚪 "
-                when 'controller'
-                  border_color = "#ef4444"
-                  n_icon = "⚙️ "
-                when 'external', 'rhost'
-                  border_color = "#0ea5e9"
-                  n_icon = "☁️ "
-              end
               
+              if node.remote?
+                border_color = "#0ea5e9"
+                n_icon = "☁️ "
+              else
+                case node.type
+                  when 'host', 'vhost' 
+                    border_color = "#38bdf8"
+                    n_icon = "💻 "
+                  when 'router' 
+                    border_color = "#f59e0b"
+                    n_icon = "🔀 "
+                  when 'gateway' 
+                    border_color = "#a855f7"
+                    n_icon = "🚪 "
+                  when 'controller' 
+                    border_color = "#ef4444"
+                    n_icon = "⚙️ "
+                end
+              end
+
               server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-              node_link = node.dnat.nil? || node.type == 'gateway' ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+              node_link = (node.dnat.nil? || !node.dnat.is_a?(Array)) ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
               col_span = node.nics.size == 0 ? 1 : node.nics.size
         -%>
-          subgraph cluster_<%= node.name.sub(/.-/, "_") %> {
+          subgraph cluster_<%= node.name.gsub(/[.-]/, "_") %> {
             graph[style="invis", group="<%= group %>"]
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
-            <%= node.name.sub(/.-/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
+            <%= node.name.gsub(/[.-]/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
         <%- if ![ 'host', 'vhost', 'controller', 'external', 'rhost' ].include?(group) -%>
               <tr>
-                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name %></font></b></td>
+                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
               <tr>
         <%-   
-              valid_nics = node.nics.reject { |k, _| ['rhost', 'external'].include?(group) && k == 'eth0' }
+              valid_nics = node.nics.reject { |k, _| node.remote? && k == 'eth0' }
               if valid_nics.empty? 
         -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
@@ -270,28 +292,30 @@ class Graph
               </tr>
         <%- if [ 'host', 'vhost', 'controller', 'external', 'rhost' ].include?(group) -%>
               <tr>
-                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name %></font></b></td>
+                <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
             </table> >]
           }
         <%- end -%>
 
-        <%- ext_names = @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.map(&:name) -%>
+        <%- ext_names = @nodes.select { |n| n.remote? }.map(&:name) -%>
         <%- i = 0
             @links.each do |l|
-              node_a = l[0].split(':')[0]
-              node_b = l[1].split(':')[0]
+              node_a, int_a = l[0].split(':')
+              node_b, int_b = l[1].split(':')
               if (node_a == 'sw0' || node_a == 'ro0') && !ext_names.include?(node_a) && !ext_names.include?(node_b)
+                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+                link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
-        <%=     l[0].sub(/.-/, "_") %>:s -- <%= l[1].sub(/.-/, "_") %>:n [color="<%= @graph.colors[i] %>"]
+        <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
         <%-     i = (i + 1) % @graph.colors.size -%>
         <%-   end -%>
         <%- end -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
           subgraph cluster_ctlabs_host {
@@ -305,10 +329,10 @@ class Graph
           }
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
-          ctlabs_host:eth0:s -- <%= target_node.name %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.each do |ext_node| 
+          ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| 
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
-          <%= ext_node.name.sub(/.-/, "_") %>:<%= ext_port %>:s -- <%= target_node.name %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
+          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 
@@ -323,90 +347,92 @@ class Graph
 
   def get_topology
     %{
-      graph <%= @name.sub(/.-/, "_") %> {
+      graph <%= @name.gsub(/[.-]/, "_") %> {
         graph [pad="0.5", esep="0.5", ranksep="1.4", overlap=false, splines=polyline, layout=neato, bgcolor="#1e293b", fontname="Helvetica, Arial, sans-serif", fontsize="16"]
         node  [shape=rect, style="rounded,filled", fillcolor="#0f172a", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.25,0.15"]
         edge  [color="#64748b", penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12", fontcolor="#94a3b8"]
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['name'])
+              nodes = init_nodes(vm['hv'] || vm['name'])
               nodes.each do |node|
-                if node.kind == "mgmt" || node.type == "controller"
+                if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller"
                   next
                 end
                 server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-                node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+                node_link = (node.dnat.nil? || !node.dnat.is_a?(Array)) ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
         -%>
         <%-     if node.type == 'host' || node.type == 'vhost' -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16">💻 <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
-        <%-     elsif node.type == 'external' || node.type == 'rhost' -%>
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16">💻 <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
+        <%-     elsif node.remote? -%>
         <%-       data_ip = node.nics.is_a?(Hash) ? (node.nics['tun0'] || node.nics['eth1']) : nil -%>
         <%-       data_ip_str = data_ip.to_s.strip.empty? ? '&nbsp;' : data_ip.to_s.split('/').first -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="#0ea5e9", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#0ea5e9" point-size="16">☁️ <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= data_ip_str %></font></td></tr></table> >]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#0ea5e9", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#0ea5e9" point-size="16">☁️ <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= data_ip_str %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
         <%-   nodes.each do |node|
-                if node.kind == 'mgmt'
+                if node.kind == 'mgmt' || node.plane == 'mgmt'
                   next
                 end
         -%>
         <%-     if node.type == 'router' -%>
-        <%=       node.name %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16">🔀 <%= node.name %></font></b></td></tr></table> >]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16">🔀 <%= node.name %></font></b></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['name'])
+              nodes = init_nodes(vm['hv'] || vm['name'])
               nodes.each do |node|
-                if node.kind == 'mgmt'
+                if node.kind == 'mgmt' || node.plane == 'mgmt'
                   next
                 end
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         <%-
             @nodes.each do |node|
-              if node.kind == 'mgmt'
+              if node.kind == 'mgmt' || node.plane == 'mgmt'
                 next
               end
         -%>
-        <%-   if node.type == 'gateway' && !node.dnat.nil? -%>
-                <%= node.name %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
+        <%-   if node.type == 'gateway' && !node.dnat.nil? && !node.remote? -%>
+                <%= node.name.gsub(/[.-]/, "_") %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
         <%-   end -%>
         <%- end -%>
 
-        <%- ext_names = @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.map(&:name) -%>
+        <%- ext_names = @nodes.select { |n| n.remote? }.map(&:name) -%>
         <%- @links.each do |l|
-              node_a = l[0].split(':')[0]
-              node_b = l[1].split(':')[0]
+              node_a, int_a = l[0].split(':')
+              node_b, int_b = l[1].split(':')
               if node_a != "sw0" && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)
+                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+                link_opts = is_vpn ? ' [style="dashed", color="#0ea5e9", penwidth="2.5"]' : ""
         -%>
-          <%= node_a.sub(/.-/, "_") %> -- <%= node_b.sub(/.-/, "_") %>
+          <%= node_a.gsub(/[.-]/, "_") %> -- <%= node_b.gsub(/[.-]/, "_") %><%= link_opts %>
         <%-   end -%>
         <%- end -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.each do |ext_node| -%>
-        <%= ext_node.name.sub(/.-/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| -%>
+        <%= ext_node.name.gsub(/[.-]/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 
@@ -421,21 +447,21 @@ class Graph
 
   def get_mgmt_topo
     %{
-      graph <%= @name.sub(/.-/, "_") %> {
+      graph <%= @name.gsub(/[.-]/, "_") %> {
         graph [pad="0.5", esep="0.5", ranksep="1.4", overlap=false, splines=polyline, layout=neato, bgcolor="#1e293b", fontname="Helvetica, Arial, sans-serif", fontsize="16"]
         node  [shape=rect, style="rounded,filled", fillcolor="#0f172a", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.25,0.15"]
         edge  [color="#64748b", penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12", fontcolor="#94a3b8"]
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
         <%-   nodes.each do |node| -%>
-        <%-     if ['host', 'vhost', 'controller', 'external', 'rhost'].include?(node.type)
+        <%-     if ['host', 'vhost', 'controller'].include?(node.type) || node.remote?
                   server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-                  node_link = node.dnat.nil? ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
+                  node_link = (node.dnat.nil? || !node.dnat.is_a?(Array)) ? "" : "https://" + server_ip + ":" + node.dnat[0][0].to_s
 
                   if node.type == 'controller'
                     node_color = '#ef4444'
                     n_icon = '⚙️ '
-                  elsif node.type == 'external' || node.type == 'rhost'
+                  elsif node.remote?
                     node_color = '#0ea5e9'
                     n_icon = '☁️ '
                   else
@@ -444,29 +470,29 @@ class Graph
                   end
                   
                   # Use gw for remote hosts, eth0 for local hosts
-                  mgmt_ip = ['external', 'rhost'].include?(node.type) ? node.gw : node.nics['eth0']
+                  mgmt_ip = node.remote? ? node.gw : node.nics['eth0']
         -%>
-        <%=       node.name.sub(/.-/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= n_icon %><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= mgmt_ip.to_s.empty? ? '&nbsp;' : mgmt_ip %></font></td></tr></table> >]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= n_icon %><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= mgmt_ip.to_s.empty? ? '&nbsp;' : mgmt_ip %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if node.type == 'router' -%>
-        <%=       node.name %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16">🔀 <%= node.name %></font></b></td></tr></table> >]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16">🔀 <%= node.name %></font></b></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['name'])
+              nodes = init_nodes(vm['hv'] || vm['name']) 
               nodes.each do |node|
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
-        <%=       node.name %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="#10b981", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🎛️ <%= node.name %></font></b>>]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -474,35 +500,37 @@ class Graph
         <%-
             @nodes.each do |node|
         -%>
-        <%-   if node.type == 'gateway' -%>
-                <%= node.name %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
+        <%-   if node.type == 'gateway' && !node.remote? -%>
+                <%= node.name.gsub(/[.-]/, "_") %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
         <%-   end -%>
         <%- end -%>
 
-        <%- ext_names = @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.map(&:name) -%>
+        <%- ext_names = @nodes.select { |n| n.remote? }.map(&:name) -%>
         <%- @links.each do |l|
-              node_a = l[0].split(':')[0]
-              node_b = l[1].split(':')[0]
+              node_a, int_a = l[0].split(':')
+              node_b, int_b = l[1].split(':')
               # Check BOTH sides to see if this is a management link!
               is_mgmt_link = (node_a == 'sw0' || node_a == 'ro0' || node_b == 'sw0' || node_b == 'ro0')
-              
+
               if is_mgmt_link && !ext_names.include?(node_a) && !ext_names.include?(node_b)
+                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+                link_opts = is_vpn ? ' [style="dashed", color="#0ea5e9", penwidth="2.5"]' : ""
         -%>
-          <%= node_a.sub(/.-/, "_") %> -- <%= node_b.sub(/.-/, "_") %>
+          <%= node_a.gsub(/[.-]/, "_") %> -- <%= node_b.gsub(/[.-]/, "_") %><%= link_opts %>
         <%-   end -%>
         <%- end -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.type == 'external' || n.type == 'rhost' }.each do |ext_node| -%>
-        <%= ext_node.name.sub(/.-/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| -%>
+        <%= ext_node.name.gsub(/[.-]/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 
@@ -552,7 +580,7 @@ class Graph
 
 [rhosts]
   <%- @nodes.each do |node| -%>
-  <%-   if ['rhost', 'external'].include?(node.type) -%>
+  <%-   if node.remote? -%>
   <%-     # For remote nodes, 'gw' is the Public Management IP -%>
   <%-     mgmt_ip = (node.gw && !node.gw.to_s.strip.empty?) ? node.gw : (node.nics && node.nics['eth0']) -%>
   <%-     if mgmt_ip && !mgmt_ip.to_s.empty? -%>
@@ -560,7 +588,6 @@ class Graph
   <%-     end -%>
   <%-   end -%>
   <%- end -%>
-
     }
   end
 
@@ -595,20 +622,18 @@ class Graph
   <%- @nodes.each do |node| -%>
   <%-   is_target = ['host', 'vhost', 'server'].include?(node.type) -%>
   <%-   data_ip = node.nics ? (node.nics['eth1'] || node.nics['tun0']) : nil -%>
-  <%-   if is_target && data_ip && !data_ip.to_s.empty? -%>
+  <%-   if is_target && data_ip && !data_ip.to_s.empty? && !node.remote? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
   <%-   end -%>
   <%- end -%>
 
 [rhosts]
   <%- @nodes.each do |node| -%>
-  <%-   is_rhost = ['rhost', 'external'].include?(node.type) -%>
-  <%-   data_ip = node.nics ? (node.nics['tun0'] || node.nics['eth1']) : nil -%>
-  <%-   if is_rhost && data_ip && !data_ip.to_s.empty? -%>
+  <%-   data_ip = node.nics ? (node.nics['tun0'] || node.nics['wg0'] || node.nics['eth1']) : nil -%>
+  <%-   if node.remote? && data_ip && !data_ip.to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
   <%-   end -%>
   <%- end -%>
-
     }
   end
 

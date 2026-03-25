@@ -50,7 +50,7 @@ class Lab
     @name       = @cfg['name']      || ''
     @ephemeral  = @cfg['ephemeral'] || true
     @desc       = @cfg['desc']      || ''
-    @defaults   = @cfg['defaults']  || {}
+    @defaults   = @cfg['profiles']  || @cfg['defaults'] || {}
     @topology   = @cfg['topology']  || {}
     @dns        = @cfg['dns']       || []
     @domain     = @cfg['domain']    || "ctlabs.internal"
@@ -100,7 +100,7 @@ class Lab
 
     vm = nil
     @cfg['topology'].each_with_index do |v, i|
-      if( v['name'] == name )
+      if( v['name'] == name || v['hv'] == name )
         vm = @cfg['topology'][i]
         break
       end
@@ -108,6 +108,34 @@ class Lab
     if( vm.nil? )
       vm = @cfg['topology'][0]
     end
+
+    # --- v2.0 SCHEMA NORMALIZER ---
+    # Automatically flattens 'planes' into the legacy 'nodes' array
+    if vm && vm['planes'] && vm['nodes'].nil?
+      flat_nodes = {}
+      
+      vm['planes'].each do |plane_name, plane_data|
+        next unless plane_data && plane_data['nodes']
+        
+        # Hoist Management Network Settings to the root VM level
+        if plane_name == 'mgmt'
+          vm['mgmt'] ||= {}
+          ['net', 'gw', 'dns', 'vrfid'].each do |k|
+            vm['mgmt'][k] = plane_data[k] if plane_data.key?(k)
+          end
+        end
+
+        # Flatten Nodes and Tag their Plane & Profile
+        plane_data['nodes'].each do |n_name, n_cfg|
+          n_cfg['plane'] = plane_name
+          n_cfg['kind']  = n_cfg['profile'] if n_cfg['profile'] # Alias profile -> kind
+          flat_nodes[n_name] = n_cfg
+        end
+      end
+      
+      vm['nodes'] = flat_nodes
+    end
+
     vm
   end
 
@@ -215,12 +243,17 @@ class Lab
     cnt = 20
 
     cfg['nodes'].each_key do |n|
-      if cfg['nodes'][n]['kind'] == 'mgmt' || cfg['nodes'][n]['type'] == 'controller'
-        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( cfg['nodes'][n] ) )
+      node_cfg = cfg['nodes'][n]
+      
+      # Determine if the node lives outside the local Docker engine
+      is_remote = ['rhost', 'external'].include?(node_cfg['type']) || ['gcp', 'external', 'aws', 'azure'].include?(node_cfg['provider'].to_s.downcase)
+
+      if node_cfg['kind'] == 'mgmt' || node_cfg['type'] == 'controller' || is_remote
+        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( node_cfg ) )
         nodes << node
       else
-        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( cfg['nodes'][n] ) )
-        # assign the node a mgmt-ip
+        node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => dns, 'domain' => domain }.merge( node_cfg ) )
+        # assign the node a mgmt-ip ONLY if it's local
         node.nics['eth0'] = "#{net}#{cnt}/#{mask}"
         cnt += 1
         nodes << node
@@ -240,6 +273,9 @@ class Lab
     cnt      = 2
 
     cfg['nodes'].each do |name, node|
+      is_remote = ['rhost', 'external'].include?(node['type']) || ['gcp', 'external', 'aws', 'azure'].include?(node['provider'].to_s.downcase)
+      next if is_remote
+
       if !(node['kind'] == 'mgmt' && node['type'] == 'switch' )
         case node['type']
           when 'controller'
@@ -254,8 +290,10 @@ class Lab
       end
     end
 
+    sw0 = find_node('sw0')
     (switches + router + hosts).each do |n|
       links << [ "sw0:eth#{cnt}", "#{n}:eth0" ]
+      sw0.nics["eth#{cnt}"] = '' if sw0 && sw0.nics
       cnt += 1
     end
     links
@@ -306,28 +344,15 @@ class Lab
     return nil
   end
 
-  # TODO
-  # check if the rule already exists
   def add_dnat
     @log.write "#{__method__}(): ", "debug"
 
     chain = "#{@name.upcase}-DNAT"
-    # find main ipv4 address
     vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
     vmips = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).split
     natgw = find_node('natgw')
-    via   = nil
-    #p "natgw=#{natgw}"
-    if( !natgw.nil? && !natgw.dnat.nil? )
-      @log.write "#{__method__}(): natgw=#{natgw}", "debug"
-
-      ro, nic = natgw.dnat.split(':')
-      node    = find_node(ro)
-      via     = node.nics[nic].split('/')[0]
-    end
 
     # create new chain if it does not exist
-    #vmip = %x( ip -4 addr ls eth0 | grep inet | awk '{print $2}' ).rstrip
     %x( iptables -tnat -S #{chain} 2> /dev/null )
     if $?.exitstatus > 0
       %x( iptables -tnat -N #{chain} )
@@ -344,63 +369,72 @@ class Lab
         @log.write "#{__method__}(): node=#{node},vxlan=#{node.vxlan}", "debug"
 
         local, lport = node.vxlan['local'].split(':')
-        router       = find_node(natgw.dnat.split(':')[0])
-        #router, intf = node.vxlan['via'].split(':')
-        #node         = find_node(router)
-        #via          = node.nics[intf].split('/')[0]
-        #via          = find_node('natgw').via
+        
+        # Resolve VXLAN router dynamically
+        target_route = natgw.dnat.is_a?(Hash) ? (natgw.dnat[node.plane] || natgw.dnat.values.first) : natgw.dnat
+        router_name  = target_route.split(':')[0]
+        router       = find_node(router_name)
 
-        %x( iptables -tnat -C #{chain} -p udp -d #{local} --dport #{lport} -j DNAT --to-destination #{via}:#{lport} 2> /dev/null )
+        %x( iptables -tnat -C #{chain} -p udp -d #{local} --dport #{lport} -j DNAT --to-destination #{router.via}:#{lport} 2> /dev/null )
         if $?.exitstatus > 0
-          %x( iptables -tnat -I #{chain} -p udp -d #{local} --dport #{lport} -j DNAT --to-destination #{via}:#{lport} )
-          %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p udp -d #{via} --dport #{lport} -j DNAT --to-destination #{node.ipv4.split('/')[0]}:#{lport})
+          %x( iptables -tnat -I #{chain} -p udp -d #{local} --dport #{lport} -j DNAT --to-destination #{router.via}:#{lport} )
+          %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p udp -d #{router.via} --dport #{lport} -j DNAT --to-destination #{node.ipv4.split('/')[0]}:#{lport})
         end
-
       end
-
       #
-      # DNAT
+      # DNAT (Dynamic Routing Dictionary & Port Forwarding)
       #
-      if( ! node.dnat.nil? and node.type == 'host' )
-        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}", "debug"
-        #p @dnatgw
-        #p vmip
-        #p node
+      if !node.dnat.nil? && node.dnat.is_a?(Array) && ['host', 'controller', 'server', 'gateway', 'router'].include?(node.type)
+        @log.write "#{__method__}(): node=#{node.name}, dnat=#{node.dnat}", "debug"
 
-        router = find_node(natgw.dnat.split(':')[0])
-        dnic   = 'eth1'
-        node.dnat.each do |r|
-          if r[1].to_s.include?(':')
-            dnic, dport = r[1].split(':')
+        # --- THE SMART LOOKUP ---
+        target_route = nil
+        if natgw && natgw.dnat
+          if natgw.dnat.is_a?(Hash)
+            # Use the explicit routing dictionary!
+            target_route = natgw.dnat[node.plane] || natgw.dnat.values.first
           else
-            dport = r[1]
-          end
-          @log.info "#{vmip}:#{r[0]} -> #{node.nics[dnic].split('/')[0]}:#{dport}"
-          
-          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} 2> /dev/null )
-          if $?.exitstatus > 0
-            %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{via}:#{r[0]} )
-            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{via} --dport #{r[0]} -j DNAT --to-destination #{node.nics[dnic].split('/')[0]}:#{dport})
+            # Legacy Fallback (so old YAMLs don't break)
+            target_route = node.plane == 'mgmt' ? 'ro0:eth1' : natgw.dnat
           end
         end
 
-      end
+        next unless target_route
 
-      if( ! node.dnat.nil? and node.type == 'controller' )
-        @log.write "#{__method__}(): node=#{node},dnat=#{node.dnat}", "debug"
-        router   = find_node('ro0')
-        mgmt_via = router.nics['eth1'].split('/')[0]
+        # Extract the specific router and its IP
+        router_name, router_nic = target_route.split(':')
+        router = find_node(router_name)
+        via = router.nics[router_nic].split('/')[0]
+
+        # Target IP: Smart fallback (eth1, eth0, tun0, wg0)
+        target_ip = node.nics['eth1']&.split('/')&.first || 
+                    node.nics['eth0']&.split('/')&.first || 
+                    node.nics['tun0']&.split('/')&.first ||
+                    node.nics['wg0']&.split('/')&.first
+
         node.dnat.each do |r|
-          %x( iptables -tnat -C #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[1]} 2> /dev/null )
-          if $?.exitstatus > 0
-            @log.info "#{vmip}:#{r[0]} -> #{node.nics['eth0'].split('/')[0]}:#{r[1]}"
-            %x( iptables -tnat -I #{chain} -p #{r[2]||"tcp"} -d #{vmip} --dport #{r[0]} -j DNAT --to-destination=#{mgmt_via}:#{r[0]} )
-            %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{r[2]||"tcp"} -d #{mgmt_via} --dport #{r[0]} -j DNAT --to-destination #{node.nics['eth0'].split('/')[0]}:#{r[1]})
+          ext_port = r[0]
+          int_port = r[1].to_s.include?(':') ? r[1].split(':')[1] : r[1]
+          proto    = r[2] || 'tcp'
+
+          @log.info "#{vmip}:#{ext_port} -> #{target_ip}:#{int_port} (#{proto})"
+          
+          if target_ip == via
+            # OPTIMIZATION: Direct translation on the host
+            %x( iptables -tnat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination=#{via}:#{int_port} 2> /dev/null )
+            if $?.exitstatus > 0
+              %x( iptables -tnat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination=#{via}:#{int_port} )
+            end
+          else
+            # TARGET IS BEHIND ROUTER: 2-step hop
+            %x( iptables -tnat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination=#{via}:#{ext_port} 2> /dev/null )
+            if $?.exitstatus > 0
+              %x( iptables -tnat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination=#{via}:#{ext_port} )
+              %x( ip netns exec #{router.netns} iptables -tnat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port} )
+            end
           end
         end
-
       end
-
     end
   end
 
@@ -414,82 +448,67 @@ class Lab
     node = find_node(node_name)
     raise "Node '#{node_name}' not found" if node.nil?
 
-    if node.type == 'controller'
-      # === MGMT NETWORK PATH (implicit via ro0) ===
-      router = find_node('ro0')
-      raise "'ro0' router not found for controller DNAT" if router.nil?
-      raise "'ro0' missing eth1" unless router.nics.key?('eth1')
+    natgw = find_node('natgw')
+    raise "No 'natgw' node found (required for DNAT)" if natgw.nil?
+    raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
 
-      mgmt_via = router.nics['eth1'].split('/')[0]
-      target_ip = node.nics['eth0']&.split('/')&.first
-      raise "Controller node missing eth0" if target_ip.nil?
+    # --- THE SMART LOOKUP ---
+    target_route = nil
+    if natgw.dnat.is_a?(Hash)
+      target_route = natgw.dnat[node.plane] || natgw.dnat.values.first
+    else
+      target_route = node.plane == 'mgmt' ? 'ro0:eth1' : natgw.dnat
+    end
 
-      # Rule 1: Host → ro0 (mgmt gateway)
-      rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
-      rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{mgmt_via}:#{ext_port}"
+    parts = target_route.to_s.split(':')
+    raise "Invalid natgw route format: #{target_route}" unless parts.length == 2
+    
+    router_name, nic = parts
+    router = find_node(router_name)
+    raise "Router '#{router_name}' not found" if router.nil?
+    raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
+
+    via = router.nics[nic].split('/')[0]
+    
+    # Target IP: Smart fallback
+    target_ip = node.nics['eth1']&.split('/')&.first || 
+                node.nics['eth0']&.split('/')&.first || 
+                node.nics['tun0']&.split('/')&.first ||
+                node.nics['wg0']&.split('/')&.first
+                
+    raise "Node #{node.name} missing suitable network interface" if target_ip.nil?
+
+    if target_ip == via
+      # OPTIMIZATION: Direct translation on the Host
+      rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{int_port}"
+      rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{int_port}"
 
       unless system(rule1_check)
-        @log.write "#{__method__}(): Adding mgmt DNAT rule 1: #{rule1_add}", "debug"
-        raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
+        @log.write "#{__method__}(): Adding optimized DNAT rule 1: #{rule1_add}", "debug"
+        raise "Failed optimized rule 1: #{$?.exitstatus}" unless system(rule1_add)
       end
-
-      router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-      # Rule 2: Inside ro0 netns → final controller
-      rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-      rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{mgmt_via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
-
-      unless system(rule2_check)
-        @log.write "#{__method__}(): Adding mgmt DNAT rule 2: #{rule2_add}", "debug"
-        raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
-      end
-
-      @log.info "[ADHOC DNAT] (MGMT) #{vmip}:#{ext_port} ➡ #{mgmt_via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-
-    elsif ['host', 'server', 'router', 'gateway'].include?(node.type)
-      # === DATA/EDGE NETWORK PATH (via natgw) ===
-      natgw = find_node('natgw')
-      raise "No 'natgw' node found (required for #{node.type} DNAT)" if natgw.nil?
-      raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
-
-      parts = natgw.dnat.to_s.split(':')
-      raise "Invalid natgw.dnat format" unless parts.length == 2
-      router_name, nic = parts
-      raise "Empty router/interface in natgw.dnat" if router_name.empty? || nic.empty?
-
-      router = find_node(router_name)
-      raise "Router '#{router_name}' not found" if router.nil?
-      raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
-
-      via = router.nics[nic].split('/')[0]
-      
-      # Target IP: Smart fallback. Try eth1 (data), then eth0 (mgmt/edge), then tun0
-      target_ip = node.nics['eth1']&.split('/')&.first || node.nics['eth0']&.split('/')&.first || node.nics['tun0']&.split('/')&.first
-      raise "Node #{node.name} missing suitable network interface (eth1, eth0, or tun0)" if target_ip.nil?
-
-      # Rule 1: Host → natgw internal IP (same port)
+    else
+      # TARGET IS BEHIND ROUTER: 2-step hop
       rule1_check = "iptables -t nat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
       rule1_add   = "iptables -t nat -I #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination #{via}:#{ext_port}"
 
       unless system(rule1_check)
-        @log.write "#{__method__}(): Adding data DNAT rule 1: #{rule1_add}", "debug"
+        @log.write "#{__method__}(): Adding DNAT rule 1: #{rule1_add}", "debug"
         raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
       end
 
       router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-      # Rule 2: Inside router netns → final host
+      
       rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
       rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
 
       unless system(rule2_check)
-        @log.write "#{__method__}(): Adding data DNAT rule 2: #{rule2_add}", "debug"
+        @log.write "#{__method__}(): Adding DNAT rule 2: #{rule2_add}", "debug"
         raise "Failed rule 2: #{$?.exitstatus}" unless system(rule2_add)
       end
-
-      @log.info "[ADHOC DNAT] (DATA) #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
-
-    else
-      raise "AdHoc DNAT only supported for 'host', 'controller', 'router', 'server', and 'gateway' nodes"
     end
+
+    @log.info "[ADHOC DNAT] #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
     return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
   end
@@ -518,7 +537,7 @@ class Lab
   # Mounts the keys into a specific container via Docker Exec
   def inject_ssh_key_to_node(node, priv_key, pub_key_path, pub_key)
     # Skip remote hosts since we don't have local docker exec access to them
-    return if ['rhost', 'external'].include?(node.type)
+    return if ['rhost', 'external', 'gateway'].include?(node.type)
 
     begin
       # Ensure .ssh directory exists
