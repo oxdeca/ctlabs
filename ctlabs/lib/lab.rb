@@ -344,6 +344,29 @@ class Lab
     return nil
   end
 
+  def hotplug_link(ep1, ep2)
+    @log.write "[HOTPLUG] Connecting link: #{ep1} <--> #{ep2}", "info"
+    @nodes.each { |n| n.resolve_runtime! if n.respond_to?(:resolve_runtime!) }
+
+    Link.new({ 'links' => [ep1, ep2], 'nodes' => @nodes, 'mgmt' => @mgmt, 'log' => @log })
+    
+    # Re-apply IPs after the physical pipe is constructed
+    [ep1, ep2].each do |endpoint|
+      node_name, nic = endpoint.split(':')
+      node = find_node(node_name)
+      node.hotplug_ip(nic, node.nics[nic]) if node && node.nics && node.nics[nic]
+    end
+  end
+
+  def hotunplug_link(ep1, ep2)
+    @log.write "[HOTPLUG] Disconnecting link: #{ep1} <--> #{ep2}", "info"
+    @nodes.each { |n| n.resolve_runtime! if n.respond_to?(:resolve_runtime!) }
+
+    # Pass 'false' to prevent it from automatically connecting!
+    link = Link.new({ 'links' => [ep1, ep2], 'nodes' => @nodes, 'mgmt' => @mgmt, 'log' => @log }, false)
+    link.disconnect
+  end
+
   def add_dnat
     @log.write "#{__method__}(): ", "debug"
 

@@ -9,29 +9,24 @@ window.updateKindOptions = function(type, targetId) {
     const map = window.getImagesMap ? window.getImagesMap() : (typeof window.getLabData === 'function' ? window.getLabData('images-map') : {});
     const targetElement = document.getElementById(targetId);
     if (!targetElement) return;
-    
+
     if (targetElement.tagName === 'INPUT') {
         const dataList = document.getElementById(targetElement.getAttribute('list'));
         if (!dataList) return;
-        dataList.innerHTML = ''; 
-        
-        if (type === 'external' || type === 'rhost') {
-            dataList.innerHTML += `<option value="remote">remote</option>`;
-            targetElement.value = 'remote'; 
-        } else {
-            targetElement.value = ''; 
-            const kinds = map[type] || [];
-            kinds.forEach(k => { dataList.innerHTML += `<option value="${k}">${k}</option>`; });
-        }
+        dataList.innerHTML = '';
+
+        targetElement.value = '';
+        const kinds = map[type] || [];
+        kinds.forEach(k => { dataList.innerHTML += `<option value="${k}">${k}</option>`; });
     }
 };
 
 window.updateGatewayForSwitch = function(switchName) {
     const gwInput = document.getElementById('edit-gw');
     if (!gwInput) return;
-    
+
     if (!switchName) {
-        gwInput.value = ''; 
+        gwInput.value = '';
         return;
     }
 
@@ -50,25 +45,28 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
     const ipInput = document.getElementById('edit-ip');
     const gwInput = document.getElementById('edit-gw');
     const planeSelect = document.getElementById('edit-plane');
-    
+    const providerSelect = document.getElementById('edit-provider');
+
     if (!switchSelect || !ipInput || !gwInput) return;
 
     if (!nodePlane) {
         nodePlane = planeSelect ? planeSelect.value : 'data';
     }
 
+    const provider = providerSelect ? providerSelect.value : 'local';
+
     const switchContainer = switchSelect.closest('.w3-col');
     const ipContainer = ipInput.closest('.w3-col');
     const gwContainer = gwInput.closest('.w3-col');
-    
+
     const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
     const ipLabel = ipContainer ? ipContainer.querySelector('label') : null;
     const gwLabel = gwContainer ? gwContainer.querySelector('label') : null;
 
-    // --- DYNAMIC NIC & LABELS BASED ON NODE TYPE ---
+    // --- DYNAMIC NIC & LABELS BASED ON TYPE AND PROVIDER ---
     let primaryNic = 'eth1';
     if (nodeType === 'controller') primaryNic = 'eth0';
-    if (nodeType === 'rhost') primaryNic = 'tun0';
+    if (provider !== 'local') primaryNic = 'tun0';
 
     let targetType = 'switches';
     let labelText = `Connect to Switch (${primaryNic})`;
@@ -80,25 +78,23 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
         targetType = 'routers';
         labelText = `Connect to Router (${primaryNic})`;
         showIpGw = false;
-    } else if (nodeType === 'rhost') {
-        // VPN / Remote Host specific overrides
+    } 
+    
+    // Cloud / External Overrides
+    if (provider !== 'local') {
         targetType = 'routers';
         labelText = `Connect to Router (${primaryNic})`;
-        showIpGw = true; 
-        ipLabelText = 'Tunnel / Data IP (tun0)';
+        showIpGw = true;
+        ipLabelText = `Tunnel / Data IP (${primaryNic})`;
         gwLabelText = 'Public Mgmt IP (for SSH)';
-    } else if (nodeType === 'external') {
-        targetType = 'switches';
-        labelText = 'Connect to Switch (Optional)';
-        showIpGw = true; 
     }
 
     if (switchLabel) switchLabel.innerHTML = labelText;
     if (ipLabel) ipLabel.innerHTML = ipLabelText;
     if (gwLabel) gwLabel.innerHTML = gwLabelText;
-    
+
     if (ipContainer) ipContainer.style.display = showIpGw ? 'block' : 'none';
-    if (gwContainer) gwContainer.style.display = (showIpGw && nodeType !== 'external') ? 'block' : 'none';
+    if (gwContainer) gwContainer.style.display = showIpGw ? 'block' : 'none';
 
     if (!showIpGw) {
         ipInput.value = '';
@@ -130,22 +126,22 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
 
 window.editNodeConfig = async function(labName, nodeName) {
     window.currentEditLab = labName;
-    window.currentEditNode = nodeName; 
-    
+    window.currentEditNode = nodeName;
+
     document.getElementById('node-modal-icon').className = 'fas fa-edit';
     document.getElementById('node-modal-title').innerText = 'Configure Node: ';
     document.getElementById('editor-node-name').innerText = nodeName;
     document.getElementById('node-modal-save-text').innerText = 'Save Override';
     document.getElementById('edit-node-name').value = nodeName;
-    document.getElementById('edit-node-name').disabled = true; 
+    document.getElementById('edit-node-name').disabled = true;
     document.getElementById('node-editor-result').style.display = 'none';
-    
+
     try {
         const safeLab = labName.split('/').map(encodeURIComponent).join('/');
         const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
         if (!res.ok) throw new Error("HTTP Status " + res.status);
         const data = await res.json();
-        
+
         document.getElementById('node-yaml-editor').value = data.yaml || '';
         if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
           window.cmEditors['node-yaml-editor'].setValue(data.yaml || '');
@@ -155,39 +151,43 @@ window.editNodeConfig = async function(labName, nodeName) {
             const nodeObj = data.json[nodeName] || data.json || {};
             const nodeType = nodeObj.type || 'host';
             const nodePlane = nodeObj.plane || 'data';
-            
+            const nodeProvider = nodeObj.provider || 'local';
+
             let primaryNic = 'eth1';
             if (nodeType === 'controller') primaryNic = 'eth0';
-            if (nodeType === 'rhost') primaryNic = 'tun0';
+            if (nodeProvider !== 'local') primaryNic = 'tun0';
+
+            document.getElementById('edit-type').value = nodeType;
+            
+            const providerEl = document.getElementById('edit-provider');
+            if (providerEl) providerEl.value = nodeProvider;
+
+            const planeEl = document.getElementById('edit-plane');
+            if(planeEl) planeEl.value = nodePlane;
 
             try {
                 window.updateNodeFormFields(nodeType, nodePlane);
                 if (typeof window.updateKindOptions === 'function') window.updateKindOptions(nodeType, 'edit-kind');
             } catch (e) { console.error("UI Setup Error:", e); }
 
-            document.getElementById('edit-type').value = nodeType;
-            
-            const planeEl = document.getElementById('edit-plane');
-            if(planeEl) planeEl.value = nodePlane;
-            
             document.getElementById('edit-info').value = nodeObj.info || '';
             document.getElementById('edit-term').value = nodeObj.term || '';
-            
+
             const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
             document.getElementById('edit-kind').value = nodeObj.kind || (needsLinuxFallback ? 'linux' : '');
-            
+
             let nicsStr = '';
             let dataIp = '';
             if (nodeObj.nics && typeof nodeObj.nics === 'object') {
-                for (const [key, value] of Object.entries(nodeObj.nics)) { 
+                for (const [key, value] of Object.entries(nodeObj.nics)) {
                     const cleanKey = String(key).replace(/['"]/g, '').trim();
                     if (cleanKey === primaryNic) dataIp = value;
-                    else nicsStr += `${cleanKey}=${value}\n`; 
+                    else nicsStr += `${cleanKey}=${value}\n`;
                 }
             }
             document.getElementById('edit-ip').value = dataIp;
             document.getElementById('edit-nics').value = nicsStr.trim();
-            
+
             let connectedSwitch = '';
             try {
                 const linkRows = document.querySelectorAll('#network-links-table .link-row');
@@ -198,7 +198,7 @@ window.editNodeConfig = async function(labName, nodeName) {
                         const nodeB = cols[1].querySelector('strong')?.innerText.trim();
                         const spanA = Array.from(cols[0].querySelectorAll('span')).find(s => s.innerText.includes('['));
                         const spanB = Array.from(cols[1].querySelectorAll('span')).find(s => s.innerText.includes('['));
-                        
+
                         const intA = spanA ? spanA.innerText.replace(/[[\]]/g, '').trim() : '';
                         const intB = spanB ? spanB.innerText.replace(/[[\]]/g, '').trim() : '';
 
@@ -220,7 +220,7 @@ window.editNodeConfig = async function(labName, nodeName) {
             if (!connectedSwitch && nodePlane === 'mgmt') {
                 connectedSwitch = (nodeType === 'switch') ? 'ro0' : 'sw0';
             }
-            
+
             if (connectedSwitch) {
                 const switchSelect = document.getElementById('edit-switch');
                 if (switchSelect) {
@@ -229,12 +229,12 @@ window.editNodeConfig = async function(labName, nodeName) {
                     switchSelect.value = connectedSwitch;
                 }
             }
-            
+
             document.getElementById('edit-gw').value = nodeObj.gw || '';
             if (!nodeObj.gw && connectedSwitch && typeof window.updateGatewayForSwitch === 'function') {
                 try { window.updateGatewayForSwitch(connectedSwitch); } catch(e) {}
             }
-            
+
             try {
                 let urlStr = '';
                 if (nodeObj.urls && typeof nodeObj.urls === 'object') {
@@ -244,16 +244,16 @@ window.editNodeConfig = async function(labName, nodeName) {
                 document.getElementById('edit-vols').value = Array.isArray(nodeObj.vols) ? nodeObj.vols.join('\n') : (nodeObj.vols || '');
                 document.getElementById('edit-env').value  = Array.isArray(nodeObj.env)  ? nodeObj.env.join('\n')  : (nodeObj.env || '');
                 document.getElementById('edit-devs').value = Array.isArray(nodeObj.devs) ? nodeObj.devs.join('\n') : (nodeObj.devs || '');
-                
+
                 setTimeout(() => {
                     document.querySelectorAll('#AdvancedEdit textarea').forEach(ta => {
-                       ta.style.height = '56px'; 
-                       ta.style.height = Math.max(ta.scrollHeight, 56) + 'px'; 
+                       ta.style.height = '56px';
+                       ta.style.height = Math.max(ta.scrollHeight, 56) + 'px';
                     });
                 }, 10);
             } catch (e) { console.error("Advanced Fields Error:", e); }
         }
-        
+
         document.getElementById('defaultTab').click();
         document.getElementById('node-editor-modal').style.display = 'block';
     } catch (err) {
@@ -263,7 +263,7 @@ window.editNodeConfig = async function(labName, nodeName) {
 
 window.openAddNodeModal = function(labPath) {
     window.currentEditLab = labPath;
-    window.currentEditNode = null; 
+    window.currentEditNode = null;
 
     document.getElementById('node-modal-icon').className = 'fas fa-plus-circle';
     document.getElementById('node-modal-title').innerText = 'Add Node';
@@ -274,9 +274,12 @@ window.openAddNodeModal = function(labPath) {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
-    
+
     const planeEl = document.getElementById('edit-plane');
     if (planeEl) planeEl.value = 'data';
+    
+    const providerEl = document.getElementById('edit-provider');
+    if (providerEl) providerEl.value = 'local';
 
     document.getElementById('node-yaml-editor').value = '';
     if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
@@ -285,7 +288,7 @@ window.openAddNodeModal = function(labPath) {
 
     document.getElementById('edit-node-name').disabled = false;
     document.getElementById('node-editor-result').style.display = 'none';
-    
+
     window.updateNodeFormFields('', 'data');
     document.getElementById('defaultTab').click();
     document.getElementById('node-editor-modal').style.display = 'block';
@@ -295,33 +298,35 @@ window.saveNodeConfig = async function() {
     const resultDiv = document.getElementById('node-editor-result');
     const btn = document.getElementById('node-modal-save-btn');
     const origBtnHtml = btn.innerHTML;
-    
+
     const isAdding = !window.currentEditNode;
     const nodeName = isAdding ? document.getElementById('edit-node-name').value.trim() : window.currentEditNode;
-    
+
     if (!nodeName) return alert("Node Name is required.");
-    
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-    
+
     const formData  = new URLSearchParams();
     const isYaml    = document.getElementById('YamlEdit').style.display === 'block';
-    
+
     let typeField = document.getElementById('edit-type').value;
+    let providerField = document.getElementById('edit-provider').value;
     let planeEl = document.getElementById('edit-plane');
     let planeField = planeEl ? planeEl.value : 'data';
-    
+
+    // Smart NIC assignment based on Provider and Type
     let primaryNic = 'eth1';
     if (typeField === 'controller') primaryNic = 'eth0';
-    if (typeField === 'rhost') primaryNic = 'tun0';
+    if (providerField !== 'local') primaryNic = 'tun0';
 
     let ipField   = document.getElementById('edit-ip').value.trim();
     let gwField   = document.getElementById('edit-gw').value.trim();
     let finalNics = document.getElementById('edit-nics').value.trim();
     let finalTerm = document.getElementById('edit-term').value.trim();
 
-    // AUTO-GENERATE SSH LINK FOR RHOST USING THE PUBLIC MGMT IP
-    if (typeField === 'rhost' && !finalTerm && gwField) {
+    // AUTO-GENERATE SSH LINK FOR REMOTE NODES USING THE PUBLIC MGMT IP
+    if (providerField !== 'local' && !finalTerm && gwField) {
         const ipOnly = gwField.split('/')[0];
         finalTerm = `ssh://root@${ipOnly}`;
     }
@@ -329,7 +334,7 @@ window.saveNodeConfig = async function() {
     let nicsArray = finalNics ? finalNics.split('\n') : [];
     if (ipField) {
         nicsArray = nicsArray.filter(n => !n.startsWith(`${primaryNic}=`));
-        nicsArray.unshift(`${primaryNic}=${ipField}`); 
+        nicsArray.unshift(`${primaryNic}=${ipField}`);
     }
     finalNics = nicsArray.join('\n');
 
@@ -348,6 +353,7 @@ window.saveNodeConfig = async function() {
     } else {
         formData.append('format', 'form');
         formData.append('type', typeField);
+        formData.append('provider', providerField);
         formData.append('plane', planeField);
         formData.append('kind', document.getElementById('edit-kind').value);
         formData.append('gw',   gwField);
@@ -359,31 +365,31 @@ window.saveNodeConfig = async function() {
         formData.append('env',  document.getElementById('edit-env').value);
         formData.append('devs', document.getElementById('edit-devs').value);
     }
-    
+
     const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
-    
+
     try {
         if (isAdding) {
             const labStateEl = document.getElementById('lab-running-state');
             const isRunning = labStateEl && labStateEl.getAttribute('data-is-running') === 'true';
             const createUrl = isRunning ? `/labs/${safeLab}/node` : `/labs/${safeLab}/node/new`;
-            
+
             const createRes = await fetch(createUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData.toString()
             });
-            
+
             if (!createRes.ok) throw new Error(await createRes.text());
         }
-        
+
         const editRes = await fetch(`/labs/${safeLab}/node_edit/${encodeURIComponent(nodeName)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString()
         });
         const data = await editRes.json();
-        
+
         if (editRes.ok) {
             resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; display: block; padding: 8px;';
             resultDiv.innerHTML = '<i class="fas fa-check-circle w3-text-green"></i> Node saved successfully! (Reloading...)';
@@ -407,10 +413,10 @@ window.openEditorTab = function(evt, tabName) {
     for (i = 0; i < tablinks.length; i++) tablinks[i].className = tablinks[i].className.replace(" w3-text-blue", "");
     document.getElementById(tabName).style.display = "block";
     evt.currentTarget.className += " w3-text-blue";
-    
+
     if (tabName === 'YamlEdit') {
         window.initCodeEditor('node-yaml-editor', 'yaml');
-        
+
         if (!window.currentEditNode && window.cmEditors && window.cmEditors['node-yaml-editor']) {
             const cm = window.cmEditors['node-yaml-editor'];
             if (cm.getValue().trim() === '') {
@@ -439,7 +445,6 @@ window.filterNodeProfiles = function() {
         rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
     }
 };
-
 
 // ===================================================
 // REMOTE HOST LIVENESS WATCHER
@@ -485,6 +490,6 @@ window.checkRemoteHosts = async function() {
     }
 };
 
-// Start a background watcher that runs every 2 seconds. 
+// Start a background watcher that runs every 2 seconds.
 // Whenever the dashboard dynamically reloads the nodes.erb card, this will instantly catch it!
 setInterval(window.checkRemoteHosts, 2000);

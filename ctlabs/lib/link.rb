@@ -13,7 +13,7 @@
 class Link
   attr_reader :node1, :node2, :nic1, :nic2, :mgmt
  
-  def initialize(args) #nodes, links, log)
+  def initialize(args, auto_connect=true)
     @links  = args['links']
     @nodes  = args['nodes']
     @mgmt   = args['mgmt']
@@ -37,7 +37,7 @@ class Link
     @log.write "initialize(): node1=#{@node1},nic1=#{@nic1}", "debug"
     @log.write "initialize(): node2=#{@node2},nic2=#{@nic2}", "debug"
  
-    connect
+    connect if auto_connect
   end
  
   def find_node(name)
@@ -258,6 +258,39 @@ class Link
 
       end
 
+    end
+  end
+
+  def disconnect
+    @log.write "#{__method__}(): #{@links[0]} -- #{@links[1]}", "debug"
+    @log.info "[HOTPLUG] Disconnecting #{@links[0]} -- #{@links[1]}"
+
+    remove_link(@node1, @nic1)
+    remove_link(@node2, @nic2)
+  end
+
+  def remove_link(node, nic)
+    return if node.nil?
+
+    case node.type
+      when 'host', 'router', 'switch', 'controller'
+        if nic_exists?(node, nic)
+          @log.write "#{__method__}(): removing #{nic} from #{node.name}", "debug"
+          %x( ip netns exec #{node.netns} ip link set #{nic} down 2>/dev/null )
+          %x( ip netns exec #{node.netns} ip link delete #{nic} 2>/dev/null )
+        end
+
+        # Clean up OVS ports so they don't block future connections!
+        if node.type == 'switch' && ['ovs'].include?(node.kind) && nic != "eth0"
+          @log.write "#{__method__}(): removing #{nic} from openvswitch #{node.name}", "debug"
+          engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+          %x( #{engine} exec #{node.name} sh -c '/usr/bin/ovs-vsctl del-port #{node.name} #{nic}' 2>/dev/null )
+        end
+        
+      when 'gateway'
+        @log.write "#{__method__}(): removing link from bridge", "debug"
+        %x( ip link set #{node.name}#{nic} nomaster down 2>/dev/null )
+        %x( ip link delete #{node.name}#{nic} 2>/dev/null )
     end
   end
  

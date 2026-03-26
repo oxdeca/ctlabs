@@ -278,6 +278,44 @@ class Node
     end
   end
 
+  def resolve_runtime!
+    return if remote? || @type == 'gateway'
+    
+    # Guarantee MTU is present
+    @mtu = 1460 if @mtu.nil? || @mtu.to_s.strip.empty?
+    
+    # Recover the Container ID so we can find the existing network namespace symlink
+    if @netns.nil? || @netns.to_s.strip.empty?
+      engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+      cid = %x( #{engine} inspect -f '{{.Id}}' #{@name} 2>/dev/null ).strip
+      
+      if !cid.empty?
+        @cid = cid
+        @netns = cid # ctlabs uses the container ID for the netns symlink
+
+        # Safeguard: Recreate the symlink just in case it was lost
+        cpid = %x( #{engine} inspect -f '{{.State.Pid}}' #{@name} 2>/dev/null ).strip
+        if !cpid.empty? && cpid != '0'
+          %x( mkdir -vp /var/run/netns/ 2>/dev/null )
+          %x( ln -sfT /proc/#{cpid}/ns/net /var/run/netns/#{@cid} 2>/dev/null )
+        end
+      end
+    end
+  end
+
+  def hotplug_ip(nic, ip)
+    resolve_runtime!
+    return false if remote? || @type == 'gateway' || @netns.nil? || @netns.to_s.empty?
+
+    @log.info "[HOTPLUG] Configuring #{nic} with #{ip} on #{@name}"
+    system("ip netns exec #{@netns} ip link set #{nic} up 2>/dev/null")
+    system("ip netns exec #{@netns} ip addr flush dev #{nic} 2>/dev/null")
+    success = system("ip netns exec #{@netns} ip addr add #{ip} dev #{nic} 2>/dev/null")
+    
+    @log.info "[HOTPLUG] Failed to assign IP to #{nic}" unless success
+    success
+  end
+
   def if_wait
     %{#!/bin/sh
 INTFS=$1  #$(echo $CLAB_INTFS)

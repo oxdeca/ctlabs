@@ -31,14 +31,14 @@
       <i class="fas fa-plus"></i> Add Node
     </button>
   </div>
-  
+
   <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
     <input type="text" id="node-filter-input" onkeyup="window.filterNodes()" placeholder=" Filter nodes by name, profile, or type..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
   <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="nodes-scroll">
     <table class="w3-table w3-striped w3-small" id="active-nodes-table">
-      <thead><tr style="color: #94a3b8;"><th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th><th>Name</th><th>Profile</th><th>Type</th><th>Kind</th><th>Image</th><th style="text-align:right;">Actions</th></tr></thead>
+      <thead><tr style="color: #94a3b8;"><th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th><th>Name</th><th>Profile</th><th>Type</th><th>Provider</th><th>Image</th><th style="text-align:right;">Actions</th></tr></thead>
       <tbody>
         <% (info_hash[:nodes] || []).each do |node| %>
           <%
@@ -61,36 +61,40 @@
               when 'gateway' then node_icon = 'fa-door-open'; node_prefix = 'gw'
               else node_icon = 'fa-server'; node_prefix = node[:type].to_s[0..3]
             end
+            
+            # Use the new remote? superpower (or check provider if the Node object isn't fully instantiated here)
+            is_remote = ['gcp', 'external', 'aws', 'azure'].include?(node[:provider].to_s.downcase) || ['rhost', 'external'].include?(node[:type].to_s.downcase)
+            provider_icon = is_remote ? '☁️' : '🐳'
           %>
           <tr class="node-row" style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
             <td style="text-align: center; vertical-align: middle;">
-              <% if ['rhost', 'external'].include?(node[:type].to_s.downcase) %>
+              <% if is_remote %>
                 <i class="fas fa-circle-notch fa-spin w3-text-gray rhost-status-icon" data-lab="<%= info_hash[:lab_path] %>" data-node="<%= node[:name] %>" style="font-size: 0.8em;" title="Checking reachability..."></i>
               <% else %>
                 <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
               <% end %>
             </td>
-            
+
             <td style="vertical-align: middle; white-space: nowrap;">
               <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
               <strong style="color: #38bdf8;"><%= node[:name] %></strong>
               <% if node[:adhoc] %><span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span><% end %>
             </td>
-            
+
             <td style="vertical-align: middle;">
               <strong style="color: #a855f7;"><%= node_prefix %>:<%= node[:kind] %></strong>
             </td>
 
             <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= node[:type] %></span></td>
-            <td style="vertical-align: middle;"><%= node[:kind] %></td>
-            
+            <td style="vertical-align: middle;"><%= provider_icon %> <%= node[:provider] || 'local' %></td>
+
             <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
               <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry' %>" style="margin-right: 4px;">
                 <i class="fas fa-cube <%= is_built ? 'w3-text-green' : '' %>" <%= is_built ? '' : 'style="color: #475569;"' %>></i>
               </span>
               <%= node[:image] %>
             </td>
-            
+
             <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
               <button type="button" onclick="const w=900, h=600, t=(window.top.outerHeight/2)+window.top.screenY-(h/2), l=(window.top.outerWidth/2)+window.top.screenX-(w/2); window.open('/terminal/<%= node[:name] %>', 'term_<%= node[:name] %>', 'width='+w+',height='+h+',top='+t+',left='+l+',resizable=yes,scrollbars=yes,toolbar=no,location=no');" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now"><i class="fas fa-terminal fa-lg"></i></button>
               <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node"><i class="fas fa-edit fa-lg"></i></button>

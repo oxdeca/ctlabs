@@ -14,35 +14,35 @@
 
 <div id="node-editor-modal" class="w3-modal" style="z-index: 9999;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 850px;">
-    
+
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;">
-        <i id="node-modal-icon" class="fas fa-edit"></i> 
-        <span id="node-modal-title">Configure Node:</span> 
+        <i id="node-modal-icon" class="fas fa-edit"></i>
+        <span id="node-modal-title">Configure Node:</span>
         <span id="editor-node-name" style="color: #38bdf8;"></span>
       </h4>
     </header>
-    
+
     <div class="w3-container w3-padding">
       <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px;">
-        <i class="fas fa-info-circle"></i> If the lab is running, edits apply as an <strong>override</strong> (and new nodes boot automatically). If stopped, they save permanently to the <strong>base YAML</strong>.
+        <i class="fas fa-info-circle"></i> If the lab is running, edits apply as an <strong>override</strong>. If stopped, they save permanently to the <strong>base YAML</strong>.
       </div>
-      
+
       <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #475569;">
         <button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'AdvancedEdit')"><b>Advanced</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button>
       </div>
-      
+
       <div id="FormEdit" class="editor-tab" style="max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
         <div class="w3-row-padding" style="margin: 0 -8px;">
-          
+
           <div class="w3-col m12 w3-margin-bottom">
             <label>Node Name</label>
             <input type="text" id="edit-node-name" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. h3 or ext_server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
           </div>
-          
+
           <div class="w3-col m6 w3-margin-bottom">
             <label>Node Type</label>
             <select id="edit-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateKindOptions) window.updateKindOptions(this.value, 'edit-kind'); if(window.updateNodeFormFields) window.updateNodeFormFields(this.value, document.getElementById('edit-plane').value);">
@@ -52,15 +52,25 @@
               <option value="router">Router</option>
               <option value="gateway">Gateway</option>
               <option value="controller">Controller</option>
-              <option value="rhost">☁️ Remote Host (rhost)</option>
             </select>
           </div>
-          
+
           <div class="w3-col m6 w3-margin-bottom">
-            <label>Profile (Kind)</label>
+            <label>Provider</label>
+            <select id="edit-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              <option value="local" selected>🐳 Local (Docker)</option>
+              <option value="external">☁️ External / VPN</option>
+              <option value="gcp">☁️ Google Cloud (GCP)</option>
+              <option value="aws">☁️ AWS</option>
+              <option value="azure">☁️ Azure</option>
+            </select>
+          </div>
+
+          <div class="w3-col m6 w3-margin-bottom">
+            <label>Profile</label>
             <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="Double-click to select profile..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
             <datalist id="node-profiles-list">
-              <% 
+              <%
                 available_kinds = []
                 if defined?(info_hash) && info_hash && info_hash[:images]
                   info_hash[:images].each { |img| available_kinds << img[:kind].to_s.strip }
@@ -81,7 +91,7 @@
             </select>
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom">
+          <div class="w3-col m12 w3-margin-bottom">
             <label>Connect to Switch</label>
             <select id="edit-switch" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateGatewayForSwitch) window.updateGatewayForSwitch(this.value)">
               <option value="" selected>-- None (Mgmt Only) --</option>
@@ -106,10 +116,10 @@
           </div>
         </div>
       </div>
-      
+
       <div id="AdvancedEdit" class="editor-tab" style="display:none; max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
         <div class="w3-row-padding" style="margin: 0 -8px;">
-          
+
           <div class="w3-col m12 w3-margin-bottom">
             <label>Additional NICs (nics)</label>
             <textarea id="edit-nics" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="eth2=10.0.0.1/24&#10;eth3=10.0.1.1/24" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
@@ -129,28 +139,28 @@
             <label>Devices (devs)</label>
             <textarea id="edit-devs" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="/dev/net/tun" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
-          
+
           <div class="w3-col m12 w3-margin-bottom">
             <label><i class="fas fa-info-circle"></i> Node Info (Description)</label>
             <input type="text" id="edit-info" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g., Primary Database Server" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
           </div>
-          
+
           <div class="w3-col m12 w3-margin-bottom">
             <label><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
             <input type="text" id="edit-term" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
           </div>
-          
+
           <div class="w3-col m12 w3-margin-bottom">
             <label><i class="fas fa-link"></i> Custom URLs (Title|https://link.com)</label>
             <textarea id="edit-urls" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="Flashcards|https://quizlet.com/..." oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
         </div>
       </div>
-      
+
       <div id="YamlEdit" class="editor-tab" style="display:none">
         <textarea id="node-yaml-editor" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 350px; resize: vertical; white-space: pre;"></textarea>
       </div>
-      
+
       <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>
 
       <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right; margin-top: 15px;">

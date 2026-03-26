@@ -7,6 +7,22 @@ require 'socket'
 require 'timeout'
 
 # ===================================================
+# HELPER: Find node in raw YAML (supports v1 and v2)
+# ===================================================
+def find_node_in_raw_yaml(vm_cfg, node_name)
+  if vm_cfg['nodes'] && vm_cfg['nodes'][node_name]
+    return vm_cfg['nodes'][node_name], nil
+  elsif vm_cfg['planes']
+    vm_cfg['planes'].each do |p_name, p_data|
+      if p_data && p_data['nodes'] && p_data['nodes'][node_name]
+        return p_data['nodes'][node_name], p_name
+      end
+    end
+  end
+  [nil, nil]
+end
+
+# ===================================================
 # NODES
 # ===================================================
 get '/labs/*/node/:node_name' do
@@ -17,7 +33,9 @@ get '/labs/*/node/:node_name' do
   node_cfg = nil
   if File.file?(lab_path)
     data = YAML.load_file(lab_path)
-    node_cfg = data['topology'][0]['nodes'][node_name] if data['topology'] && data['topology'][0]
+    vm = data['topology']&.first || {}
+    node_cfg, plane_name = find_node_in_raw_yaml(vm, node_name)
+    node_cfg['plane'] = plane_name if node_cfg && plane_name
   end
 
   node_cfg ||= { 'type' => 'host', 'kind' => 'linux', 'gw' => '', 'nics' => { 'eth1' => '' } }
@@ -39,15 +57,26 @@ post '/labs/*/node/new' do
     raise "Node name is required." if node_name.empty?
     
     yaml['topology'] ||= [{}]
-    yaml['topology'][0] ||= {}
-    yaml['topology'][0]['nodes'] ||= {}
-    raise "Node '#{node_name}' already exists!" if yaml['topology'][0]['nodes'].key?(node_name)
+    vm = yaml['topology'][0] ||= {}
+    
+    existing_node, _ = find_node_in_raw_yaml(vm, node_name)
+    raise "Node '#{node_name}' already exists!" if existing_node
 
     new_node          = { 'type' => params[:type] }
     new_node['plane'] = params[:plane] unless params[:plane].to_s.empty?
     new_node['kind']  = params[:kind] unless params[:kind].to_s.empty?
 
-    yaml['topology'][0]['nodes'][node_name] = new_node
+    target_plane = new_node['plane'] || 'data'
+
+    if vm['planes']
+      vm['planes'][target_plane] ||= {}
+      vm['planes'][target_plane]['nodes'] ||= {}
+      vm['planes'][target_plane]['nodes'][node_name] = new_node
+    else
+      vm['nodes'] ||= {}
+      vm['nodes'][node_name] = new_node
+    end
+
     write_formatted_yaml(lab_path, yaml)
     { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
   rescue => e
@@ -62,9 +91,10 @@ post '/labs/*/node' do
   node_name = params[:node_name]
 
   node_cfg = { 'type' => params[:type] || 'host', 'kind' => params[:kind] || 'linux' }
-  node_cfg['plane'] = params[:plane] unless params[:plane].to_s.empty?
-  node_cfg['gw'] = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
-  node_cfg['nics'] = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
+  node_cfg['plane']    = params[:plane] unless params[:plane].to_s.empty?
+  node_cfg['gw']       = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
+  node_cfg['nics']     = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
+  node_cfg['provider'] = params[:provider] unless params[:provider].to_s.empty?
 
   begin
     lab_path = get_lab_file_path(lab_name)
@@ -72,14 +102,25 @@ post '/labs/*/node' do
     cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch])
 
     data = YAML.load_file(lab_path)
-    data['topology'][0]['nodes'][node_name] = cfg_out
-    data['topology'][0]['links'] ||= []
-    
+    vm = data['topology'][0]
+    target_plane = cfg_out['plane'] || 'data'
+
+    if vm['planes']
+      vm['planes'][target_plane] ||= {}
+      vm['planes'][target_plane]['nodes'] ||= {}
+      vm['planes'][target_plane]['nodes'][node_name] = cfg_out
+    else
+      vm['nodes'] ||= {}
+      vm['nodes'][node_name] = cfg_out
+    end
+
+    vm['links'] ||= []
     if data_link
-      data['topology'][0]['links'] << data_link
+      vm['links'] << data_link
       sw_name = params[:switch].strip
       sw_port = data_link[0].split(':eth').last.to_i
-      sw_node = data['topology'][0]['nodes'][sw_name]
+      
+      sw_node, _ = find_node_in_raw_yaml(vm, sw_name)
       sw_node['ports'] = sw_port if sw_node && sw_port > (sw_node['ports'] || 4)
     end
     
@@ -99,13 +140,16 @@ post '/labs/*/node_edit/:node_name' do
 
   begin
     full_yaml = YAML.load_file(lab_path)
-    base_data = full_yaml['topology'][0]['nodes'][node_name] || {}
+    vm = full_yaml['topology'][0]
+    base_data, old_plane = find_node_in_raw_yaml(vm, node_name)
+    base_data ||= {}
 
     if params[:format] == 'form'
       new_cfg = base_data.dup
       new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
       params[:plane].to_s.empty? ? new_cfg.delete('plane') : new_cfg['plane'] = params[:plane]
       params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
+      params[:provider].to_s.empty? ? new_cfg.delete('provider') : new_cfg['provider'] = params[:provider]
       params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
       params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]
       params[:term].to_s.empty? ? new_cfg.delete('term') : new_cfg['term'] = params[:term]
@@ -127,7 +171,6 @@ post '/labs/*/node_edit/:node_name' do
         new_cfg.delete('urls')
       end
 
-      # --- ADDED: Properly parse Advanced Array fields ---
       ['vols', 'env', 'devs'].each do |field|
         if params[field] && !params[field].strip.empty?
           new_cfg[field] = params[field].split("\n").map(&:strip).reject(&:empty?)
@@ -135,14 +178,48 @@ post '/labs/*/node_edit/:node_name' do
           new_cfg.delete(field)
         end
       end
-      # ---------------------------------------------------
-
     else
       new_cfg = YAML.safe_load(params[:yaml_data])
     end
 
-    full_yaml['topology'][0]['nodes'][node_name] = new_cfg
+    new_plane = new_cfg['plane'] || old_plane || 'data'
+
+    if vm['planes']
+      # Remove from old plane if it moved
+      if old_plane && old_plane != new_plane && vm['planes'][old_plane] && vm['planes'][old_plane]['nodes']
+        vm['planes'][old_plane]['nodes'].delete(node_name)
+      end
+      vm['planes'][new_plane] ||= {}
+      vm['planes'][new_plane]['nodes'] ||= {}
+      vm['planes'][new_plane]['nodes'][node_name] = new_cfg
+    else
+      vm['nodes'][node_name] = new_cfg
+    end
+
     write_formatted_yaml(lab_path, full_yaml)
+
+    # --- HOT-PLUG DIFFING ENGINE ---
+    if Lab.running? && Lab.current_name == lab_name
+      begin
+        lab = Lab.new(cfg: lab_path, log: LabLog.null)
+        target_node = lab.find_node(node_name)
+
+        if target_node && !target_node.remote?
+          old_nics = base_data['nics'] || {}
+          new_nics = new_cfg['nics'] || {}
+
+          # Handle IP Changes & New NICs
+          new_nics.each do |nic_name, ip|
+            if old_nics[nic_name] != ip
+              target_node.hotplug_ip(nic_name, ip)
+            end
+          end
+        end
+      rescue => e
+        puts "[HotPlug Error] #{e.message}"
+      end
+    end
+    # -------------------------------
 
     content_type :json
     { success: true, message: "Node configuration saved." }.to_json
@@ -165,8 +242,17 @@ post '/labs/*/node/:node_name/delete' do
     end
 
     yaml = YAML.load_file(lab_path)
-    yaml['topology'][0]['nodes'].delete(node_name)
-    yaml['topology'][0]['links']&.reject! do |l|
+    vm = yaml['topology'][0]
+
+    if vm['nodes']
+      vm['nodes'].delete(node_name)
+    elsif vm['planes']
+      vm['planes'].each do |_, p_data|
+        p_data['nodes'].delete(node_name) if p_data && p_data['nodes']
+      end
+    end
+
+    vm['links']&.reject! do |l|
       l.is_a?(Array) && (l[0].start_with?("#{node_name}:") || l[1].start_with?("#{node_name}:"))
     end
 
@@ -189,7 +275,7 @@ get '/labs/*/node/:node_name/ping' do
 
   begin
     data = YAML.load_file(lab_path)
-    node_cfg = data['topology'][0]['nodes'][node_name]
+    node_cfg, _ = find_node_in_raw_yaml(data['topology'][0], node_name)
     
     # Extract Public Mgmt IP from the 'gw' field
     target_ip = node_cfg['gw'].to_s.split('/').first
@@ -229,6 +315,10 @@ post '/labs/*/link/save' do
     new_link = [ep1, ep2]
 
     if params[:old_ep1] && params[:old_ep2] && !params[:old_ep1].empty?
+      if Lab.running? && Lab.current_name == lab_name
+        Lab.new(cfg: lab_path, log: LabLog.null).hotunplug_link(params[:old_ep1], params[:old_ep2])
+      end
+      
       idx = yaml['topology'][0]['links'].find_index { |l| l.is_a?(Array) && l.include?(params[:old_ep1]) && l.include?(params[:old_ep2]) }
       idx ? (yaml['topology'][0]['links'][idx] = new_link) : (yaml['topology'][0]['links'] << new_link)
     else
@@ -236,7 +326,12 @@ post '/labs/*/link/save' do
     end
 
     write_formatted_yaml(lab_path, yaml)
-    { success: true, message: "Link saved successfully." }.to_json
+
+    if Lab.running? && Lab.current_name == lab_name
+      Lab.new(cfg: lab_path, log: LabLog.null).hotplug_link(ep1, ep2)
+    end
+
+    { success: true, message: "Link saved and connected successfully." }.to_json
   rescue => e
     status 400
     { success: false, error: e.message }.to_json
@@ -250,12 +345,18 @@ post '/labs/*/link/delete' do
     yaml = YAML.load_file(lab_path)
     yaml['topology'][0]['links']&.reject! { |l| l.is_a?(Array) && l.include?(params[:ep1]) && l.include?(params[:ep2]) }
     write_formatted_yaml(lab_path, yaml)
-    { success: true, message: "Link deleted." }.to_json
+
+    if Lab.running? && Lab.current_name == lab_name
+      Lab.new(cfg: lab_path, log: LabLog.null).hotunplug_link(params[:ep1], params[:ep2])
+    end
+
+    { success: true, message: "Link deleted and disconnected." }.to_json
   rescue => e
     status 400
     { success: false, error: e.message }.to_json
   end
 end
+
 
 # ===================================================
 # DNAT
@@ -270,10 +371,14 @@ post '/labs/*/dnat' do
     rule = lab.add_adhoc_dnat(params[:node], params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase)
 
     data = YAML.load_file(lab_path)
-    data['topology'][0]['nodes'][params[:node]]['dnat'] ||= []
-    data['topology'][0]['nodes'][params[:node]]['dnat'] << [params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase]
+    node_cfg, _ = find_node_in_raw_yaml(data['topology'][0], params[:node])
     
-    write_formatted_yaml(lab_path, data)
+    if node_cfg
+      node_cfg['dnat'] ||= []
+      node_cfg['dnat'] << [params[:external_port].to_i, params[:internal_port].to_i, (params[:protocol] || 'tcp').downcase]
+      write_formatted_yaml(lab_path, data)
+    end
+    
     content_type :json
     { success: true, message: "AdHoc DNAT rule added" }.to_json
   rescue => e
@@ -288,11 +393,12 @@ post '/labs/*/dnat/delete' do
   begin
     yaml = YAML.load_file(lab_path)
     node = params[:node]
-    dnat_rules = yaml['topology'][0]['nodes'][node]['dnat'] rescue nil
+    node_cfg, _ = find_node_in_raw_yaml(yaml['topology'][0], node)
+    dnat_rules = node_cfg['dnat'] rescue nil
     
     if dnat_rules
       dnat_rules.reject! { |r| r[0].to_s == params[:ext].to_s && r[1].to_s == params[:int].to_s && (r[2] || 'tcp').to_s == params[:proto].to_s }
-      yaml['topology'][0]['nodes'][node].delete('dnat') if dnat_rules.empty?
+      node_cfg.delete('dnat') if dnat_rules.empty?
       write_formatted_yaml(lab_path, yaml)
     end
     { success: true, message: "DNAT rule deleted." }.to_json
@@ -301,3 +407,4 @@ post '/labs/*/dnat/delete' do
     { success: false, error: e.message }.to_json
   end
 end
+
