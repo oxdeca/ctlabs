@@ -4,6 +4,27 @@
 # -----------------------------------------------------------------------------
 
 # ===================================================
+# HELPER: Find Controller in Raw YAML
+# ===================================================
+def find_automation_controller(vm_cfg)
+  if vm_cfg['nodes']
+    name = vm_cfg['nodes'].keys.find { |k| k == 'ansible' || vm_cfg['nodes'][k]['type'] == 'controller' }
+    return name, vm_cfg['nodes'][name], nil if name
+  end
+  
+  if vm_cfg['planes']
+    vm_cfg['planes'].each do |p_name, p_data|
+      if p_data && p_data['nodes']
+        name = p_data['nodes'].keys.find { |k| k == 'ansible' || p_data['nodes'][k]['type'] == 'controller' }
+        return name, p_data['nodes'][name], p_name if name
+      end
+    end
+  end
+  
+  [nil, nil, nil]
+end
+
+# ===================================================
 # ANSIBLE
 # ===================================================
 ANS_BASE_DIR = '/root/ctlabs-ansible'.freeze
@@ -16,12 +37,12 @@ get '/labs/*/ansible/config' do
 
   begin
     full_yaml = YAML.load_file(lab_path)
-    ctrl_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' || k == 'ansible' }
-    raise "No controller node found in topology" unless ctrl_node_name
+    vm = full_yaml['topology']&.first || {}
+    name, base_data, _ = find_automation_controller(vm)
     
-    base_data = full_yaml['topology'][0]['nodes'][ctrl_node_name] || {}
+    raise "No controller node found in topology" unless name
+
     play = base_data['play'] || {}
-    
     { json: { play: play } }.to_json
   rescue => e
     status 400
@@ -33,16 +54,16 @@ end
 get '/labs/*/ansible/file' do
   content_type :json
   filepath = params[:path].to_s.strip
-  
+
   # Security: Prevent escaping out of /root/ctlabs-ansible/
   halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
   begin
     full_path = File.join(ANS_BASE_DIR, filepath)
-    
+
     # If the file exists, return it. If it doesn't, return a blank slate so they can create it!
     content = File.file?(full_path) ? File.read(full_path) : "# New file: #{filepath}\n"
-    
+
     { content: content }.to_json
   rescue => e
     status 400
@@ -59,10 +80,10 @@ get '/labs/*/ansible/tree' do
       # Recursively search the entire directory
       Dir.glob(File.join(ANS_BASE_DIR, "**", "*")).each do |file|
         next if File.directory?(file)
-        
+
         # Ignore noisy hidden folders so the dropdown is clean
         next if file.include?('/.git/') || file.include?('/__pycache__/') || file.include?('/.idea/')
-        
+
         # Add relative path to array (e.g., "playbooks/main.yml")
         files << file.sub(ANS_BASE_DIR + '/', '')
       end
@@ -80,22 +101,23 @@ post '/labs/*/ansible/edit' do
 
   begin
     full_yaml = YAML.load_file(lab_path)
-    ansible_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| k == 'ansible' || full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' }
-    raise "No ansible controller node found in topology" unless ansible_node_name
+    vm = full_yaml['topology']&.first || {}
+    name, base_data, plane = find_automation_controller(vm)
     
-    base_data = full_yaml['topology'][0]['nodes'][ansible_node_name] || {}
+    raise "No ansible controller node found in topology" unless name
+
     play_cfg = base_data['play'] || {}
     play_cfg = {} if play_cfg.is_a?(String)
-    
+
     params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
     params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
-    
+
     if params[:custom_inv] && !params[:custom_inv].to_s.strip.empty?
       play_cfg['custom_inv'] = params[:custom_inv].to_s.strip
     else
       play_cfg.delete('custom_inv')
     end
-    
+
     # Safely parse Environment Variables across different OS line-endings
     env_str = params[:env].to_s.strip
     if env_str.empty?
@@ -107,7 +129,14 @@ post '/labs/*/ansible/edit' do
     params[:tags] && !params[:tags].to_s.strip.empty? ? play_cfg['tags'] = params[:tags].to_s.split(",").map(&:strip).reject(&:empty?) : play_cfg.delete('tags')
 
     base_data['play'] = play_cfg
-    full_yaml['topology'][0]['nodes'][ansible_node_name] = base_data
+    
+    # Save it back to the correct structure!
+    if plane
+      full_yaml['topology'][0]['planes'][plane]['nodes'][name] = base_data
+    else
+      full_yaml['topology'][0]['nodes'][name] = base_data
+    end
+    
     write_formatted_yaml(lab_path, full_yaml)
 
     ans_files = JSON.parse(params[:ans_files] || '{}')
@@ -121,7 +150,7 @@ post '/labs/*/ansible/edit' do
 
     content_type :json
     { success: true, message: "Configuration and files updated successfully." }.to_json
-  
+
   # Catch ALL exceptions to guarantee JSON response instead of HTML crash pages
   rescue Exception => e
     status 400
@@ -134,16 +163,16 @@ end
 post '/labs/*/ansible/file/delete' do
   content_type :json
   filepath = params[:filepath].to_s.strip
-  
+
   # Security constraints to prevent directory traversal attacks
   halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
-  
+
   begin
     full_path = File.join(ANS_BASE_DIR, filepath)
-    
+
     # Only attempt to delete if the file actually exists on disk (safely ignores typos that were never saved)
     File.delete(full_path) if File.exist?(full_path)
-    
+
     { success: true }.to_json
   rescue => e
     status 400
@@ -176,23 +205,6 @@ end
 # ===================================================
 TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
-# get '/labs/*/terraform/config' do
-#   content_type :json
-#   lab_name = params[:splat].first
-#   lab_path = get_lab_file_path(lab_name)
-# 
-#   begin
-#     lab = Lab.new(cfg: lab_path, log: LabLog.null)
-#     ctrl = lab.find_node('ansible') || lab.nodes.find { |n| n.type == 'controller' }
-#     raise "No controller node found in topology" unless ctrl
-#     
-#     { json: { tf: ctrl.terraform || {} } }.to_json
-#   rescue => e
-#     status 400
-#     { error: e.message }.to_json
-#   end
-# end
-
 get '/labs/*/terraform/config' do
   content_type :json
   lab_name = params[:splat].first
@@ -201,17 +213,18 @@ get '/labs/*/terraform/config' do
   begin
     # Bypass memory and read directly from YAML to preserve the vault block!
     full_yaml = YAML.load_file(lab_path)
-    nodes = full_yaml['topology'][0]['nodes'] || {}
-    ctrl_node = nodes.values.find { |n| n['type'] == 'controller' } || nodes['ansible'] || {}
-    tf_cfg = ctrl_node['terraform'] || {}
-    
+    vm = full_yaml['topology']&.first || {}
+    name, node_cfg, _ = find_automation_controller(vm)
+
+    tf_cfg = node_cfg ? (node_cfg['terraform'] || {}) : {}
+
     { json: { tf: tf_cfg } }.to_json
   rescue => e
     status 400
     { error: e.message }.to_json
   end
 end
- 
+
 # Recursive Tree for Terraform
 get '/labs/*/terraform/tree' do
   content_type :json
@@ -265,7 +278,7 @@ get '/labs/*/terraform/files' do
       Dir.glob(File.join(target_dir, "*")).each do |file_path|
         next if File.directory?(file_path) # Skip folders
         filename = File.basename(file_path)
-        
+
         # Read text content. (Limit to standard text files to avoid trying to read binaries)
         if filename.match?(/\.(tf|yml|yaml|json|sh|txt|tfvars|conf)$/i) || filename == 'Makefile'
           response[filename] = File.read(file_path)
@@ -280,78 +293,22 @@ get '/labs/*/terraform/files' do
   end
 end
 
-#post '/labs/*/terraform/edit' do
-#  lab_name = params[:splat].first
-#  lab_path = get_lab_file_path(lab_name)
-#
-#  begin
-#    full_yaml = YAML.load_file(lab_path)
-#    controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' || k == 'ansible' }
-#    
-#    base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
-#    tf_cfg = base_data['terraform'] || {}
-#    
-#    params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
-#    params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
-#    
-#    # Safely parse Variables
-#    vars_str = params[:vars].to_s.strip
-#    if vars_str.empty?
-#      tf_cfg.delete('vars')
-#    else
-#      tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
-#    end
-#
-#    # --- NEW: PARSE VAULT CONFIG ---
-#    v_project = params[:vault_project].to_s.strip
-#    v_roleset = params[:vault_roleset].to_s.strip
-#    
-#    if v_project.empty?
-#      tf_cfg.delete('vault')
-#    else
-#      tf_cfg['vault'] = {
-#        'project' => v_project,
-#        'roleset' => v_roleset.empty? ? 'terraform-runner' : v_roleset
-#      }
-#    end
-#
-#    base_data['terraform'] = tf_cfg
-#    full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
-#    write_formatted_yaml(lab_path, full_yaml)
-#
-#    tf_files = JSON.parse(params[:tf_files] || '{}')
-#    tf_files.each do |filepath, content|
-#      next if filepath.include?('..') || filepath.start_with?('/') 
-#      full_path = File.join(TF_BASE_DIR, filepath)
-#      FileUtils.mkdir_p(File.dirname(full_path))
-#      File.write(full_path, content)
-#    end
-#
-#    content_type :json
-#    { success: true, message: "Configuration and all files saved successfully." }.to_json
-#  
-#  # Catch ALL exceptions to guarantee JSON response
-#  rescue Exception => e
-#    status 400
-#    content_type :json
-#    { success: false, error: "Backend error: #{e.message}" }.to_json
-#  end
-#end
-
 post '/labs/*/terraform/edit' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
 
   begin
     full_yaml = YAML.load_file(lab_path)
-    controller_node_name = full_yaml['topology'][0]['nodes'].keys.find { |k| full_yaml['topology'][0]['nodes'][k]['type'] == 'controller' || k == 'ansible' }
+    vm = full_yaml['topology']&.first || {}
+    name, base_data, plane = find_automation_controller(vm)
     
-    base_data = full_yaml['topology'][0]['nodes'][controller_node_name] || {}
+    raise "No controller node found in topology" unless name
+
     tf_cfg = base_data['terraform'] || {}
-    
+
     params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
     params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
-    
+
     vars_str = params[:vars].to_s.strip
     if vars_str.empty?
       tf_cfg.delete('vars')
@@ -359,19 +316,19 @@ post '/labs/*/terraform/edit' do
       tf_cfg['vars'] = vars_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
     end
 
-    # --- NEW: PARSE COMMANDS (EXECUTION SCRIPT) ---
+    # --- PARSE COMMANDS (EXECUTION SCRIPT) ---
     commands_str = params[:commands].to_s.strip
     if commands_str.empty?
       tf_cfg.delete('commands')
     else
       # We use literal strings or multi-line blocks in YAML so it preserves the bash formatting
-      tf_cfg['commands'] = commands_str 
+      tf_cfg['commands'] = commands_str
     end
 
-    # --- NEW: PARSE VAULT CONFIG ---
+    # --- PARSE VAULT CONFIG ---
     v_project = params[:vault_project].to_s.strip
     v_roleset = params[:vault_roleset].to_s.strip
-    
+
     if v_project.empty?
       tf_cfg.delete('vault')
     else
@@ -382,12 +339,18 @@ post '/labs/*/terraform/edit' do
     end
 
     base_data['terraform'] = tf_cfg
-    full_yaml['topology'][0]['nodes'][controller_node_name] = base_data
+    
+    if plane
+      full_yaml['topology'][0]['planes'][plane]['nodes'][name] = base_data
+    else
+      full_yaml['topology'][0]['nodes'][name] = base_data
+    end
+    
     write_formatted_yaml(lab_path, full_yaml)
 
     tf_files = JSON.parse(params[:tf_files] || '{}')
     tf_files.each do |filepath, content|
-      next if filepath.include?('..') || filepath.start_with?('/') 
+      next if filepath.include?('..') || filepath.start_with?('/')
       full_path = File.join(TF_BASE_DIR, filepath)
       FileUtils.mkdir_p(File.dirname(full_path))
       File.write(full_path, content)
@@ -407,7 +370,7 @@ post '/labs/*/terraform/file/delete' do
   content_type :json
   filepath = params[:filepath].to_s.strip
   halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
-  
+
   begin
     full_path = File.join(TF_BASE_DIR, filepath)
     File.delete(full_path) if File.exist?(full_path)
@@ -431,8 +394,8 @@ post '/labs/*/terraform' do
       lab_instance = Lab.new(cfg: get_lab_file_path(lab_name), relative_path: lab_name)
       File.open(log_path, 'a') { |f| f.puts "\n--- Manual Terraform apply triggered ---\n" }
       lab_instance.run_terraform(
-        params[:node_name], 
-        log_path, 
+        params[:node_name],
+        log_path,
         session[:vault_token],
         session[:vault_addr],
         action

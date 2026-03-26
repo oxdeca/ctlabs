@@ -11,31 +11,31 @@
   .slim-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
   .slim-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
   .slim-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
-  
+
   /* Target CodeMirror's exact floating scrollbar containers */
   .CodeMirror-vscrollbar::-webkit-scrollbar,
-  .CodeMirror-hscrollbar::-webkit-scrollbar { 
-      width: 8px; 
-      height: 8px; 
+  .CodeMirror-hscrollbar::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
   }
   .CodeMirror-vscrollbar::-webkit-scrollbar-track,
-  .CodeMirror-hscrollbar::-webkit-scrollbar-track { 
-      background: #0f172a; 
-      border-radius: 4px; 
+  .CodeMirror-hscrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+      border-radius: 4px;
   }
   .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
-  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb { 
-      background: #475569; 
-      border-radius: 4px; 
+  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
   }
   .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover,
-  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover { 
-      background: #64748b; 
+  .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
   }
-  
+
   /* Blends the corner square where vertical and horizontal scrollbars meet */
-  .CodeMirror-scrollbar-filler { 
-      background-color: #0f172a !important; 
+  .CodeMirror-scrollbar-filler {
+      background-color: #0f172a !important;
       border: none;
   }
 
@@ -47,7 +47,7 @@
 
 <div id="ansible-editor-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column;">
-    
+
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
       <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-magic"></i> Configure Ansible Playbook</h4>
@@ -59,12 +59,12 @@
     </div>
 
     <div class="w3-container w3-padding slim-scroll" id="ans-editors-container" style="flex: 1; overflow-y: auto; min-height: 400px;">
-      
+
       <div id="AnsSettings" class="ans-tab">
         <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
           <i class="fas fa-info-circle"></i> Edits to the playbook configuration apply to the current run.
         </div>
-        
+
         <div class="w3-margin-bottom">
           <label>Playbook File</label>
           <input type="text" id="edit-ansible-book" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. main.yml">
@@ -87,11 +87,10 @@
 
         <div class="w3-margin-bottom">
             <label>Environment Variables (One per line)</label>
-            <label style="font-size: 0.85em; color: #94a3b8;">Volumes (vols)</label>
             <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
       </div>
-      
+
       <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 1em; padding: 8px; margin-top: 15px;"></div>
     </div>
 
@@ -114,7 +113,7 @@
       <h4 style="margin: 0;"><i class="fas fa-folder-open"></i> Open / Create File</h4>
     </header>
     <div class="w3-container w3-padding">
-      <labelSelect existing or type new path (e.g. roles/web/tasks/main.yml)</label>
+      <label>Select existing or type new path (e.g. roles/web/tasks/main.yml)</label>
       <input type="text" id="ans-file-browser-input" list="ans-files-datalist" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; margin-top: 8px;" placeholder="Double-click to browse files...">
       <datalist id="ans-files-datalist"></datalist>
     </div>
