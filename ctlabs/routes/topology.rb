@@ -62,9 +62,9 @@ post '/labs/*/node/new' do
     existing_node, _ = find_node_in_raw_yaml(vm, node_name)
     raise "Node '#{node_name}' already exists!" if existing_node
 
-    new_node          = { 'type' => params[:type] }
-    new_node['plane'] = params[:plane] unless params[:plane].to_s.empty?
-    new_node['kind']  = params[:kind] unless params[:kind].to_s.empty?
+    new_node            = { 'type' => params[:type] }
+    new_node['plane']   = params[:plane] unless params[:plane].to_s.empty?
+    new_node['profile'] = params[:profile] unless params[:profile].to_s.empty?
 
     target_plane = new_node['plane'] || 'data'
 
@@ -90,7 +90,7 @@ post '/labs/*/node' do
   halt 400, "AdHoc Nodes only allowed on the running lab" unless get_running_lab == lab_name
   node_name = params[:node_name]
 
-  node_cfg = { 'type' => params[:type] || 'host', 'kind' => params[:kind] || 'linux' }
+  node_cfg = { 'type' => params[:type] || 'host', 'profile' => params[:profile] || 'linux' }
   node_cfg['plane']    = params[:plane] unless params[:plane].to_s.empty?
   node_cfg['gw']       = params[:gw].strip if params[:gw] && !params[:gw].strip.empty?
   node_cfg['nics']     = { 'eth1' => params[:ip].strip } if params[:ip] && !params[:ip].strip.empty?
@@ -148,7 +148,7 @@ post '/labs/*/node_edit/:node_name' do
       new_cfg = base_data.dup
       new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
       params[:plane].to_s.empty? ? new_cfg.delete('plane') : new_cfg['plane'] = params[:plane]
-      params[:kind].to_s.empty? ? new_cfg.delete('kind') : new_cfg['kind'] = params[:kind]
+      params[:profile].to_s.empty? ? new_cfg.delete('profile') : new_cfg['profile'] = params[:profile]
       params[:provider].to_s.empty? ? new_cfg.delete('provider') : new_cfg['provider'] = params[:provider]
       params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
       params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]

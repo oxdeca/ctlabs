@@ -174,7 +174,7 @@ window.editNodeConfig = async function(labName, nodeName) {
             document.getElementById('edit-term').value = nodeObj.term || '';
 
             const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
-            document.getElementById('edit-kind').value = nodeObj.kind || (needsLinuxFallback ? 'linux' : '');
+            document.getElementById('edit-kind').value = nodeObj.profile || (needsLinuxFallback ? 'linux' : '');
 
             let nicsStr = '';
             let dataIp = '';
@@ -355,7 +355,7 @@ window.saveNodeConfig = async function() {
         formData.append('type', typeField);
         formData.append('provider', providerField);
         formData.append('plane', planeField);
-        formData.append('kind', document.getElementById('edit-kind').value);
+        formData.append('profile', document.getElementById('edit-kind').value);
         formData.append('gw',   gwField);
         formData.append('nics', finalNics);
         formData.append('info', document.getElementById('edit-info').value);
