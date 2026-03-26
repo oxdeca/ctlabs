@@ -7,4 +7,4 @@ base_img: parrotsec
 	cd base && sh ./build.sh
 
 parrotsec:
-	docker pull docker.io/parrotsec/security
+	docker pull docker.io/parrotsec/core
