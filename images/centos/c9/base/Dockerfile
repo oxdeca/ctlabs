@@ -19,7 +19,8 @@ RUN        systemctl mask systemd-logind systemd-sysusers systemd-tmpfiles-setup
 
 RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
 COPY       bashrc.kali /etc/profile.d/ctlabs-bashrc.sh
-COPY       sshd-mgmt.service /etc/systemd/system/sshd-mgmt.service
-RUN        systemctl enable sshd-mgmt.service && systemctl disable sshd.service
+COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
+COPY       sshd.service /etc/systemd/system/sshd.service
+RUN        systemctl enable sshd.service
 
 ENTRYPOINT ["/usr/lib/systemd/systemd"]

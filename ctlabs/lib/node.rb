@@ -142,6 +142,8 @@ class Node
     @log.info "#{__method__}(): #{@name}"
     case @type
       when 'host', 'router', 'switch', 'controller'
+        @env << "CTLABS_PLANE=#{@plane}" unless @env.any? { |e| e.start_with?('CTLABS_PLANE=') }
+
         caps  = @caps.map { |c| "--cap-add #{c} " }.join
         vols  = @vols.map { |v| "-v #{v} "}.join
         env   = @env.map  { |e| "-e #{e} "}.join
