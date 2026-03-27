@@ -188,26 +188,59 @@ class Link
   #
   def create_mgmt(node)
     case node.type
-      when 'host', 'switch', 'router'
+      when 'host', 'switch', 'router', 'server', 'vhost'
         @log.write "#{__method__}(): adding mgmt vrf", "debug"
-        if node.kind == 'mgmt'
-          @log.write "#{__method__}(): skipping mgmt vrf (node.kind == 'mgmt')", "debug"
-          return # skip over as mgmt not needed
+        
+        # If the node natively lives in the mgmt plane, or is specifically a mgmt profile, skip the VRF!
+        if node.kind == 'mgmt' || node.plane == 'mgmt'
+          @log.write "#{__method__}(): skipping mgmt vrf (node is in mgmt plane)", "debug"
+          return 
         end
+        
         %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
         if $?.exitstatus == 0
           %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
           if $?.exitstatus > 0
-            @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf", "debug"
+            @log.write "#{__method__}(): node(#{node.type}) - adding mgmt vrf", "debug"
             @log.write "#{__method__}(): node=#{node.inspect}", "debug"
             %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 99 )
             %x( ip netns exec #{node.netns} ip link set mgmt up )
             %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
-            %x( ip netns exec #{node.netns} ip route add default via #{@mgmt['gw']} vrf mgmt )
+            
+            # Ensure @mgmt is available before trying to add the route
+            if @mgmt && @mgmt['gw']
+              %x( ip netns exec #{node.netns} ip route add default via #{@mgmt['gw']} vrf mgmt )
+            end
           end
         end
     end
   end
+
+#  #
+#  # create mgmt vrf
+#  #
+#  def create_mgmt(node)
+#    case node.type
+#      when 'host', 'switch', 'router'
+#        @log.write "#{__method__}(): adding mgmt vrf", "debug"
+#        if node.kind == 'mgmt'
+#          @log.write "#{__method__}(): skipping mgmt vrf (node.kind == 'mgmt')", "debug"
+#          return # skip over as mgmt not needed
+#        end
+#        %x( ip netns exec #{node.netns} ip link ls eth0 2> /dev/null )
+#        if $?.exitstatus == 0
+#          %x( ip netns exec #{node.netns} ip link ls mgmt 2> /dev/null )
+#          if $?.exitstatus > 0
+#            @log.write "#{__method__}(): node(host,switch,router) - adding mgmt vrf", "debug"
+#            @log.write "#{__method__}(): node=#{node.inspect}", "debug"
+#            %x( ip netns exec #{node.netns} ip link add mgmt type vrf table 99 )
+#            %x( ip netns exec #{node.netns} ip link set mgmt up )
+#            %x( ip netns exec #{node.netns} ip link set eth0 master mgmt )
+#            %x( ip netns exec #{node.netns} ip route add default via #{@mgmt['gw']} vrf mgmt )
+#          end
+#        end
+#    end
+#  end
  
   #
   # create bond interface

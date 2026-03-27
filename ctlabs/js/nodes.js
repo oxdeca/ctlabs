@@ -65,7 +65,7 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
 
     // --- DYNAMIC NIC & LABELS BASED ON TYPE AND PROVIDER ---
     let primaryNic = 'eth1';
-    if (nodeType === 'controller') primaryNic = 'eth0';
+    if (nodeType === 'controller' || nodePlane === 'mgmt') primaryNic = 'eth0';
     if (provider !== 'local') primaryNic = 'tun0';
 
     let targetType = 'switches';
@@ -154,7 +154,7 @@ window.editNodeConfig = async function(labName, nodeName) {
             const nodeProvider = nodeObj.provider || 'local';
 
             let primaryNic = 'eth1';
-            if (nodeType === 'controller') primaryNic = 'eth0';
+            if (nodeType === 'controller' || nodePlane === 'mgmt') primaryNic = 'eth0';
             if (nodeProvider !== 'local') primaryNic = 'tun0';
 
             document.getElementById('edit-type').value = nodeType;
@@ -317,7 +317,7 @@ window.saveNodeConfig = async function() {
 
     // Smart NIC assignment based on Provider and Type
     let primaryNic = 'eth1';
-    if (typeField === 'controller') primaryNic = 'eth0';
+    if (typeField === 'controller' || planeField === 'mgmt') primaryNic = 'eth0';
     if (providerField !== 'local') primaryNic = 'tun0';
 
     let ipField   = document.getElementById('edit-ip').value.trim();

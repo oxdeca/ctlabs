@@ -584,7 +584,20 @@ class Lab
     end
   end
 
+  def get_next_switch_port(switch_name)
+    used_ports = @links.map do |l|
+      if l[0] =~ /^#{switch_name}:eth(\d+)$/
+        $1.to_i
+      elsif l[1] =~ /^#{switch_name}:eth(\d+)$/
+        $1.to_i
+      end
+    end.compact
     
+    next_port = 1
+    next_port += 1 while used_ports.include?(next_port)
+    next_port
+  end
+
   def add_adhoc_node(node_name, node_cfg, target_switch = nil)
     @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
     raise "Node '#{node_name}' already exists" if find_node(node_name)
@@ -597,53 +610,41 @@ class Lab
       end
     end
 
-    # 2. Determine explicitly vs implicitly managed networks
-    type = node_cfg['type']
-    kind = node_cfg['kind']
+    type = node_cfg['type'] || 'host'
+    kind = node_cfg['kind'] || node_cfg['profile'] || 'linux'
     plane = node_cfg['plane'] || 'data'
+    is_remote = ['rhost', 'external'].include?(type) || ['gcp', 'external', 'aws', 'azure'].include?(node_cfg['provider'].to_s.downcase)
 
-    # Remote hosts don't get implicit local docker mgmt networks
-    is_remote = ['rhost', 'external'].include?(type)
-
-    is_explicit_mgmt = (type == 'controller' || plane == 'mgmt' || (type == 'router' && kind == 'mgmt'))
-    needs_implicit_mgmt = !is_remote && (['host', 'switch', 'server'].include?(type) || (type == 'router' && kind != 'mgmt'))
-
-    # Calculate next available Mgmt IP safely
-    vm_name = @vm_name || @cfg['topology'][0]['name']
+    vm_name = @vm_name || @cfg['topology'][0]['hv'] || @cfg['topology'][0]['name']
     cfg_vm  = find_vm(vm_name)
     mgmt    = cfg_vm['mgmt'] || @mgmt || {}
-    net     = mgmt['net'] || "192.168.40.0/24"
-
-    tmp  = net.split('/')
-    mask = tmp[1]
-    net_prefix = tmp[0].split('.')[0..2].join('.') + '.'
-
-    used_ips = @nodes.map do |n|
-      n.nics['eth0'].to_s.split('/')[0].to_s.split('.').last.to_i if n.nics && !n.nics['eth0'].to_s.strip.empty?
-    end.compact
-
-    mgmt_ip = "#{net_prefix}#{(used_ips.max || 20) + 1}/#{mask}"
-
-    # 3. Create Runtime Configuration
-    runtime_cfg = Marshal.load(Marshal.dump(node_cfg)) # Deep clone
-    runtime_cfg['nics'] ||= {}
-
-    if is_explicit_mgmt && !is_remote
-      # Explicit mgmt nodes MUST have eth0 explicitly in the YAML
-      if runtime_cfg['nics']['eth0'].nil? || runtime_cfg['nics']['eth0'].strip.empty?
-        runtime_cfg['nics']['eth0'] = mgmt_ip
-        node_cfg['nics'] ||= {}
-        node_cfg['nics']['eth0'] = mgmt_ip
-      end
-    elsif needs_implicit_mgmt
-      # Implicit mgmt nodes get eth0 at runtime, but it MUST NOT save to YAML
-      runtime_cfg['nics']['eth0'] = mgmt_ip
-      node_cfg['nics'].delete('eth0') if node_cfg['nics']
+    
+    # 2. SMART IP CALCULATION
+    target_nic = is_remote ? 'tun0' : 'eth0'
+    node_cfg['nics'] ||= {}
+    
+    if node_cfg['nics'][target_nic].to_s.strip.empty?
+      net = mgmt['net'] || "192.168.99.0/24"
+      
+      # Gather all IPs currently in use in memory to find the true highest IP
+      used_ips = @nodes.flat_map do |n|
+        ips = n.nics&.values&.map { |ip| ip.to_s.split('/')[0] } || []
+        ips << n.ipv4.to_s.split('/')[0] if n.ipv4 && !n.ipv4.to_s.empty?
+        ips
+      end.compact.reject(&:empty?)
+      
+      require 'ipaddr'
+      subnet = IPAddr.new(net)
+      ip_range = subnet.to_range.to_a
+      start_idx = [20, ip_range.size - 2].min
+      
+      next_ip = ip_range[start_idx..-2].find { |ip| !used_ips.include?(ip.to_s) }
+      node_cfg['nics'][target_nic] = "#{next_ip}/#{subnet.prefix}" if next_ip
     end
 
-    node_cfg['adhoc'] = true # Tag for UI
-
-    # 4. Instantiate Node with RUNTIME config
+    # 3. Instantiate Node
+    node_cfg['adhoc'] = true 
+    
     node = Node.new({
       'name'      => node_name,
       'ephemeral' => @ephemeral,
@@ -651,12 +652,10 @@ class Lab
       'log'       => @log,
       'domain'    => cfg_vm['domain'] || @domain,
       'dns'       => cfg_vm['dns'] || @dns
-    }.merge(runtime_cfg))
+    }.merge(node_cfg))
 
     @nodes << node
-    
-    # Do not try to run a local container for a remote host!
-    node.run unless is_remote 
+    node.run unless is_remote
 
     unless is_remote
       safe_name = @relative_path.gsub('/', '_')
@@ -667,112 +666,51 @@ class Lab
       end
     end
 
-    # 5. Connect Mgmt Interface to sw0 sequentially
-    if !is_remote && !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
-      sw0 = find_node('sw0')
-      if sw0
-        used_sw0 = @links.map do |l|
-          if l[0] =~ /^sw0:eth(\d+)$/
-            $1.to_i
-          elsif l[1] =~ /^sw0:eth(\d+)$/
-            $1.to_i
-          end
-        end.compact
-
-        next_sw0_port = 1
-        next_sw0_port += 1 while used_sw0.include?(next_sw0_port)
-
-        mgmt_link = ["sw0:eth#{next_sw0_port}", "#{node_name}:eth0"]
-        @links << mgmt_link
-        Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
-      end
-    end
-
-    # 6. Connect Data Interface to Target Switch sequentially
+    # 4. SMART WIRING (Prevents dual-wiring eth1 in mgmt plane)
     data_link = nil
-    if target_switch && !target_switch.to_s.strip.empty?
-      if target_sw_node = find_node(target_switch)
-        used_sw = @links.map do |l|
-          if l[0] =~ /^#{target_switch}:eth(\d+)$/
-            $1.to_i
-          elsif l[1] =~ /^#{target_switch}:eth(\d+)$/
-            $1.to_i
-          end
-        end.compact
-
-        next_port = 1
-        next_port += 1 while used_sw.include?(next_port)
-
-        # Smart primary NIC selection based on the new types
-        primary_nic = 'eth1'
-        primary_nic = 'eth0' if type == 'controller'
-        primary_nic = 'tun0' if type == 'rhost'
-
-        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:#{primary_nic}"]
+    
+    if is_remote
+      # Remote node wiring
+      if target_switch && !target_switch.strip.empty?
+        next_port = get_next_switch_port(target_switch)
+        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:tun0"]
         @links << data_link
-        
-        # Do not try to build a local veth pair for a remote host!
-        Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt) unless is_remote 
+      end
+    elsif plane == 'mgmt' || type == 'controller'
+      # MGMT PLANE: Only one connection needed (eth0 -> target_switch or sw0)
+      actual_switch = (target_switch && !target_switch.strip.empty?) ? target_switch : 'sw0'
+      if find_node(actual_switch)
+        next_port = get_next_switch_port(actual_switch)
+        data_link = ["#{actual_switch}:eth#{next_port}", "#{node_name}:eth0"]
+        @links << data_link
+        Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
+      end
+    else
+      # DATA PLANE: Needs OOB Mgmt (eth0 -> sw0) AND Data (eth1 -> target_switch)
+      if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
+        if find_node('sw0')
+          next_sw0 = get_next_switch_port('sw0')
+          mgmt_link = ["sw0:eth#{next_sw0}", "#{node_name}:eth0"]
+          @links << mgmt_link
+          Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
+        end
+      end
+      
+      if target_switch && !target_switch.strip.empty?
+        if find_node(target_switch)
+          next_port = get_next_switch_port(target_switch)
+          data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:eth1"]
+          @links << data_link
+          Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
+        end
       end
     end
 
     @log.info "[ADHOC NODE] Started node #{node_name}"
 
-    # CACHE THE EXACT TEXT FOR SAVING LATER
-    begin
-      FileUtils.mkdir_p('/var/run/ctlabs')
-      runtime_file = "/var/run/ctlabs/#{@relative_path.gsub('/', '_')}.adhoc"
-      File.open(runtime_file, 'a') do |f|
-        clean_cfg = Marshal.load(Marshal.dump(node_cfg))
-        clean_cfg.delete('adhoc')
-
-        # 8 spaces for node name
-        yaml_str = "      #{node_name}:\n"
-        # 10 spaces for attributes
-        yaml_str << "        type: #{clean_cfg['type']}\n" if clean_cfg['type']
-        yaml_str << "        plane: #{clean_cfg['plane']}\n" if clean_cfg['plane'] && !clean_cfg['plane'].to_s.empty?
-        yaml_str << "        kind: #{clean_cfg['kind']}\n" if clean_cfg['kind'] && !clean_cfg['kind'].to_s.empty?
-        yaml_str << "        gw: #{clean_cfg['gw']}\n" if clean_cfg['gw'] && !clean_cfg['gw'].to_s.empty?
-        yaml_str << "        info: \"#{clean_cfg['info']}\"\n" if clean_cfg['info'] && !clean_cfg['info'].to_s.empty?
-        yaml_str << "        term: \"#{clean_cfg['term']}\"\n" if clean_cfg['term'] && !clean_cfg['term'].to_s.empty?
-
-        # Safely extract array blocks (vols, env, devs)
-        ['vols', 'env', 'devs'].each do |arr_key|
-          if clean_cfg[arr_key] && clean_cfg[arr_key].is_a?(Array) && !clean_cfg[arr_key].empty?
-            yaml_str << "        #{arr_key}:\n"
-            clean_cfg[arr_key].each { |val| yaml_str << "        - \"#{val}\"\n" }
-          end
-        end
-
-        # Safely extract url dictionary
-        if clean_cfg['urls'] && clean_cfg['urls'].is_a?(Hash) && !clean_cfg['urls'].empty?
-          yaml_str << "        urls:\n"
-          clean_cfg['urls'].each { |k, v| yaml_str << "          #{k}: \"#{v}\"\n" }
-        end
-
-        # Carefully extract NICs, dropping eth0 ONLY if it was auto-generated for implicit mgmt
-        if clean_cfg['nics'] && !clean_cfg['nics'].empty?
-          yaml_str << "        nics:\n"
-          clean_cfg['nics'].each do |nic, ip|
-            next if nic == 'eth0' && needs_implicit_mgmt
-            yaml_str << "          #{nic}: #{ip}\n"
-          end
-        end
-
-        f.puts "===NODE==="
-        f.puts yaml_str.chomp 
-
-        if data_link
-          f.puts "===LINK==="
-          f.puts "      - [ \"#{data_link[0]}\",  \"#{data_link[1]}\" ]\n"
-        end
-      end
-    rescue => e
-      @log.write("Failed to write adhoc state cache: #{e.message}", "error")
-    end
-
     [node_cfg, data_link]
   end
+
 
   def del_dnat
     @log.write "#{__method__}(): ", "debug"
