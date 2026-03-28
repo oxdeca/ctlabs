@@ -7,13 +7,16 @@ ConditionPathExists=!/etc/ssh/sshd_not_to_be_run
 
 [Service]
 EnvironmentFile=-/etc/default/ssh
-ExecStartPre=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -t
-ExecStart=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -D $SSHD_OPTS
-ExecReload=/usr/bin/ip vrf exec mgmt /usr/sbin/sshd -t
-ExecReload=/usr/bin/ip vrf exec mgmt /bin/kill -HUP $MAINPID
+ExecStartPre=/usr/bin/ctlabs-exec /usr/sbin/sshd -t
+ExecStart=/usr/bin/ctlabs-exec /usr/sbin/sshd -D $SSHD_OPTS
+ExecReload=/usr/bin/ctlabs-exec /usr/sbin/sshd -t
+
+# Signals don't need VRF context
+ExecReload=/bin/kill -HUP $MAINPID
+
 KillMode=process
 Restart=on-failure
-RestartSec=5s
+RestartSec=10s
 RestartPreventExitStatus=255
 Type=notify
 RuntimeDirectory=sshd

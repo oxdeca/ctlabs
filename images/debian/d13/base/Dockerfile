@@ -1,4 +1,4 @@
-FROM         debian:12
+FROM         debian:13
 ENV          container docker
 ENV          DEBIAN_FRONTEND=noninteractive
 ENV          TERM=linux
@@ -14,6 +14,5 @@ RUN         echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' > /
 COPY        bashrc.kali /etc/bashrc.kali
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
 COPY       sshd.service /etc/systemd/system/ssh.service
-RUN        systemctl enable ssh.service
 
 ENTRYPOINT  ["/bin/systemd"]

@@ -1,0 +1,12 @@
+#!/bin/bash
+# A universal wrapper to execute commands in the correct CTLabs routing plane.
+PLANE=$(tr '\0' '\n' < /proc/1/environ | grep '^CTLABS_PLANE=' | cut -d= -f2)
+
+if [ "$PLANE" = "mgmt" ]; then
+    # Mgmt plane: Just execute the command directly
+    exec "$@"
+else
+    # Data plane: Wait for orchestration, then execute inside the VRF
+    while ! ip link show mgmt >/dev/null 2>&1; do sleep 0.5; done
+    exec /sbin/ip vrf exec mgmt "$@"
+fi
