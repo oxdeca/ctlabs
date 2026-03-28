@@ -1,4 +1,4 @@
-FROM       quay.io/centos/centos:stream9
+FROM       quay.io/centos/centos:stream10
 ENV        container docker
 ENV        TERM=linux
 
