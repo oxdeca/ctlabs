@@ -25,11 +25,16 @@ create_net_setup_script() {
   local eth1_nic=enp0s2
   local eth1_ip=$( ip -br addr ls eth1 | awk '{print $3}' )
   local eth1_gw=$( ip -br route ls default | awk '{print $3}' )
+  local ssh_key=$( cat /root/.ssh/authorized_keys )
 cat > /mnt/ctlabs_net_setup.sh << EOF
 #!/bin/bash
 
 hostnamectl set-hostname ${HOSTNAME}
 
+if [ ! -d "/root/.ssh" ]; then 
+  mkdir -vp /root/.ssh
+  echo ${ssh_key} > /root/.ssh/authorized_keys
+fi
 
 # ens3
 ip addr add ${eth0_ip} dev ${eth0_nic}
