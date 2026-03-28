@@ -3,7 +3,7 @@
 # import environment password to container
 export $(cat /proc/1/environ | tr '\0' '\n' | grep QEMU)
 
-IMG="debian-12-nocloud-amd64.qcow2"
+IMG="debian-13-nocloud-amd64.qcow2"
 DISK1="/media/vda.qcow2"
 ENABLE_KVM=
 QEMU_MEM=${QEMU_MEM:-768M}
@@ -11,6 +11,27 @@ QEMU_CPU=${QEMU_CPU:-2}
 QEMU_CPU_THREADS=${QEMU_CPU_THREADS:-2}
 QEMU_CPU_CORES=${QEMU_CPU_CORES:-$((QEMU_CPU/QEMU_CPU_THREADS))}
 QEMU_VGA=${QEMU_VGA:-none}
+
+FILE="/root/.ssh/authorized_keys"
+TIMEOUT=120  # Wait max 2 minutes
+SECONDS=0    # Bash builtin timer
+
+echo "Waiting for $FILE..." >&2
+
+# Wait for file to exist AND be readable
+until [ -f "$FILE" ] && [ -r "$FILE" ]; do
+    if [ $SECONDS -ge $TIMEOUT ]; then
+        echo "Error: Timeout waiting for $FILE after ${TIMEOUT}s" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+echo "File found, copying key..." >&2
+mkdir -p /mnt/ssh
+cp /root/.ssh/authorized_keys /mnt/ssh/
+
+
 
 gen_mac() {
   local premac="52:54:00:"
@@ -25,7 +46,6 @@ create_net_setup_script() {
   local eth1_nic=enp0s2
   local eth1_ip=$( ip -br addr ls eth1 | awk '{print $3}' )
   local eth1_gw=$( ip -br route ls default | awk '{print $3}' )
-  local ssh_key=$( cat /root/.ssh/authorized_keys )
 cat > /mnt/ctlabs_net_setup.sh << EOF
 #!/bin/bash
 
@@ -33,8 +53,9 @@ hostnamectl set-hostname ${HOSTNAME}
 
 if [ ! -d "/root/.ssh" ]; then 
   mkdir -vp /root/.ssh
-  echo ${ssh_key} > /root/.ssh/authorized_keys
 fi
+cp /mnt/ssh/authorized_keys /root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
 
 # ens3
 ip addr add ${eth0_ip} dev ${eth0_nic}
