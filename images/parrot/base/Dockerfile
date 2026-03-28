@@ -3,6 +3,7 @@ ENV         container docker
 ENV         DEBIAN_FRONTEND=noneinteractive
 ENV         TERM=linux
 
+COPY        parrot.list /etc/apt/sources.list.d/parrot.list
 RUN         apt update && apt -y full-upgrade && apt -y install attr acl less systemd iproute2 tcpdump gnupg sudo  && \
             apt -y install iptables openssh-server python3 htop iputils-ping pipx nmap netcat-traditional dnsutils lsof && \
             sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config  && \

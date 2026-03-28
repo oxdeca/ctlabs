@@ -1,0 +1,8 @@
+deb https://deb.parrot.sh/parrot echo main contrib non-free non-free-firmware
+deb https://deb.parrot.sh/parrot echo-security main contrib non-free non-free-firmware
+deb https://deb.parrot.sh/parrot echo-backports main contrib non-free non-free-firmware
+#deb-src https://deb.parrot.sh/parrot echo main contrib non-free non-free-firmware
+#deb-src https://deb.parrot.sh/parrot echo-security main contrib non-free non-free-firmware
+#deb-src https://deb.parrot.sh/parrot echo-backports main contrib non-free non-free-firmware
+deb https://mirrors.aliyun.com/parrot echo main contrib non-free non-free-firmware
+deb https://mirror.math.princeton.edu/pub/parrot/ echo main contrib non-free non-free-firmware

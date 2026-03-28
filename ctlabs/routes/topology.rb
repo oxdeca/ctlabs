@@ -167,7 +167,7 @@ post '/labs/*/node/new' do
     raise "Node '#{node_name}' already exists!" if existing_node
 
     new_node = parse_node_form_data(params)
-    validate_node_profile!(new_cfg, full_yaml)
+    validate_node_profile!(new_node, yaml)
     target_plane = new_node['plane'] || 'data'
 
     if vm['planes']
@@ -197,10 +197,10 @@ post '/labs/*/node' do
     data = YAML.load_file(lab_path)
 
     node_cfg = parse_node_form_data(params)
-    validate_node_profile!(new_cfg, full_yaml)
+    validate_node_profile!(node_cfg, data)
 
     # Let the Lab Engine handle the IP calculation and wiring perfectly!
-    lab = Lab.new(cfg: lab_path)
+    lab = Lab.new(cfg: lab_path, relative_path: lab_name)
     cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch])
 
     vm = data['topology'][0]
@@ -251,9 +251,7 @@ post '/labs/*/node_edit/:node_name' do
       new_cfg = YAML.safe_load(params[:yaml_data])
     end
 
-    # --- NEW: SCHEMA GUARDRAIL ---
     validate_node_profile!(new_cfg, full_yaml)
-    # -----------------------------
 
     new_plane = new_cfg['plane'] || old_plane || 'data'
 
