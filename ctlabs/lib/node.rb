@@ -23,7 +23,7 @@ class Node
     @plane      = args['plane']     || (args['type'] == 'controller' ? 'mgmt' : 'data')
     @provider   = args['provider']  || 'local'
     @eos        = args['eos'  ]     || 'linux'
-    @kind       = args['kind' ]     || 'linux'
+    @kind       = args['profile' ]  || args['kind'] || 'linux'
     @kvm        = args['kvm'  ]     || false
     @image      = args['image']
     @env        = args['env'  ]     || []
@@ -57,11 +57,20 @@ class Node
 
     case @type
       when 'switch', 'router', 'host', 'controller'
-        @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
-        @ports = @ports.nil?  && (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports'] : @ports || 4
-        @devs  = (!@defaults[@type][@kind]['devs'].nil?)  ? @defaults[@type][@kind]['devs'] : @devs
+       @defaults ||= {}
+        type_defs = @defaults[@type] || {}
+        kind_defs = type_defs[@kind] || {}
+        
+        @caps  = @caps + kind_defs['caps'] if kind_defs['caps']
+        @ports = @ports || kind_defs['ports'] || 4
+        @devs  = kind_defs['devs'] || @devs
       when 'gateway'
-        @ports = @ports.nil? ? 2 : @ports
+        @ports = @ports || 2
+#        @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps
+#        @ports = @ports.nil?  && (!@defaults[@type][@kind]['ports'].nil?) ? @defaults[@type][@kind]['ports'] : @ports || 4
+#        @devs  = (!@defaults[@type][@kind]['devs'].nil?)  ? @defaults[@type][@kind]['devs'] : @devs
+#      when 'gateway'
+#        @ports = @ports.nil? ? 2 : @ports
     end
 
     switch_ports

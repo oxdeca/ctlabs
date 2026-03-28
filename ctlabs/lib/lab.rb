@@ -50,7 +50,15 @@ class Lab
     @name       = @cfg['name']      || ''
     @ephemeral  = @cfg['ephemeral'] || true
     @desc       = @cfg['desc']      || ''
-    @defaults   = @cfg['profiles']  || @cfg['defaults'] || {}
+
+    global_data = File.file?(::GLOBAL_PROFILES) ? YAML.load_file(::GLOBAL_PROFILES) : {}
+    global_profiles = global_data['profiles'] || global_data['defaults'] || {}
+    
+    local_profiles  = @cfg['profiles'] || @cfg['defaults'] || {}
+    
+    # Merge them! Local lab overrides take precedence over global settings.
+    @defaults   = merge_profiles(global_profiles, local_profiles)
+    
     @topology   = @cfg['topology']  || {}
     @dns        = @cfg['dns']       || []
     @domain     = @cfg['domain']    || "ctlabs.internal"
@@ -1085,6 +1093,28 @@ class Lab
       puts "Error saving runtime to base: #{e.message}"
       return false
     end
+  end
+
+  # Intelligently merges lab overrides on top of global profiles
+  def merge_profiles(global, local)
+    merged = Marshal.load(Marshal.dump(global)) # Deep clone global
+    return merged if local.nil? || local.empty?
+
+    local.each do |type, kinds|
+      merged[type] ||= {}
+      next unless kinds.is_a?(Hash)
+      
+      kinds.each do |kind, attrs|
+        merged[type][kind] ||= {}
+        if attrs.is_a?(Hash)
+          # Arrays like 'caps' or 'env' should be combined or overwritten
+          # Here we just use a standard hash merge for simplicity, 
+          # which overwrites the global attributes with the local ones.
+          merged[type][kind].merge!(attrs)
+        end
+      end
+    end
+    merged
   end
 
 end # end class Lab

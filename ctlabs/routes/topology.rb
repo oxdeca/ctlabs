@@ -101,6 +101,32 @@ def auto_assign_mgmt_ip!(node_cfg, full_yaml)
 end
 
 # ===================================================
+# HELPER: Schema Validation (Block undefined profiles)
+# ===================================================
+def validate_node_profile!(node_cfg, full_yaml)
+  type = node_cfg['type'] || 'host'
+  profile = node_cfg['profile'] || node_cfg['kind']
+
+  # Only validate if a profile is explicitly requested
+  return if profile.nil? || profile.to_s.strip.empty?
+
+  # 1. Check local lab overrides first
+  profile_key = full_yaml.key?('profiles') ? 'profiles' : 'defaults'
+  return if full_yaml.dig(profile_key, type, profile)
+
+  # 2. Check the global profiles dictionary
+  if File.exist?(::GLOBAL_PROFILES)
+    global_yaml = YAML.load_file(::GLOBAL_PROFILES) || {}
+    global_key = global_yaml.key?('profiles') ? 'profiles' : 'defaults'
+    
+    return if global_yaml.dig(global_key, type, profile)
+  end
+
+  # 3. If it's in neither place, block it!
+  raise "Schema Error: Profile '#{profile}' is not defined for type '#{type}'. Please create it in the global config/profiles.yml file or override it in this lab."
+end
+
+# ===================================================
 # NODES
 # ===================================================
 get '/labs/*/node/:node_name' do
@@ -141,6 +167,7 @@ post '/labs/*/node/new' do
     raise "Node '#{node_name}' already exists!" if existing_node
 
     new_node = parse_node_form_data(params)
+    validate_node_profile!(new_cfg, full_yaml)
     target_plane = new_node['plane'] || 'data'
 
     if vm['planes']
@@ -170,6 +197,7 @@ post '/labs/*/node' do
     data = YAML.load_file(lab_path)
 
     node_cfg = parse_node_form_data(params)
+    validate_node_profile!(new_cfg, full_yaml)
 
     # Let the Lab Engine handle the IP calculation and wiring perfectly!
     lab = Lab.new(cfg: lab_path)
@@ -222,6 +250,10 @@ post '/labs/*/node_edit/:node_name' do
     else
       new_cfg = YAML.safe_load(params[:yaml_data])
     end
+
+    # --- NEW: SCHEMA GUARDRAIL ---
+    validate_node_profile!(new_cfg, full_yaml)
+    # -----------------------------
 
     new_plane = new_cfg['plane'] || old_plane || 'data'
 
