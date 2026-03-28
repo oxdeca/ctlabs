@@ -11,7 +11,7 @@ RUN         apt update && apt -y full-upgrade && apt -y install attr acl less sy
 RUN         systemctl enable ssh && systemctl mask systemd-logind dev-hugepages.mount
 COPY        bashrc.kali /etc/bashrc.kali
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
-COPY       sshd.service /etc/systemd/system/ssh.service
+COPY       ssh.service /etc/systemd/system/ssh.service
 RUN        systemctl enable ssh.service
 
 ENTRYPOINT  ["/usr/lib/systemd/systemd"]

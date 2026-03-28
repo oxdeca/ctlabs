@@ -1,10 +1,10 @@
 #!/bin/bash
 
-IMG_NAME=ctlabs/d12/qemu
+IMG_NAME=ctlabs/d13/qemu
 IMG_VERS=0.4
 
-MNTDIR=/media/ctlabs_d12_qemu
-QIMG_NAME=debian-12-nocloud-amd64.qcow2
+MNTDIR=/media/ctlabs_d13_qemu
+QIMG_NAME=debian-13-nocloud-amd64.qcow2
 QIMG_SIZE=20G
 QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/${QIMG_NAME}
 
