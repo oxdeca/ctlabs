@@ -10,6 +10,6 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
 
 RUN         systemctl enable ssh && systemctl mask systemd-logind dev-hugepages.mount
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
-COPY       sshd.service /etc/systemd/system/ssh.service
+COPY       ssh.service /etc/systemd/system/ssh.service
 
 ENTRYPOINT  ["/usr/lib/systemd/systemd"]

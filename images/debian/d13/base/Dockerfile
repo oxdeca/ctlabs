@@ -13,6 +13,6 @@ RUN         echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' > /
 
 COPY        bashrc.kali /etc/bashrc.kali
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
-COPY       sshd.service /etc/systemd/system/ssh.service
+COPY       ssh.service /etc/systemd/system/ssh.service
 
 ENTRYPOINT  ["/bin/systemd"]
