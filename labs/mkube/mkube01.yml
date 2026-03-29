@@ -8,42 +8,6 @@
 name: mkube01
 desc: LAB MiniKube (2x 1-Node-Cluster)
 
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 18
-    linux:
-      image: ctlabs/c9/base
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    kali:
-      image: ctlabs/kali/base
-    parrot:
-      image: ctlabs/parrot/base
-    qemu:
-      image: ctlabs/d12/qemu
-    slapd:
-      image: ctlabs/d12/base
-      caps: [SYS_PTRACE]
-    vault:
-      image: ctlabs/d12/base
-      caps : [IPC_LOCK]
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
-
 topology:
   - vm:
     name: mkube01-vm1

@@ -8,38 +8,6 @@
 name: net04
 desc: Netbox Lab
 
-
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 20
-    linux:
-      image: ctlabs/c9/base
-      ports: 5
-  host:
-    linux:
-      image: ctlabs/c9/base
-    kali:
-      image: ctlabs/kali/base
-    parrot:
-      image: ctlabs/parrot/base
-    d12:
-      image: ctlabs/d12/base
-    slapd:
-      image: ctlabs/d12/base
-      caps: [SYS_PTRACE]
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
 topology:
   - vm:
     name: net04-vm1

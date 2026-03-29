@@ -9,39 +9,6 @@
 name: k3s02
 desc: "LAB K3S (4 Nodes: 3 control-plane, 1 worker)"
 
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 16
-    linux:
-      image: ctlabs/c9/base
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    kali:
-      image: ctlabs/kali/base
-    parrot:
-      image: ctlabs/parrot/base
-    qemu:
-      image: ctlabs/d12/qemu
-    vault:
-      image: ctlabs/d12/base
-      caps : [IPC_LOCK]
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
-
 topology:
   - vm:
     name: k3s02-vm1

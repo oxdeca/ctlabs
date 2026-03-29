@@ -6,38 +6,6 @@
 
 name: sys02
 desc: LAB SYS - CI
-profiles:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 14
-    linux:
-      image: ctlabs/c9/base
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    kali:
-      image: ctlabs/kali/base
-    vault:
-      image: ctlabs/d12/base
-      caps:
-      - IPC_LOCK
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps:
-      - SYS_NICE
-      - NET_BIND_SERVICE
-    mgmt:
-      image: ctlabs/c9/frr
-      caps:
-      - SYS_NICE
-      - NET_BIND_SERVICE
 
 topology:
 - hv: lvm-vm1

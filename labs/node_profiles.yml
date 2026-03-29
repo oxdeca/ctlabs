@@ -1,5 +1,9 @@
 ---
 
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/node_profiles.yml
+# -----------------------------------------------------------------------------
+
 profiles:
   controller:
     linux:
@@ -10,11 +14,15 @@ profiles:
       ports: 4
       caps: [SYS_NICE, NET_BIND_SERVICE, IPC_LOCK, NET_BROADCAST]
     mgmt:
-      image: ctlabs/c9/ctrl
+      image: ctlabs/c9/ovs
       ports: 14
+      caps: [SYS_NICE, NET_BIND_SERVICE, IPC_LOCK, NET_BROADCAST]
     linux:
       image: ctlabs/c9/base
       ports: 8
+    arista:
+      image: ctlabs/misc/ceos
+      ports: 5      
   host:
     linux:
       image: ctlabs/c9/base
@@ -30,13 +38,26 @@ profiles:
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
+    qemu:
+      image: ctlabs/d12/qemu
+    db2:
+      image: ctlabs/misc/db2
+      caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
+    cbeaver:
+      image: ctlabs/misc/cbeaver
+    juice:
+      image: ctlabs/owasp/juice
+    win:
+      image: ctlabs/qemu/win
   router:
     frr:
       image: ctlabs/c9/frr
       caps: [SYS_NICE, NET_BIND_SERVICE]
+      dev: ['/dev/net/tun']
     mgmt:
       image: ctlabs/c9/frr
       caps: [SYS_NICE, NET_BIND_SERVICE]
+      dev: ['/dev/net/tun']
   gateway:
     remote:
       image: ctlabs/c9/base

@@ -8,34 +8,6 @@
 name: k8s01
 desc: LAB K8S (1 Node)
 
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 12
-    linux:
-      image: ctlabs/c9/base
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    kali:
-      image: ctlabs/kali/base
-    qemu:
-      image: ctlabs/d12/qemu
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
-
 topology:
   - vm:
     name: k8s01-vm1

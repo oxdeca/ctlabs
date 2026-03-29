@@ -7,40 +7,6 @@
 name: srv01
 desc: LAB Vault
 
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 16
-    linux:
-      image: ctlabs/c9/base
-      ports: 6
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    vault:
-      image: ctlabs/d12/base
-      caps: [IPC_LOCK]
-    kali:
-      image: ctlabs/kali/base
-    parrot:
-      image: ctlabs/parrot/base
-    slapd:
-      image: ctlabs/d12/base
-      caps: [SYS_PTRACE]
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
 topology:
   - vm:
     name: srv01-vm1

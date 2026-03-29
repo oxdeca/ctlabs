@@ -9,40 +9,6 @@ name: net02
 desc: LAB OpenVPN
 
 
-defaults:
-  controller:
-    linux:
-      image: ctlabs/c9/ctrl
-  switch:
-    mgmt:
-      image: ctlabs/c9/ctrl
-      ports: 10
-    linux:
-      image: ctlabs/c9/base
-    ovs:
-      image: ctlabs/c9/ovs
-      caps : [SYS_NICE,NET_BIND_SERVICE,IPC_LOCK,NET_BROADCAST]
-  host:
-    linux:
-      image: ctlabs/c9/base
-    d12:
-      image: ctlabs/d12/base
-    kali:
-      image: ctlabs/kali/base
-      devs : ['/dev/net/tun']
-    parrot:
-      image: ctlabs/parrot/base
-      devs : ['/dev/net/tun']
-  router:
-    frr:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-      devs : ['/dev/net/tun']
-    mgmt:
-      image: ctlabs/c9/frr
-      caps : [SYS_NICE,NET_BIND_SERVICE]
-
-
 topology:
   - vm:
     name: net02-vm1
