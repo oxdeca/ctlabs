@@ -53,11 +53,11 @@ profiles:
     frr:
       image: ctlabs/c9/frr
       caps: [SYS_NICE, NET_BIND_SERVICE]
-      dev: ['/dev/net/tun']
+      devs: ['/dev/net/tun']
     mgmt:
       image: ctlabs/c9/frr
       caps: [SYS_NICE, NET_BIND_SERVICE]
-      dev: ['/dev/net/tun']
+      devs: ['/dev/net/tun']
   gateway:
     remote:
       image: ctlabs/c9/base
