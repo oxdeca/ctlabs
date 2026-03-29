@@ -35,13 +35,12 @@
       <h4 style="margin: 0;"><i class="fas fa-box-open"></i> Add/Edit Profile</h4>
     </header>
     
-    <div class="w3-container w3-padding">
       <div class="w3-margin-bottom">
-        <label style="font-size: 0.85em; color: #94a3b8;">Node Type & Kind</label>
+        <label style="font-size: 0.85em; color: #94a3b8;">Type, Kind & Provider</label>
         <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col s6" style="padding: 0 8px;">
+          <div class="w3-col s4" style="padding: 0 8px;">
             <select id="edit-img-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-              <option value="" disabled selected>Select Type...</option>
+              <option value="" disabled selected>Type...</option>
               <option value="router">router</option>
               <option value="switch">switch</option>
               <option value="firewall">firewall</option>
@@ -51,8 +50,17 @@
               <option value="gateway">gateway</option>
             </select>
           </div>
-          <div class="w3-col s6" style="padding: 0 8px;">
-            <input type="text" id="edit-img-kind" class="w3-select w3-small w3-round w3-hover-text-light-green" placeholder="e.g. linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          <div class="w3-col s4" style="padding: 0 8px;">
+            <input type="text" id="edit-img-kind" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. linux" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          </div>
+          <div class="w3-col s4" style="padding: 0 8px;">
+            <select id="edit-img-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              <option value="local">local</option>
+              <option value="gcp">gcp</option>
+              <option value="aws">aws</option>
+              <option value="azure">azure</option>
+              <option value="external">external</option>
+            </select>
           </div>
         </div>
       </div>
@@ -83,11 +91,11 @@
       </div>
 
       <div id="node-profile-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px;"></div>
-    </div>
 
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
       <button type="button" onclick="document.getElementById('node-profile-editor').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
       <button type="button" onclick="window.saveImageConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save</button>
     </footer>
+    </div>
   </div>
 </div>

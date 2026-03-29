@@ -61,7 +61,21 @@ get '/terminal/:node_name' do
         uri = URI.parse(custom_term)
         user = uri.user || 'root'
         host = uri.host
-        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', "#{user}@#{host}"]
+        
+        # Build base SSH command
+        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no']
+
+        # Inject the lab's dedicated ed25519 private key if the lab is running
+        if Lab.running?
+          safe_name = Lab.current_name.gsub('/', '_')
+          priv_key_path = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
+          
+          if File.exist?(priv_key_path)
+            cmd.push('-i', priv_key_path)
+          end
+        end
+        
+        cmd.push("#{user}@#{host}")
         # Note: SSH strips custom env vars by default, so Vault vars won't easily pass through SSH here.
       else
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'

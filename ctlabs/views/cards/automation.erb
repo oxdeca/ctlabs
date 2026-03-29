@@ -65,13 +65,24 @@
       if real_path
         begin
           yaml_data = YAML.load_file(real_path)
-          nodes = yaml_data['topology'][0]['nodes'] || {}
-          ctrl_node = nodes.values.find { |n| n['type'] == 'controller' } || nodes['ansible'] || {}
+          vm = yaml_data['topology'][0] || {}
+          
+          # Gather all nodes from both flat schemas and nested 'planes' schemas
+          all_nodes = vm['nodes'] ? vm['nodes'].values : []
+          if vm['planes']
+            vm['planes'].values.each do |p_data|
+              all_nodes.concat(p_data['nodes'].values) if p_data['nodes']
+            end
+          end
+
+          # Find the controller node anywhere in the topology
+          ctrl_node = all_nodes.find { |n| n['type'] == 'controller' } || {}
           tf_cfg = ctrl_node['terraform'] || {}
-        rescue
+        rescue => e
+          # puts "Error parsing Terraform UI Config: #{e.message}"
         end
       end
-      
+
       tf_cfg = info_hash[:terraform] if tf_cfg.empty? && info_hash[:terraform]
       
       work_dir  = tf_cfg['work_dir'] || tf_cfg[:work_dir]

@@ -184,7 +184,7 @@
       document.getElementById('node-profile-editor').style.display = 'block';
   };
 
-  window.editImageConfig = function(labPath, type, kind, image, caps, env, extras) {
+  window.editImageConfig = function(labPath, type, kind, provider, image, caps, env, extras) {
       window.currentEditLab = labPath; 
       
       const typeSelect = document.getElementById('edit-img-type');
@@ -209,6 +209,7 @@
       document.getElementById('edit-img-caps').value = caps ? decodeURIComponent(caps) : '';
       document.getElementById('edit-img-env').value = env ? decodeURIComponent(env) : '';
       document.getElementById('edit-img-extras').value = extras ? decodeURIComponent(extras) : '';
+      document.getElementById('edit-img-provider').value = provider || 'local';
       
       const resDiv = document.getElementById('node-profile-editor-result');
       if (resDiv) resDiv.style.display = 'none';
@@ -228,6 +229,7 @@
       const formData = new URLSearchParams({
           type: document.getElementById('edit-img-type').value.trim(),
           kind: document.getElementById('edit-img-kind').value.trim(),
+          provider: document.getElementById('edit-img-provider').value,
           image: document.getElementById('edit-img-ref').value.trim(),
           caps: document.getElementById('edit-img-caps').value.trim(),
           env: document.getElementById('edit-img-env').value.trim(),

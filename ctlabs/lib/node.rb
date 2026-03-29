@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user
   attr_writer :nics
   attr_accessor :is_running
 
@@ -45,6 +45,24 @@ class Node
     @urls       = args[:urls  ]     || args['urls' ]
     @term       = args[:term  ]     || args['term' ]
     @is_running = false
+
+    # --- NEW: Smart Ansible User Resolution ---
+    parsed_user = args['user'] || args[:user]
+    
+    # Fallback 1: Check Profile defaults
+    if (parsed_user.nil? || parsed_user.empty?) && @defaults && @defaults[@type] && @defaults[@type][@kind]
+      parsed_user = @defaults[@type][@kind]['user']
+    end
+
+    # Fallback 2: Extract from SSH term string for remote nodes (e.g., ssh://ansible@1.2.3.4)
+    if (parsed_user.nil? || parsed_user.empty?) && remote? && @term.to_s.start_with?('ssh://')
+      require 'uri'
+      parsed_user = URI.parse(@term).user rescue nil
+    end
+
+    # Fallback 3: Default to root for local containers
+    @user = (parsed_user && !parsed_user.empty?) ? parsed_user : 'root'
+    # ------------------------------------------
 
     dcaps       = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols       = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]

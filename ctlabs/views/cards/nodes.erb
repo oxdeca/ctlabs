@@ -42,16 +42,22 @@
       <tbody>
         <% (info_hash[:nodes] || []).each do |node| %>
           <%
-            target_image = node[:image].to_s.strip
-            is_built = false
-            unless target_image.empty?
-              target_image += ":latest" unless target_image.include?(':')
-              is_built = @local_built_images.include?(target_image)
-            end
+            # --- BULLETPROOF KEY EXTRACTION (Handles both String and Symbol keys) ---
+            n_name     = node[:name] || node['name']
+            n_type     = node[:type] || node['type'] || 'host'
+            n_kind     = node[:kind] || node['kind'] || node[:profile] || node['profile'] || 'linux'
+            n_provider = node[:provider] || node['provider'] || 'local'
+            n_image    = node[:image] || node['image']
+            n_adhoc    = node[:adhoc] || node['adhoc']
 
+            # Check if this node lives outside the local container engine
+            is_remote = ['gcp', 'external', 'aws', 'azure'].include?(n_provider.to_s.downcase) || ['rhost', 'external'].include?(n_type.to_s.downcase)
+            provider_icon = is_remote ? '☁️' : '🐳'
+
+            # Icon calculation
             node_icon = 'fa-server'
             node_prefix = 'node'
-            case node[:type].to_s.downcase
+            case n_type.to_s.downcase
               when 'router' then node_icon = 'fa-route'; node_prefix = 'ro'
               when 'switch' then node_icon = 'fa-exchange-alt'; node_prefix = 'sw'
               when 'firewall' then node_icon = 'fa-shield-alt'; node_prefix = 'fw'
@@ -59,17 +65,32 @@
               when 'server' then node_icon = 'fa-server'; node_prefix = 'srv'
               when 'controller' then node_icon = 'fa-cogs'; node_prefix = 'ctrl'
               when 'gateway' then node_icon = 'fa-door-open'; node_prefix = 'gw'
-              else node_icon = 'fa-server'; node_prefix = node[:type].to_s[0..3]
+              else node_icon = 'fa-server'; node_prefix = n_type.to_s[0..3]
             end
-            
-            # Use the new remote? superpower (or check provider if the Node object isn't fully instantiated here)
-            is_remote = ['gcp', 'external', 'aws', 'azure'].include?(node[:provider].to_s.downcase) || ['rhost', 'external'].include?(node[:type].to_s.downcase)
-            provider_icon = is_remote ? '☁️' : '🐳'
+
+            # --- SMART IMAGE DISPLAY ---
+            if is_remote
+              display_image = "Remote OS (#{n_kind})"
+              cube_icon = '<i class="fas fa-cloud w3-text-blue"></i>'
+              cube_title = "Remote Cloud Instance"
+            else
+              target_image = n_image.to_s.strip
+              # Default fallback if the YAML omitted the image string
+              target_image = @defaults[n_type][n_kind]['image'] if target_image.empty? rescue target_image
+              target_image += ":latest" unless target_image.include?(':') || target_image.empty?
+              
+              is_built = @local_built_images.include?(target_image)
+              display_image = target_image.empty? ? "Unknown Image" : target_image
+              
+              cube_color = is_built ? 'w3-text-green' : 'style="color: #475569;"'
+              cube_icon = "<i class=\"fas fa-cube #{cube_color}\"></i>"
+              cube_title = is_built ? "Ready in local registry" : "Not found in local registry"
+            end
           %>
-          <tr class="node-row" style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if node[:adhoc] %>">
+          <tr class="node-row" style="<%= 'background-color:rgba(59, 130, 246, 0.1);' if n_adhoc %>">
             <td style="text-align: center; vertical-align: middle;">
               <% if is_remote %>
-                <i class="fas fa-circle-notch fa-spin w3-text-gray rhost-status-icon" data-lab="<%= info_hash[:lab_path] %>" data-node="<%= node[:name] %>" style="font-size: 0.8em;" title="Checking reachability..."></i>
+                <i class="fas fa-circle-notch fa-spin w3-text-gray rhost-status-icon" data-lab="<%= info_hash[:lab_path] %>" data-node="<%= n_name %>" style="font-size: 0.8em;" title="Checking reachability..."></i>
               <% else %>
                 <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
               <% end %>
@@ -77,28 +98,29 @@
 
             <td style="vertical-align: middle; white-space: nowrap;">
               <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
-              <strong style="color: #38bdf8;"><%= node[:name] %></strong>
-              <% if node[:adhoc] %><span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span><% end %>
+              <strong style="color: #38bdf8;"><%= n_name %></strong>
+              <% if n_adhoc %><span style="color:#f59e0b; font-size:0.75em; margin-left:4px; font-weight: bold;">(adhoc)</span><% end %>
             </td>
 
             <td style="vertical-align: middle;">
-              <strong style="color: #a855f7;"><%= node_prefix %>:<%= node[:kind] %></strong>
+              <strong style="color: #a855f7;"><%= node_prefix %>:<%= n_kind %>:<%= n_provider %></strong>
             </td>
 
-            <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= node[:type] %></span></td>
-            <td style="vertical-align: middle;"><%= provider_icon %> <%= node[:provider] || 'local' %></td>
+            <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= n_type %></span></td>
+            
+            <td style="vertical-align: middle;"><%= provider_icon %> <%= n_provider %></td>
 
             <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
-              <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry' %>" style="margin-right: 4px;">
-                <i class="fas fa-cube <%= is_built ? 'w3-text-green' : '' %>" <%= is_built ? '' : 'style="color: #475569;"' %>></i>
+              <span title="<%= cube_title %>" style="margin-right: 4px;">
+                <%= cube_icon %>
               </span>
-              <%= node[:image] %>
+              <%= display_image %>
             </td>
 
             <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
-              <button type="button" onclick="const w=900, h=600, t=(window.top.outerHeight/2)+window.top.screenY-(h/2), l=(window.top.outerWidth/2)+window.top.screenX-(w/2); window.open('/terminal/<%= node[:name] %>', 'term_<%= node[:name] %>', 'width='+w+',height='+h+',top='+t+',left='+l+',resizable=yes,scrollbars=yes,toolbar=no,location=no');" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now"><i class="fas fa-terminal fa-lg"></i></button>
-              <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node"><i class="fas fa-edit fa-lg"></i></button>
-              <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= node[:name] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node"><i class="fas fa-trash fa-lg"></i></button>
+              <button type="button" onclick="const w=900, h=600, t=(window.top.outerHeight/2)+window.top.screenY-(h/2), l=(window.top.outerWidth/2)+window.top.screenX-(w/2); window.open('/terminal/<%= n_name %>', 'term_<%= n_name %>', 'width='+w+',height='+h+',top='+t+',left='+l+',resizable=yes,scrollbars=yes,toolbar=no,location=no');" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now"><i class="fas fa-terminal fa-lg"></i></button>
+              <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node"><i class="fas fa-edit fa-lg"></i></button>
+              <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node"><i class="fas fa-trash fa-lg"></i></button>
             </td>
           </tr>
         <% end %>

@@ -276,6 +276,15 @@ post '/labs/*/image/edit' do
     # Update properties
     params[:image].to_s.strip.empty? ? profile.delete('image') : profile['image'] = params[:image].strip
 
+    # --- NEW: Inject Provider ---
+    provider_val = params[:provider].to_s.strip.downcase
+    if provider_val.empty? || provider_val == 'local'
+      profile.delete('provider') # Keep YAML clean by omitting default 'local'
+    else
+      profile['provider'] = provider_val
+    end
+    # ----------------------------
+
     caps = params[:caps].to_s.split(',').map(&:strip).reject(&:empty?)
     caps.empty? ? profile.delete('caps') : profile['caps'] = caps
 

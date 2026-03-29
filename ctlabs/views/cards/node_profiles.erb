@@ -1,6 +1,6 @@
 <!--
 # -----------------------------------------------------------------------------
-# File        : ctlabs/views/cards/images.erb
+# File        : ctlabs/views/cards/node_profiles.erb
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
@@ -31,9 +31,9 @@
       <button type="button" onclick="window.openImageEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Profile</button>
     </div>
   </div>
-  
+
   <div class="w3-padding" style="background-color: #1e293b; border-bottom: 1px solid #334155;">
-    <input type="text" id="profile-filter-input" onkeyup="window.filterNodeProfiles()" placeholder=" Filter profiles by name, type, or image..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
+    <input type="text" id="profile-filter-input" onkeyup="window.filterNodeProfiles()" placeholder=" Filter profiles by name, type, provider, or image..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
   <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;" class="profile-scroll">
@@ -46,16 +46,21 @@
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
             <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Kind</th>
-            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Mapped Image</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Provider</th> <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Mapped Image</th>
             <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <% (info_hash[:images] || []).each do |img| %>
             <%
+              img_provider = img[:provider] || 'local'
+              is_remote = ['gcp', 'external', 'aws', 'azure'].include?(img_provider.to_s.downcase)
+              provider_icon = is_remote ? '☁️' : '🐳' # Determine the emoji
+
               target_image = img[:image].to_s.strip
               is_built = false
-              unless target_image.empty?
+
+              unless target_image.empty? || is_remote
                 target_image += ":latest" unless target_image.include?(':')
                 is_built = @local_built_images.include?(target_image)
               end
@@ -72,22 +77,34 @@
                 when 'gateway' then node_icon = 'fa-door-open'; node_prefix = 'gw'
                 else node_icon = 'fa-server'; node_prefix = img[:type].to_s[0..3]
               end
+
+              # --- SMART IMAGE DISPLAY ---
+              if is_remote
+                display_image = "Remote OS"
+                cube_icon = '<i class="fas fa-cloud w3-text-blue"></i>'
+                cube_title = "Remote Cloud Instance"
+              else
+                display_image = target_image.empty? ? "Unknown Image" : target_image
+                cube_color = is_built ? 'w3-text-green' : 'style="color: #475569;"'
+                cube_icon = "<i class=\"fas fa-cube #{cube_color}\"></i>"
+                cube_title = is_built ? "Ready in local registry" : "Not found in local registry"
+              end
             %>
             <tr class="profile-row">
               <td style="vertical-align: middle; white-space: nowrap;">
                 <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
-                <strong style="color: #a855f7;"><%= node_prefix %>:<%= img[:kind] %></strong>
+                <strong style="color: #a855f7;"><%= node_prefix %>:<%= img[:kind] %>:<%= img_provider %></strong>
               </td>
               <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:type] %></span></td>
               <td style="vertical-align: middle;"><%= img[:kind] %></td>
-              <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
-                <span title="<%= is_built ? 'Ready in local registry' : 'Not found in local registry' %>" style="margin-right: 4px;">
-                  <i class="fas fa-cube <%= is_built ? 'w3-text-green' : '' %>" <%= is_built ? '' : 'style="color: #475569;"' %>></i>
+              <td style="vertical-align: middle;"><%= provider_icon %> <%= img_provider %></td> <td style="color: #cbd5e1; vertical-align: middle; white-space: nowrap;">
+                <span title="<%= cube_title %>" style="margin-right: 4px;">
+                  <%= cube_icon %>
                 </span>
-                <%= img[:image] %>
+                <%= display_image %>
               </td>
               <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
-                <button type="button" onclick="window.editImageConfig('<%= info_hash[:lab_path] %>', '<%= img[:type] %>', '<%= img[:kind] %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras] || '') %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node Profile"><i class="fas fa-edit fa-lg"></i></button>
+                <button type="button" onclick="window.editImageConfig('<%= info_hash[:lab_path] %>', '<%= img[:type] %>', '<%= img[:kind] %>', '<%= img_provider %>', '<%= ERB::Util.url_encode(img[:image]) %>', '<%= ERB::Util.url_encode(img[:caps].join(', ')) %>', '<%= ERB::Util.url_encode(img[:env].join("\n")) %>', '<%= ERB::Util.url_encode(img[:extras] || '') %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node Profile"><i class="fas fa-edit fa-lg"></i></button>
                 <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'image/<%= img[:type] %>/<%= img[:kind] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node Profile"><i class="fas fa-trash fa-lg"></i></button>
               </td>
             </tr>

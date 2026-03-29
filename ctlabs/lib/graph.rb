@@ -551,30 +551,30 @@ class Graph
 [controller]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'controller' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
 [router]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
 [switches]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   elsif node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
 [hosts]
   <%- @nodes.each do |node| -%>
   <%-   if ['host', 'vhost', 'server'].include?(node.type) and node.nics && !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
@@ -584,7 +584,7 @@ class Graph
   <%-     # For remote nodes, 'gw' is the Public Management IP -%>
   <%-     mgmt_ip = (node.gw && !node.gw.to_s.strip.empty?) ? node.gw : (node.nics && node.nics['eth0']) -%>
   <%-     if mgmt_ip && !mgmt_ip.to_s.empty? -%>
-  <%=       node.name.ljust(24) %> ansible_host=<%= mgmt_ip.to_s.split('/')[0] %>
+  <%=       node.name.ljust(24) %> ansible_host=<%= mgmt_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-     end -%>
   <%-   end -%>
   <%- end -%>
@@ -599,7 +599,7 @@ class Graph
 [controller]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'controller' and node.nics && !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
@@ -607,14 +607,14 @@ class Graph
   <%- @nodes.each do |node| -%>
   <%-   ip = node.ipv4 || (node.nics && node.nics['eth1']) -%>
   <%-   if node.type == 'router' && !ip.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= ip.split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= ip.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
 [switches]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
@@ -623,7 +623,7 @@ class Graph
   <%-   is_target = ['host', 'vhost', 'server'].include?(node.type) -%>
   <%-   data_ip = node.nics ? (node.nics['eth1'] || node.nics['tun0']) : nil -%>
   <%-   if is_target && data_ip && !data_ip.to_s.empty? && !node.remote? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
 
@@ -631,7 +631,7 @@ class Graph
   <%- @nodes.each do |node| -%>
   <%-   data_ip = node.nics ? (node.nics['tun0'] || node.nics['wg0'] || node.nics['eth1']) : nil -%>
   <%-   if node.remote? && data_ip && !data_ip.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
     }
