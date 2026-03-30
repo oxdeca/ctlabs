@@ -20,15 +20,14 @@ class Graph
     @links   = args[:links]
     @binding = args[:binding]
     @dotfile = "#{@pubdir}/../#{@name}.dot"
-    
+
     @colors  = [
-      '#ef4444', '#3b82f6', '#22c55e', '#eab308', 
-      '#a855f7', '#06b6d4', '#f97316', '#ec4899', 
+      '#ef4444', '#3b82f6', '#22c55e', '#eab308',
+      '#a855f7', '#06b6d4', '#f97316', '#ec4899',
       '#84cc16', '#6366f1', '#14b8a6', '#d946ef'
     ]
 
-    # --- AUTO-PORT INJECTOR ---
-    # Prevents Graphviz "port unrecognized" warnings when users link interfaces not explicitly defined in 'nics'
+    # --- AUTO-PORT INJECTOR FOR STANDARD LINKS ---
     (@links || []).each do |l|
       next unless l.is_a?(Array) && l.size >= 2
       n_a_name, int_a = l[0].to_s.split(':')
@@ -39,6 +38,37 @@ class Graph
 
       n_a.nics[int_a] = '' if n_a && int_a && !n_a.nics.key?(int_a)
       n_b.nics[int_b] = '' if n_b && int_b && !n_b.nics.key?(int_b)
+    end
+
+    # --- AUTO-PORT INJECTOR FOR VPN PEERS ---
+    (@nodes || []).each do |node|
+      if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+        if node.peers && node.peers.is_a?(Hash)
+          p_local = node.peers['local'] || node.peers[:local] || {}
+          p_remote = node.peers['remote'] || node.peers[:remote] || {}
+
+          l_node_name = p_local['node'] || p_local[:node]
+          r_node_name = p_remote['node'] || p_remote[:node]
+
+          # Extract the interface names dynamically (e.g. tun0)
+          l_int = p_local.keys.find { |k| k.to_s != 'node' } || 'tun0'
+          r_int = p_remote.keys.find { |k| k.to_s != 'node' } || 'tun0'
+
+          # Wipe out default empty eth interfaces for pure VPN gateways
+          node.nics.delete_if { |k, v| k.start_with?('eth') && v.to_s.empty? }
+
+          # Inject interfaces into the VPN Gateway
+          node.nics[l_int] = p_local[l_int] || ''
+          node.nics[r_int] = p_remote[r_int] || ''
+
+          # Inject interfaces into the attached Peers
+          l_obj = @nodes.find { |n| n.name == l_node_name }
+          r_obj = @nodes.find { |n| n.name == r_node_name }
+
+          l_obj.nics[l_int] = p_local[l_int] || '' if l_obj && !l_obj.nics.key?(l_int)
+          r_obj.nics[r_int] = p_remote[r_int] || '' if r_obj && !r_obj.nics.key?(r_int)
+        end
+      end
     end
   end
 
@@ -51,8 +81,8 @@ class Graph
       tt << "━━━━━━━━━━━━━━━━━━━━━━━━"
     end
 
-    if node.remote? && node.gw && !node.gw.empty?
-      tt << "🌐 Mgmt (GW): #{node.gw}"
+    if node.remote? && node.nics && node.nics['eth0']
+      tt << "🌐 Mgmt (eth0): #{node.nics['eth0']}"
     elsif node.ipv4 && !node.ipv4.to_s.empty?
       tt << "🌐 IPv4: #{node.ipv4}"
     end
@@ -67,7 +97,7 @@ class Graph
         nic_lines << "   ▪ #{k}  ➔  #{v}"
         has_valid_nics = true
       end
-      
+
       if has_valid_nics
         tt << "🔌 Interfaces:"
         tt += nic_lines
@@ -119,29 +149,36 @@ class Graph
 
         <%-
             @nodes.each do |node|
-              if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller" || (!node.remote? && node.type == 'gateway' && node.dnat.nil?)
+              is_vpn_gw = node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller" || (!node.remote? && node.type == 'gateway' && node.dnat.nil? && !is_vpn_gw)
                 next
               end
               group = node.type
-              
-              border_color = "#10b981" 
+
+              border_color = "#10b981"
               n_icon = "🎛️ "
-              
+
               if node.remote?
-                border_color = "#0ea5e9"
-                n_icon = "☁️ "
+                is_transit = (node.plane == 'transit') || (node.nics && node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                border_color = is_transit ? "#14b8a6" : "#0ea5e9"
+                n_icon = is_transit ? "🛡️ " : "☁️ "
               else
                 case node.type
-                  when 'host', 'vhost' 
+                  when 'host', 'vhost'
                     border_color = "#38bdf8"
                     n_icon = "💻 "
-                  when 'router' 
+                  when 'router'
                     border_color = "#f59e0b"
                     n_icon = "🔀 "
-                  when 'gateway' 
-                    border_color = "#a855f7"
-                    n_icon = "🚪 "
-                  when 'controller' 
+                  when 'gateway'
+                    if is_vpn_gw
+                      border_color = "#14b8a6"
+                      n_icon = "🛡️ "
+                    else
+                      border_color = "#a855f7"
+                      n_icon = "🚪 "
+                    end
+                  when 'controller'
                     border_color = "#ef4444"
                     n_icon = "⚙️ "
                 end
@@ -157,15 +194,15 @@ class Graph
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
             <%= node.name.gsub(/[.-]/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
-        <%- if !['host', 'vhost', 'external', 'rhost'].include?(group) -%>
+        <%- if !['host', 'vhost', 'external'].include?(group) -%>
               <tr>
                 <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
               <tr>
-        <%-   
+        <%-
               valid_nics = node.nics.reject { |k, _| node.remote? && k == 'eth0' }
-              if valid_nics.empty? 
+              if valid_nics.empty?
         -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
         <%-   else -%>
@@ -174,7 +211,7 @@ class Graph
         <%-     end -%>
         <%-   end -%>
               </tr>
-        <%- if ['host', 'vhost', 'external', 'rhost'].include?(group) -%>
+        <%- if ['host', 'vhost', 'external'].include?(group) -%>
               <tr>
                 <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
@@ -188,14 +225,42 @@ class Graph
             @links.each do |l|
               node_a, int_a = l[0].split(':')
               node_b, int_b = l[1].split(':')
-              if node_a != 'sw0' && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)
-                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+              is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+              
+              if (node_a != 'sw0' && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
                 link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
         <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
         <%-     i = (i + 1) % @graph.colors.size -%>
         <%-   end -%>
         <%- end -%>
+
+        <%-
+            # --- NEW: EXPLICIT VPN GATEWAY PEERING FOR CONN MAPS ---
+            @nodes.each do |node|
+              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+                if node.peers && node.peers.is_a?(Hash)
+                  p_local = node.peers['local'] || node.peers[:local] || {}
+                  p_remote = node.peers['remote'] || node.peers[:remote] || {}
+
+                  l_node = p_local['node'] || p_local[:node]
+                  r_node = p_remote['node'] || p_remote[:node]
+                  
+                  l_int = p_local.keys.find { |k| k.to_s != 'node' } || 'tun0'
+                  r_int = p_remote.keys.find { |k| k.to_s != 'node' } || 'tun0'
+
+                  if l_node
+        -%>
+          <%= l_node.gsub(/[.-]/, "_") %>:<%= l_int %>:s -- <%= node.name.gsub(/[.-]/, "_") %>:<%= l_int %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end 
+                  if r_node
+        -%>
+          <%= node.name.gsub(/[.-]/, "_") %>:<%= r_int %>:s -- <%= r_node.gsub(/[.-]/, "_") %>:<%= r_int %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end
+                end
+              end
+            end
+        -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
@@ -214,7 +279,9 @@ class Graph
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| 
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
+                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                next if is_transit
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
           <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
@@ -239,26 +306,33 @@ class Graph
 
         <%-
             @nodes.each do |node|
+              is_vpn_gw = node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
               group = node.type
-              
-              border_color = "#10b981" 
+
+              border_color = "#10b981"
               n_icon = "🎛️ "
-              
+
               if node.remote?
-                border_color = "#0ea5e9"
-                n_icon = "☁️ "
+                is_transit = (node.plane == 'transit') || (node.nics && node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                border_color = is_transit ? "#14b8a6" : "#0ea5e9"
+                n_icon = is_transit ? "🛡️ " : "☁️ "
               else
                 case node.type
-                  when 'host', 'vhost' 
+                  when 'host', 'vhost'
                     border_color = "#38bdf8"
                     n_icon = "💻 "
-                  when 'router' 
+                  when 'router'
                     border_color = "#f59e0b"
                     n_icon = "🔀 "
-                  when 'gateway' 
-                    border_color = "#a855f7"
-                    n_icon = "🚪 "
-                  when 'controller' 
+                  when 'gateway'
+                    if is_vpn_gw
+                      border_color = "#14b8a6"
+                      n_icon = "🛡️ "
+                    else
+                      border_color = "#a855f7"
+                      n_icon = "🚪 "
+                    end
+                  when 'controller'
                     border_color = "#ef4444"
                     n_icon = "⚙️ "
                 end
@@ -273,15 +347,15 @@ class Graph
             node[shape=rect, style="rounded,filled", fillcolor="#0f172a", color="<%= border_color %>", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.1"]
             <%= node.name.gsub(/[.-]/, "_") %>[href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=<
             <table border="0" cellborder="0" cellspacing="6" cellpadding="4">
-        <%- if ![ 'host', 'vhost', 'controller', 'external', 'rhost' ].include?(group) -%>
+        <%- if ![ 'host', 'vhost', 'controller', 'external' ].include?(group) -%>
               <tr>
                 <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
         <%- end -%>
               <tr>
-        <%-   
+        <%-
               valid_nics = node.nics.reject { |k, _| node.remote? && k == 'eth0' }
-              if valid_nics.empty? 
+              if valid_nics.empty?
         -%>
                 <td bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12">&nbsp;</font></td>
         <%-   else -%>
@@ -290,7 +364,7 @@ class Graph
         <%-     end -%>
         <%-   end -%>
               </tr>
-        <%- if [ 'host', 'vhost', 'controller', 'external', 'rhost' ].include?(group) -%>
+        <%- if [ 'host', 'vhost', 'controller', 'external'].include?(group) -%>
               <tr>
                 <td align="center" colspan="<%= col_span %>"><b><font color="<%= border_color %>" point-size="16"><%= n_icon %><%= node.name.gsub(/[.-]/, "_") %></font></b></td>
               </tr>
@@ -304,14 +378,42 @@ class Graph
             @links.each do |l|
               node_a, int_a = l[0].split(':')
               node_b, int_b = l[1].split(':')
-              if (node_a == 'sw0' || node_a == 'ro0') && !ext_names.include?(node_a) && !ext_names.include?(node_b)
-                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+              is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+              
+              if (node_a == 'sw0' || node_a == 'ro0') && (!ext_names.include?(node_a) && !ext_names.include?(node_b) || is_vpn)
                 link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
         <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
         <%-     i = (i + 1) % @graph.colors.size -%>
         <%-   end -%>
         <%- end -%>
+
+        <%-
+            # --- NEW: EXPLICIT VPN GATEWAY PEERING FOR CONN MAPS ---
+            @nodes.each do |node|
+              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+                if node.peers && node.peers.is_a?(Hash)
+                  p_local = node.peers['local'] || node.peers[:local] || {}
+                  p_remote = node.peers['remote'] || node.peers[:remote] || {}
+
+                  l_node = p_local['node'] || p_local[:node]
+                  r_node = p_remote['node'] || p_remote[:node]
+                  
+                  l_int = p_local.keys.find { |k| k.to_s != 'node' } || 'tun0'
+                  r_int = p_remote.keys.find { |k| k.to_s != 'node' } || 'tun0'
+
+                  if l_node
+        -%>
+          <%= l_node.gsub(/[.-]/, "_") %>:<%= l_int %>:s -- <%= node.name.gsub(/[.-]/, "_") %>:<%= l_int %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end 
+                  if r_node
+        -%>
+          <%= node.name.gsub(/[.-]/, "_") %>:<%= r_int %>:s -- <%= r_node.gsub(/[.-]/, "_") %>:<%= r_int %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end
+                end
+              end
+            end
+        -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
@@ -330,7 +432,9 @@ class Graph
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| 
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
+                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                next if is_transit
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
           <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
@@ -365,9 +469,12 @@ class Graph
         <%-     if node.type == 'host' || node.type == 'vhost' -%>
         <%=       node.name.gsub(/[.-]/, "_") %> [color="#38bdf8", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#38bdf8" point-size="16">💻 <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= node.nics['eth1'].to_s.empty? ? '&nbsp;' : node.nics['eth1'] %></font></td></tr></table> >]
         <%-     elsif node.remote? -%>
-        <%-       data_ip = node.nics.is_a?(Hash) ? (node.nics['tun0'] || node.nics['eth1']) : nil -%>
+        <%-       is_transit = (node.plane == 'transit') || (node.nics && node.nics.keys.any? { |k| k.start_with?('tun', 'wg') }) -%>
+        <%-       n_color = is_transit ? '#14b8a6' : '#0ea5e9' -%>
+        <%-       n_icon  = is_transit ? '🛡️' : '☁️' -%>
+        <%-       data_ip = node.nics.is_a?(Hash) ? (node.nics['tun0'] || node.nics['wg0'] || node.nics['eth1']) : nil -%>
         <%-       data_ip_str = data_ip.to_s.strip.empty? ? '&nbsp;' : data_ip.to_s.split('/').first -%>
-        <%=       node.name.gsub(/[.-]/, "_") %> [color="#0ea5e9", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#0ea5e9" point-size="16">☁️ <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= data_ip_str %></font></td></tr></table> >]
+        <%=       node.name.gsub(/[.-]/, "_") %> [color="<%= n_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= n_color %>" point-size="16"><%= n_icon %> <%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= data_ip_str %></font></td></tr></table> >]
         <%-     end -%>
         <%-   end -%>
         <%- end -%>
@@ -405,8 +512,12 @@ class Graph
                 next
               end
         -%>
-        <%-   if node.type == 'gateway' && !node.dnat.nil? && !node.remote? -%>
+        <%-   if node.type == 'gateway' && !node.remote? -%>
+        <%-     if !node.dnat.nil? -%>
                 <%= node.name.gsub(/[.-]/, "_") %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
+        <%-     elsif ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase) -%>
+                <%= node.name.gsub(/[.-]/, "_") %> [color="#14b8a6", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🛡️ <%= node.name %></font></b>>]
+        <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
@@ -414,13 +525,40 @@ class Graph
         <%- @links.each do |l|
               node_a, int_a = l[0].split(':')
               node_b, int_b = l[1].split(':')
-              if node_a != "sw0" && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)
-                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
-                link_opts = is_vpn ? ' [style="dashed", color="#0ea5e9", penwidth="2.5"]' : ""
+              is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
+              
+              if (node_a != "sw0" && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
+                link_opts = is_vpn ? ' [style="dashed", color="#14b8a6", penwidth="2.5"]' : ""
         -%>
           <%= node_a.gsub(/[.-]/, "_") %> -- <%= node_b.gsub(/[.-]/, "_") %><%= link_opts %>
         <%-   end -%>
         <%- end -%>
+
+        <%-
+            # --- NEW: EXPLICIT VPN GATEWAY PEERING ---
+            @nodes.each do |node|
+              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+                if node.peers && node.peers.is_a?(Hash)
+                  p_local = node.peers['local'] || node.peers[:local] || {}
+                  p_remote = node.peers['remote'] || node.peers[:remote] || {}
+
+                  l_node = p_local['node'] || p_local[:node]
+                  r_node = p_remote['node'] || p_remote[:node]
+
+                  # Draw line from Local Router to VPN Gateway
+                  if l_node
+        -%>
+          <%= l_node.gsub(/[.-]/, "_") %> -- <%= node.name.gsub(/[.-]/, "_") %> [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end 
+                  # Draw line from VPN Gateway to Remote Host
+                  if r_node
+        -%>
+          <%= node.name.gsub(/[.-]/, "_") %> -- <%= r_node.gsub(/[.-]/, "_") %> [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end
+                end
+              end
+            end
+        -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
@@ -431,7 +569,9 @@ class Graph
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| -%>
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
+                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                next if is_transit -%>
         <%= ext_node.name.gsub(/[.-]/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
@@ -462,15 +602,16 @@ class Graph
                     node_color = '#ef4444'
                     n_icon = '⚙️ '
                   elsif node.remote?
-                    node_color = '#0ea5e9'
-                    n_icon = '☁️ '
+                    is_transit = (node.plane == 'transit') || (node.nics && node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                    node_color = is_transit ? '#14b8a6' : '#0ea5e9'
+                    n_icon = is_transit ? '🛡️ ' : '☁️ '
                   else
                     node_color = '#38bdf8'
                     n_icon = '💻 '
                   end
-                  
-                  # Use gw for remote hosts, eth0 for local hosts
-                  mgmt_ip = node.remote? ? node.gw : node.nics['eth0']
+
+                  # Use eth0 explicitly for Mgmt Topo (fallback to gw)
+                  mgmt_ip = (node.nics && node.nics['eth0']) || node.gw
         -%>
         <%=       node.name.gsub(/[.-]/, "_") %> [color="<%= node_color %>", href="<%= node_link %>",target="_blank",tooltip="<%= @graph.build_tooltip(node) %>",label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="<%= node_color %>" point-size="16"><%= n_icon %><%= node.fqdn || node.name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= mgmt_ip.to_s.empty? ? '&nbsp;' : mgmt_ip %></font></td></tr></table> >]
         <%-     end -%>
@@ -488,7 +629,7 @@ class Graph
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['hv'] || vm['name']) 
+              nodes = init_nodes(vm['hv'] || vm['name'])
               nodes.each do |node|
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
@@ -501,7 +642,11 @@ class Graph
             @nodes.each do |node|
         -%>
         <%-   if node.type == 'gateway' && !node.remote? -%>
+        <%-     if !node.dnat.nil? -%>
                 <%= node.name.gsub(/[.-]/, "_") %> [color="#a855f7", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🚪 <%= node.name %></font></b>>]
+        <%-     elsif ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase) -%>
+                <%= node.name.gsub(/[.-]/, "_") %> [color="#14b8a6", tooltip="<%= @graph.build_tooltip(node) %>", label=<<b><font point-size="16">🛡️ <%= node.name %></font></b>>]
+        <%-     end -%>
         <%-   end -%>
         <%- end -%>
 
@@ -509,16 +654,41 @@ class Graph
         <%- @links.each do |l|
               node_a, int_a = l[0].split(':')
               node_b, int_b = l[1].split(':')
-              # Check BOTH sides to see if this is a management link!
               is_mgmt_link = (node_a == 'sw0' || node_a == 'ro0' || node_b == 'sw0' || node_b == 'ro0')
+              is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
 
-              if is_mgmt_link && !ext_names.include?(node_a) && !ext_names.include?(node_b)
-                is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
-                link_opts = is_vpn ? ' [style="dashed", color="#0ea5e9", penwidth="2.5"]' : ""
+              if (is_mgmt_link && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
+                link_opts = is_vpn ? ' [style="dashed", color="#14b8a6", penwidth="2.5"]' : ""
         -%>
           <%= node_a.gsub(/[.-]/, "_") %> -- <%= node_b.gsub(/[.-]/, "_") %><%= link_opts %>
         <%-   end -%>
         <%- end -%>
+
+        <%-
+            # --- NEW: EXPLICIT VPN GATEWAY PEERING ---
+            @nodes.each do |node|
+              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+                if node.peers && node.peers.is_a?(Hash)
+                  p_local = node.peers['local'] || node.peers[:local] || {}
+                  p_remote = node.peers['remote'] || node.peers[:remote] || {}
+
+                  l_node = p_local['node'] || p_local[:node]
+                  r_node = p_remote['node'] || p_remote[:node]
+
+                  # Draw line from Local Router to VPN Gateway
+                  if l_node
+        -%>
+          <%= l_node.gsub(/[.-]/, "_") %> -- <%= node.name.gsub(/[.-]/, "_") %> [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end 
+                  # Draw line from VPN Gateway to Remote Host
+                  if r_node
+        -%>
+          <%= node.name.gsub(/[.-]/, "_") %> -- <%= r_node.gsub(/[.-]/, "_") %> [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-       end
+                end
+              end
+            end
+        -%>
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
@@ -529,7 +699,9 @@ class Graph
         <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
-        <%-   @nodes.select { |n| n.remote? }.each do |ext_node| -%>
+        <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
+                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
+                next if is_transit -%>
         <%= ext_node.name.gsub(/[.-]/, "_") %> -- <%= target_node.name %> [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
@@ -577,17 +749,6 @@ class Graph
   <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>
-
-[rhosts]
-  <%- @nodes.each do |node| -%>
-  <%-   if node.remote? -%>
-  <%-     # For remote nodes, 'gw' is the Public Management IP -%>
-  <%-     mgmt_ip = (node.gw && !node.gw.to_s.strip.empty?) ? node.gw : (node.nics && node.nics['eth0']) -%>
-  <%-     if mgmt_ip && !mgmt_ip.to_s.empty? -%>
-  <%=       node.name.ljust(24) %> ansible_host=<%= mgmt_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
-  <%-     end -%>
-  <%-   end -%>
-  <%- end -%>
     }
   end
 
@@ -623,14 +784,6 @@ class Graph
   <%-   is_target = ['host', 'vhost', 'server'].include?(node.type) -%>
   <%-   data_ip = node.nics ? (node.nics['eth1'] || node.nics['tun0']) : nil -%>
   <%-   if is_target && data_ip && !data_ip.to_s.empty? && !node.remote? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
-  <%-   end -%>
-  <%- end -%>
-
-[rhosts]
-  <%- @nodes.each do |node| -%>
-  <%-   data_ip = node.nics ? (node.nics['tun0'] || node.nics['wg0'] || node.nics['eth1']) : nil -%>
-  <%-   if node.remote? && data_ip && !data_ip.to_s.empty? -%>
   <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= node.user == 'root' ? '' : ' ansible_become=yes' %>
   <%-   end -%>
   <%- end -%>

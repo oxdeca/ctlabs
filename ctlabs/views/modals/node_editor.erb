@@ -45,7 +45,7 @@
 
           <div class="w3-col m6 w3-margin-bottom">
             <label>Node Type</label>
-            <select id="edit-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateKindOptions) window.updateKindOptions(this.value, 'edit-kind'); if(window.updateNodeFormFields) window.updateNodeFormFields(this.value, document.getElementById('edit-plane').value);">
+            <select id="edit-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateKindOptions) window.updateKindOptions(this.value, 'edit-kind'); if(window.updateNodeFormFields) window.updateNodeFormFields(this.value, document.getElementById('edit-plane').value); window.updateDynamicLabels && window.updateDynamicLabels();">
               <option value="" disabled selected>-- Select Type --</option>
               <option value="host">Host</option>
               <option value="switch">Switch</option>
@@ -57,72 +57,92 @@
 
           <div class="w3-col m6 w3-margin-bottom">
             <label>Provider</label>
-            <select id="edit-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+            <select id="edit-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="window.updateDynamicLabels && window.updateDynamicLabels();">
               <option value="local" selected>🐳 Local (Docker)</option>
               <option value="external">☁️ External / VPN</option>
               <option value="gcp">☁️ Google Cloud (GCP)</option>
               <option value="aws">☁️ AWS</option>
               <option value="azure">☁️ Azure</option>
+              <option value="openvpn">🛡️ OpenVPN Gateway</option>
+              <option value="wireguard">🛡️ WireGuard Gateway</option>
+              <option value="ipsec">🛡️ IPSec Gateway</option>
             </select>
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom">
+          <div class="w3-col m6 w3-margin-bottom std-field">
+            <label>Network Plane</label>
+            <select id="edit-plane" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateNodeFormFields) window.updateNodeFormFields(document.getElementById('edit-type').value, this.value); window.updateDynamicLabels && window.updateDynamicLabels();">
+              <option value="data" selected>Data Plane (Default)</option>
+              <option value="mgmt">Management Plane</option>
+              <option value="edge">Edge Plane (Public / Internet)</option>
+              <option value="transit">Transit Plane (VPN / Tunnels)</option>
+            </select>
+          </div>
+
+          <div class="w3-col m6 w3-margin-bottom std-field" id="div-profile">
             <label>Profile</label>
             <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="Double-click to select profile..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-            <datalist id="node-profiles-list">
-              <%
-                available_kinds = []
-                if defined?(info_hash) && info_hash && info_hash[:images]
-                  info_hash[:images].each { |img| available_kinds << img[:kind].to_s.strip }
-                end
-              %>
-              <% available_kinds.reject(&:empty?).uniq.sort.each do |k| %>
-                <option value="<%= k %>"><%= k %></option>
+            <datalist id="node-profiles-list"></datalist>
+            <script>window.rawProfilesData = <%= (info_hash[:images] || []).to_json %>;</script>
+          </div>
+
+          <div class="w3-col m6 w3-margin-bottom std-field" id="div-eth0">
+            <label id="lbl-eth0">Mgmt IP (eth0)</label>
+            <input type="text" id="edit-eth0" placeholder="e.g. 34.138.103.53/32" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          </div>
+
+          <div class="w3-col m6 w3-margin-bottom std-field" id="div-eth1">
+            <label id="lbl-eth1">IP (eth1)</label>
+            <input type="text" id="edit-eth1" placeholder="e.g. 192.168.45.3/24" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          </div>
+
+          <div class="w3-col m6 w3-margin-bottom std-field" id="div-gw">
+            <label>Gateway (gw)</label>
+            <input type="text" id="edit-gw" list="edit-gw-options" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+            <datalist id="edit-gw-options">
+              <% if defined?(info_hash) && info_hash && info_hash[:gateways] %>
+                <% info_hash[:gateways].each do |g| %><option value="<%= g %>"><% end %>
               <% end %>
             </datalist>
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom">
-            <label>Network Plane</label>
-            <select id="edit-plane" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateNodeFormFields) window.updateNodeFormFields(document.getElementById('edit-type').value, this.value);">
-              <option value="data" selected>Data Plane (Default)</option>
-              <option value="mgmt">Management Plane</option>
-              <option value="edge">Edge / Transit Plane</option>
-            </select>
-          </div>
-
-          <div class="w3-col m12 w3-margin-bottom">
+          <div class="w3-col m6 w3-margin-bottom std-field" id="div-switch">
             <label>Connect to Switch</label>
             <select id="edit-switch" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateGatewayForSwitch) window.updateGatewayForSwitch(this.value)">
               <option value="" selected>-- None (Mgmt Only) --</option>
             </select>
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom">
-            <label>Data IP / Public IP Address</label>
-            <input type="text" id="edit-ip" placeholder="e.g. 192.168.10.20/24" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          <div class="w3-col m12 w3-margin-bottom vpn-field" style="display: none; border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px;">
+            <span style="color: #14b8a6; font-weight: bold;"><i class="fas fa-project-diagram"></i> VPN Overlay Peers</span>
+          </div>
+          
+          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
+            <label>Local Node (e.g., ro1)</label>
+            <input type="text" id="edit-peer-local-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          </div>
+          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
+            <label>Local Interface (e.g., tun0)</label>
+            <input type="text" id="edit-peer-local-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom">
-            <label>Gateway (gw)</label>
-            <input type="text" id="edit-gw" list="edit-gw-options" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
-            <datalist id="edit-gw-options">
-              <% if defined?(info_hash) && info_hash && info_hash[:gateways] %>
-                <% info_hash[:gateways].each do |g| %>
-                  <option value="<%= g %>">
-                <% end %>
-              <% end %>
-            </datalist>
+          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
+            <label>Remote Node (e.g., vm-2)</label>
+            <input type="text" id="edit-peer-remote-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
           </div>
+          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
+            <label>Remote Interface (e.g., tun0)</label>
+            <input type="text" id="edit-peer-remote-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+          </div>
+
         </div>
       </div>
 
       <div id="AdvancedEdit" class="editor-tab" style="display:none; max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
         <div class="w3-row-padding" style="margin: 0 -8px;">
-
           <div class="w3-col m12 w3-margin-bottom">
             <label>Additional NICs (nics)</label>
-            <textarea id="edit-nics" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="eth2=10.0.0.1/24&#10;eth3=10.0.1.1/24" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
+            <textarea id="edit-nics" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="tun0=10.8.15.2&#10;eth3=10.0.1.1/24" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
 
           <div class="w3-col m12 w3-margin-bottom">
@@ -147,7 +167,7 @@
 
           <div class="w3-col m12 w3-margin-bottom">
             <label><i class="fas fa-terminal"></i> Terminal / SSH Link</label>
-            <input type="text" id="edit-term" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g., ssh://root@192.168.10.5" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            <input type="text" id="edit-term" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g., ssh://ansible@34.138.103.53" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
           </div>
 
           <div class="w3-col m12 w3-margin-bottom">
@@ -165,7 +185,7 @@
 
       <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right; margin-top: 15px;">
         <button type="button" onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
-        <button type="button" id="node-modal-save-btn" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> <span id="node-modal-save-text">Save Node</span></button>
+        <button type="button" id="node-modal-save-btn" onclick="window.saveNodeConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> <span id="node-modal-save-text">Save Override</span></button>
       </footer>
     </div>
   </div>

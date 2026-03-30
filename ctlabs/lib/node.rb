@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers
   attr_writer :nics
   attr_accessor :is_running
 
@@ -22,6 +22,7 @@ class Node
     @type       = args['type' ]
     @plane      = args['plane']     || (args['type'] == 'controller' ? 'mgmt' : 'data')
     @provider   = args['provider']  || 'local'
+    @peers      = args['peers']     || args[:peers] || {}
     @eos        = args['eos'  ]     || 'linux'
     @kind       = args['profile' ]  || args['kind'] || 'linux'
     @kvm        = args['kvm'  ]     || false
@@ -114,45 +115,55 @@ class Node
     ['gcp', 'external', 'aws', 'azure'].include?(@provider.to_s.downcase) || ['rhost', 'external'].include?(@type.to_s.downcase)
   end
 
-  # CLASS METHOD: Solves the N+1 problem by doing one master check
   def self.bulk_update_status(nodes)
     return if nodes.empty?
 
-    # 1. Fetch local containers EXACTLY ONCE
+    # 1. Fetch local containers once
     podman_running = `podman ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
     docker_running = `docker ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
     active_containers = (podman_running + docker_running).uniq
 
-    # 2. Update every node in the array
     nodes.each do |node|
-      if node.type == 'rhost'
-        # Remote nodes get a quick TCP ping
-        ip = (node.nics && node.nics['eth1']) ? node.nics['eth1'].split('/').first : nil
-        ip ||= node.ipv4 ? node.ipv4.split('/').first : nil
-        
-        if ip && !ip.empty?
+      if node.type == 'gateway' && ['local', 'openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+        node.is_running = true
+      elsif node.remote?
+        # Standardize key access and strip IPs
+        nics = (node.nics || {}).transform_keys(&:to_s)
+        raw_ip = nics['eth0'] || node.gw || nics['eth1']
+        ip = raw_ip.to_s.split('/').first.to_s.strip
+
+        if !ip.empty?
           begin
-            Socket.tcp(ip, 22, connect_timeout: 0.5) { |sock| true }
-            node.is_running = true
-          rescue StandardError
+            # Use your confirmed working IRB logic
+            Socket.tcp(ip, 22, connect_timeout: 1.0) { |sock| node.is_running = true }
+          rescue => e
             node.is_running = false
           end
+        else
+          node.is_running = false
         end
       else
-        # Local nodes get the lightning-fast array check
         node.is_running = active_containers.include?(node.name)
       end
     end
   end
 
-  # INSTANCE METHOD: For when you just need to check one single node on the fly
+  # INSTANCE METHOD: Single check
   def running?
-    if @type == 'rhost'
-      ip = (@nics && @nics['eth1']) ? @nics['eth1'].split('/').first : nil
-      ip ||= @ipv4 ? @ipv4.split('/').first : nil
+    if @type == 'gateway' && ['local', 'openvpn', 'wireguard', 'ipsec'].include?(@provider.to_s.downcase)
+      true
+    elsif remote?
+      string_nics = (@nics || {}).transform_keys(&:to_s)
+      raw_ip = string_nics['eth0'] || @gw || string_nics['eth1'] || string_nics['tun0']
+
+      # --- ADD THESE THREE LINES ---
+      #puts "DEBUG: Checking remote node #{node.name}"
+      #puts "DEBUG: Extracted IP is '#{ip}'"
+      
+      ip = raw_ip.to_s.split('/').first
       return false unless ip && !ip.empty?
       begin
-        Socket.tcp(ip, 22, connect_timeout: 0.5) { |sock| true }
+        Socket.tcp(ip, 22, connect_timeout: 1.0) { |sock| true }
         return true
       rescue StandardError
         return false

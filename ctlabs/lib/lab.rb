@@ -715,6 +715,7 @@ class Lab
     end
 
     @log.info "[ADHOC NODE] Started node #{node_name}"
+    inventory
 
     [node_cfg, data_link]
   end
@@ -753,6 +754,8 @@ class Lab
     end
 
     setup_lab_ssh_keys
+    @log.info "Generating fresh Ansible inventory..."
+    inventory
 
     # Copy lab-specific flashcards if they exist
     lab_flashcards    = File.join(File.dirname(@cfg_file), 'flashcards.json')

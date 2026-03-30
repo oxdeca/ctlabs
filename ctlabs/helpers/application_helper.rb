@@ -118,6 +118,7 @@ module ApplicationHelper
                 type: tk, 
                 kind: kk, 
                 image: kv['image'] || 'N/A',
+                provider: kv['provider'] || 'local',
                 caps: kv['caps'] || [],
                 env: kv['env'] || [],
                 extras: extras_yaml
@@ -139,26 +140,25 @@ module ApplicationHelper
     nodes = []
     if lab.nodes
       lab.nodes.each do |node|
-        if node.type != "gateway"
-          image_ref = 'N/A'
-          if lab.defaults && lab.defaults[node.type] && lab.defaults[node.type][node.kind || 'linux']
-            image_ref = lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A'
-          end
-          
-          is_adhoc = !base_nodes_list.include?(node.name)
-
-          node_info = {
-            name: node.name,
-            type: node.type   || 'N/A',
-            kind: node.kind   || 'N/A',
-            image: image_ref,
-            cpus: 'N/A',
-            memory: 'N/A',
-            adhoc: is_adhoc,
-            running: node.is_running # <-- Just read the property!
-          }
-          nodes << node_info
+        image_ref = 'N/A'
+        if lab.defaults && lab.defaults[node.type] && lab.defaults[node.type][node.kind || 'linux']
+          image_ref = lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A'
         end
+          
+        is_adhoc = !base_nodes_list.include?(node.name)
+
+        node_info = {
+          name: node.name,
+          type: node.type   || 'N/A',
+          kind: node.kind   || 'N/A',
+          provider: node.provider || 'local',
+          image: image_ref,
+          cpus: 'N/A',
+          memory: 'N/A',
+          adhoc: is_adhoc,
+          running: node.is_running 
+        }
+        nodes << node_info
       end
     end
 

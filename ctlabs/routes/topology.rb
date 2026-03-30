@@ -247,6 +247,25 @@ post '/labs/*/node_edit/:node_name' do
 
     if params[:format] == 'form'
       new_cfg = parse_node_form_data(params, base_data)
+
+      # --- NEW: VPN Peer Handling ---
+      if new_cfg['type'] == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(new_cfg['provider'].to_s.downcase)
+        if params[:peers] && !params[:peers].to_s.strip.empty?
+          begin
+            new_cfg['peers'] = JSON.parse(params[:peers])
+            new_cfg['nics'] = {}  # Set explicitly to empty hash, prevents 'nil' errors!
+            new_cfg.delete('profile')
+            new_cfg.delete('gw')
+            new_cfg.delete('image')
+          rescue => e
+            puts "Error parsing peers JSON: #{e.message}"
+          end
+        end
+      else
+        new_cfg.delete('peers')
+      end
+      # ------------------------------
+
     else
       new_cfg = YAML.safe_load(params[:yaml_data])
     end
@@ -340,13 +359,29 @@ get '/labs/*/node/:node_name/ping' do
   begin
     data = YAML.load_file(lab_path)
     node_cfg, _ = find_node_in_raw_yaml(data['topology'][0], node_name)
-    target_ip = node_cfg['gw'].to_s.split('/').first
+    
+    # 1. Abstract VPN Gateways are conceptually "alive" (no SSH needed)
+    if node_cfg['type'] == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node_cfg['provider'].to_s.downcase)
+      content_type :json
+      return { success: true, alive: true }.to_json
+    end
 
-    halt 400, { success: false, error: "No IP defined" }.to_json if target_ip.nil? || target_ip.strip.empty?
+    # 2. Extract IP safely using the new schema priorities
+    nics = node_cfg['nics'] || {}
+    string_nics = nics.transform_keys(&:to_s) rescue nics # Safe fallback for Ruby < 2.5 if ever moved
+    
+    raw_ip = string_nics['eth0'] || node_cfg['gw'] || string_nics['eth1'] || string_nics['tun0']
+    target_ip = raw_ip.to_s.split('/').first.to_s.strip
 
+    if target_ip.empty?
+      halt 400, { success: false, error: "No IP defined" }.to_json
+    end
+
+    # 3. Perform the actual health check
     is_alive = false
     begin
-      Socket.tcp(target_ip, 22, connect_timeout: 1) { |sock| is_alive = true }
+      # Increased timeout slightly to 1.5s for cloud latency reliability
+      Socket.tcp(target_ip, 22, connect_timeout: 1.5) { |sock| is_alive = true }
     rescue StandardError
       is_alive = false
     end

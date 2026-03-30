@@ -124,6 +124,66 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
     });
 };
 
+window.updateDynamicLabels = function() {
+    const typeEl = document.getElementById('edit-type');
+    const providerEl = document.getElementById('edit-provider');
+    if (!typeEl || !providerEl) return;
+
+    const type = typeEl.value;
+    const provider = providerEl.value;
+
+    const isVPN = (type === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
+    const isCloud = ['gcp', 'aws', 'azure', 'external'].includes(provider);
+
+    // Toggle visibility using W3CSS column classes
+    document.querySelectorAll('.std-field').forEach(el => {
+        el.style.display = isVPN ? 'none' : 'block';
+    });
+    document.querySelectorAll('.vpn-field').forEach(el => {
+        el.style.display = isVPN ? 'block' : 'none';
+    });
+
+    if (isVPN) return;
+
+    const divEth0 = document.getElementById('div-eth0');
+    const divGw   = document.getElementById('div-gw');
+
+    if (divEth0) {
+        divEth0.style.display = (type === 'router' && provider === 'local') ? 'none' : 'block';
+    }
+
+    if (divGw) {
+        divGw.style.display = isCloud ? 'none' : 'block';
+    }
+
+    const profileList = document.getElementById('node-profiles-list');
+    if (profileList && window.rawProfilesData) {
+        profileList.innerHTML = '';
+        const filteredProfiles = window.rawProfilesData.filter(p => p.provider === provider || (!p.provider && provider === 'local'));
+        
+        const uniqueKinds = [...new Set(filteredProfiles.map(p => p.kind))].sort();
+        uniqueKinds.forEach(k => {
+            if (k) profileList.innerHTML += `<option value="${k}">${k}</option>`;
+        });
+    }
+};
+
+window.toggleVpnFields = function() {
+    const typeEl = document.getElementById('edit-type');
+    const providerEl = document.getElementById('edit-provider');
+    if (!typeEl || !providerEl) return;
+
+    const type = typeEl.value;
+    const provider = providerEl.value;
+    const isVPN = (type === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
+
+    const standardFields = document.getElementById('standard-network-fields');
+    const vpnFields = document.getElementById('vpn-peer-fields');
+
+    if (standardFields) standardFields.style.display = isVPN ? 'none' : 'block';
+    if (vpnFields) vpnFields.style.display = isVPN ? 'block' : 'none';
+};
+
 window.editNodeConfig = async function(labName, nodeName) {
     window.currentEditLab = labName;
     window.currentEditNode = nodeName;
@@ -144,7 +204,7 @@ window.editNodeConfig = async function(labName, nodeName) {
 
         document.getElementById('node-yaml-editor').value = data.yaml || '';
         if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
-          window.cmEditors['node-yaml-editor'].setValue(data.yaml || '');
+            window.cmEditors['node-yaml-editor'].setValue(data.yaml || '');
         }
 
         if (data.json) {
@@ -153,20 +213,34 @@ window.editNodeConfig = async function(labName, nodeName) {
             const nodePlane = nodeObj.plane || 'data';
             const nodeProvider = nodeObj.provider || 'local';
 
-            let primaryNic = 'eth1';
-            if (nodeType === 'controller' || nodePlane === 'mgmt') primaryNic = 'eth0';
-            if (nodeProvider !== 'local') primaryNic = 'tun0';
-
             document.getElementById('edit-type').value = nodeType;
-            
             const providerEl = document.getElementById('edit-provider');
             if (providerEl) providerEl.value = nodeProvider;
-
             const planeEl = document.getElementById('edit-plane');
             if(planeEl) planeEl.value = nodePlane;
 
+            // Trigger the UI Context safely
+            if (typeof window.updateDynamicLabels === 'function') {
+                window.updateDynamicLabels();
+            }
+
+            // Load the peers safely
+            if (nodeObj.peers) {
+                const pLocal = nodeObj.peers.local || {};
+                const pRemote = nodeObj.peers.remote || {};
+                document.getElementById('edit-peer-local-node').value = pLocal.node || '';
+                document.getElementById('edit-peer-local-nic').value  = pLocal.nic || 'tun0';
+                document.getElementById('edit-peer-remote-node').value = pRemote.node || '';
+                document.getElementById('edit-peer-remote-nic').value = pRemote.nic || 'tun0';
+            } else {
+                document.getElementById('edit-peer-local-node').value = '';
+                document.getElementById('edit-peer-local-nic').value = 'tun0';
+                document.getElementById('edit-peer-remote-node').value = '';
+                document.getElementById('edit-peer-remote-nic').value = 'tun0';
+            }
+
             try {
-                window.updateNodeFormFields(nodeType, nodePlane);
+                if (typeof window.updateNodeFormFields === 'function') window.updateNodeFormFields(nodeType, nodePlane);
                 if (typeof window.updateKindOptions === 'function') window.updateKindOptions(nodeType, 'edit-kind');
             } catch (e) { console.error("UI Setup Error:", e); }
 
@@ -176,20 +250,28 @@ window.editNodeConfig = async function(labName, nodeName) {
             const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
             document.getElementById('edit-kind').value = nodeObj.profile || (needsLinuxFallback ? 'linux' : '');
 
+            // --- NIC EXTRACTION LOGIC ---
             let nicsStr = '';
-            let dataIp = '';
+            let eth0Ip = '';
+            let eth1Ip = '';
+
             if (nodeObj.nics && typeof nodeObj.nics === 'object') {
                 for (const [key, value] of Object.entries(nodeObj.nics)) {
                     const cleanKey = String(key).replace(/['"]/g, '').trim();
-                    if (cleanKey === primaryNic) dataIp = value;
+                    if (cleanKey === 'eth0') eth0Ip = value;
+                    else if (cleanKey === 'eth1') eth1Ip = value;
                     else nicsStr += `${cleanKey}=${value}\n`;
                 }
             }
-            document.getElementById('edit-ip').value = dataIp;
+
+            document.getElementById('edit-eth0').value = eth0Ip;
+            document.getElementById('edit-eth1').value = eth1Ip;
             document.getElementById('edit-nics').value = nicsStr.trim();
+            // --------------------------------
 
             let connectedSwitch = '';
             try {
+                const switchNic = (nodePlane === 'mgmt' || nodeType === 'controller') ? 'eth0' : 'eth1';
                 const linkRows = document.querySelectorAll('#network-links-table .link-row');
                 for (const row of linkRows) {
                     const cols = row.querySelectorAll('td');
@@ -199,13 +281,13 @@ window.editNodeConfig = async function(labName, nodeName) {
                         const spanA = Array.from(cols[0].querySelectorAll('span')).find(s => s.innerText.includes('['));
                         const spanB = Array.from(cols[1].querySelectorAll('span')).find(s => s.innerText.includes('['));
 
-                        const intA = spanA ? spanA.innerText.replace(/[[\]]/g, '').trim() : '';
-                        const intB = spanB ? spanB.innerText.replace(/[[\]]/g, '').trim() : '';
+                        const intA = spanA ? spanA.innerText.replace(/\[|\]/g, '').trim() : '';
+                        const intB = spanB ? spanB.innerText.replace(/\[|\]/g, '').trim() : '';
 
                         if (nodeA && intA && nodeB && intB) {
                             const sideA = `${nodeA}:${intA}`;
                             const sideB = `${nodeB}:${intB}`;
-                            const targetSearch = `${nodeName}:${primaryNic}`;
+                            const targetSearch = `${nodeName}:${switchNic}`;
 
                             if (sideA === targetSearch) {
                                 connectedSwitch = nodeB; break;
@@ -254,7 +336,8 @@ window.editNodeConfig = async function(labName, nodeName) {
             } catch (e) { console.error("Advanced Fields Error:", e); }
         }
 
-        document.getElementById('defaultTab').click();
+        const defaultTabBtn = document.getElementById('defaultTab');
+        if (defaultTabBtn) defaultTabBtn.click();
         document.getElementById('node-editor-modal').style.display = 'block';
     } catch (err) {
         alert("Failed to load node configuration. " + err.message);
@@ -308,43 +391,42 @@ window.saveNodeConfig = async function() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
     const formData  = new URLSearchParams();
-    const isYaml    = document.getElementById('YamlEdit').style.display === 'block';
+    const yamlEditTab = document.getElementById('YamlEdit');
+    const isYaml = yamlEditTab && yamlEditTab.style.display === 'block';
 
     let typeField = document.getElementById('edit-type').value;
     let providerField = document.getElementById('edit-provider').value;
     let planeEl = document.getElementById('edit-plane');
     let planeField = planeEl ? planeEl.value : 'data';
 
-    // Smart NIC assignment based on Provider and Type
-    let primaryNic = 'eth1';
-    if (typeField === 'controller' || planeField === 'mgmt') primaryNic = 'eth0';
-    if (providerField !== 'local') primaryNic = 'tun0';
-
-    let ipField   = document.getElementById('edit-ip').value.trim();
+    let eth0Field = document.getElementById('edit-eth0').value.trim();
+    let eth1Field = document.getElementById('edit-eth1').value.trim();
+    let advancedNics = document.getElementById('edit-nics').value.trim();
     let gwField   = document.getElementById('edit-gw').value.trim();
-    let finalNics = document.getElementById('edit-nics').value.trim();
     let finalTerm = document.getElementById('edit-term').value.trim();
 
-    // AUTO-GENERATE SSH LINK FOR REMOTE NODES USING THE PUBLIC MGMT IP
-    if (providerField !== 'local' && !finalTerm && gwField) {
-        const ipOnly = gwField.split('/')[0];
-        finalTerm = `ssh://root@${ipOnly}`;
+    if (providerField !== 'local' && !finalTerm && eth0Field) {
+        const ipOnly = eth0Field.split('/')[0];
+        finalTerm = `ssh://ansible@${ipOnly}`;
     }
 
-    let nicsArray = finalNics ? finalNics.split('\n') : [];
-    if (ipField) {
-        nicsArray = nicsArray.filter(n => !n.startsWith(`${primaryNic}=`));
-        nicsArray.unshift(`${primaryNic}=${ipField}`);
-    }
-    finalNics = nicsArray.join('\n');
+    let nicsArray = advancedNics ? advancedNics.split('\n').map(n => n.trim()).filter(n => n !== '') : [];
+    nicsArray = nicsArray.filter(n => !n.startsWith('eth0=') && !n.startsWith('eth1='));
+
+    if (eth1Field) nicsArray.unshift(`eth1=${eth1Field}`);
+    if (eth0Field) nicsArray.unshift(`eth0=${eth0Field}`);
+
+    let finalNics = nicsArray.join('\n');
 
     if (isAdding) {
         formData.append('node_name', nodeName);
         formData.append('switch', document.getElementById('edit-switch').value);
-        formData.append('ip', ipField);
+        formData.append('ip', eth1Field || eth0Field);
     } else {
         formData.append('switch', document.getElementById('edit-switch').value);
     }
+
+    const isVPN = (typeField === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(providerField);
 
     if (isYaml && !isAdding) {
         formData.append('format', 'yaml');
@@ -355,9 +437,26 @@ window.saveNodeConfig = async function() {
         formData.append('type', typeField);
         formData.append('provider', providerField);
         formData.append('plane', planeField);
+
+        // ALways append these safe defaults
         formData.append('profile', document.getElementById('edit-kind').value);
-        formData.append('gw',   gwField);
+        formData.append('gw',    gwField);
         formData.append('nics', finalNics);
+
+        if (isVPN) {
+            const peersObj = {
+                local: {
+                    node: document.getElementById('edit-peer-local-node').value.trim(),
+                    nic: document.getElementById('edit-peer-local-nic').value.trim() || 'tun0'
+                },
+                remote: {
+                    node: document.getElementById('edit-peer-remote-node').value.trim(),
+                    nic: document.getElementById('edit-peer-remote-nic').value.trim() || 'tun0'
+                }
+            };
+            formData.append('peers', JSON.stringify(peersObj));
+        }
+
         formData.append('info', document.getElementById('edit-info').value);
         formData.append('urls_text', document.getElementById('edit-urls').value);
         formData.append('term', finalTerm);
@@ -395,7 +494,7 @@ window.saveNodeConfig = async function() {
             resultDiv.innerHTML = '<i class="fas fa-check-circle w3-text-green"></i> Node saved successfully! (Reloading...)';
             setTimeout(() => location.reload(), 800);
         } else {
-            throw new Error(data.error);
+            throw new Error(data.error || "Failed to save node.");
         }
     } catch (err) {
         resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; display: block; padding: 8px;';
@@ -493,3 +592,4 @@ window.checkRemoteHosts = async function() {
 // Start a background watcher that runs every 2 seconds.
 // Whenever the dashboard dynamically reloads the nodes.erb card, this will instantly catch it!
 setInterval(window.checkRemoteHosts, 2000);
+
