@@ -301,7 +301,7 @@ post '/labs/*/node/new' do
 
     new_node = parse_node_form_data(params)
     validate_node_profile!(new_node, yaml)
-    sync_node_to_terraform_config!(node_name, new_cfg, full_yaml, params[:cloud_vm_yaml])
+    sync_node_to_terraform_config!(node_name, new_node, yaml, params[:cloud_vm_yaml])
     target_plane = new_node['plane'] || 'data'
 
     if vm['planes']

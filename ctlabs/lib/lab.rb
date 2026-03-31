@@ -832,8 +832,8 @@ class Lab
           # Re-initialize nodes so the new IPs are available for the Ansible inventory
           @nodes = init_nodes(@vm_name)
         rescue => e
-          @log.error "Terraform provisioning failed: #{e.message}"
-          raise "Lab startup aborted due to Terraform failure: #{e.message}"
+          @log.write("Terraform provisioning failed: #{e.message}", "error")
+          #raise "Lab startup aborted due to Terraform failure: #{e.message}"
         end
       end
     end
