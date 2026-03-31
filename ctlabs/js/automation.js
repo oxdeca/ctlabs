@@ -743,18 +743,21 @@ window.openTfTab = function(tabId) {
       }
   };
 
-  // --- DIRECTORY BROWSER ---
-  window.openTerraformDirBrowser = async function() {
+// --- DIRECTORY BROWSER ---
+  window.openTerraformDirBrowser = async function(targetInputId = 'edit-terraform-workdir') {
+      // 1. Save which input field requested the browser
+      window.currentTfDirTarget = targetInputId;
+
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform/tree?t=${Date.now()}`);
           if (res.ok) {
               const files = await res.json();
-              
+
               // Extract unique directories from the file paths
               const dirs = new Set();
               dirs.add('.'); // Always include the root directory as an option
-              
+
               files.forEach(f => {
                   if (f.includes('/')) {
                       const parts = f.split('/');
@@ -766,7 +769,7 @@ window.openTfTab = function(tabId) {
               // Populate the datalist
               const datalist = document.getElementById('tf-dirs-datalist');
               datalist.innerHTML = '';
-              
+
               // Sort directories alphabetically and inject them
               Array.from(dirs).sort().forEach(d => {
                   const opt = document.createElement('option');
@@ -774,8 +777,8 @@ window.openTfTab = function(tabId) {
                   datalist.appendChild(opt);
               });
           }
-      } catch (e) { 
-          console.error("Failed to load Terraform directory tree", e); 
+      } catch (e) {
+          console.error("Failed to load Terraform directory tree", e);
       }
 
       document.getElementById('tf-dir-browser-input').value = '';
@@ -783,15 +786,27 @@ window.openTfTab = function(tabId) {
   };
 
   window.confirmTerraformDirBrowser = function() {
-      let val = document.getElementById('tf-dir-browser-input').value.trim();
-      if (val) {
-          // Clean up the pretty '(root)' string back into a blank path for the backend
-          if (val === '(root)' || val === '.') val = '';
-          
-          document.getElementById('edit-terraform-workdir').value = val;
-          document.getElementById('tf-dir-browser-modal').style.display = 'none';
-          
-          // Instantly auto-load the files for this new directory!
-          window.loadTerraformFiles(); 
+      const inputEl = document.getElementById('tf-dir-browser-input');
+      if (!inputEl) return;
+      
+      let val = inputEl.value.trim();
+      
+      // Clean up the pretty '(root)' string back into a blank path for the backend
+      if (val === '(root)' || val === '.') val = '';
+
+      // 2. Retrieve the saved target ID (Defaults to global editor if missing)
+      const targetId = window.currentTfDirTarget || 'edit-terraform-workdir';
+      
+      const targetField = document.getElementById(targetId);
+      if (targetField) {
+          targetField.value = val;
+      }
+
+      document.getElementById('tf-dir-browser-modal').style.display = 'none';
+
+      // 3. CRITICAL: Only auto-load files if the GLOBAL Terraform editor called this!
+      if (targetId === 'edit-terraform-workdir' && typeof window.loadTerraformFiles === 'function') {
+          window.loadTerraformFiles();
       }
   };
+

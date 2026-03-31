@@ -59,9 +59,22 @@ def parse_node_form_data(params, base_data = {})
       new_cfg.delete(field)
     end
   end
-  
+
+  # --- PARSE TERRAFORM CONFIG ---
+  if params[:terraform] && !params[:terraform].strip.empty?
+    require 'json'
+    begin
+      new_cfg['terraform'] = JSON.parse(params[:terraform])
+    rescue JSON::ParserError
+      # Silently ignore bad JSON payloads
+    end
+  else
+    new_cfg.delete('terraform')
+  end
+
   new_cfg
 end
+
 
 # ===================================================
 # HELPER: Auto-Assign Management IP
@@ -127,6 +140,80 @@ def validate_node_profile!(node_cfg, full_yaml)
 end
 
 # ===================================================
+# HELPER: Sync Node to Terraform config.yml (Text-Based)
+# ===================================================
+def sync_node_to_terraform_config!(node_name, node_cfg, full_lab_yaml, cloud_vm_yaml_payload)
+  return unless node_cfg['provider'].to_s.downcase == 'gcp'
+  return if cloud_vm_yaml_payload.nil? || cloud_vm_yaml_payload.strip.empty?
+
+  vm_topology = full_lab_yaml['topology']&.first || {}
+  ctrl_node, _ = find_node_in_raw_yaml(vm_topology, 'ansible')
+  ctrl_node ||= find_node_in_raw_yaml(vm_topology, 'controller').first
+  
+  work_dir = ctrl_node&.dig('terraform', 'work_dir')
+  return if work_dir.nil? || work_dir.strip.empty?
+
+  config_path = "/root/ctlabs-terraform/#{work_dir}/config.yml"
+  
+  unless File.exist?(config_path)
+    puts "[Warning] config.yml not found at #{config_path}. Cannot save Cloud VM snippet."
+    return
+  end
+
+  # --- INDENTATION NORMALIZER ---
+  # We figure out how many spaces the user put in front of "- name:", 
+  # strip them, and strictly enforce exactly 2 spaces so it aligns perfectly under "vms:"
+  lines = cloud_vm_yaml_payload.rstrip.lines
+  first_line_indent = lines.first[/\A\s*/].length
+  
+  payload = lines.map do |line|
+    unindented = line.sub(/\A\s{0,#{first_line_indent}}/, '')
+    "  #{unindented}"
+  end.join + "\n"
+  # ------------------------------
+
+  content = File.read(config_path)
+
+  regex = /^(\s*)-\s*name\s*:\s*#{Regexp.escape(node_name)}\b.*?(?=(^\s*-\s*name\s*:|^\S|\z))/m
+
+  if content.match?(regex)
+    content.sub!(regex, payload)
+  else
+    if content.match?(/^vms:\s*$/)
+      content.sub!(/^vms:\s*$/, "vms:\n" + payload)
+    else
+      content += "\n\nvms:\n" + payload
+    end
+  end
+
+  File.write(config_path, content)
+  puts "[SUCCESS] Updated #{node_name} in #{config_path}"
+end
+
+
+# ===================================================
+# HELPER: Remove Node from Terraform config.yml
+# ===================================================
+def remove_node_from_terraform_config!(node_name, full_lab_yaml)
+  vm_topology = full_lab_yaml['topology']&.first || {}
+  ctrl_node, _ = find_node_in_raw_yaml(vm_topology, 'ansible')
+  ctrl_node ||= find_node_in_raw_yaml(vm_topology, 'controller').first
+  
+  work_dir = ctrl_node&.dig('terraform', 'work_dir')
+  return if work_dir.nil? || work_dir.strip.empty?
+
+  config_path = "/root/ctlabs-terraform/#{work_dir}/config.yml"
+  #config_path = File.expand_path(File.join("..", "ctlabs-terraform", work_dir, "config.yml"))
+  return unless File.exist?(config_path)
+
+  tf_config = YAML.load_file(config_path) || {}
+  if tf_config['vms']
+    tf_config['vms'].reject! { |v| v['name'] == node_name }
+    File.write(config_path, tf_config.to_yaml)
+  end
+end
+
+# ===================================================
 # NODES
 # ===================================================
 get '/labs/*/node/:node_name' do
@@ -148,8 +235,54 @@ get '/labs/*/node/:node_name' do
   yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}, #{$4}]\n" }
   yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}]\n" }
 
+  # --- FETCH CLOUD VM CONFIG ---
+  cloud_vm_yaml = ""
+  begin
+    full_yaml = YAML.load_file(lab_path) || {}
+    vm_topology = full_yaml['topology']&.first || {}
+    ctrl_node, _ = find_node_in_raw_yaml(vm_topology, 'ansible')
+    ctrl_node ||= find_node_in_raw_yaml(vm_topology, 'controller').first
+    
+    work_dir = ctrl_node&.dig('terraform', 'work_dir')
+    if work_dir && !work_dir.strip.empty?
+      config_path = "/root/ctlabs-terraform/#{work_dir}/config.yml"
+      
+      if File.exist?(config_path)
+        # BULLETPROOF LINE-BY-LINE PARSER
+        lines = File.readlines(config_path)
+        capturing = false
+        captured_lines = []
+
+        lines.each do |line|
+          if !capturing
+            # Start capturing when we find our exact VM block
+            if line.match?(/^\s*-\s*name\s*:\s*#{Regexp.escape(node_name)}\b/)
+              capturing = true
+              captured_lines << line
+            end
+          else
+            # Stop capturing if we hit the next VM block OR a root-level YAML key
+            if line.match?(/^\s*-\s*name\s*:/) || line.match?(/^[a-zA-Z0-9_-]+\s*:/)
+              break
+            else
+              captured_lines << line
+            end
+          end
+        end
+
+        if captured_lines.any?
+          # Cleanly un-indent the block so it aligns perfectly in the CodeMirror editor
+          first_indent = captured_lines.first[/\A\s*/].length
+          cloud_vm_yaml = captured_lines.map { |l| l.sub(/\A\s{0,#{first_indent}}/, '') }.join.rstrip
+        end
+      end
+    end
+  rescue => e
+    cloud_vm_yaml = "# ⚠️ ERROR READING config.yml ⚠️\n# #{e.message}"
+  end
+
   content_type :json
-  { yaml: yaml_str, json: node_cfg }.to_json
+  { yaml: yaml_str, json: node_cfg, cloud_vm_yaml: cloud_vm_yaml }.to_json
 end
 
 post '/labs/*/node/new' do
@@ -168,6 +301,7 @@ post '/labs/*/node/new' do
 
     new_node = parse_node_form_data(params)
     validate_node_profile!(new_node, yaml)
+    sync_node_to_terraform_config!(node_name, new_cfg, full_yaml, params[:cloud_vm_yaml])
     target_plane = new_node['plane'] || 'data'
 
     if vm['planes']
@@ -249,7 +383,7 @@ post '/labs/*/node_edit/:node_name' do
       new_cfg = parse_node_form_data(params, base_data)
 
       # --- NEW: VPN Peer Handling ---
-      if new_cfg['type'] == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(new_cfg['provider'].to_s.downcase)
+      if new_cfg['type'] == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(new_cfg['provider'].to_s.downcase)
         if params[:peers] && !params[:peers].to_s.strip.empty?
           begin
             new_cfg['peers'] = JSON.parse(params[:peers])
@@ -271,6 +405,31 @@ post '/labs/*/node_edit/:node_name' do
     end
 
     validate_node_profile!(new_cfg, full_yaml)
+    
+    # --- DIAGNOSTIC TRACE ---
+    puts "\n" + "="*50
+    puts "[DIAGNOSTIC] Node Edit Save triggered for: #{node_name}"
+    puts "[DIAGNOSTIC] 1. Provider is: '#{new_cfg['provider']}'"
+    puts "[DIAGNOSTIC] 2. Payload received? : #{!params[:cloud_vm_yaml].nil? && !params[:cloud_vm_yaml].strip.empty?}"
+    
+    vm_topology_diag = full_yaml['topology']&.first || {}
+    ctrl_node_diag, _ = find_node_in_raw_yaml(vm_topology_diag, 'ansible')
+    ctrl_node_diag ||= find_node_in_raw_yaml(vm_topology_diag, 'controller').first
+    
+    work_dir_diag = ctrl_node_diag&.dig('terraform', 'work_dir')
+    puts "[DIAGNOSTIC] 3. Controller Node Found? : #{!ctrl_node_diag.nil?}"
+    puts "[DIAGNOSTIC] 4. Work Dir extracted: '#{work_dir_diag}'"
+    
+    if work_dir_diag
+      config_path_diag = "/root/ctlabs-terraform/#{work_dir_diag}/config.yml"
+      #config_path_diag = File.expand_path(File.join("..", "ctlabs-terraform", work_dir_diag, "config.yml"))
+      puts "[DIAGNOSTIC] 5. Target config file exists? : #{File.exist?(config_path_diag)} (Path: #{config_path_diag})"
+    end
+    puts "="*50 + "\n"
+
+    # Now actually run the sync
+    sync_node_to_terraform_config!(node_name, new_cfg, full_yaml, params[:cloud_vm_yaml])
+    # ------------------------
 
     new_plane = new_cfg['plane'] || old_plane || 'data'
 
@@ -343,6 +502,8 @@ post '/labs/*/node/:node_name/delete' do
       l.is_a?(Array) && (l[0].start_with?("#{node_name}:") || l[1].start_with?("#{node_name}:"))
     end
 
+    remove_node_from_terraform_config!(node_name, yaml)
+
     write_formatted_yaml(lab_path, yaml)
     { success: true, message: "Node deleted and orphaned links removed." }.to_json
   rescue => e
@@ -359,29 +520,36 @@ get '/labs/*/node/:node_name/ping' do
   begin
     data = YAML.load_file(lab_path)
     node_cfg, _ = find_node_in_raw_yaml(data['topology'][0], node_name)
-    
-    # 1. Abstract VPN Gateways are conceptually "alive" (no SSH needed)
-    if node_cfg['type'] == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node_cfg['provider'].to_s.downcase)
+
+    # 1. Abstract VPN Tunnels are conceptually "alive" (no SSH needed)
+    if node_cfg['type'] == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node_cfg['provider'].to_s.downcase)
       content_type :json
       return { success: true, alive: true }.to_json
     end
 
     # 2. Extract IP safely using the new schema priorities
     nics = node_cfg['nics'] || {}
-    string_nics = nics.transform_keys(&:to_s) rescue nics # Safe fallback for Ruby < 2.5 if ever moved
-    
+    string_nics = nics.transform_keys(&:to_s) rescue nics
+
     raw_ip = string_nics['eth0'] || node_cfg['gw'] || string_nics['eth1'] || string_nics['tun0']
     target_ip = raw_ip.to_s.split('/').first.to_s.strip
 
+    # FIX: Return HTTP 200 instead of 400 when there is no IP yet.
+    # This tells the JS cleanly that the node is offline, stopping the spinner!
     if target_ip.empty?
-      halt 400, { success: false, error: "No IP defined" }.to_json
+      content_type :json
+      return { success: true, alive: false }.to_json
     end
 
-    # 3. Perform the actual health check
+    # 3. Perform the native Ruby health check with a strict timeout wrapper
     is_alive = false
     begin
-      # Increased timeout slightly to 1.5s for cloud latency reliability
-      Socket.tcp(target_ip, 22, connect_timeout: 1.5) { |sock| is_alive = true }
+      require 'socket'
+      require 'timeout'
+      
+      Timeout.timeout(1.0) do
+        Socket.tcp(target_ip, 22, connect_timeout: 1.0) { |sock| is_alive = true }
+      end
     rescue StandardError
       is_alive = false
     end
@@ -389,8 +557,9 @@ get '/labs/*/node/:node_name/ping' do
     content_type :json
     { success: true, alive: is_alive }.to_json
   rescue => e
-    status 400
-    { success: false, error: e.message }.to_json
+    # Return 200 even on total failure so the UI spinner stops
+    content_type :json
+    { success: true, alive: false, error: e.message }.to_json
   end
 end
 
@@ -492,5 +661,93 @@ post '/labs/*/dnat/delete' do
   rescue => e
     status 400
     { success: false, error: e.message }.to_json
+  end
+end
+
+get '/labs/*/raw' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  
+  if File.exist?(lab_path)
+    content_type 'text/plain'
+    File.read(lab_path)
+  else
+    status 404
+    "File not found"
+  end
+end
+
+post '/labs/*/raw' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  
+  begin
+    yaml_content = params[:yaml_content]
+    
+    # Optional: Safely parse it first to ensure the user didn't write broken YAML
+    YAML.safe_load(yaml_content)
+    
+    File.write(lab_path, yaml_content)
+    content_type :json
+    { success: true }.to_json
+  rescue => e
+    status 400
+    content_type :json
+    { success: false, error: "Invalid YAML: #{e.message}" }.to_json
+  end
+end
+
+get '/labs/*/cloud_config' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  
+  begin
+    full_yaml = YAML.load_file(lab_path) || {}
+    vm_topology = full_yaml['topology']&.first || {}
+    ctrl_node, _ = find_node_in_raw_yaml(vm_topology, 'ansible')
+    ctrl_node ||= find_node_in_raw_yaml(vm_topology, 'controller').first
+
+    work_dir = ctrl_node&.dig('terraform', 'work_dir')
+    raise "No Terraform working directory configured for this lab." if work_dir.nil? || work_dir.strip.empty?
+
+    config_path = "/root/ctlabs-terraform/#{work_dir}/config.yml"
+    #config_path = File.expand_path(File.join("..", "ctlabs-terraform", work_dir, "config.yml"))
+    raise "config.yml not found at: #{config_path}" unless File.exist?(config_path)
+
+    content_type :json
+    { success: true, content: File.read(config_path) }.to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+end
+
+post '/labs/*/cloud_config' do
+  lab_name = params[:splat].first
+  lab_path = get_lab_file_path(lab_name)
+  
+  begin
+    full_yaml = YAML.load_file(lab_path) || {}
+    vm_topology = full_yaml['topology']&.first || {}
+    ctrl_node, _ = find_node_in_raw_yaml(vm_topology, 'ansible')
+    ctrl_node ||= find_node_in_raw_yaml(vm_topology, 'controller').first
+
+    work_dir = ctrl_node&.dig('terraform', 'work_dir')
+    raise "No Terraform working directory configured for this lab." if work_dir.nil? || work_dir.strip.empty?
+
+    config_path = "/root/ctlabs-terraform/#{work_dir}/config.yml"
+    #config_path = File.expand_path(File.join("..", "ctlabs-terraform", work_dir, "config.yml"))
+    
+    # Validate it's proper YAML before blindly overwriting
+    yaml_content = params[:content]
+    YAML.safe_load(yaml_content)
+    
+    File.write(config_path, yaml_content)
+    
+    content_type :json
+    { success: true }.to_json
+  rescue => e
+    status 400
+    { success: false, error: "Invalid YAML: #{e.message}" }.to_json
   end
 end

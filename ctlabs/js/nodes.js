@@ -132,8 +132,16 @@ window.updateDynamicLabels = function() {
     const type = typeEl.value;
     const provider = providerEl.value;
 
-    const isVPN = (type === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
+    const isVPN = (type === 'tunnel') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
+    
+    // Consolidated into a single, clean declaration
     const isCloud = ['gcp', 'aws', 'azure', 'external'].includes(provider);
+
+    // Toggle the Terraform Tab visibility
+    const tfTabBtn = document.getElementById('tab-btn-terraform');
+    if (tfTabBtn) {
+        tfTabBtn.style.display = isCloud ? 'block' : 'none';
+    }
 
     // Toggle visibility using W3CSS column classes
     document.querySelectorAll('.std-field').forEach(el => {
@@ -160,7 +168,7 @@ window.updateDynamicLabels = function() {
     if (profileList && window.rawProfilesData) {
         profileList.innerHTML = '';
         const filteredProfiles = window.rawProfilesData.filter(p => p.provider === provider || (!p.provider && provider === 'local'));
-        
+
         const uniqueKinds = [...new Set(filteredProfiles.map(p => p.kind))].sort();
         uniqueKinds.forEach(k => {
             if (k) profileList.innerHTML += `<option value="${k}">${k}</option>`;
@@ -175,7 +183,7 @@ window.toggleVpnFields = function() {
 
     const type = typeEl.value;
     const provider = providerEl.value;
-    const isVPN = (type === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
+    const isVPN = (type === 'tunnel') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
 
     const standardFields = document.getElementById('standard-network-fields');
     const vpnFields = document.getElementById('vpn-peer-fields');
@@ -198,7 +206,7 @@ window.editNodeConfig = async function(labName, nodeName) {
 
     try {
         const safeLab = labName.split('/').map(encodeURIComponent).join('/');
-        const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}`);
+        const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}?t=${Date.now()}`);
         if (!res.ok) throw new Error("HTTP Status " + res.status);
         const data = await res.json();
 
@@ -247,8 +255,8 @@ window.editNodeConfig = async function(labName, nodeName) {
             document.getElementById('edit-info').value = nodeObj.info || '';
             document.getElementById('edit-term').value = nodeObj.term || '';
 
-            const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType);
-            document.getElementById('edit-kind').value = nodeObj.profile || (needsLinuxFallback ? 'linux' : '');
+            const needsLinuxFallback = ['host', 'controller', 'switch', 'router', 'gateway'].includes(nodeType) && nodeProvider === 'local';
+            document.getElementById('edit-kind').value = nodeObj.profile || nodeObj.kind || (needsLinuxFallback ? 'linux' : '');
 
             // --- NIC EXTRACTION LOGIC ---
             let nicsStr = '';
@@ -334,6 +342,30 @@ window.editNodeConfig = async function(labName, nodeName) {
                     });
                 }, 10);
             } catch (e) { console.error("Advanced Fields Error:", e); }
+
+            // --- LOAD CLOUD VM YAML ---
+            if (data.cloud_vm_yaml) {
+                document.getElementById('node-cloud-vm-editor').value = data.cloud_vm_yaml;
+                if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
+                    window.cmEditors['node-cloud-vm-editor'].setValue(data.cloud_vm_yaml);
+                }
+            } else {
+                // Provide a helpful default skeleton if it's a new cloud node
+                const defaultVmYaml = `- name: ${nodeName}\n  domain: gcp.ctlabs.internal\n  type: e2-micro\n  zone: us-east1-c\n  image: debian-12-bookworm-v20260310\n  network: net1-sub1\n  nat: true\n`;
+                document.getElementById('node-cloud-vm-editor').value = defaultVmYaml;
+                if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
+                    window.cmEditors['node-cloud-vm-editor'].setValue(defaultVmYaml);
+                }
+            }
+            
+            // Trigger auto-resize for the new textareas
+            setTimeout(() => {
+                document.querySelectorAll('#TerraformEdit textarea').forEach(ta => {
+                   ta.style.height = '56px';
+                   ta.style.height = Math.max(ta.scrollHeight, 56) + 'px';
+                });
+            }, 10);
+            // -----------------------------
         }
 
         const defaultTabBtn = document.getElementById('defaultTab');
@@ -353,7 +385,7 @@ window.openAddNodeModal = function(labPath) {
     document.getElementById('editor-node-name').innerText = '';
     document.getElementById('node-modal-save-text').innerText = 'Add Node';
 
-    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls', 'edit-plane'].forEach(id => {
+    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls', 'edit-plane', 'edit-node-tf-dir', 'edit-node-tf-workspace', 'edit-node-tf-cmds', 'edit-node-tf-vars', 'edit-node-tf-vault-project', 'edit-node-tf-vault-roleset'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -426,7 +458,8 @@ window.saveNodeConfig = async function() {
         formData.append('switch', document.getElementById('edit-switch').value);
     }
 
-    const isVPN = (typeField === 'gateway') && ['openvpn', 'wireguard', 'ipsec'].includes(providerField);
+    const isVPN = (typeField === 'tunnel') && ['openvpn', 'wireguard', 'ipsec'].includes(providerField);
+    const isCloudProvider = ['gcp', 'aws', 'azure'].includes(providerField);
 
     if (isYaml && !isAdding) {
         formData.append('format', 'yaml');
@@ -438,11 +471,12 @@ window.saveNodeConfig = async function() {
         formData.append('provider', providerField);
         formData.append('plane', planeField);
 
-        // ALways append these safe defaults
+        // ALWAYS append these safe defaults
         formData.append('profile', document.getElementById('edit-kind').value);
         formData.append('gw',    gwField);
         formData.append('nics', finalNics);
 
+        // --- VPN PAYLOAD ---
         if (isVPN) {
             const peersObj = {
                 local: {
@@ -455,6 +489,13 @@ window.saveNodeConfig = async function() {
                 }
             };
             formData.append('peers', JSON.stringify(peersObj));
+        }
+
+        // --- CLOUD VM PAYLOAD ---
+        if (isCloudProvider) {
+            const cloudYaml = window.cmEditors && window.cmEditors['node-cloud-vm-editor'] ? window.cmEditors['node-cloud-vm-editor'].getValue() : document.getElementById('node-cloud-vm-editor').value;
+            console.log("[DIAGNOSTIC - FRONTEND] Cloud YAML Payload:\n", cloudYaml);
+            formData.append('cloud_vm_yaml', cloudYaml);
         }
 
         formData.append('info', document.getElementById('edit-info').value);
@@ -522,6 +563,9 @@ window.openEditorTab = function(evt, tabName) {
                 cm.setValue("# Note: The Form and Raw YAML tabs do not sync in real-time.\n# Whichever tab you are viewing when you click 'Save Node'\n# is the data that will be saved to your lab.");
             }
         }
+    }
+    if (tabName === 'TerraformEdit') {
+        window.initCodeEditor('node-cloud-vm-editor', 'yaml');
     }
 };
 

@@ -115,33 +115,43 @@ class Node
     ['gcp', 'external', 'aws', 'azure'].include?(@provider.to_s.downcase) || ['rhost', 'external'].include?(@type.to_s.downcase)
   end
 
+  # CLASS METHOD: Solves the N+1 problem by doing one master check
   def self.bulk_update_status(nodes)
     return if nodes.empty?
 
-    # 1. Fetch local containers once
     podman_running = `podman ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
     docker_running = `docker ps --format '{{.Names}}' 2>/dev/null`.split("\n").map(&:strip)
     active_containers = (podman_running + docker_running).uniq
 
+    require 'socket'
+
     nodes.each do |node|
-      if node.type == 'gateway' && ['local', 'openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+      # 1. Abstract Overlays are always "Running" conceptually
+      if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
         node.is_running = true
+
+      # 2. Local Gateways (NAT bridges): Check if the network interface exists on the host
+      elsif node.type == 'gateway' && node.provider.to_s.downcase == 'local'
+        node.is_running = Socket.getifaddrs.any? { |iface| iface.name == node.name }
+        
+      # 3. Remote hosts: Use native Ruby Socket
       elsif node.remote?
-        # Standardize key access and strip IPs
-        nics = (node.nics || {}).transform_keys(&:to_s)
-        raw_ip = nics['eth0'] || node.gw || nics['eth1']
+        string_nics = (node.nics || {}).transform_keys(&:to_s)
+        raw_ip = string_nics['eth0'] || node.gw || string_nics['eth1'] || string_nics['tun0']
         ip = raw_ip.to_s.split('/').first.to_s.strip
 
-        if !ip.empty?
+        if ip && !ip.empty?
           begin
-            # Use your confirmed working IRB logic
-            Socket.tcp(ip, 22, connect_timeout: 1.0) { |sock| node.is_running = true }
-          rescue => e
+            Socket.tcp(ip, 22, connect_timeout: 1.5) { |sock| true }
+            node.is_running = true
+          rescue StandardError
             node.is_running = false
           end
         else
           node.is_running = false
         end
+        
+      # 4. Local nodes check the container engine
       else
         node.is_running = active_containers.include?(node.name)
       end
@@ -150,24 +160,29 @@ class Node
 
   # INSTANCE METHOD: Single check
   def running?
-    if @type == 'gateway' && ['local', 'openvpn', 'wireguard', 'ipsec'].include?(@provider.to_s.downcase)
-      true
+    require 'socket'
+    
+    if @type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(@provider.to_s.downcase)
+      return true
+      
+    # Local Gateway Check
+    elsif @type == 'gateway' && @provider.to_s.downcase == 'local'
+      return Socket.getifaddrs.any? { |iface| iface.name == @name }
+
     elsif remote?
       string_nics = (@nics || {}).transform_keys(&:to_s)
       raw_ip = string_nics['eth0'] || @gw || string_nics['eth1'] || string_nics['tun0']
+      ip = raw_ip.to_s.split('/').first.to_s.strip
 
-      # --- ADD THESE THREE LINES ---
-      #puts "DEBUG: Checking remote node #{node.name}"
-      #puts "DEBUG: Extracted IP is '#{ip}'"
-      
-      ip = raw_ip.to_s.split('/').first
-      return false unless ip && !ip.empty?
+      return false if ip.empty?
+
       begin
-        Socket.tcp(ip, 22, connect_timeout: 1.0) { |sock| true }
+        Socket.tcp(ip, 22, connect_timeout: 1.5) { |sock| true }
         return true
       rescue StandardError
         return false
       end
+      
     else
       engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
       system("#{engine} inspect -f '{{.State.Running}}' #{@name} >/dev/null 2>&1")

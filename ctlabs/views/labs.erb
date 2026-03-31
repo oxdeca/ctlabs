@@ -73,6 +73,10 @@
         </span>
       </button>
 
+      <button type="button" class="w3-button w3-orange w3-text-white w3-round" onclick="window.openLabYamlEditor()" title="Edit raw Lab YAML">
+        <i class="fas fa-file-code"></i> Edit Lab
+      </button>
+
       <button type="button" class="w3-button w3-teal w3-round" onclick="window.openUnifiedSaveModal()" title="Save or Clone Lab">
         <i class="fas fa-save"></i> Save Lab
       </button>
@@ -239,6 +243,85 @@
         btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
         btn.disabled = false;
       }
+    }
+  };
+</script>
+
+
+<div id="lab-yaml-editor-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1000px;">
+    
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('lab-yaml-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-file-code w3-text-orange"></i> Edit Lab YAML</h4>
+    </header>
+
+    <div class="w3-container w3-padding">
+      <textarea id="lab-yaml-editor-textarea" class="w3-input w3-small w3-round" style="display:none;"></textarea>
+      <div id="lab-yaml-editor-result" class="w3-panel w3-round w3-small" style="display:none; padding: 8px; margin-top: 10px;"></div>
+    </div>
+
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+      <button onclick="document.getElementById('lab-yaml-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button id="lab-yaml-save-btn" onclick="window.saveLabYaml()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save YAML</button>
+    </footer>
+  </div>
+</div>
+
+<script>
+  window.openLabYamlEditor = async function() {
+    const currentLab = document.getElementById('lab-selector').value;
+    if (!currentLab) return alert("No lab selected.");
+
+    document.getElementById('lab-yaml-editor-result').style.display = 'none';
+    document.getElementById('lab-yaml-editor-modal').style.display = 'block';
+
+    if (!window.cmEditors) window.cmEditors = {};
+    if (!window.cmEditors['lab-yaml-editor-textarea']) {
+        window.cmEditors['lab-yaml-editor-textarea'] = window.initCodeEditor('lab-yaml-editor-textarea', 'yaml');
+        window.cmEditors['lab-yaml-editor-textarea'].setSize(null, "65vh");
+    }
+
+    const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+    try {
+        const res = await fetch(`/labs/${safeLab}/raw?t=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to load lab YAML");
+        const data = await res.text(); // We just want the raw text
+        window.cmEditors['lab-yaml-editor-textarea'].setValue(data);
+        setTimeout(() => window.cmEditors['lab-yaml-editor-textarea'].refresh(), 100);
+    } catch (err) {
+        window.cmEditors['lab-yaml-editor-textarea'].setValue(`# Error loading lab YAML:\n# ${err.message}`);
+    }
+  };
+
+  window.saveLabYaml = async function() {
+    const currentLab = document.getElementById('lab-selector').value;
+    const content = window.cmEditors['lab-yaml-editor-textarea'].getValue();
+    const btn = document.getElementById('lab-yaml-save-btn');
+    const resultDiv = document.getElementById('lab-yaml-editor-result');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+    try {
+        const res = await fetch(`/labs/${safeLab}/raw`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ yaml_content: content }).toString()
+        });
+        
+        if (!res.ok) throw new Error((await res.json()).error || "Failed to save");
+
+        resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+        resultDiv.innerHTML = '✅ YAML Saved successfully.';
+        setTimeout(() => { window.location.reload(); }, 800);
+    } catch (err) {
+        resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+        resultDiv.innerHTML = '❌ ' + err.message;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save YAML';
     }
   };
 </script>

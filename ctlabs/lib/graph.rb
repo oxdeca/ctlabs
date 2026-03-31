@@ -42,7 +42,7 @@ class Graph
 
     # --- AUTO-PORT INJECTOR FOR VPN PEERS ---
     (@nodes || []).each do |node|
-      if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+      if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
         if node.peers && node.peers.is_a?(Hash)
           p_local = node.peers['local'] || node.peers[:local] || {}
           p_remote = node.peers['remote'] || node.peers[:remote] || {}
@@ -149,7 +149,7 @@ class Graph
 
         <%-
             @nodes.each do |node|
-              is_vpn_gw = node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              is_vpn_gw = node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
               if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller" || (!node.remote? && node.type == 'gateway' && node.dnat.nil? && !is_vpn_gw)
                 next
               end
@@ -170,14 +170,12 @@ class Graph
                   when 'router'
                     border_color = "#f59e0b"
                     n_icon = "🔀 "
+                  when 'tunnel'
+                    border_color = "#14b8a6"
+                    n_icon = "🛡️ "
                   when 'gateway'
-                    if is_vpn_gw
-                      border_color = "#14b8a6"
-                      n_icon = "🛡️ "
-                    else
-                      border_color = "#a855f7"
-                      n_icon = "🚪 "
-                    end
+                    border_color = "#a855f7"
+                    n_icon = "🚪 "
                   when 'controller'
                     border_color = "#ef4444"
                     n_icon = "⚙️ "
@@ -238,7 +236,7 @@ class Graph
         <%-
             # --- NEW: EXPLICIT VPN GATEWAY PEERING FOR CONN MAPS ---
             @nodes.each do |node|
-              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
                 if node.peers && node.peers.is_a?(Hash)
                   p_local = node.peers['local'] || node.peers[:local] || {}
                   p_remote = node.peers['remote'] || node.peers[:remote] || {}
@@ -306,7 +304,7 @@ class Graph
 
         <%-
             @nodes.each do |node|
-              is_vpn_gw = node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              is_vpn_gw = node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
               group = node.type
 
               border_color = "#10b981"
@@ -324,14 +322,12 @@ class Graph
                   when 'router'
                     border_color = "#f59e0b"
                     n_icon = "🔀 "
+                  when 'tunnel'
+                    border_color = "#14b8a6"
+                    n_icon = "🛡️ "
                   when 'gateway'
-                    if is_vpn_gw
-                      border_color = "#14b8a6"
-                      n_icon = "🛡️ "
-                    else
-                      border_color = "#a855f7"
-                      n_icon = "🚪 "
-                    end
+                    border_color = "#a855f7"
+                    n_icon = "🚪 "
                   when 'controller'
                     border_color = "#ef4444"
                     n_icon = "⚙️ "
@@ -391,7 +387,7 @@ class Graph
         <%-
             # --- NEW: EXPLICIT VPN GATEWAY PEERING FOR CONN MAPS ---
             @nodes.each do |node|
-              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
                 if node.peers && node.peers.is_a?(Hash)
                   p_local = node.peers['local'] || node.peers[:local] || {}
                   p_remote = node.peers['remote'] || node.peers[:remote] || {}
@@ -537,7 +533,7 @@ class Graph
         <%-
             # --- NEW: EXPLICIT VPN GATEWAY PEERING ---
             @nodes.each do |node|
-              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
                 if node.peers && node.peers.is_a?(Hash)
                   p_local = node.peers['local'] || node.peers[:local] || {}
                   p_remote = node.peers['remote'] || node.peers[:remote] || {}
@@ -667,7 +663,7 @@ class Graph
         <%-
             # --- NEW: EXPLICIT VPN GATEWAY PEERING ---
             @nodes.each do |node|
-              if node.type == 'gateway' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
+              if node.type == 'tunnel' && ['openvpn', 'wireguard', 'ipsec'].include?(node.provider.to_s.downcase)
                 if node.peers && node.peers.is_a?(Hash)
                   p_local = node.peers['local'] || node.peers[:local] || {}
                   p_remote = node.peers['remote'] || node.peers[:remote] || {}

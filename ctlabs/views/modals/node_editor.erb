@@ -13,7 +13,7 @@
 </style>
 
 <div id="node-editor-modal" class="w3-modal" style="z-index: 9999;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 850px;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1200px;">
 
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('node-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
@@ -33,6 +33,7 @@
         <button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'AdvancedEdit')"><b>Advanced</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button>
+        <button type="button" id="tab-btn-terraform" class="w3-bar-item w3-button editor-tablink" onclick="window.openEditorTab(event, 'TerraformEdit')" style="display: none;"><b class="w3-text-purple"><i class="fas fa-cloud"></i> Cloud VM</b></button>
       </div>
 
       <div id="FormEdit" class="editor-tab" style="max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
@@ -51,6 +52,7 @@
               <option value="switch">Switch</option>
               <option value="router">Router</option>
               <option value="gateway">Gateway</option>
+              <option value="tunnel">Tunnel</option>
               <option value="controller">Controller</option>
             </select>
           </div>
@@ -114,25 +116,43 @@
           </div>
 
           <div class="w3-col m12 w3-margin-bottom vpn-field" style="display: none; border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px;">
-            <span style="color: #14b8a6; font-weight: bold;"><i class="fas fa-project-diagram"></i> VPN Overlay Peers</span>
+            <span style="color: #14b8a6; font-weight: bold;"><i class="fas fa-project-diagram"></i> Tunnel Overlay Peers</span>
           </div>
           
           <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
-            <label>Local Node (e.g., ro1)</label>
-            <input type="text" id="edit-peer-local-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-          </div>
-          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
-            <label>Local Interface (e.g., tun0)</label>
-            <input type="text" id="edit-peer-local-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+            <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px;">
+              <div style="color: #38bdf8; font-size: 0.9em; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+                <i class="fas fa-server"></i> Local Peer
+              </div>
+              
+              <div class="w3-margin-bottom">
+                <label>Node Name (e.g., ro1)</label>
+                <input type="text" id="edit-peer-local-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              </div>
+              
+              <div style="margin-bottom: 4px;">
+                <label>Interface (e.g., tun0)</label>
+                <input type="text" id="edit-peer-local-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              </div>
+            </div>
           </div>
 
           <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
-            <label>Remote Node (e.g., vm-2)</label>
-            <input type="text" id="edit-peer-remote-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-          </div>
-          <div class="w3-col m6 w3-margin-bottom vpn-field" style="display: none;">
-            <label>Remote Interface (e.g., tun0)</label>
-            <input type="text" id="edit-peer-remote-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+            <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px;">
+              <div style="color: #a855f7; font-size: 0.9em; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px;">
+                <i class="fas fa-cloud"></i> Remote Peer
+              </div>
+              
+              <div class="w3-margin-bottom">
+                <label>Node Name (e.g., vm-2)</label>
+                <input type="text" id="edit-peer-remote-node" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              </div>
+              
+              <div style="margin-bottom: 4px;">
+                <label>Interface (e.g., tun0)</label>
+                <input type="text" id="edit-peer-remote-nic" placeholder="tun0" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              </div>
+            </div>
           </div>
 
         </div>
@@ -179,6 +199,13 @@
 
       <div id="YamlEdit" class="editor-tab" style="display:none">
         <textarea id="node-yaml-editor" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 350px; resize: vertical; white-space: pre;"></textarea>
+      </div>
+
+      <div id="TerraformEdit" class="editor-tab" style="display:none">
+        <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px;">
+          <i class="fas fa-info-circle"></i> This defines the <b>VM block</b> for this node inside your Terraform <code>config.yml</code>.
+        </div>
+        <textarea id="node-cloud-vm-editor" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 350px; resize: vertical; white-space: pre;"></textarea>
       </div>
 
       <div id="node-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 10px;"></div>

@@ -663,6 +663,63 @@ class Lab
     }.merge(node_cfg))
 
     @nodes << node
+
+    # --- TERRAFORM AUTO-PROVISIONING (BACKGROUNDED) ---
+    if is_remote && node_cfg['terraform'] && !node_cfg['terraform'].empty?
+      @log.info "Queueing auto-provisioning for Node #{node_name} via Terraform in the background..."
+
+      ctrl = find_node('ansible')
+      if ctrl
+        ctrl_name = ctrl.name
+        tf_dir = node_cfg['terraform']['work_dir'] || '.'
+        workspace = node_cfg['terraform']['workspace'] || 'default'
+        lab_file = @cfg_file
+
+        # Detach the execution from the HTTP request thread!
+        Thread.new do
+          begin
+            @log.info "[BG-TASK] Starting Terraform apply for #{node_name}..."
+            engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+
+            # 1. Run Terraform Apply directly in the container
+            tf_cmd = "cd /root/ctlabs-terraform/#{tf_dir} && " \
+                     "(terraform workspace select #{workspace} || terraform workspace new #{workspace}) && " \
+                     "terraform init -upgrade && terraform apply -auto-approve"
+
+            `#{engine} exec #{ctrl_name} bash -c '#{tf_cmd}'`
+
+            # 2. Fetch the JSON output
+            tf_output_json = `#{engine} exec #{ctrl_name} bash -c 'cd /root/ctlabs-terraform/#{tf_dir} && terraform output -json provisioned_vms'`.strip
+            vms_out = JSON.parse(tf_output_json)
+
+            # 3. Safely update the YAML file with the new IPs
+            if vms_out[node_name]
+              pub_ip = vms_out[node_name]['public_ip']
+              priv_ip = vms_out[node_name]['private_ip']
+
+              @log.info "[BG-TASK] Mapped Terraform IPs for #{node_name}: eth0=#{pub_ip}, eth1=#{priv_ip}"
+
+              # Read and update the file directly to avoid memory race conditions with the live lab
+              if File.exist?(lab_file)
+                live_yaml = YAML.load_file(lab_file)
+                
+                # Navigate through the schema safely to find the node
+                target = live_yaml['topology'][0]['nodes'][node_name]
+                if target
+                  target['nics'] ||= {}
+                  target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
+                  target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
+                  File.write(lab_file, live_yaml.to_yaml)
+                end
+              end
+            end
+          rescue => e
+            @log.write("[BG-TASK] Terraform auto-provisioning failed: #{e.message}", "error")
+          end
+        end
+      end
+    end
+
     node.run unless is_remote
 
     unless is_remote
@@ -754,6 +811,34 @@ class Lab
     end
 
     setup_lab_ssh_keys
+
+    # --- NEW: BATCH TERRAFORM PROVISIONING ---
+    ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
+    if ctrl
+      node_cfg = @cfg['topology'][0]['nodes'][ctrl.name] || {}
+      
+      # Only run Terraform if a working directory is explicitly configured
+      if node_cfg['terraform'] && node_cfg['terraform']['work_dir'] && !node_cfg['terraform']['work_dir'].strip.empty?
+        @log.info "Executing Terraform provisioning phase..."
+        begin
+          # Call run_terraform synchronously. If it fails, the lab startup will abort here.
+          run_terraform(ctrl.name, nil, nil, nil, 'apply')
+          
+          # CRITICAL: We must reload the lab YAML into memory because Terraform
+          # may have injected new public/private IPs for the cloud VMs!
+          @log.info "Reloading topology to capture Terraform IP assignments..."
+          @cfg = YAML.load_file(@cfg_file)
+          
+          # Re-initialize nodes so the new IPs are available for the Ansible inventory
+          @nodes = init_nodes(@vm_name)
+        rescue => e
+          @log.error "Terraform provisioning failed: #{e.message}"
+          raise "Lab startup aborted due to Terraform failure: #{e.message}"
+        end
+      end
+    end
+    # -----------------------------------------
+
     @log.info "Generating fresh Ansible inventory..."
     inventory
 
@@ -931,11 +1016,85 @@ class Lab
       end if log_path
     end
 
-    # 5. Check Exit Status
+    # 5. Check Exit Status and Harvest IPs
     if $?.success?
       msg = "\n✅ Terraform execution completed successfully.\n"
       @log.info msg.strip
       File.open(log_path, 'a') { |f| f.puts msg } if log_path
+
+      # ONLY harvest IPs if this was an 'apply' action
+      if action == 'apply'
+        begin
+          @log.info "Harvesting provisioned IPs from terraform.tfstate..."
+          
+          # Handle Workspace paths correctly
+          state_file = workspace == 'default' ? "#{work_dir}/terraform.tfstate" : "#{work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+
+          if File.exist?(state_file)
+            state_data = JSON.parse(File.read(state_file))
+            live_yaml = YAML.load_file(@cfg_file)
+            updates_made = false
+
+            (state_data['resources'] || []).each do |res|
+              # Target GCP Compute Instances
+              if res['type'] == 'google_compute_instance'
+                (res['instances'] || []).each do |inst|
+                  attrs = inst['attributes'] || {}
+                  vm_name = attrs['name']
+                  
+                  next unless vm_name
+
+                  # Extract IPs from GCP network interface schema
+                  nic = attrs['network_interface']&.first || {}
+                  priv_ip = nic['network_ip']
+                  pub_ip  = nic.dig('access_config', 0, 'nat_ip') rescue nil
+
+                  # SCHEMA-AWARE LOOKUP: Check both legacy 'nodes' and modern 'planes'
+                  vm_topology = live_yaml['topology']&.first || {}
+                  target = nil
+                  
+                  if vm_topology['nodes'] && vm_topology['nodes'][vm_name]
+                    target = vm_topology['nodes'][vm_name]
+                  elsif vm_topology['planes']
+                    vm_topology['planes'].each do |_, p_data|
+                      if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
+                        target = p_data['nodes'][vm_name]
+                        break
+                      end
+                    end
+                  end
+
+                  if target && (priv_ip || pub_ip)
+                    target['nics'] ||= {}
+                    target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
+                    target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
+                    if pub_ip
+                      target['term'] = "ssh://ansible@#{pub_ip}"
+                    end
+                    updates_made = true
+                    
+                    log_msg = "Mapped Terraform IPs for #{vm_name}: eth0=#{pub_ip || 'none'}, eth1=#{priv_ip || 'none'}"
+                    @log.info log_msg
+                    File.open(log_path, 'a') { |f| f.puts "[IP Harvest] #{log_msg}" } if log_path
+                  end
+                end
+              end
+            end
+
+            # Write the updated IPs back to the base lab file
+            if updates_made
+              File.write(@cfg_file, live_yaml.to_yaml)
+              @log.info "Successfully saved new IPs to lab YAML."
+              File.open(log_path, 'a') { |f| f.puts "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}" } if log_path
+            end
+          else
+            @log.info "No terraform.tfstate found at #{state_file}. Skipping IP harvest."
+          end
+        rescue => e
+          @log.error "Failed to harvest Terraform IPs: #{e.message}"
+          File.open(log_path, 'a') { |f| f.puts "⚠️ IP Harvest failed: #{e.message}" } if log_path
+        end
+      end
     else
       msg = "\n⚠️ Terraform execution failed.\n"
       @log.info msg.strip
