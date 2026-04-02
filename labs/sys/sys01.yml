@@ -9,98 +9,107 @@ name: sys01
 desc: LAB SYS - LVM
 
 topology:
-  - vm:
-    name: lvm-vm1
+  - hv: lvm-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
-    mgmt:
-      vrfid : 99
-      dns   : [1.1.1.1, 8.8.8.8]
-      net   : 192.168.99.0/24
-      gw    : 192.168.99.1
-    nodes:
-      ansible:
-        type : controller
-        gw   : 192.168.99.1
-        nics :
-          eth0: 192.168.99.3/24
-        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw']      
-        play:
-          book: ctlabs.yml
-          tags: [up, setup, bind]
-      sw0:
-        type  : switch
-        kind  : mgmt
-        ipv4  : 192.168.99.10/24
+    planes:
+      mgmt:
+        vrfid : 99
+        dns   : [1.1.1.1, 8.8.8.8]
+        net   : 192.168.99.0/24
         gw    : 192.168.99.1
-      ro0:
-        type : router
-        kind : mgmt
-        gw   : 192.168.15.1
-        nics :
-          eth0: 192.168.99.1/24
-          eth1: 192.168.15.2/29
-      natgw:
-        type : gateway
-        ipv4 : 192.168.15.1/29
-        snat : true
-        dnat : ro1:eth1
-      sw1:
-        type : switch
-      sw2:
-        type : switch
-      ro1:
-        type : router
-        kind : frr
-        gw   : 192.168.15.1
-        nics :
-          eth1: 192.168.15.3/29
-          eth2: 192.168.10.1/24
-          eth3: 192.168.20.1/24
-      ns1:
-        type : host
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.11/24
-      ns2:
-        type : host
-        kind : d12
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.11/24
-      h1:
-        type : host
-        kind : kali
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.12/24
-        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [1088, 8888]
-      h2:
-        type : host
-        kind : parrot
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.12/24
-        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [2088, 8888]
-      h3:
-        type : host
-        kind : qemu
-        kvm  : true
-        gw   : 192.168.10.1
-        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
-        nics :
-          eth1: 192.168.10.17/24
-      h4:
-        type : host
-        kind : qemu
-        kvm  : true
-        gw   : 192.168.20.1
-        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
-        nics :
-          eth1: 192.168.20.17/24
+        nodes:
+          ansible:
+            type : controller
+            gw   : 192.168.99.1
+            nics :
+              eth0: 192.168.99.3/24
+            vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
+            play:
+              book: ctlabs.yml
+              tags: [up, setup, bind]
+          sw0:
+            type  : switch
+            kind  : mgmt
+            ipv4  : 192.168.99.10/24
+            gw    : 192.168.99.1
+          ro0:
+            type : router
+            kind : frr
+            gw   : 192.168.15.1
+            nics :
+              eth0: 192.168.99.1/24
+              eth1: 192.168.15.2/29
+
+      edge:
+        nodes:
+          natgw:
+            type : gateway
+            ipv4 : 192.168.15.1/29
+            snat : true
+            dnat : ro1:eth1
+
+      transit:
+        nodes:
+          sw1:
+            type : switch
+          sw2:
+            type : switch
+          ro1:
+            type : router
+            kind : frr
+            gw   : 192.168.15.1
+            nics :
+              eth1: 192.168.15.3/29
+              eth2: 192.168.10.1/24
+              eth3: 192.168.20.1/24
+
+      data:
+        nodes:
+          ns1:
+            type : host
+            gw   : 192.168.10.1
+            nics :
+              eth1: 192.168.10.11/24
+          ns2:
+            type : host
+            kind : d12
+            gw   : 192.168.20.1
+            nics :
+              eth1: 192.168.20.11/24
+          h1:
+            type : host
+            kind : kali
+            gw   : 192.168.10.1
+            nics :
+              eth1: 192.168.10.12/24
+            vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [1088, 8888]
+          h2:
+            type : host
+            kind : parrot
+            gw   : 192.168.20.1
+            nics :
+              eth1: 192.168.20.12/24
+            vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [2088, 8888]
+          h3:
+            type : host
+            kind : qemu
+            kvm  : true
+            gw   : 192.168.10.1
+            vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
+            nics :
+              eth1: 192.168.10.17/24
+          h4:
+            type : host
+            kind : qemu
+            kvm  : true
+            gw   : 192.168.20.1
+            vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
+            nics :
+              eth1: 192.168.20.17/24
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]

@@ -38,7 +38,7 @@ topology:
             gw      : 192.168.99.1
           ro0:
             type    : router
-            profile : mgmt
+            profile : frr
             gw      : 192.168.15.1
             nics:
               eth0: 192.168.99.1/24
