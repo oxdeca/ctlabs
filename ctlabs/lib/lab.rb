@@ -88,65 +88,6 @@ class Lab
     @links += init_mgmt_links(vm_name)
   end
 
-#  #def initialize(cfg, vm_name=nil, dlevel="warn")
-#  def initialize(args={})
-#    cfg           = args[:cfg]
-#    vm_name       = args[:vm_name]
-#    dlevel        = args[:dlevel]
-#    relative_path = args[:relative_path]
-#
-#    @cfg_file      = cfg
-#    @relative_path = relative_path || File.basename(cfg)
-#    @log           = args[:log]    || LabLog.null
-#    @pubdir        = "/srv/ctlabs-server/public"
-#
-#    @log.write "== Lab ==", "debug"
-#
-#    unless File.directory?(@pubdir)
-#      FileUtils.mkdir_p(@pubdir)
-#    end
-#
-#    # write the current lab config to ctlabs-server pubdir
-#    if( File.file?(cfg) )
-#      File.open("#{@pubdir}/config.yml", 'w') do |f|
-#        f.write( File.read(cfg) )
-#      end
-#    end
-#
-#    # process lab config
-#    @cfg = YAML.load(File.read(cfg))
-#    @log.write "#{__method__}(): file=#{cfg},cfg=#{@cfg},relative_path=#{@relative_path},vm=#{vm_name}", "debug"
-#
-#    @vm_name    = vm_name
-#    @name       = @cfg['name']      || ''
-#    @ephemeral  = @cfg['ephemeral'] || true
-#    @desc       = @cfg['desc']      || ''
-#
-#    global_data = File.file?(::GLOBAL_PROFILES) ? YAML.load_file(::GLOBAL_PROFILES) : {}
-#    global_profiles = global_data['profiles'] || global_data['defaults'] || {}
-#    
-#    local_profiles  = @cfg['profiles'] || @cfg['defaults'] || {}
-#    
-#    # Merge them! Local lab overrides take precedence over global settings.
-#    @defaults   = merge_profiles(global_profiles, local_profiles)
-#    
-#    @topology   = @cfg['topology']  || {}
-#    @dns        = @cfg['dns']       || []
-#    @domain     = @cfg['domain']    || "ctlabs.internal"
-#    @mgmt       = @cfg['mgmt']      || {}
-#    @dnatgw     = {}
-#    #@server_ip  = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3]
-#    @server_ip = Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }&.ip_address || '127.0.0.1'
-#
-#    # hack, before we start the nodes make sure ip_forwarding is enabled
-#    %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
-#    # another hack, elastic search needs more virtual memory areas to start
-#    %( echo 262144 > /proc/sys/vm/max_map_count )
-#    @nodes  = init_nodes(vm_name)
-#    @links  = init_links(vm_name)
-#    @links += init_mgmt_links(vm_name)
-#  end
-
   def self.running?
     File.file?(LOCK_FILE)
   end
@@ -156,12 +97,6 @@ class Lab
   rescue
     nil
   end
-
-#  def self.acquire_lock!(name)
-#    raise "A lab is already running: #{current_name}" if running?
-#    FileUtils.mkdir_p(File.dirname(LOCK_FILE))
-#    File.write(LOCK_FILE, name)
-#  end
 
   def self.acquire_lock!(name)
     raise ArgumentError, "Lab name must be relative path like 'dir/lab.yml'" unless name =~ %r{^[^/]+/[^/]+\.yml$}
@@ -218,7 +153,7 @@ class Lab
     vm
   end
 
-    # Acquire playbook execution lock (with stale lock cleanup)
+  # Acquire playbook execution lock (with stale lock cleanup)
   def self.acquire_playbook_lock!(lab_name, timeout: 30)
     lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
     FileUtils.mkdir_p(PLAYBOOK_LOCK_DIR)
@@ -310,8 +245,8 @@ class Lab
     cfg    = find_vm(vm_name)
     dns    = cfg['dns']    || @dns
     domain = cfg['domain'] || @domain
-    mgmt   = cfg['mgmt']   || @mgmt
-    net    = mgmt['net']   || "192.168.40.0/24"
+    mgmt   = cfg['mgmt']   || cfg['planes']['mgmt'] || @mgmt
+    net    = mgmt['net']   || "192.168.99.0/24"
 
     # 
     tmp  = net.split('/')
@@ -327,7 +262,7 @@ class Lab
       # Determine if the node lives outside the local Docker engine
       is_remote = ['rhost', 'external'].include?(node_cfg['type']) || ['gcp', 'external', 'aws', 'azure'].include?(node_cfg['provider'].to_s.downcase)
 
-      if node_cfg['kind'] == 'mgmt' || node_cfg['type'] == 'controller' || is_remote
+      if node_cfg['plane'] == 'mgmt' || node_cfg['kind'] == 'mgmt' || is_remote
         node = Node.new( { 'name' => n, 'ephemeral' => @ephemeral, 'defaults' => @defaults, 'log' => @log, 'dns' => mgmt['dns'], 'domain' => domain }.merge( node_cfg ) )
         nodes << node
       else
