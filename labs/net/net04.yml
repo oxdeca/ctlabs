@@ -42,10 +42,11 @@ topology:
           eth0: 192.168.99.1/24
           eth1: 192.168.15.2/29
       natgw:
-        type : gateway
-        ipv4 : 192.168.15.1/29
-        snat : true
-        dnat : ro1:eth1
+        type: gateway
+        ipv4: 192.168.15.1/29
+        snat: true
+        dnat: 
+          data: ro1:eth1
       sw1:
         type : switch
       sw2:

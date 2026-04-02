@@ -50,7 +50,7 @@ topology:
             ipv4: 192.168.15.1/29
             snat: true
             dnat: 
-              data:ro1:eth1
+              data: ro1:eth1
 
       transit:
         nodes:

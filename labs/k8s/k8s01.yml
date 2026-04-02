@@ -46,7 +46,8 @@ topology:
             type: gateway
             ipv4: 192.168.15.1/29
             snat: true
-            dnat: ro1:eth1
+            dnat:
+              data: ro1:eth1
 
       transit:
         nodes:

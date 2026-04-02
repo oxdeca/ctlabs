@@ -45,10 +45,12 @@ topology:
       edge:
         nodes:
           natgw:
-            type : gateway
-            ipv4 : 192.168.15.1/29
-            snat : true
-            dnat : isp1:eth1
+            type: gateway
+            ipv4: 192.168.15.1/29
+            snat: true
+            dnat:
+              data: isp1:eth1
+
           isp1:
             type    : router
             dns     : [169.254.169.254]
