@@ -10,126 +10,134 @@ desc: LAB LPIC2 - openvpn
 
 
 topology:
-  - vm:
-    name: lpic212-vm1
+  - hv: lpic212-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
-    mgmt:
-      vrfid : 99
-      dns   : [1.1.1.1, 8.8.8.8]
-      net   : 192.168.99.0/24
-      gw    : 192.168.99.1
-    nodes:
-      ansible :
-        type : controller
-        gw   : 192.168.99.1
-        nics :
-          eth0: 192.168.99.5/24
-        vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
-        play:
-          book: lpic2.yml
-          tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd, jupyter]
-        dnat  :
-          - [9988, 8888]
-      sw0:
-        type  : switch
-        kind  : mgmt
-        ipv4  : 192.168.99.10/24
+      mgmt:
+        vrfid : 99
+        dns   : [1.1.1.1, 8.8.8.8]
+        net   : 192.168.99.0/24
         gw    : 192.168.99.1
-      ro0:
-        type : router
-        kind : mgmt
-        gw   : 192.168.15.1
-        nics :
-          eth0: 192.168.99.1/24
-          eth1: 192.168.15.2/29
-      natgw:
-        type : gateway
-        ipv4 : 192.168.15.1/29
-        snat : true
-        dnat : isp1:eth1
-      sw1:
-        type : switch
-      sw2:
-        type : switch
-      isp1:
-        type : router
-        kind : frr
-        dns  : [169.254.169.254]
-        gw   : 192.168.15.1
-        nics :
-          eth1: 192.168.15.3/29
-          eth2: 192.168.16.1/30
-          eth3: 192.168.17.1/30
-      ro1:
-        type : router
-        kind : frr
-        snat : true
-        gw   : 192.168.16.1
-        nics :
-          eth1: 192.168.10.1/24
-          eth2: 192.168.16.2/30
-      ro2:
-        type : router
-        kind : frr
-        snat : true
-        gw   : 192.168.17.1
-        nics :
-          eth1: 192.168.17.2/30
-          eth2: 192.168.20.1/24
-      ns1:
-        type : host
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.11/24
-      ns2:
-        type : host
-        kind : d12
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.11/24
-      h1:
-        type : host
-        kind : kali
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.12/24
-        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [1088, 8888]
-      h2:
-        type : host
-        kind : parrot
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.12/24
-        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [2088, 8888]
-      slapd1:
-        type : host
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.13/24
-      slapd2:
-        type : host
-        kind : slapd
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.13/24
-      dc1:
-        type : host
-        kind : d12
-        #dns  : [192.168.10.14, 192.168.10.11, 8.8.8.8]        
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.14/24
-      dc2:
-        type : host
-        kind : d12
-        #dns  : [192.168.10.14, 192.168.20.11, 8.8.8.8]
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.14/24
+        nodes:
+          ansible :
+            type : controller
+            gw   : 192.168.99.1
+            nics :
+              eth0: 192.168.99.5/24
+            vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+            play:
+              book: lpic2.yml
+              tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd]
+            dnat  :
+              - [9988, 8888]
+          sw0:
+            type    : switch
+            ipv4    : 192.168.99.10/24
+            gw      : 192.168.99.1
+            profile : mgmt
+          ro0:
+            type    : router
+            gw      : 192.168.15.1
+            profile : mgmt
+            nics:
+              eth0: 192.168.99.1/24
+              eth1: 192.168.15.2/29
+
+      edge:
+        nodes:
+          natgw:
+            type : gateway
+            ipv4 : 192.168.15.1/29
+            snat : true
+            dnat : isp1:eth1
+          isp1:
+            type    : router
+            dns     : [169.254.169.254]
+            gw      : 192.168.15.1
+            profile : frr
+            nics:
+              eth1: 192.168.15.3/29
+              eth2: 192.168.16.1/30
+              eth3: 192.168.17.1/30
+
+      transit:
+        nodes:
+          ro1:
+            type    : router
+            snat    : true
+            gw      : 192.168.16.1
+            profile : frr
+            nics :
+              eth1: 192.168.10.1/24
+              eth2: 192.168.16.2/30
+          ro2:
+            type    : router
+            snat    : true
+            gw      : 192.168.17.1
+            profile : frr
+            nics :
+              eth1: 192.168.17.2/30
+              eth2: 192.168.20.1/24
+
+      data:
+        node:
+          sw1:
+            type : switch
+          sw2:
+            type : switch
+          ns1:
+            type : host
+            gw   : 192.168.10.1
+            nics :
+              eth1: 192.168.10.11/24
+          ns2:
+            type    : host
+            gw      : 192.168.20.1
+            profile : d12
+            nics:
+              eth1: 192.168.20.11/24
+          h1:
+            type    : host
+            gw      : 192.168.10.1
+            profile : kali
+            nics:
+              eth1: 192.168.10.12/24
+            vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [1088, 8888]
+          h2:
+            type    : host
+            gw      : 192.168.20.1
+            profile : parrot
+            nics:
+              eth1: 192.168.20.12/24
+            vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [2088, 8888]
+          slapd1:
+            type : host
+            gw   : 192.168.10.1
+            nics :
+              eth1: 192.168.10.13/24
+          slapd2:
+            type    : host
+            gw      : 192.168.20.1
+            profile : slapd
+            nics :
+              eth1: 192.168.20.13/24
+          dc1:
+            type    : host
+            #dns     : [192.168.10.14, 192.168.10.11, 8.8.8.8]        
+            gw      : 192.168.10.1
+            profile : d12
+            nics :
+              eth1: 192.168.10.14/24
+          dc2:
+            type    : host
+            #dns     : [192.168.10.14, 192.168.20.11, 8.8.8.8]
+            gw      : 192.168.20.1
+            profile : d12
+            nics :
+              eth1: 192.168.20.14/24
 
     links:
       - [ "isp1:eth1", "natgw:eth1" ]

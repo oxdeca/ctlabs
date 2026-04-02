@@ -9,124 +9,133 @@ name: mon01
 desc: LAB Monitoring - Grafana Lab
 
 topology:
-  - vm:
-    name: mon01-vm1
+  - hv: mon01-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
-    mgmt:
-      vrfid : 99
-      dns   : [1.1.1.1, 8.8.8.8]
-      net   : 192.168.99.0/24
-      gw    : 192.168.99.1
-    nodes:
-      ansible:
-        type : controller
-        gw   : 192.168.99.1
-        nics :
-          eth0: 192.168.99.3/24
-        vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
-        play:
-          book: ctlabs.yml
-          tags: [up, setup, ca, bind, prometheus, node_exporter, blackbox_exporter, grafana, mimir, loki, alloy, postfix, jupyter]
-        dnat  :
-          - [9988, 8888]
-      sw0:
-        type  : switch
-        kind  : mgmt
-        ipv4  : 192.168.99.10/24
+    planes:
+      mgmt:
+        vrfid : 99
+        dns   : [1.1.1.1, 8.8.8.8]
+        net   : 192.168.99.0/24
         gw    : 192.168.99.1
-      ro0:
-        type : router
-        kind : mgmt
-        gw   : 192.168.15.1
-        nics :
-          eth0: 192.168.99.1/24
-          eth1: 192.168.15.2/29
-      natgw:
-        type : gateway
-        ipv4 : 192.168.15.1/29
-        snat : true
-        dnat : ro1:eth1
-      sw1:
-        type : switch
-        ports: 8
-      sw2:
-        type: switch
-        ports: 8
-      ro1:
-        type  : router
-        kind  : frr
-        gw    : 192.168.15.1
-        nics :
-          eth1: 192.168.15.3/29
-          eth2: 192.168.10.1/24
-          eth3: 192.168.20.1/24
-      ns1:
-        type : host
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.11/24
-      ns2:
-        type : host
-        kind : d12
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.11/24
-      h1:
-        type : host
-        kind : kali
-        gw   : 192.168.10.1
-        nics :
-          eth1: 192.168.10.12/24
-        vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [1088, 8888]
-      h2:
-        type : host
-        kind : parrot
-        gw   : 192.168.20.1
-        nics :
-          eth1: 192.168.20.12/24
-        vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
-        dnat :
-          - [2088, 8888]
-      prometheus:
-        type  : host
-        gw    : 192.168.10.1
-        nics  :
-          eth1: 192.168.10.21/24
-        dnat  :
-          - [8082, 9090]
-      grafana:
-        type  : host
-        gw    : 192.168.20.1
-        nics :
-          eth1: 192.168.20.22/24
-        dnat  :
-          - [8081, 3000]
-      loki:
-        type  : host
-        gw    : 192.168.20.1
-        nics  :
-          eth1: 192.168.20.23/24
-        dnat  :
-          - [8084, 3100]
-      mimir:
-        type  : host
-        gw    : 192.168.20.1
-        nics  :
-          eth1: 192.168.20.24/24
-        dnat  :
-          - [8083, 9009]
-      mail1:
-        type  : host
-        gw    : 192.168.10.1
-        nics  :
-          eth1: 192.168.10.15/24
-      opa1:
-        type  : host
-        gw    : 192.168.10.1
-        nics  : 
-          eth1: 192.168.10.16/24
+        nodes:
+          ansible:
+            type : controller
+            gw   : 192.168.99.1
+            nics :
+              eth0: 192.168.99.3/24
+            vols  : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+            play:
+              book: ctlabs.yml
+              tags: [up, setup, ca, bind, prometheus, node_exporter, blackbox_exporter, grafana, mimir, loki, alloy, postfix]
+            dnat  :
+              - [9988, 8888]
+          sw0:
+            type     : switch
+            ipv4     : 192.168.99.10/24
+            gw       : 192.168.99.1
+            profiles : mgmt
+          ro0:
+            type     : router
+            gw       : 192.168.15.1
+            profiles : mgmt
+            nics :
+              eth0: 192.168.99.1/24
+              eth1: 192.168.15.2/29
+
+      edge:
+        nodes:
+          natgw:
+            type : gateway
+            ipv4 : 192.168.15.1/29
+            snat : true
+            dnat : ro1:eth1
+
+      transit:
+        nodes:
+          ro1:
+            type     : router
+            gw       : 192.168.15.1
+            profiles : frr
+            nics :
+              eth1: 192.168.15.3/29
+              eth2: 192.168.10.1/24
+              eth3: 192.168.20.1/24
+
+      data:
+        nodes: 
+          sw1:
+            type : switch
+            ports: 8
+          sw2:
+            type: switch
+            ports: 8
+          ns1:
+            type : host
+            gw   : 192.168.10.1
+            nics :
+              eth1: 192.168.10.11/24
+          ns2:
+            type     : host
+            gw       : 192.168.20.1
+            profiles : d12
+            nics :
+              eth1: 192.168.20.11/24
+          h1:
+            type     : host
+            gw       : 192.168.10.1
+            profiles : kali
+            nics :
+              eth1: 192.168.10.12/24
+            vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [1088, 8888]
+          h2:
+            type     : host
+            gw       : 192.168.20.1
+            profiles : parrot
+            nics :
+              eth1: 192.168.20.12/24
+            vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+            dnat :
+              - [2088, 8888]
+          prometheus:
+            type  : host
+            gw    : 192.168.10.1
+            nics  :
+              eth1: 192.168.10.21/24
+            dnat  :
+              - [8082, 9090]
+          grafana:
+            type  : host
+            gw    : 192.168.20.1
+            nics :
+              eth1: 192.168.20.22/24
+            dnat  :
+              - [8081, 3000]
+          loki:
+            type  : host
+            gw    : 192.168.20.1
+            nics  :
+              eth1: 192.168.20.23/24
+            dnat  :
+              - [8084, 3100]
+          mimir:
+            type  : host
+            gw    : 192.168.20.1
+            nics  :
+              eth1: 192.168.20.24/24
+            dnat  :
+              - [8083, 9009]
+          mail1:
+            type  : host
+            gw    : 192.168.10.1
+            nics  :
+              eth1: 192.168.10.15/24
+          opa1:
+            type  : host
+            gw    : 192.168.10.1
+            nics  : 
+              eth1: 192.168.10.16/24
 
     links:
       - [ "ro0:eth1", "natgw:eth1"      ]

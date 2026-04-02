@@ -6,6 +6,15 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  /* Custom Slim Dark Scrollbar specifically for the Container Images Table */
+  .select-scroll::-webkit-scrollbar { width: 4px; height: 4px; }
+  .select-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .select-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .select-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  select.w3-select  { font-family: monospace !important; }
+</style>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/dockerfile.min.js"></script>
 <script src="/js/labs.js"></script>
 <script src="/js/links.js"></script>
@@ -40,7 +49,7 @@
     <form method="post" action="/labs/execute" style="display: flex; align-items: flex-end; gap: 8px; margin: 0;">
       <div>
         <label style="font-size: 0.85em; color: #94a3b8;"><b>Select Lab:</b></label><br>
-        <select name="lab_name" id="lab-selector" class="w3-select w3-round" style="min-width: 200px; padding: 6px;" required <%= 'disabled' if running %>>
+        <select name="lab_name" id="lab-selector" class="w3-select w3-medium w3-round select-scroll w3-hover-text-light-green" style="min-width: 200px; padding: 6px;" required <%= 'disabled' if running %>>
           <% @labs.each do |lab| %>
             <option value="<%= lab %>" <%= 'selected' if lab == @selected_lab %>><%= lab %></option>
           <% end %>
@@ -74,15 +83,15 @@
       </button>
 
       <button type="button" class="w3-button w3-orange w3-text-white w3-round" onclick="window.openLabYamlEditor()" title="Edit raw Lab YAML">
-        <i class="fas fa-file-code"></i> Edit Lab
+        <i class="fas fa-file-code"></i> Edit
       </button>
 
       <button type="button" class="w3-button w3-teal w3-round" onclick="window.openUnifiedSaveModal()" title="Save or Clone Lab">
-        <i class="fas fa-save"></i> Save Lab
+        <i class="fas fa-save"></i> Save
       </button>
       
       <button type="button" class="w3-button w3-blue w3-round" onclick="document.getElementById('new-lab-modal').style.display='block'">
-        <i class="fas fa-folder-plus"></i> New Lab
+        <i class="fas fa-folder-plus"></i> New
       </button>
     </div>
   </div> 
@@ -249,7 +258,7 @@
 
 
 <div id="lab-yaml-editor-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1000px;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px;">
     
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('lab-yaml-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
