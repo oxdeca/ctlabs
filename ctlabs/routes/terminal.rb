@@ -79,7 +79,7 @@ get '/terminal/:node_name' do
         # Note: SSH strips custom env vars by default, so Vault vars won't easily pass through SSH here.
       else
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-        cmd = [engine, 'exec', '-it', '-w', '~/', '-e', 'TERM=xterm-256color']
+        cmd = [engine, 'exec', '-it', '-w', '/root', '-e', 'TERM=xterm-256color']
 
         if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
 
