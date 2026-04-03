@@ -63,7 +63,7 @@ get '/terminal/:node_name' do
         host = uri.host
         
         # Build base SSH command
-        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no']
+        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', 'TERM=xterm-256color']
 
         # Inject the lab's dedicated ed25519 private key if the lab is running
         if Lab.running?
@@ -79,7 +79,7 @@ get '/terminal/:node_name' do
         # Note: SSH strips custom env vars by default, so Vault vars won't easily pass through SSH here.
       else
         engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-        cmd = [engine, 'exec', '-it', '-e', 'TERM=xterm-256color']
+        cmd = [engine, 'exec', '-it', '-e', '-w', '~/', 'TERM=xterm-256color']
 
         if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
 
