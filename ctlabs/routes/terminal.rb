@@ -63,7 +63,7 @@ get '/terminal/:node_name' do
         host = uri.host
         
         # Build base SSH command
-        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', 'TERM=xterm-256color']
+        cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'SetEnv="TERM=xterm-256color"']
 
         # Inject the lab's dedicated ed25519 private key if the lab is running
         if Lab.running?
