@@ -176,12 +176,51 @@ get '/terminal/:node_name' do
       end
     end
 
+#    # 3. Cleanup on Disconnect
+#    driver.on(:close) do |event|
+#      pty_thread&.kill
+#      pty_read&.close
+#      pty_write&.close
+#      Process.kill('TERM', pty_pid) rescue nil if pty_pid
+#      ssl_mutex.synchronize { io.close } rescue nil
+#    end
+
     # 3. Cleanup on Disconnect
     driver.on(:close) do |event|
       pty_thread&.kill
-      pty_read&.close
-      pty_write&.close
-      Process.kill('TERM', pty_pid) rescue nil if pty_pid
+      
+      # Close PTY file descriptors in correct order
+      pty_write&.close  # Close write end first to signal EOF to child
+      pty_read&.close   # Then close read end
+      
+      # Signal the process group (negative PID) to kill shell + any children
+      if pty_pid
+        begin
+          # Send SIGTERM first for graceful shutdown
+          Process.kill('TERM', -pty_pid) rescue nil
+          # Give it a moment to exit cleanly
+          sleep 0.1
+          # Force kill if still alive
+          Process.kill('KILL', -pty_pid) rescue nil
+        rescue Errno::ESRCH
+          # Process already exited - that's fine
+        end
+        
+        # ⚠️ CRITICAL: Reap the zombie by waiting for exit status
+        # Use WNOHANG to avoid blocking if process hasn't exited yet
+        begin
+          Timeout.timeout(2) do
+            loop do
+              pid, status = Process.waitpid2(pty_pid, Process::WNOHANG)
+              break if pid
+              sleep 0.05
+            end
+          end
+        rescue Timeout::Error, Errno::ECHILD
+          # Process already reaped elsewhere or doesn't exist - OK
+        end
+      end
+      
       ssl_mutex.synchronize { io.close } rescue nil
     end
 
