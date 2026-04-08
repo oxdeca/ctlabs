@@ -233,19 +233,23 @@ get '/terminal/:node_name' do
         begin
           data = nil
           ssl_mutex.synchronize do
-            data = io.read_nonblock(8192)
+            # Using exception: false prevents Ruby from generating an expensive 
+            # Exception object every time the socket is empty.
+            data = io.read_nonblock(8192, exception: false)
           end
           
-          if data == :wait_readable || data == :wait_writable
-            sleep(0.01)
+          if data == :wait_readable
+            # Block efficiently until the OS confirms the socket has data.
+            # The pending check prevents deadlocks if OpenSSL has decrypted data buffered.
+            IO.select([io]) unless io.respond_to?(:pending) && io.pending > 0
             next
+          elsif data.nil?
+            # Nil means EOF (connection closed)
+            break
           end
           
           driver.parse(data) if data && !data.empty?
 
-        rescue IO::WaitReadable
-          sleep(0.01)
-          retry
         rescue EOFError, Errno::ECONNRESET, IOError, OpenSSL::SSL::SSLError
           break
         rescue StandardError => e
