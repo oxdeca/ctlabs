@@ -24,6 +24,7 @@ topology:
             nics :
               eth0: 192.168.99.3/24
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
+            play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, minikube, smbadc, slapd, vault, xrdp]
               env : ['CTLABS_VAULT_SERVER=true']

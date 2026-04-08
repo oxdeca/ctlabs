@@ -12,6 +12,7 @@ desc: LAB LPIC2 - openvpn
 topology:
   - hv: lpic212-vm1
     dns : [192.168.10.11, 192.168.20.11, 8.8.8.8]
+    planes:
       mgmt:
         vrfid : 99
         dns   : [1.1.1.1, 8.8.8.8]
