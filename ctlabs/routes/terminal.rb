@@ -227,36 +227,64 @@ get '/terminal/:node_name' do
     # 4. START HANDSHAKE
     driver.start
 
-    # 5. Thread-Safe Socket Read Loop (Browser -> Parser)
+    # 5. Thread-Safe Socket Read Loop (Diagnostic Version)
     Thread.new do
+      puts "\n[Terminal Debug] --- STARTING READ LOOP for node: #{node_name} ---"
+      
       loop do
         begin
           data = nil
           ssl_mutex.synchronize do
-            # Using exception: false prevents Ruby from generating an expensive 
-            # Exception object every time the socket is empty.
-            data = io.read_nonblock(8192, exception: false)
+            data = io.read_nonblock(8192)
           end
           
-          if data == :wait_readable
-            # Block efficiently until the OS confirms the socket has data.
-            # The pending check prevents deadlocks if OpenSSL has decrypted data buffered.
-            IO.select([io]) unless io.respond_to?(:pending) && io.pending > 0
+          if data == :wait_readable || data == :wait_writable
+            # We are testing the IO.select optimization here
+            begin
+              IO.select([io], nil, nil, 0.1)
+            rescue => select_err
+              puts "[Terminal Debug] IO.select failed: #{select_err.class} - #{select_err.message}. Falling back to sleep."
+              sleep(0.01)
+            end
             next
           elsif data.nil?
-            # Nil means EOF (connection closed)
+            puts "[Terminal Debug] 'data' returned nil! (Typically means EOF / socket closed remotely)"
             break
           end
           
           driver.parse(data) if data && !data.empty?
 
-        rescue EOFError, Errno::ECONNRESET, IOError, OpenSSL::SSL::SSLError
+        rescue IO::WaitReadable
+          begin
+            IO.select([io], nil, nil, 0.1)
+          rescue => select_err
+            puts "[Terminal Debug] IO.select (in rescue) failed: #{select_err.class} - #{select_err.message}. Falling back to sleep."
+            sleep(0.01)
+          end
+          retry
+        rescue IO::WaitWritable
+          sleep(0.01)
+          retry
+        rescue EOFError => e
+          puts "[Terminal Debug] Loop broken by EOFError: #{e.message}"
+          break
+        rescue Errno::ECONNRESET => e
+          puts "[Terminal Debug] Loop broken by ECONNRESET: #{e.message}"
+          break
+        rescue IOError => e
+          puts "[Terminal Debug] Loop broken by IOError: #{e.message}"
+          break
+        rescue OpenSSL::SSL::SSLError => e
+          puts "[Terminal Debug] Loop broken by SSLError: #{e.message}"
           break
         rescue StandardError => e
-          puts "[Socket Read Error] #{e.class}: #{e.message}"
+          puts "[Terminal Debug] Loop broken by StandardError: #{e.class} - #{e.message}"
+          puts e.backtrace.first(5).join("\n") # Print top 5 lines of stack trace
           break
         end
       end
+      
+      puts "[Terminal Debug] --- EXITED READ LOOP. Closing driver. ---"
       driver.close rescue nil
     end
 
