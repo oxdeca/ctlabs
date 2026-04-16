@@ -48,7 +48,7 @@
     <input type="text" id="link-filter-input" onkeyup="window.filterLinks()" placeholder=" Filter links by node or interface..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
-  <div class="scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;">
+  <div class="card-scroll" style="flex: 1; min-height: 0; overflow-y: auto; padding: 0;">
     <% if (info_hash[:links] || []).empty? %>
       <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No links defined</p></div>
     <% else %>
