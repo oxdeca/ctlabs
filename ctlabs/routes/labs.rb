@@ -163,63 +163,6 @@ post '/labs/new' do
   redirect '/labs' # Refresh the page to show the new lab in the dropdown
 end
 
-#post '/labs/*/save' do
-#  content_type :json
-#  lab_name = params[:splat].first
-#  
-#  begin
-#    # get_lab_file_path intelligently grabs the .lock file if the lab is running, 
-#    # or the base .yml if it is stopped.
-#    source_path = get_lab_file_path(lab_name)
-#    
-#    # We always want to OVERWRITE the base .yml file
-#    base_path = File.join(LABS_DIR, "#{lab_name.gsub('.yml', '')}.yml")
-#    
-#    # Read the current state and commit it to the base file
-#    yaml = YAML.load_file(source_path) || {}
-#    write_formatted_yaml(base_path, yaml)
-#    
-#    { success: true, message: "Lab overwritten successfully" }.to_json
-#  rescue => e
-#    status 500
-#    { success: false, error: "Backend Crash: #{e.message}" }.to_json
-#  end
-#end
-#
-#post '/labs/*/save_as' do
-#  lab_name = params[:splat].first
-#  new_lab_name = params[:new_lab_name].to_s.strip.gsub(/[^a-zA-Z0-9_\-\/\.]/, '')
-#  new_desc = params[:new_desc].to_s.strip
-#  force_overwrite = params[:force] == 'true'
-#
-#  halt 400, { success: false, error: "New lab name is required" }.to_json if new_lab_name.empty?
-#
-#  new_lab_name += '.yml' unless new_lab_name.end_with?('.yml')
-#  new_lab_path = File.join(LABS_DIR, new_lab_name)
-#
-#  # --- FIX: Return a special EXISTS flag so the frontend can ask for permission ---
-#  if File.exist?(new_lab_path) && !force_overwrite
-#    halt 400, { success: false, error: "EXISTS" }.to_json
-#  end
-#
-#  begin
-#    source_path = get_lab_file_path(lab_name)
-#    yaml = YAML.load_file(source_path) || {}
-#
-#    base_name = File.basename(new_lab_name, '.yml')
-#    yaml['name'] = base_name
-#    yaml['desc'] = new_desc unless new_desc.empty?
-#
-#    FileUtils.mkdir_p(File.dirname(new_lab_path))
-#    write_formatted_yaml(new_lab_path, yaml)
-#
-#    { success: true, message: "Lab saved as #{new_lab_name}", new_lab: new_lab_name }.to_json
-#  rescue => e
-#    status 500
-#    { success: false, error: e.message }.to_json
-#  end
-#end
-
 post '/labs/*/save' do
   content_type :json
   lab_name = params[:splat].first
