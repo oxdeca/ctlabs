@@ -21,6 +21,7 @@ window.updateKindOptions = function(type, targetId) {
     }
 };
 
+//
 window.updateGatewayForSwitch = function(switchName) {
     const gwInput = document.getElementById('edit-gw');
     if (!gwInput) return;
@@ -40,6 +41,7 @@ window.updateGatewayForSwitch = function(switchName) {
     }
 };
 
+//
 window.updateNodeFormFields = function(nodeType, nodePlane) {
     const switchSelect = document.getElementById('edit-switch');
     const ipInput = document.getElementById('edit-ip');

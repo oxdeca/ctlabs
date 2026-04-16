@@ -26,14 +26,15 @@ end
 # HELPER: Parse Form Data (DRY Helper)
 # ===================================================
 def parse_node_form_data(params, base_data = {})
-  new_cfg = base_data.dup
+  new_cfg         = base_data.dup
+
   new_cfg['type'] = params[:type] unless params[:type].to_s.empty?
-  params[:plane].to_s.empty? ? new_cfg.delete('plane') : new_cfg['plane'] = params[:plane]
-  params[:profile].to_s.empty? ? new_cfg.delete('profile') : new_cfg['profile'] = params[:profile]
+  params[:plane].to_s.empty?    ? new_cfg.delete('plane')    : new_cfg['plane']    = params[:plane]
+  params[:profile].to_s.empty?  ? new_cfg.delete('profile')  : new_cfg['profile']  = params[:profile]
   params[:provider].to_s.empty? ? new_cfg.delete('provider') : new_cfg['provider'] = params[:provider]
-  params[:gw].to_s.empty? ? new_cfg.delete('gw') : new_cfg['gw'] = params[:gw]
-  params[:info].to_s.empty? ? new_cfg.delete('info') : new_cfg['info'] = params[:info]
-  params[:term].to_s.empty? ? new_cfg.delete('term') : new_cfg['term'] = params[:term]
+  params[:gw].to_s.empty?       ? new_cfg.delete('gw')       : new_cfg['gw']       = params[:gw]
+  params[:info].to_s.empty?     ? new_cfg.delete('info')     : new_cfg['info']     = params[:info]
+  params[:term].to_s.empty?     ? new_cfg.delete('term')     : new_cfg['term']     = params[:term]
 
   if params[:nics] && !params[:nics].strip.empty?
     new_cfg['nics'] = params[:nics].split("\n").map { |l| l.split('=').map(&:strip) }.to_h.reject { |k,v| k.nil? || v.nil? }
