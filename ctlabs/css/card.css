@@ -6,8 +6,8 @@
 -->
 
 <style>
-  .card-scroll::-webkit-scrollbar             { width: 8px; height: 8px; }
-  .card-scroll::-webkit-scrollbar-track       { background: #0f172a; border-radius: 4px; }
-  .card-scroll::-webkit-scrollbar-thumb       { background: #475569; border-radius: 4px; }
-  .card-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+  .slim-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .slim-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
 </style>
