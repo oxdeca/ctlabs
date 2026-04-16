@@ -563,6 +563,11 @@ get '/labs/*/node/:node_name/ping' do
   end
 end
 
+
+# ===================================================
+# LINKS
+# ===================================================
+
 post '/labs/*/link/save' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -616,6 +621,11 @@ post '/labs/*/link/delete' do
     { success: false, error: e.message }.to_json
   end
 end
+
+
+# ===================================================
+# DNAT
+# ===================================================
 
 post '/labs/*/dnat' do
   lab_name = params[:splat].first
@@ -677,6 +687,9 @@ get '/labs/*/raw' do
   end
 end
 
+# ===================================================
+# LABS RAW
+# ===================================================
 post '/labs/*/raw' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)
@@ -697,6 +710,9 @@ post '/labs/*/raw' do
   end
 end
 
+# ===================================================
+# LABS CLOUD CONFIG
+# ===================================================
 get '/labs/*/cloud_config' do
   lab_name = params[:splat].first
   lab_path = get_lab_file_path(lab_name)

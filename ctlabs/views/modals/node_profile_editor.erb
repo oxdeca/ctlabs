@@ -5,6 +5,8 @@
 # -----------------------------------------------------------------------------
 -->
 
+<link rel="stylesheet" href="/css/modal.css">
+
 <%
   # Cache the local registry images so we only run the shell commands once!
   unless @local_built_images
@@ -20,13 +22,6 @@
   # Filter to strictly show ctlabs images for the dropdown
   ctlabs_images = @local_built_images.select { |img| img.start_with?("ctlabs/") }.sort
 %>
-
-<style>
-  label             { font-size: 0.85em; color: #94a3b8; }
-  input.w3-input    { font-family: monospace !important; }
-  textarea.w3-input { font-family: monospace !important; }
-  select.w3-select  { font-family: monospace !important; }
-</style>
 
 <div id="node-profile-editor" class="w3-modal" style="z-index: 9999;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 450px;">
