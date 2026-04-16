@@ -5,7 +5,27 @@
 # -----------------------------------------------------------------------------
 -->
 
-<link rel="stylesheet" href="/css/modal.css">
+<style>
+  .slim-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .slim-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  .slim-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+  .CodeMirror-vscrollbar::-webkit-scrollbar, .CodeMirror-hscrollbar::-webkit-scrollbar {width: 8px; height: 8px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-track, .CodeMirror-hscrollbar::-webkit-scrollbar-track {background: #0f172a; border-radius: 4px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb, .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {background: #475569; border-radius: 4px; }
+  .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover, .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover {background: #64748b; }
+  .CodeMirror-scrollbar-filler {background-color: #0f172a !important; border: none; }
+
+  .file-list-item { cursor: pointer; padding: 6px 12px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
+  .file-list-item:hover { background-color: #334155; }
+  .file-list-item.selected { background-color: #0284c7; color: white; }
+
+  label             { font-size: 0.85em; color: #94a3b8; }
+  input.w3-input    { font-family: monospace !important; }
+  textarea.w3-input { font-family: monospace !important; }
+  select.w3-select  { font-family: monospace !important; }
+</style>
 
 <div id="unified-file-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 10vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 600px; display: flex; flex-direction: column; max-height: 80vh;">
