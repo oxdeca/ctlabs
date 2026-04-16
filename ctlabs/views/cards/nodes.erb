@@ -5,13 +5,8 @@
 # -----------------------------------------------------------------------------
 -->
 
-<style>
-  /* Custom Slim Dark Scrollbar specifically for the Container Images Table */
-  .nodes-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-  .nodes-scroll::-webkit-scrollbar-track { background: #0f172a; border-radius: 4px; }
-  .nodes-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-  .nodes-scroll::-webkit-scrollbar-thumb:hover { background: #64748b; }
-</style>
+<link rel="stylesheet" href="/css/card.css">
+
 <%
   unless @local_built_images
     @local_built_images = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
@@ -36,7 +31,7 @@
     <input type="text" id="node-filter-input" onkeyup="window.filterNodes()" placeholder=" Filter nodes by name, profile, or type..." class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; padding: 6px 10px;">
   </div>
 
-  <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="nodes-scroll">
+  <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="scroll">
     <table class="w3-table w3-striped w3-small" id="active-nodes-table">
       <thead><tr style="color: #94a3b8;"><th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th><th>Name</th><th>Profile</th><th>Type</th><th>Provider</th><th>Image</th><th style="text-align:right;">Actions</th></tr></thead>
       <tbody>
