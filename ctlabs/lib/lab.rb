@@ -612,8 +612,8 @@ class Lab
     next_port
   end
 
-  def add_adhoc_node(node_name, node_cfg, target_switch = nil)
-    @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
+def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, web_v_addr = nil)
+  @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
     raise "Node '#{node_name}' already exists" if find_node(node_name)
 
     # 1. Fetch live container namespace IDs for existing nodes
@@ -692,10 +692,14 @@ class Lab
                      "(terraform workspace select #{workspace} || terraform workspace new #{workspace}) && " \
                      "terraform init -upgrade && terraform apply -auto-approve"
 
-            `#{engine} exec #{ctrl_name} bash -c '#{tf_cmd}'`
+            v_env  = ""
+            v_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
+            v_env += "-e VAULT_ADDR='#{web_v_addr}' "   if web_v_addr  && !web_v_addr.empty?
+            v_env += "-e VAULT_SKIP_VERIFY=true "       if web_v_token &&  web_v_addr
+            `#{engine} exec #{v_env}#{ctrl_name} bash -c '#{tf_cmd}'`
 
             # 2. Fetch the JSON output
-            tf_output_json = `#{engine} exec #{ctrl_name} bash -c 'cd /root/ctlabs-terraform/#{tf_dir} && terraform output -json provisioned_vms'`.strip
+            tf_output_json = `#{engine} exec #{v_env}#{ctrl_name} bash -c 'cd /root/ctlabs-terraform/#{tf_dir} && terraform output -json provisioned_vms'`.strip
             vms_out = JSON.parse(tf_output_json)
 
             # 3. Safely update the YAML file with the new IPs
@@ -799,7 +803,7 @@ class Lab
     %x( iptables -tnat -X #{chain} )
   end
 
-  def up
+  def up(web_v_token = nil, web_v_addr = nil)
     self.class.acquire_lock!(@relative_path)
   
     @log.info "Starting Lab: #{@relative_path}"
@@ -818,7 +822,6 @@ class Lab
 
     setup_lab_ssh_keys
 
-    # --- NEW: BATCH TERRAFORM PROVISIONING ---
     ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
     if ctrl
       node_cfg = @cfg['topology'][0]['nodes'][ctrl.name] || {}
@@ -828,7 +831,7 @@ class Lab
         @log.info "Executing Terraform provisioning phase..."
         begin
           # Call run_terraform synchronously. If it fails, the lab startup will abort here.
-          run_terraform(ctrl.name, nil, nil, nil, 'apply')
+          run_terraform(ctrl.name, nil, web_v_token, web_v_addr, 'apply')
           
           # CRITICAL: We must reload the lab YAML into memory because Terraform
           # may have injected new public/private IPs for the cloud VMs!
@@ -965,7 +968,10 @@ class Lab
     v_roleset = vault_cfg['roleset'].to_s.strip
     v_roleset = 'terraform-runner' if v_roleset.empty?
 
-    exec_env = ""
+    exec_env  = ""
+    exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
+    exec_env += "-e VAULT_ADDR='#{web_v_addr}' "   if web_v_addr  && !web_v_addr.empty?
+    exec_env += "-e VAULT_SKIP_VERIFY=true "       if web_v_token &&  web_v_addr
 
     if !v_project.empty?
       # Fail fast if the web session doesn't have a token!

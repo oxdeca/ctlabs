@@ -124,7 +124,7 @@ post '/labs/*/node' do
     validate_node_profile!(node_cfg, data)
 
     lab = Lab.new(cfg: lab_path, relative_path: lab_name)
-    cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch])
+    cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch], session[:vault_token], session[:vault_addr])
 
     vm = data['topology'][0]
     target_plane = cfg_out['plane'] || 'data'

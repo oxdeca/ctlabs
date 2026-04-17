@@ -245,12 +245,15 @@ post '/labs/execute' do
   runtime_path = "#{LOCK_DIR}/#{lab_name.gsub('/', '_')}.yml"
   log = LabLog.for_lab(lab_name: lab_name, action: action)
 
+  v_token = session[:vault_token]
+  v_addr  = session[:vault_addr]
+
   Thread.new do
     begin
       if action == 'up'
         FileUtils.cp(source_path, runtime_path)
         lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
-        lab_instance.up
+        lab_instance.up(v_token, v_addr)
         log.info "--- Lab #{lab_name} UP completed ---"
 
         # ✅ RUN PLAYBOOK ONCE with built-in concurrency protection
