@@ -99,9 +99,14 @@
   // Helper to dynamically read data from the DOM after an AJAX load
   window.getLabData = function(key) {
       const dataDiv = document.getElementById('lab-dynamic-data');
-      if (!dataDiv) return (key === 'images-map') ? {} : [];
-      try { return JSON.parse(dataDiv.getAttribute('data-' + key) || (key === 'images-map' ? '{}' : '[]')); } 
-      catch(e) { return (key === 'images-map') ? {} : []; }
+      const isMap = ['images-map', 'switch-gws'].includes(key);
+      if (!dataDiv) return isMap ? {} : [];
+      try { 
+        const val = dataDiv.getAttribute('data-' + key);
+        return JSON.parse(val || (isMap ? '{}' : '[]')); 
+      } catch(e) { 
+        return isMap ? {} : []; 
+      }
   };
 
   // Old helper mapped to new helper to prevent breaking existing code
@@ -170,223 +175,6 @@
           else alert("Failed to delete link.");
       } catch (err) { alert("Error: " + err.message); }
   };
-
-  // --- IMAGES ---
-  window.openImageEditor = function(labName) {
-      window.currentEditLab = labName;
-      document.getElementById('node-profile-editor-result').style.display = 'none';
-      document.getElementById('edit-img-type').value = 'host';
-      document.getElementById('edit-img-kind').value = '';
-      document.getElementById('edit-img-ref').value = '';
-      document.getElementById('edit-img-caps').value = '';
-      document.getElementById('edit-img-env').value = '';
-      document.getElementById('edit-img-extras').value = '';
-      document.getElementById('node-profile-editor').style.display = 'block';
-  };
-
-  window.editImageConfig = function(labPath, type, kind, provider, image, caps, env, extras) {
-      window.currentEditLab = labPath; 
-      
-      const typeSelect = document.getElementById('edit-img-type');
-      const imgInput = document.getElementById('edit-img-ref'); // Now an input again!
-      
-      const safeType = type || '';
-      const safeImg = image ? decodeURIComponent(image) : '';
-
-      // SMART GUARDRAIL: If the profile has a custom Node Type not in the list, inject it dynamically!
-      if (safeType && !Array.from(typeSelect.options).some(opt => opt.value === safeType)) {
-          const newOpt = document.createElement('option');
-          newOpt.value = safeType;
-          newOpt.text = safeType + ' (Custom)';
-          typeSelect.appendChild(newOpt);
-      }
-      typeSelect.value = safeType;
-
-      // The datalist input natively accepts any value, so we just set it!
-      imgInput.value = safeImg;
-
-      document.getElementById('edit-img-kind').value = kind || '';
-      document.getElementById('edit-img-caps').value = caps ? decodeURIComponent(caps) : '';
-      document.getElementById('edit-img-env').value = env ? decodeURIComponent(env) : '';
-      document.getElementById('edit-img-extras').value = extras ? decodeURIComponent(extras) : '';
-      document.getElementById('edit-img-provider').value = provider || 'local';
-      
-      const resDiv = document.getElementById('node-profile-editor-result');
-      if (resDiv) resDiv.style.display = 'none';
-      
-      document.getElementById('node-profile-editor').style.display = 'block';
-  };
-
-  window.saveImageConfig = async function() {
-      const resDiv = document.getElementById('node-profile-editor-result');
-      
-      if (!window.currentEditLab) {
-          resDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; padding: 8px;';
-          resDiv.innerHTML = '❌ Error: Lab path is missing from memory. Please close and re-open the modal.';
-          return;
-      }
-
-      const formData = new URLSearchParams({
-          type: document.getElementById('edit-img-type').value.trim(),
-          kind: document.getElementById('edit-img-kind').value.trim(),
-          provider: document.getElementById('edit-img-provider').value,
-          image: document.getElementById('edit-img-ref').value.trim(),
-          caps: document.getElementById('edit-img-caps').value.trim(),
-          env: document.getElementById('edit-img-env').value.trim(),
-          extras: document.getElementById('edit-img-extras').value.trim()
-      });
-
-      resDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; padding: 8px;';
-      resDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving profile...';
-
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
-      try {
-          // Send to the unified Edit/Add endpoint
-          const res = await fetch(`/labs/${safeLab}/image/edit`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: formData.toString()
-          });
-
-          if (res.ok) {
-              resDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; padding: 8px;';
-              resDiv.textContent = '✅ Profile saved successfully.';
-              setTimeout(() => location.reload(), 800);
-          } else {
-              // Safely handle HTML vs JSON error responses
-              const errText = await res.text();
-              let errMsg = errText;
-              try { errMsg = JSON.parse(errText).error; } catch(e) {} 
-              throw new Error(errMsg);
-          }
-      } catch (err) {
-          resDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; padding: 8px; max-height: 200px; overflow-y: auto;';
-          resDiv.innerHTML = '❌ ' + err.message;
-      }
-  };
-
-  // --- CONTAINER IMAGES FILTER ---
-  window.filterContainerImages = function() {
-    const input = document.getElementById('image-filter-input');
-    if (!input) return;
-
-    const filter = input.value.toUpperCase();
-    const table = document.getElementById('container-images-table');
-    if (!table) return;
-    
-    // Get all rows with class 'image-row'
-    const trs = table.getElementsByClassName('image-row');
-
-    for (let i = 0; i < trs.length; i++) {
-      let tds = trs[i].getElementsByTagName('td');
-      let textValue = "";
-      // Grab text from the first 4 columns (Name, Category, OS, Version)
-      for (let j = 0; j < 4; j++) {
-        if (tds[j]) textValue += (tds[j].textContent || tds[j].innerText) + " ";
-      }
-      
-      if (textValue.toUpperCase().indexOf(filter) > -1) {
-        trs[i].style.display = "";
-      } else {
-        trs[i].style.display = "none";
-      }
-    }
-  };
-
-  // --- NEW IMAGE MANAGEMENT ACTIONS ---
-
-  // Open the Container Manage Images Modal
-  window.openManageImagesModal = function() {
-      document.getElementById('manage-images-modal').style.display = 'block';
-  };
-
-  // Unload Image from Local Registry (Eject Icon)
-  window.unloadImage = async function(imageEnc) {
-      const decodedImg = decodeURIComponent(imageEnc);
-      if (!confirm(`Are you sure you want to unload ${decodedImg} from the container registry? (This does not delete your source files.)`)) return;
-      
-      try {
-          const res = await fetch(`/images/unload`, { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ image: decodedImg }).toString() 
-          });
-          if (res.ok) location.reload();
-          else alert((await res.json()).error);
-      } catch(err) { alert("Failed to unload image: " + err.message); }
-  };
-
-  window.submitNewLocalImage = async function(e) {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      try {
-          const res = await fetch(`/images/create`, { 
-              method: 'POST', 
-              body: new URLSearchParams(formData).toString() 
-          });
-          if (res.ok) location.reload();
-          else alert((await res.json()).error);
-      } catch(err) { alert(err.message); }
-  };
-
-  // Delete Image (Trash Icon)
-  window.deleteLocalImage = async function(imageEnc) {
-      const decodedImg = decodeURIComponent(imageEnc);
-      if (!confirm(`WARNING: Are you absolutely sure you want to permanently delete the ${decodedImg} directory and all files inside it?`)) return;
-      
-      try {
-          const res = await fetch(`/images/delete`, { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ image: decodedImg }).toString() 
-          });
-          if (res.ok) location.reload();
-          else alert((await res.json()).error);
-      } catch(err) { alert(err.message); }
-  };
-
-  // Pull External Image from Docker Hub / Registry
-  window.submitPullImage = async function(e) {
-      e.preventDefault();
-      const formData = new FormData(e.target);
-      const btn = e.target.querySelector('button[type="submit"]');
-      const origText = btn.innerHTML;
-      
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Pulling...';
-      btn.disabled = true;
-
-      try {
-          const res = await fetch(`/images/pull`, { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
-              body: new URLSearchParams(formData).toString() 
-          });
-          if (res.ok) location.reload();
-          else { 
-              alert((await res.json()).error); 
-              btn.innerHTML = origText; 
-              btn.disabled = false; 
-          }
-      } catch(err) { alert(err.message); btn.innerHTML = origText; btn.disabled = false; }
-  };
-
-  // Remove an imported image directly by its full registry tag
-  window.removeImportedImage = async function(imageTagEnc) {
-      const tag = decodeURIComponent(imageTagEnc);
-      if (!confirm(`Remove external image '${tag}' from the registry?`)) return;
-      
-      try {
-          const res = await fetch(`/images/remove_imported`, { 
-              method: 'POST', 
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ image: tag }).toString() 
-          });
-          if (res.ok) location.reload();
-          else alert((await res.json()).error);
-      } catch(err) { alert("Failed to remove image: " + err.message); }
-  };
-
-
 
   // --- SAVE ACTIVE LAB ---
   window.saveActiveLab = async function() {
@@ -536,4 +324,3 @@
       }
     }
   });
-

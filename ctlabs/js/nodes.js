@@ -36,17 +36,20 @@ window.updateGatewayForSwitch = function(switchName) {
         gwMap = window.getLabData('switch-gws') || {};
     }
 
+    // Set the gateway if found, otherwise clear it to avoid stale values
     if (gwMap && gwMap[switchName]) {
         gwInput.value = gwMap[switchName];
+    } else {
+        gwInput.value = '';
     }
 };
 
 //
 window.updateNodeFormFields = function(nodeType, nodePlane) {
-    const switchSelect = document.getElementById('edit-switch');
-    const ipInput = document.getElementById('edit-ip');
-    const gwInput = document.getElementById('edit-gw');
-    const planeSelect = document.getElementById('edit-plane');
+    const switchSelect   = document.getElementById('edit-switch');
+    const ipInput        = document.getElementById('edit-ip');
+    const gwInput        = document.getElementById('edit-gw');
+    const planeSelect    = document.getElementById('edit-plane');
     const providerSelect = document.getElementById('edit-provider');
 
     if (!switchSelect || !ipInput || !gwInput) return;
@@ -58,14 +61,13 @@ window.updateNodeFormFields = function(nodeType, nodePlane) {
     const provider = providerSelect ? providerSelect.value : 'local';
 
     const switchContainer = switchSelect.closest('.w3-col');
-    const ipContainer = ipInput.closest('.w3-col');
-    const gwContainer = gwInput.closest('.w3-col');
+    const ipContainer     = ipInput.closest('.w3-col');
+    const gwContainer     = gwInput.closest('.w3-col');
 
     const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
-    const ipLabel = ipContainer ? ipContainer.querySelector('label') : null;
-    const gwLabel = gwContainer ? gwContainer.querySelector('label') : null;
+    const ipLabel     = ipContainer ? ipContainer.querySelector('label') : null;
+    const gwLabel     = gwContainer ? gwContainer.querySelector('label') : null;
 
-    // --- DYNAMIC NIC & LABELS BASED ON TYPE AND PROVIDER ---
     let primaryNic = 'eth1';
     if (nodeType === 'controller' || nodePlane === 'mgmt') primaryNic = 'eth0';
     if (provider !== 'local') primaryNic = 'tun0';
@@ -387,7 +389,7 @@ window.openAddNodeModal = function(labPath) {
     document.getElementById('editor-node-name').innerText = '';
     document.getElementById('node-modal-save-text').innerText = 'Add Node';
 
-    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-ip','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls', 'edit-plane', 'edit-node-tf-dir', 'edit-node-tf-workspace', 'edit-node-tf-cmds', 'edit-node-tf-vars', 'edit-node-tf-vault-project', 'edit-node-tf-vault-roleset'].forEach(id => {
+    ['edit-node-name','edit-type','edit-kind','edit-switch','edit-eth1','edit-gw','edit-nics','edit-vols','edit-env','edit-devs','edit-info','edit-term','edit-urls', 'edit-plane', 'edit-node-tf-dir', 'edit-node-tf-workspace', 'edit-node-tf-cmds', 'edit-node-tf-vars', 'edit-node-tf-vault-project', 'edit-node-tf-vault-roleset'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });

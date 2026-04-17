@@ -149,30 +149,3 @@
   </div>
 </div>
 
-<script>
-  // Real-time table filter logic
-  window.filterContainerImages = function() {
-    const input = document.getElementById('image-filter-input');
-    const filter = input.value.toUpperCase();
-    const table = document.getElementById('container-images-table');
-    if (!table) return;
-    
-    // Get all rows with class 'image-row'
-    const trs = table.getElementsByClassName('image-row');
-
-    for (let i = 0; i < trs.length; i++) {
-      let tds = trs[i].getElementsByTagName('td');
-      let textValue = "";
-      // Grab text from the first 4 columns (Name, Category, OS, Version)
-      for (let j = 0; j < 4; j++) {
-        if (tds[j]) textValue += (tds[j].textContent || tds[j].innerText) + " ";
-      }
-      
-      if (textValue.toUpperCase().indexOf(filter) > -1) {
-        trs[i].style.display = "";
-      } else {
-        trs[i].style.display = "none";
-      }
-    }
-  };
-</script>

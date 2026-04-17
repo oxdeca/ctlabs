@@ -120,12 +120,3 @@
   </div>
 </div>
 
-<script>
-  window.filterNodeProfiles = function() {
-    const filter = document.getElementById('profile-filter-input').value.toUpperCase();
-    const rows = document.getElementById('node-profiles-table')?.getElementsByClassName('profile-row') || [];
-    for (let i = 0; i < rows.length; i++) {
-      rows[i].style.display = rows[i].innerText.toUpperCase().indexOf(filter) > -1 ? "" : "none";
-    }
-  };
-</script>
