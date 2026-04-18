@@ -7,7 +7,10 @@
 
 <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
 <link rel="stylesheet" href="/css/ctlabs-maps.css">
+<script src="/js/terminal.js"></script>
 <script src="/js/ctlabs-maps.js"></script>
+
+<%= erb :'modals/terminal_manager' %>
 
 <div id="map-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
   <h2><i class="fas <%= @icon %>"></i> <%= @title %></h2>

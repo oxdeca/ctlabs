@@ -183,26 +183,7 @@ function attachCustomTooltips(svgObject) {
       if (nodeName && isNode) {
         menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/flashcards?node=${encodeURIComponent(nodeName)}', '_blank')"><i class="fas fa-layer-group w3-text-purple"></i> Walkthrough / Flashcards</div>`;
         
-        // --- BULLETPROOF POPUP CENTERING ---
-        const w = 900;
-        const h = 600;
-        
-        const topWin = window.top || window;
-        
-        // Get the browser's current screen position
-        const dualScreenLeft = topWin.screenLeft !== undefined ? topWin.screenLeft : topWin.screenX;
-        const dualScreenTop = topWin.screenTop !== undefined ? topWin.screenTop : topWin.screenY;
-        
-        // Use inner dimensions which are immune to Linux fractional-scaling window border bugs
-        const winWidth = topWin.innerWidth || document.documentElement.clientWidth || screen.width;
-        const winHeight = topWin.innerHeight || document.documentElement.clientHeight || screen.height;
-        
-        // Calculate center. (Removed the Math.max clamp so left/top monitors work natively!)
-        const left = Math.round((winWidth / 2) - (w / 2) + dualScreenLeft);
-        const top = Math.round((winHeight / 2) - (h / 2) + dualScreenTop);
-        // -----------------------------------
-
-        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.open('/terminal/${encodeURIComponent(nodeName)}', 'term_${encodeURIComponent(nodeName)}', 'width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=yes,toolbar=no,location=no')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
+        menuHtml += `<div class="context-menu-item" style="padding:10px; cursor:pointer;" onclick="window.manageTerminal('${nodeName}')"><i class="fas fa-terminal w3-text-green"></i> Open Web Terminal</div>`;
       }
 
       customLinks.forEach(link => {

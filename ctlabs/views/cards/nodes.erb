@@ -118,7 +118,7 @@
             </td>
 
             <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
-              <button type="button" onclick="window.manageTerminal('<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal now"><i class="fas fa-terminal fa-lg"></i></button>
+              <button type="button" onclick="window.manageTerminal('<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal"><i class="fas fa-terminal fa-lg"></i></button>
               <button type="button" onclick="window.editNodeConfig('<%= info_hash[:lab_path] %>', '<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-light-blue" title="Edit Node"><i class="fas fa-edit fa-lg"></i></button>
               <button type="button" onclick="window.deleteItem('<%= info_hash[:lab_path] %>', 'node/<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Node"><i class="fas fa-trash fa-lg"></i></button>
             </td>
