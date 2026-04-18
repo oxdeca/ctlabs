@@ -47,6 +47,7 @@
       <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #475569;">
         <button type="button" class="w3-bar-item w3-button editor-tablink w3-text-blue" onclick="window.openEditorTab(event, 'FormEdit')" id="defaultTab"><b>Basic</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink"              onclick="window.openEditorTab(event, 'AdvancedEdit')"><b>Advanced</b></button>
+        <button type="button" class="w3-bar-item w3-button editor-tablink"              onclick="window.openEditorTab(event, 'TerraformEdit')" id="tab-btn-terraform" style="display:none"><b>Cloud VM</b></button>
         <button type="button" class="w3-bar-item w3-button editor-tablink"              onclick="window.openEditorTab(event, 'YamlEdit')"><b>Raw YAML</b></button>
       </div>
 
@@ -214,6 +215,13 @@
             <textarea id="edit-urls" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="Flashcards|https://quizlet.com/..." oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
         </div>
+      </div>
+
+      <div id="TerraformEdit" class="editor-tab" style="display:none">
+        <div class="w3-padding w3-small" style="background-color: #0f172a; border-bottom: 1px solid #334155; color: #94a3b8; margin-bottom: 10px;">
+          <i class="fas fa-info-circle"></i> Define the Cloud VM instance details using YAML format.
+        </div>
+        <textarea id="node-cloud-vm-editor" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; height: 350px; resize: vertical; white-space: pre;"></textarea>
       </div>
 
       <div id="YamlEdit" class="editor-tab" style="display:none">

@@ -348,26 +348,32 @@ window.editNodeConfig = async function(labName, nodeName) {
             } catch (e) { console.error("Advanced Fields Error:", e); }
 
             // --- LOAD CLOUD VM YAML ---
-            if (data.cloud_vm_yaml) {
-                document.getElementById('node-cloud-vm-editor').value = data.cloud_vm_yaml;
-                if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
-                    window.cmEditors['node-cloud-vm-editor'].setValue(data.cloud_vm_yaml);
-                }
-            } else {
-                // Provide a helpful default skeleton if it's a new cloud node
-                const defaultVmYaml = `- name: ${nodeName}\n  domain: gcp.ctlabs.internal\n  type: e2-micro\n  zone: us-east1-c\n  image: debian-12-bookworm-v20260310\n  network: net1-sub1\n  nat: true\n`;
-                document.getElementById('node-cloud-vm-editor').value = defaultVmYaml;
-                if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
-                    window.cmEditors['node-cloud-vm-editor'].setValue(defaultVmYaml);
+            const cloudEditor = document.getElementById('node-cloud-vm-editor');
+            if (cloudEditor) {
+                if (data.cloud_vm_yaml) {
+                    cloudEditor.value = data.cloud_vm_yaml;
+                    if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
+                        window.cmEditors['node-cloud-vm-editor'].setValue(data.cloud_vm_yaml);
+                    }
+                } else {
+                    // Provide a helpful default skeleton if it's a new cloud node
+                    const defaultVmYaml = `- name: ${nodeName}\n  domain: gcp.ctlabs.internal\n  type: e2-micro\n  zone: us-east1-c\n  image: debian-12-bookworm-v20260310\n  network: net1-sub1\n  nat: true\n`;
+                    cloudEditor.value = defaultVmYaml;
+                    if (window.cmEditors && window.cmEditors['node-cloud-vm-editor']) {
+                        window.cmEditors['node-cloud-vm-editor'].setValue(defaultVmYaml);
+                    }
                 }
             }
             
             // Trigger auto-resize for the new textareas
             setTimeout(() => {
-                document.querySelectorAll('#TerraformEdit textarea').forEach(ta => {
-                   ta.style.height = '56px';
-                   ta.style.height = Math.max(ta.scrollHeight, 56) + 'px';
-                });
+                const tfEdit = document.getElementById('TerraformEdit');
+                if (tfEdit) {
+                    tfEdit.querySelectorAll('textarea').forEach(ta => {
+                       ta.style.height = '56px';
+                       ta.style.height = Math.max(ta.scrollHeight, 56) + 'px';
+                    });
+                }
             }, 10);
             // -----------------------------
         }
@@ -497,7 +503,8 @@ window.saveNodeConfig = async function() {
 
         // --- CLOUD VM PAYLOAD ---
         if (isCloudProvider) {
-            const cloudYaml = window.cmEditors && window.cmEditors['node-cloud-vm-editor'] ? window.cmEditors['node-cloud-vm-editor'].getValue() : document.getElementById('node-cloud-vm-editor').value;
+            const cloudEditor = document.getElementById('node-cloud-vm-editor');
+            const cloudYaml = window.cmEditors && window.cmEditors['node-cloud-vm-editor'] ? window.cmEditors['node-cloud-vm-editor'].getValue() : (cloudEditor ? cloudEditor.value : '');
             console.log("[DIAGNOSTIC - FRONTEND] Cloud YAML Payload:\n", cloudYaml);
             formData.append('cloud_vm_yaml', cloudYaml);
         }
