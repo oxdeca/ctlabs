@@ -1,0 +1,90 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/terminal_manager.erb
+# Description : Modal for managing multiple terminal sessions per node
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div id="terminal-manager-modal" class="w3-modal" style="z-index: 9999;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155;">
+      <span onclick="document.getElementById('terminal-manager-modal').style.display='none'" class="w3-button w3-display-topright w3-round-large">&times;</span>
+      <h4 id="term-mgr-title" style="margin: 0; color: #38bdf8;"><i class="fas fa-terminal"></i> Terminal Sessions</h4>
+    </header>
+    <div class="w3-container w3-padding">
+      <p id="term-mgr-msg" style="margin-bottom: 20px; color: #cbd5e1;"></p>
+      <div id="term-mgr-actions" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;">
+        <button id="btn-open-new" class="w3-button w3-blue w3-block" onclick="window.confirmTerminalAction('open')">
+          <i class="fas fa-plus-circle"></i> Open New Session
+        </button>
+        <button id="btn-terminate-oldest" class="w3-button w3-red w3-block" onclick="window.confirmTerminalAction('terminate')">
+          <i class="fas fa-trash-alt"></i> Terminate Oldest & Open New
+        </button>
+        <button class="w3-button w3-block" style="background-color: #475569; color: white;" onclick="document.getElementById('terminal-manager-modal').style.display='none'">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.currentTermNode = null;
+
+  window.showTerminalManager = function(nodeName, count) {
+      window.currentTermNode = nodeName;
+      document.getElementById('term-mgr-title').innerHTML = `<i class="fas fa-terminal"></i> Terminal: <span style="color: #f8fafc;">${nodeName}</span>`;
+      
+      const msg = document.getElementById('term-mgr-msg');
+      const openBtn = document.getElementById('btn-open-new');
+      const terminateBtn = document.getElementById('btn-terminate-oldest');
+      
+      if (count >= 3) {
+          msg.innerHTML = `This node has reached the maximum of <strong style="color: #ef4444;">3</strong> active terminal sessions. You must terminate an existing session to open a new one.`;
+          openBtn.style.display = 'none';
+          terminateBtn.innerHTML = `<i class="fas fa-recycle"></i> Terminate Oldest & Open New`;
+      } else {
+          msg.innerHTML = `There are already <strong>${count}</strong> active terminal sessions for this node. What would you like to do?`;
+          openBtn.style.display = 'block';
+          terminateBtn.innerHTML = `<i class="fas fa-trash-alt"></i> Terminate Oldest & Open New`;
+      }
+      
+      document.getElementById('terminal-manager-modal').style.display = 'block';
+  };
+
+  window.confirmTerminalAction = async function(action) {
+      const nodeName = window.currentTermNode;
+      if (!nodeName) return;
+
+      const terminateBtn = document.getElementById('btn-terminate-oldest');
+      const openBtn = document.getElementById('btn-open-new');
+      const originalTerminateHtml = terminateBtn.innerHTML;
+      const originalOpenHtml = openBtn.innerHTML;
+
+      if (action === 'terminate') {
+          terminateBtn.disabled = true;
+          terminateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Terminating...';
+          try {
+              const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/terminate_oldest`, { method: 'POST' });
+              if (!res.ok) throw new Error("Failed to terminate session");
+          } catch (e) {
+              alert("Error terminating session: " + e.message);
+              terminateBtn.disabled = false;
+              terminateBtn.innerHTML = originalTerminateHtml;
+              return;
+          }
+      }
+      
+      window.openTerminal(nodeName);
+      document.getElementById('terminal-manager-modal').style.display = 'none';
+      
+      // Reset button states for next time
+      setTimeout(() => {
+          terminateBtn.disabled = false;
+          terminateBtn.innerHTML = originalTerminateHtml;
+          openBtn.disabled = false;
+          openBtn.innerHTML = originalOpenHtml;
+      }, 500);
+  };
+</script>

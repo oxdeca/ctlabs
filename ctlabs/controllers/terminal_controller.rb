@@ -17,12 +17,23 @@ class TerminalController < BaseController
       node_name = params[:node_name]
       cmd = TerminalService.resolve_terminal_command(node_name, session)
       
-      TerminalService.handle_websocket(driver, cmd, io, ssl_mutex)
+      TerminalService.handle_websocket(driver, cmd, io, ssl_mutex, node_name)
 
       return [-1, {}, []]
     else
       @node_name = params[:node_name]
       erb :terminal, layout: false
     end
+  end
+
+  get '/terminal/:node_name/sessions' do
+    content_type :json
+    { count: TerminalService.session_count(params[:node_name]) }.to_json
+  end
+
+  post '/terminal/:node_name/terminate_oldest' do
+    content_type :json
+    success = TerminalService.terminate_oldest(params[:node_name])
+    { success: success }.to_json
   end
 end

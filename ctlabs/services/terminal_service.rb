@@ -7,8 +7,39 @@
 require 'pty'
 require 'json'
 require 'timeout'
+require 'securerandom'
 
 class TerminalService
+  @@sessions = Hash.new { |h, k| h[k] = [] }
+  @@mutex = Mutex.new
+
+  def self.register_session(node_name, session_info)
+    @@mutex.synchronize { @@sessions[node_name] << session_info }
+  end
+
+  def self.unregister_session(node_name, session_info)
+    @@mutex.synchronize { @@sessions[node_name].delete(session_info) }
+  end
+
+  def self.session_count(node_name)
+    @@mutex.synchronize { @@sessions[node_name].size }
+  end
+
+  def self.terminate_oldest(node_name)
+    session = nil
+    @@mutex.synchronize { session = @@sessions[node_name].shift }
+    if session
+      begin
+        session[:close_proc].call if session[:close_proc]
+      rescue => e
+        puts "[Terminal Termination Error] #{e.message}"
+      end
+      true
+    else
+      false
+    end
+  end
+
   def self.resolve_terminal_command(node_name, session)
     if node_name == 'ctlabs_host'
       cmd = ['env', 'TERM=linux']
@@ -87,16 +118,30 @@ class TerminalService
     cmd
   end
 
-  def self.handle_websocket(driver, cmd, io, ssl_mutex)
+  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown')
     pty_read   = nil
     pty_write  = nil
     pty_pid    = nil
     pty_thread = nil
+    session_info = nil
 
     driver.on(:open) do |_|
+      if session_count(node_name) >= 3
+        driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n")
+        driver.close
+        return
+      end
+
       begin
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
         
+        session_info = {
+          id: SecureRandom.uuid,
+          node: node_name,
+          close_proc: proc { driver.close rescue nil }
+        }
+        register_session(node_name, session_info)
+
         pty_thread = Thread.new do
           loop do
             begin
@@ -138,6 +183,7 @@ class TerminalService
     end
 
     driver.on(:close) do |_|
+      unregister_session(node_name, session_info) if session_info
       pty_thread&.kill
       pty_write&.close
       pty_read&.close
