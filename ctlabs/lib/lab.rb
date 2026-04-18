@@ -7,10 +7,14 @@
 require 'open3'
 require 'shellwords'
 require 'yaml'
+require 'set'
+require 'socket'
+require 'fileutils'
 
 class Lab
   attr_writer :dotfile, :dtype, :diagram
-  attr_reader :name, :desc, :nodes, :links, :defaults, :topology
+  attr_reader :name, :desc, :nodes, :links, :defaults, :topology, :cfg_file, :relative_path
+  attr_accessor :log
 
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
@@ -98,6 +102,36 @@ class Lab
     nil
   end
 
+  # Returns the currently running Lab instance
+  def self.current
+    name = current_name
+    name ? find(name) : nil
+  end
+
+  # Returns an array of all available lab names (relative paths)
+  def self.all
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    Dir.glob(File.join(labs_dir, "**", "*.yml"))
+       .map { |f| f.sub(labs_dir + '/', '') }
+       .sort
+  end
+
+  # Finds and returns a Lab instance by its relative name (e.g., 'db/db01.yml')
+  # Automatically handles loading from the runtime copy if the lab is currently running.
+  def self.find(name)
+    path = get_file_path(name)
+    return nil unless File.file?(path)
+    new(cfg: path, relative_path: name)
+  end
+
+  # Safely resolves the lab file path (Runtime vs Base) - Moved from LabHelper
+  def self.get_file_path(lab_name)
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
+    runtime_path = File.join(lock_dir, "#{lab_name.gsub('/', '_')}")
+    (running? && current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(labs_dir, lab_name)
+  end
+
   def self.acquire_lock!(name)
     raise ArgumentError, "Lab name must be relative path like 'dir/lab.yml'" unless name =~ %r{^[^/]+/[^/]+\.yml$}
     raise "A lab is already running: #{current_name}" if running?
@@ -107,6 +141,43 @@ class Lab
 
   def self.release_lock!
     File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper: Find node in raw YAML (supports v1 and v2) - Moved from LabHelper
+  # ---------------------------------------------------------------------------
+  def self.find_node_in_raw_yaml(vm_cfg, node_name)
+    if vm_cfg['nodes'] && vm_cfg['nodes'][node_name]
+      return vm_cfg['nodes'][node_name], nil
+    elsif vm_cfg['planes']
+      vm_cfg['planes'].each do |p_name, p_data|
+        if p_data && p_data['nodes'] && p_data['nodes'][node_name]
+          return p_data['nodes'][node_name], p_name
+        end
+      end
+    end
+    [nil, nil]
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper: Find Controller in Raw YAML (Moved from automation route)
+  # ---------------------------------------------------------------------------
+  def self.find_automation_controller(vm_cfg)
+    if vm_cfg['nodes']
+      name = vm_cfg['nodes'].keys.find { |k| k == 'ansible' || vm_cfg['nodes'][k]['type'] == 'controller' }
+      return name, vm_cfg['nodes'][name], nil if name
+    end
+    
+    if vm_cfg['planes']
+      vm_cfg['planes'].each do |p_name, p_data|
+        if p_data && p_data['nodes']
+          name = p_data['nodes'].keys.find { |k| k == 'ansible' || p_data['nodes'][k]['type'] == 'controller' }
+          return name, p_data['nodes'][name], p_name if name
+        end
+      end
+    end
+    
+    [nil, nil, nil]
   end
 
   def find_vm(name)
@@ -151,6 +222,262 @@ class Lab
     end
 
     vm
+  end
+
+  def find_node(name)
+    @nodes.find { |n| n.name == name }
+  end
+
+  # Returns detailed metadata about a lab for the UI (Moved from ApplicationHelper)
+  def self.metadata(yaml_file_path, adhoc_rules_by_lab = {})
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
+
+    lab_name = yaml_file_path.sub(labs_dir + '/', '')
+    refresh_visuals(lab_name)
+    
+    is_running = running? && current_name == lab_name
+    actual_path = get_file_path(lab_name)
+
+    # Load runtime lab and base lab to compute the diff
+    lab = Lab.new(cfg: actual_path, log: LabLog.null)
+    base_lab = is_running ? Lab.new(cfg: yaml_file_path, log: LabLog.null) : lab
+
+    # Map base nodes and base DNATs for comparison
+    base_nodes_list = base_lab.nodes.map(&:name)
+    base_dnats = {}
+    base_lab.nodes.each { |n| base_dnats[n.name] = n.dnat || [] }
+
+    info = { lab_name: File.basename(yaml_file_path, '.yml'), lab_path: lab_name, desc: lab.desc || '' }
+
+    # --- BULLETPROOF LINKS PARSER ---
+    raw_links = []
+    if base_lab.topology.is_a?(Array) && base_lab.topology.first.is_a?(Hash)
+      raw_links = base_lab.topology.first['links'] || []
+    elsif base_lab.topology.is_a?(Hash)
+      raw_links = base_lab.topology['links'] || []
+    end
+
+    info[:links] = raw_links.map do |l|
+      if l.is_a?(Array) && l.size == 2
+         n_a, i_a = l[0].split(':', 2)
+         n_b, i_b = l[1].split(':', 2)
+         { node_a: n_a, int_a: i_a, node_b: n_b, int_b: i_b, ep1: l[0], ep2: l[1] }
+      else
+         nil
+      end
+    end.compact
+    # --------------------------------
+
+    # Images Map
+    images = []
+    images_map = {}
+    if lab.defaults
+      lab.defaults.each do |tk, tv|
+        if tv.is_a?(Hash)
+          images_map[tk] = tv.keys
+          tv.each do |kk, kv|
+            if kv
+              # Grab any keys that aren't the standard three
+              core_keys = ['image', 'caps', 'env']
+              extras = kv.reject { |k, _| core_keys.include?(k) }
+              extras_yaml = extras.empty? ? "" : extras.to_yaml.sub("---\n", "").strip
+
+              images << {
+                type: tk, 
+                kind: kk, 
+                image: kv['image'] || 'N/A',
+                provider: kv['provider'] || 'local',
+                caps: kv['caps'] || [],
+                env: kv['env'] || [],
+                extras: extras_yaml
+              }
+            end
+          end
+        else
+          images_map[tk] = []
+        end
+      end
+    end
+    info[:images] = images
+    info[:images_map] = images_map
+
+    # Let the Node class figure out who is running!
+    Node.bulk_update_status(lab.nodes) if is_running
+
+    # Nodes (With Diffing)
+    nodes = []
+    if lab.nodes
+      lab.nodes.each do |node|
+        image_ref = 'N/A'
+        if lab.defaults && lab.defaults[node.type] && lab.defaults[node.type][node.kind || 'linux']
+          image_ref = lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A'
+        end
+          
+        is_adhoc = !base_nodes_list.include?(node.name)
+
+        node_info = {
+          name: node.name,
+          type: node.type   || 'N/A',
+          kind: node.kind   || 'N/A',
+          provider: node.provider || 'local',
+          image: image_ref,
+          cpus: 'N/A',
+          memory: 'N/A',
+          adhoc: is_adhoc,
+          running: node.is_running 
+        }
+        nodes << node_info
+      end
+    end
+
+    info[:nodes] = nodes
+    info[:switches] = lab.nodes.select { |n| n.type == 'switch' }.map(&:name)
+    info[:gateways] = lab.nodes.map { |n| n.gw }.compact.reject { |g| g.to_s.strip.empty? }.uniq
+
+    # Ansible
+    ansible_info = { playbook: 'N/A', inventory: 'N/A', environment: [], tags: [], roles: [] }
+    ctrl = lab.find_node("ansible")
+    if ctrl && !ctrl.play.nil?
+      if ctrl.play.is_a?(Hash)
+        # Calculate Default Inventory Name (e.g. net01.ini) if not explicitly set
+        default_inv = "#{File.basename(yaml_file_path, '.yml')}.ini"
+        ansible_info[:inventory]   = ctrl.play['inv'] && !ctrl.play['inv'].empty? ? ctrl.play['inv'] : default_inv
+        
+        ansible_info[:playbook]    = ctrl.play['book']  || 'N/A'
+        ansible_info[:environment] = ctrl.play['env']   || []
+        ansible_info[:tags]        = ctrl.play['tags']  || []
+        ansible_info[:roles]       = ctrl.play['roles'] || ctrl.play['tags'] || []
+      else
+        ansible_info[:playbook]    = ctrl.play.to_s
+        ansible_info[:inventory]   = "#{File.basename(yaml_file_path, '.yml')}.ini"
+      end
+    end
+    info[:ansible] = ansible_info
+
+
+    # Terraform
+    terraform_info = { workspace: 'default', work_dir: 'N/A', vars: [] }
+    ctrl = lab.find_node("ansible")
+    
+    if ctrl && ctrl.respond_to?(:terraform) && !ctrl.terraform.nil?
+      terraform_info[:workspace] = ctrl.terraform['workspace'] || 'default'
+      terraform_info[:work_dir]  = ctrl.terraform['work_dir']  || 'N/A'
+      terraform_info[:vars]      = ctrl.terraform['vars']      || []
+    end
+    info[:terraform] = terraform_info
+
+
+    # DNAT (With Diffing)
+    vip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
+    exposed_ports = []
+    if lab.nodes
+      lab.nodes.each do |node|
+        if (defined? node.dnat) && !node.dnat.nil? && node.dnat.is_a?(Array) && ['host', 'controller', 'router', 'server', 'gateway'].include?(node.type.to_s.downcase)
+          node.dnat.each do |p|
+
+            # Check if this exact rule exists in the base YAML
+            base_rule_exists = base_dnats[node.name] && base_dnats[node.name].is_a?(Array) && base_dnats[node.name].any? { |bp| p[0].to_s == bp[0].to_s && p[1].to_s == bp[1].to_s && (p[2] || 'tcp').to_s == (bp[2] || 'tcp').to_s }
+            is_adhoc_dnat = !base_rule_exists
+
+            # Smart IP fallback mapping
+            rip = ""
+            if node.type == 'controller'
+              rip = node.nics['eth0']&.split('/')&.first
+            else
+              # Try eth1 (data), fallback to eth0 (mgmt/edge), fallback to tun0 (vpn)
+              rip = node.nics['eth1']&.split('/')&.first || node.nics['eth0']&.split('/')&.first || node.nics['tun0']&.split('/')&.first
+            end
+
+            node_info = {
+              node: node.name,
+              type: node.type,
+              proto: p[2] || 'tcp',
+              external_port: "#{vip}:#{p[0]}",
+              internal_port: "#{rip || 'N/A'}:#{p[1]}",
+              adhoc: is_adhoc_dnat,
+              raw_ext: p[0],   
+              raw_int: p[1]    
+            }
+            exposed_ports << node_info
+          end
+        end
+      end
+    end
+
+    info[:exposed_ports] = exposed_ports
+    return info
+  rescue => e
+    { error: "Error processing lab info: #{e.message}" }
+  end
+
+  # Helper to automatically regenerate Topology Maps and Inventories ONLY if needed
+  def self.refresh_visuals(lab_name, force: false)
+    begin
+      labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+      actual_path = get_file_path(lab_name)
+      base_path = File.join(labs_dir, lab_name)
+
+      # SMART CACHE CHECK
+      pubdir = '/srv/ctlabs-server/public'
+      topo_file = File.join(pubdir, 'topo.png')
+      tracker_file = File.join(pubdir, '.topo_tracker')
+      
+      needs_rebuild = force
+      
+      if !needs_rebuild
+        # 1. Did we choose a different lab from the dropdown?
+        last_drawn_lab = File.exist?(tracker_file) ? File.read(tracker_file).strip : ""
+        if last_drawn_lab != lab_name
+          needs_rebuild = true
+          
+        # 2. Was the YAML edited (via UI or CLI) since we last drew the map?
+        elsif File.exist?(topo_file) && File.exist?(actual_path)
+          needs_rebuild = true if File.mtime(actual_path) > File.mtime(topo_file)
+          
+        # 3. Are the images missing entirely?
+        else
+          needs_rebuild = true
+        end
+      end
+
+      # Skip heavy processing if nothing changed!
+      return unless needs_rebuild
+
+      # Generate visuals
+      lab = Lab.new(cfg: actual_path, log: LabLog.null)
+      lab.visualize
+      lab.inventory
+      
+      # Update the tracker file with the currently drawn lab
+      File.write(tracker_file, lab_name)
+      
+    rescue => e
+      puts "[Warning] Failed to generate visuals for #{lab_name}: #{e.message}"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper: Check if a profile is used by any node - Moved from LabHelper
+  # ---------------------------------------------------------------------------
+  def self.profile_in_use?(yaml, target_type, target_profile)
+    vm = yaml['topology']&.first || {}
+    
+    # Gather all nodes across all planes (or flat nodes array)
+    nodes_to_scan = vm['planes'] ? vm['planes'].values.map { |p| p['nodes'] } : [vm['nodes']]
+    
+    nodes_to_scan.compact.each do |node_group|
+      node_group.values.each do |n|
+        node_type = n['type'] || 'host'
+        node_prof = n['profile'] || n['kind'] || 'linux'
+        
+        # If we find a match, it is in use!
+        if node_type.to_s == target_type.to_s && node_prof.to_s == target_profile.to_s
+          return true
+        end
+      end
+    end
+    false
   end
 
   # Acquire playbook execution lock (with stale lock cleanup)

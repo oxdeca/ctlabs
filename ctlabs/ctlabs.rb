@@ -131,9 +131,9 @@ if options[:up]
   end
 
   # Create Runtime Copy
-  runtime_path = "/var/run/ctlabs/#{config_path.gsub('/', '_')}.yml"
-  FileUtils.mkdir_p('/var/run/ctlabs')
-  FileUtils.cp(full_path, runtime_path) # <-- Fixed bug here (was source_path)
+  runtime_path = Lab.get_file_path(config_path)
+  FileUtils.mkdir_p(File.dirname(runtime_path))
+  FileUtils.cp(full_path, runtime_path)
 
   log = LabLog.for_lab(lab_name: config_path, action: 'up')
   puts "Starting lab: #{config_path}"
@@ -158,12 +158,8 @@ if options[:play]
     exit 1
   end
 
-  running_lab = Lab.current_name
-  labs_dir    = File.expand_path('../labs', __dir__)
-  
-  # Read from runtime copy
-  runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
-  full_path   = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
+  l1 = Lab.current
+  running_lab = l1.instance_variable_get(:@relative_path)
 
   # CHECK FOR CONCURRENT EXECUTION BEFORE STARTING
   if Lab.playbook_running?(running_lab)
@@ -185,7 +181,7 @@ if options[:play]
   begin
     # Reuse existing log file (append mode)
     log = LabLog.new(path: log_path)
-    l1 = Lab.new(cfg: full_path, relative_path: running_lab, log: log)
+    l1.instance_variable_set(:@log, log)
     
     playbook_arg = options[:play] == true ? nil : options[:play]
     l1.run_playbook(playbook_arg, log_path)  # Dual-stream: CLI + log file
@@ -205,24 +201,21 @@ end
 # === DOWN MODE ===
 #
 if options[:down]
-  if !Lab.running?
+  unless Lab.running?
     puts "❌ Error: No lab is running. Use --status to check."
     exit 1
   end
 
-  running_lab = Lab.current_name
-  labs_dir    = File.expand_path('../labs', __dir__)
-  
-  # Read from runtime copy to ensure AdHoc nodes are stopped!
-  runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
-  full_path   = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
+  l1 = Lab.current
+  running_lab = l1.instance_variable_get(:@relative_path)
+  runtime_path = l1.instance_variable_get(:@cfg_file)
 
   log = LabLog.for_lab(lab_name: running_lab, action: 'down')
 
   puts "Stopping running lab: #{running_lab}"
   puts "Log file: #{log.path}"
 
-  l1 = Lab.new(cfg: full_path, relative_path: running_lab, log: log)
+  l1.instance_variable_set(:@log, log)
   l1.down
   
   # Clean up runtime copy
@@ -241,29 +234,13 @@ if options[:graph] || options[:ini] || options[:print]
   # Initialize l1 if it wasn't already initialized by up/down/play
   unless defined?(l1) && l1
     if options[:config]
-      config_path = options[:config]
-      labs_dir = File.expand_path('../labs', __dir__)
-      target_path = File.join(labs_dir, config_path)
-      
-      # If this specific lab is currently running, use its runtime copy so the graphs show ad-hoc nodes!
-      if Lab.running? && Lab.current_name == config_path
-        runtime_path = "/var/run/ctlabs/#{config_path.gsub('/', '_')}.yml"
-        target_path = runtime_path if File.file?(runtime_path)
-      end
-
-      unless File.file?(target_path)
-        puts "❌ Error: Config file not found: #{target_path}"
+      l1 = Lab.find(options[:config])
+      unless l1
+        puts "❌ Error: Lab not found: #{options[:config]}"
         exit 1
       end
-      l1 = Lab.new(cfg: target_path, relative_path: config_path, log: LabLog.null)
     elsif Lab.running?
-      # Fallback to the currently running lab if no config is specified
-      running_lab = Lab.current_name
-      labs_dir    = File.expand_path('../labs', __dir__)
-      runtime_path = "/var/run/ctlabs/#{running_lab.gsub('/', '_')}.yml"
-      target_path  = File.file?(runtime_path) ? runtime_path : File.join(labs_dir, running_lab)
-      
-      l1 = Lab.new(cfg: target_path, relative_path: running_lab, log: LabLog.null)
+      l1 = Lab.current
     else
       puts "❌ Error: No lab running and no -c/--conf specified. Cannot generate graphs or inventory."
       exit 1
@@ -276,9 +253,7 @@ if options[:graph] || options[:ini] || options[:print]
 end
 
 if options[:list]
-  labs = Dir.glob(File.join(LABS_DIR, "**", "*.yml"))
-            .map { |f| f.sub(LABS_DIR + '/', '') }
-            .sort
+  labs = Lab.all
   if labs.empty?
     puts "No labs found in #{LABS_DIR}"
   else

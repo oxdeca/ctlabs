@@ -8,24 +8,23 @@
 <style>
   /* Force dark-themed scrollbars for BOTH vertical and horizontal axes */
   .log-terminal::-webkit-scrollbar {
-    width: 12px;  /* Vertical scrollbar width */
-    height: 12px; /* Horizontal scrollbar height */
+    width: 8px;
+    height: 8px;
   }
   .log-terminal::-webkit-scrollbar-track {
     background: #0f172a; 
-    border-radius: 8px;
   }
   .log-terminal::-webkit-scrollbar-thumb {
     background: #334155; 
-    border-radius: 8px;
-    border: 3px solid #0f172a; /* Creates a nice padding effect */
+    border-radius: 4px;
+    border: 2px solid #0f172a;
   }
   .log-terminal::-webkit-scrollbar-thumb:hover {
     background: #475569; 
   }
   /* Firefox Fallback */
   .log-terminal {
-    scrollbar-width: auto;
+    scrollbar-width: thin;
     scrollbar-color: #334155 #0f172a;
   }
 </style>

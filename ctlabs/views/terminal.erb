@@ -29,11 +29,13 @@
     .status { color: #10b981; font-size: 0.85em; }
     .status.disconnected { color: #ef4444; }
     
-    .xterm-viewport::-webkit-scrollbar { width: 8px; }
-    .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
-    .xterm-viewport::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-    .xterm-viewport::-webkit-scrollbar-thumb:hover { background: #38bdf8; }
-    .xterm-viewport { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+    /* --- UNIFIED SLIM SCROLLBARS --- */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f172a; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    .xterm-viewport { scrollbar-width: thin; scrollbar-color: #334155 #0f172a; }
     
     #terminal-container {
       width: 100%; flex: 1 1 0; height: 0; min-height: 0;

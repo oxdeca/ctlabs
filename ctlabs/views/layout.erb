@@ -96,6 +96,19 @@
     
     /* Code Blocks */
     pre, code { border-radius: 8px; }
+
+    /* --- UNIFIED SLIM SCROLLBARS --- */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f172a; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    
+    /* Firefox Fallback */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #334155 #0f172a;
+    }
+
     /* --- BULLETPROOF CODEMIRROR DARK THEME --- */
     .CodeMirror { 
       background-color: #0f172a !important; 

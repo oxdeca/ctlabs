@@ -2,33 +2,60 @@
 
 # -----------------------------------------------------------------------------
 # File        : ctlabs/server.rb
-# Description : ctlabs main script
+# Description : Main secure Sinatra server for CT Labs
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
-require 'fileutils'
-require 'openssl'
 require 'sinatra'
-require 'erb'
-require 'net/http'
-require 'shellwords'
-require 'set'
+require 'sinatra/base'
+require 'json'
+require 'yaml'
+require 'fileutils'
 require 'securerandom'
+require 'uri'
+require 'openssl'
 require 'websocket/driver'
 require 'pty'
-require 'json'
+require 'timeout'
 
-# --- Load Libraries ---
-$LOAD_PATH.unshift File.join(File.dirname(__FILE__), 'lib')
+# Add lib to load path
+$LOAD_PATH.unshift(File.expand_path('./lib', File.dirname(__FILE__)))
+
 require 'lab'
 require 'node'
 require 'link'
 require 'graph'
 require 'lablog'
-require 'ws_socket_wrapper' # <--- Your extracted class!
+require 'ws_socket_wrapper'
 require 'vault_auth'
 
-# --- Sinatra Settings ---
+# --- Load Helpers ---
+require_relative 'helpers/application_helper'
+require_relative 'helpers/lab_helper'
+require_relative 'helpers/image_helper'
+
+# --- Load Services ---
+require_relative 'services/lab_repository'
+require_relative 'services/automation_service'
+require_relative 'services/image_service'
+require_relative 'services/terminal_service'
+
+# --- Load Controllers ---
+require_relative 'controllers/base_controller'
+require_relative 'controllers/labs_controller'
+require_relative 'controllers/nodes_controller'
+require_relative 'controllers/automation_controller'
+require_relative 'controllers/images_controller'
+require_relative 'controllers/profiles_controller'
+require_relative 'controllers/topology_controller'
+require_relative 'controllers/vault_controller'
+require_relative 'controllers/main_controller'
+require_relative 'controllers/terminal_controller'
+require_relative 'controllers/logs_controller'
+require_relative 'controllers/dnat_controller'
+require_relative 'controllers/links_controller'
+
+# --- Sinatra Settings (Classic for root app) ---
 disable :logging
 enable  :sessions
 set     :server,             'webrick'
@@ -56,37 +83,19 @@ Dir.mkdir(LOG_DIR,    0755) unless Dir.exist?(LOG_DIR)
 Dir.mkdir(LOCK_DIR,   0755) unless Dir.exist?(LOCK_DIR)
 Dir.mkdir(UPLOAD_DIR, 0755) unless Dir.exist?(UPLOAD_DIR)
 
-# --- Middleware (Basic Auth) ---
-use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
-  salt = "GGV78Ib5vVRkTc"
-  user == 'ctlabs' && pass.crypt("$6$#{salt}$") == "$6$GGV78Ib5vVRkTc$cRAo9wl36SQPkh/UFzgEIOO1rBuju7/h5Lu8fJMDUNDG0HUcL3AhBNEqcYT1UUZkmBHa9.8r/5eh5qXwA8zcr."
-end
-
-# --- Load Helpers ---
-require_relative 'helpers/application_helper'
-require_relative 'helpers/yaml_helper'
-require_relative 'helpers/lab_helper'
-require_relative 'helpers/image_helper'
-
-helpers ApplicationHelper
-helpers YamlHelper
-helpers LabHelper
-helpers ImageHelper
-
-# --- Load Routes ---
-require_relative 'routes/main'
-require_relative 'routes/terminal'
-require_relative 'routes/images'
-require_relative 'routes/profiles'
-require_relative 'routes/logs'
-require_relative 'routes/misc'
-require_relative 'routes/automation'
-require_relative 'routes/topology'
-require_relative 'routes/nodes'
-require_relative 'routes/links'
-require_relative 'routes/dnat'
-require_relative 'routes/labs'
-require_relative 'routes/vault'
+# --- Mount Controllers ---
+use LabsController
+use NodesController
+use AutomationController
+use ImagesController
+use ProfilesController
+use TopologyController
+use VaultController
+use MainController
+use TerminalController
+use LogsController
+use DnatController
+use LinksController
 
 # ------------------------------------------------------------------------------
 # SECURE PUMA BOOTLOADER
