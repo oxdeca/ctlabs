@@ -221,7 +221,7 @@ status_check() {
     if ${CURL} -sk "${URL}" > /dev/null; then
       echo -e " ${GREEN}UP${NC}"
       echo -e "\n${GREEN}=============================================================================${NC}"
-      echo -e "${GREEN}CT LABS DEPLOYMENT SUCCESSFUL${NC}"
+      echo -e "${GREEN}CTLABS DEPLOYMENT SUCCESSFUL${NC}"
       echo -e "${GREEN}=============================================================================${NC}"
       echo -e "Web UI is ready at: ${CYAN}${URL}${NC}"
       echo -e "Default user      : ${CYAN}ctlabs${NC}"
