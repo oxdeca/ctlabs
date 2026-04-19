@@ -211,12 +211,11 @@ Every node in the lab is accessible via an integrated web terminal:
 Automation
 ----------
 
-### Ansible
-
+In the Automation Section we can configure ansible playbooks or terraform configurations that we want to run. The settings will be stored as part of the lab configuration. 
 
 ![screenshot](docs/pics/screenshot-20260419-170504.png)
 
-#### Ansible Editor
+### Ansible Editor
 
 In the `Settings` tab we can define the playbook and its configurations that should be run.
 
@@ -238,3 +237,15 @@ Once the playbook is started, we're automatically redirected to the logstream ou
 
 ![screenshot](docs/pics/screenshot-20260419-171800.png)
 
+
+### Terraform Editor
+
+In the `Settings` tab
+
+![screenshot](docs/pics/screenshot-20260419-172833.png)
+
+
+As with the Ansible Editor, we can have multiple open files at the same time, create new ones, ...
+
+
+![screenshot](docs/pics/screenshot-20260419-173122.png)
