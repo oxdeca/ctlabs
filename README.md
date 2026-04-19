@@ -4,6 +4,9 @@ CtLabs
 `ctlabs` is a tool designed to streamline the creation of repeatable lab environments.
 It automates the setup and configuration of lab components, which are all run as containers. When full virtualization is required, ctlabs creates QEMU instances within those containers and connects them to the container's network via TAP interfaces. This approach allows for a consistent and straightforward lab setup, regardless of the virtualization needs.
 
+![CtLabs](./lab_setup.gif) 
+
+
 Key Features
 ------------
 
@@ -16,6 +19,20 @@ Key Features
 * **Dynamic Topology Mapping:** Automated SVG generation for both Data and Management network planes.
 * **Ad-hoc DNAT Management:** Runtime port forwarding with a full audit trail visible in operational logs.
 * **Concurrency Protection:** Playbook execution lock prevents dangerous concurrent runs between CLI and web interfaces.
+
+
+Installation
+----------------------
+
+### CentOS
+
+- Tested successfully with CentOS 9
+- enabled nested virtualisation
+
+```sh
+curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install.sh | bash
+```
+
 
 Manual Installation
 -------------------
@@ -36,15 +53,6 @@ _optional_
 ```bash
 sh# dnf install epel-release htop irb wireshark-cli tcpdump perf bpftrace kernel-modules-extra-$(uname -r)
 ```
-
-Automated Installation
-----------------------
-
-For faster and more consistent setup, you can use Terraform to automate the creation of a CentOS 9 virtual machine.
-* [Terraform configuration](https://github.com/oxdeca/ctlabs-terraform/tree/main/01_lpic2/gcp): 
-  * This Terraform configuration creates a CentOS 9 VM on Google Cloud Platform.
-* [Installation shell script](https://raw.githubusercontent.com/oxdeca/ctlabs-terraform/refs/heads/main/01_lpic2/ppvm.sh): 
-  * This shell script installs all the necessary packages and dependencies on the VM. (used by the terraform code)
 
 Container Images
 ----------------

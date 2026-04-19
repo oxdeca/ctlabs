@@ -77,7 +77,6 @@ CTIMGS=(
   '/root/ctlabs/images/debian/d12'
   '/root/ctlabs/images/kali'
   '/root/ctlabs/images/parrot'
-  '/root/ctlabs/images/owasp'
 )
 
 BASHRC_KALI='
