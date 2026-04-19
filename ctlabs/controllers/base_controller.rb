@@ -37,8 +37,14 @@ class BaseController < Sinatra::Base
     if File.exist?(auth_file)
       begin
         auth_content = File.read(auth_file).strip
-        f_user, f_pass = auth_content.split(':', 2)
-        next user == f_user && pass == f_pass
+        f_user, f_stored = auth_content.split(':', 2)
+
+        # Handle both hashed and plaintext credentials for backward compatibility
+        if f_stored&.start_with?('$6$')
+          next user == f_user && pass.crypt(f_stored) == f_stored
+        else
+          next user == f_user && pass == f_stored
+        end
       rescue
         # Fallback to default on error
       end

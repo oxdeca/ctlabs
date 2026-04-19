@@ -190,12 +190,13 @@ selinux() {
 
 set_password() {
   PASS=$(${OPENSSL} rand -base64 12)
+  HASH=$(${OPENSSL} passwd -6 "${PASS}")
   AUTH_DIR="${HOME}/.ctlabs-server"
   AUTH_FILE="${AUTH_DIR}/auth"
 
   ${MKDIR} -p "${AUTH_DIR}" > /dev/null 2>&1
   ${CHMOD} 700 "${AUTH_DIR}" > /dev/null 2>&1
-  ${ECHO} "ctlabs:${PASS}" > "${AUTH_FILE}"
+  ${ECHO} "ctlabs:${HASH}" > "${AUTH_FILE}"
   ${CHMOD} 600 "${AUTH_FILE}" > /dev/null 2>&1
 
   echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
