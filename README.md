@@ -10,7 +10,7 @@ It automates the setup and configuration of lab components, which are primarily 
 Key Features
 ------------
 
-* **Automated Lab Setup:** Uses YAML configuration files to define complex environments.
+* **Automated Lab Setup:** Uses YAML configuration files to define complex environments. (Ansible, Terraform Support)
 * **Hybrid Virtualization:** Support for virtual machines (using QEMU/KVM) and containers (using Podman).
 * **Infrastructure as Code:** Integrated editors for Ansible playbooks, Terraform configurations, and Dockerfiles.
 * **Segregated Networking:** Automatic creation of isolated Data and Management Networks for enhanced lab security and realism.
@@ -104,7 +104,7 @@ The Lab Details view is the central hub for managing a specific lab environment.
 * **Container Images:**
   * View and manage the local container images available for use within the lab.
 
----
+
 
 Network Architecture
 --------------------
@@ -205,4 +205,36 @@ Every node in the lab is accessible via an integrated web terminal:
 *   **Direct Console Access**: Connect directly to the shell of Podman containers. QEMU serial console is accesible via tmux session in the container.
 
 ![Web Terminal](./docs/pics/screenshot-terminal_02.png)
+
+
+
+Automation
+----------
+
+### Ansible
+
+
+![screenshot](docs/pics/screenshot-20260419-170504.png)
+
+#### Ansible Editor
+
+In the `Settings` tab we can define the playbook and its configurations that should be run.
+
+![screenshot](docs/pics/screenshot-20260419-170718.png)
+
+We can also edit the files, e.g. the playbook, roles, inventory ...
+
+![screenshot](docs/pics/screenshot-20260419-170803.png)
+
+We can have multiple open files at the same time, create new ones, ...
+
+![screenshot](docs/pics/screenshot-20260419-171141.png)
+
+To run the playbook we press the `Run Playbook` button.
+
+![screenshot](docs/pics/screenshot-20260419-171631.png)
+
+Once the playbook is started, we're automatically redirected to the logstream output.
+
+![screenshot](docs/pics/screenshot-20260419-171800.png)
 
