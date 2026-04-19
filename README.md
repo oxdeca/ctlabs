@@ -42,15 +42,15 @@ The VM should have at least following resources:
 e.g. we can create a vm in `GCP` with:
 
 ```bash
-gcloud compute instances create centos9-vm \
-    --zone=us-central1-a                   \
-    --machine-type=n1-standard-1           \  # 2 vCPU, 4GB RAM
-    --image-family=centos-stream-9         \
-    --image-project=centos-cloud           \
-    --boot-disk-size=20GB                  \
-    --enable-nested-virtualization         \
-    --provisioning-model=SPOT              \
-    --instance-termination-action=STOP     \
+gcloud compute instances create vm1    \
+    --zone=us-central1-a               \
+    --machine-type=n1-standard-1       \  # 2 vCPU, 4GB RAM
+    --image-family=centos-stream-9     \
+    --image-project=centos-cloud       \
+    --boot-disk-size=20GB              \
+    --enable-nested-virtualization     \
+    --provisioning-model=SPOT          \
+    --instance-termination-action=STOP \
     --max-run-duration=8h
 ```
 
@@ -61,7 +61,7 @@ curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/instal
 ```
 
 ```bash
-[root@vm1 ctlabs]# sh ./install.sh 
+[root@vm1 ctlabs]# curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/install.sh | bash
 Starting CT Labs Deployment...
 Configuring SELinux...                             [  OK  ]
 Configuring system...                              [  OK  ]
@@ -70,6 +70,12 @@ Updating OS...                                     [  OK  ]
 Installing packages...                             [  OK  ]
 Configuring services...                            [  OK  ]
 Cloning repositories...                            [  OK  ]
+...
+```
+
+3. Enter a password for the `ctlabs` user used by the `WebUI` when prompted:
+```bash
+...
 -----------------------------------------------------------------------------
 WEB UI SECURITY
 -----------------------------------------------------------------------------
@@ -77,10 +83,23 @@ Suggested secure password: /r********M
 Enter password for 'ctlabs' user (leave empty to use suggested): 
 Password set to: /rvUIviOCCD7yAtM
 -----------------------------------------------------------------------------
+...
+```
+
+4. The installation continues to create the container images
+
+```bash
+...
 Building container images...                       [  OK  ]
 Performing final status checks...
 Waiting for ctlabs-server to start... UP
+...
+```
 
+5. Login into the `WebUI` with the information given in the summary:
+
+```bash
+...
 =============================================================================
 CT LABS DEPLOYMENT SUCCESSFUL
 =============================================================================
@@ -90,26 +109,7 @@ Password          : /r********M
 =============================================================================
 ```
 
-3. Enter a password for the `ctlabs` user used by the `WebUI` when prompted:
 
-```
------------------------------------------------------------------------------
-WEB UI SECURITY
------------------------------------------------------------------------------
-Suggested secure password: z********H
-Enter password for 'ctlabs' user (leave empty to use suggested): 
-Password set to: z********H
------------------------------------------------------------------------------
-```
-
-4. Login into the `WebUI`
-
-- <https://${CENTOS9-VM-IP}:4567>
-
-```
-username: ctlabs
-password: <was_set_during_installation>
-```
 
 ---
 
