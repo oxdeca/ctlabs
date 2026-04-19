@@ -163,8 +163,8 @@ clone_repo() {
   ${LN} -svf "${HOME}/ctlabs/ctlabs/css/" /srv/ctlabs-server/public/css > /dev/null 2>&1
   
   # Update the service file dynamically
-  ${SED} -i "s|WorkingDirectory=.*|WorkingDirectory=${HOME}/ctlabs|"    ctlabs/ctlabs/ctlabs-server.service
-  ${SED} -i "s|ExecStart=.*|ExecStart=${HOME}/ctlabs/ctlabs/server.rb|" ctlabs/ctlabs/ctlabs-server.service
+  ${SED} -i "s|WorkingDirectory=.*|WorkingDirectory=${HOME}/ctlabs/ctlabs|" ctlabs/ctlabs/ctlabs-server.service
+  ${SED} -i "s|ExecStart=.*|ExecStart=${HOME}/ctlabs/ctlabs/server.rb|"     ctlabs/ctlabs/ctlabs-server.service
 
   ${CP} ctlabs/ctlabs/ctlabs-server.service /etc/systemd/system/
   ${SYSTEMCTL} daemon-reload
