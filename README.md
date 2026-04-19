@@ -62,6 +62,7 @@ curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/instal
 
 
 ![screenshot](docs/pics/screenshot-20260419-155347.png)
+
 4. Login into the `WebUI` with the information given in the summary:
 
 ![screenshot](docs/pics/screenshot-20260419-142655.png)
