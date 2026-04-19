@@ -28,6 +28,7 @@ PYTHON=/usr/bin/python3
 DOCKER=/usr/bin/docker
 TOUCH=/usr/bin/touch
 BASE64=/usr/bin/base64
+OPENSSL=/usr/bin/openssl
 SYSTEMCTL=/usr/bin/systemctl
 
 
@@ -329,6 +330,26 @@ selinux() {
   ${SED} -ri 's@(SELINUX=).*@\1permissive@' /etc/selinux/config
 }
 
+set_password() {
+  SUGGESTED_PASS=$(${OPENSSL} rand -base64 12)
+  echo "-----------------------------------------------------------------------------"
+  echo "WEB UI SECURITY"
+  echo "-----------------------------------------------------------------------------"
+  echo "Suggested secure password: ${SUGGESTED_PASS}"
+  read -p "Enter password for 'ctlabs' user (leave empty to use suggested): " PASS
+  PASS=${PASS:-${SUGGESTED_PASS}}
+  echo "Password set to: ${PASS}"
+  
+  SALT="GGV78Ib5vVRkTc"
+  # Generate SHA-512 hash
+  HASH=$(${OPENSSL} passwd -6 -salt "${SALT}" "${PASS}")
+  
+  # Replace in base_controller.rb
+  # Using @ as delimiter for sed to avoid issues with / in the hash
+  ${SED} -i "s@user == 'ctlabs' && pass.crypt(\"\$6\$\#{salt}\$\") == \".*\"@user == 'ctlabs' && pass.crypt(\"\$6\$\#{salt}\$\") == \"${HASH}\"@" /root/ctlabs/ctlabs/controllers/base_controller.rb
+  echo "-----------------------------------------------------------------------------"
+}
+
 # -----------------------------------------------------------------------------
 # MAIN
 # -----------------------------------------------------------------------------
@@ -341,4 +362,5 @@ packages
 services
 
 clone_repo
+set_password
 ctimages
