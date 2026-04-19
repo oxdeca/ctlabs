@@ -27,8 +27,11 @@ class BaseController < Sinatra::Base
 
   # --- Middleware (Basic Auth) ---
   use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
-    salt = "GGV78Ib5vVRkTc"
-    user == 'ctlabs' && pass.crypt("$6$#{salt}$") == "$6$GGV78Ib5vVRkTc$cRAo9wl36SQPkh/UFzgEIOO1rBuju7/h5Lu8fJMDUNDG0HUcL3AhBNEqcYT1UUZkmBHa9.8r/5eh5qXwA8zcr."
+    username      = 'ctlabs'
+    salt          = "GGV78Ib5vVRkTc"
+    password_hash = "$6$GGV78Ib5vVRkTc$cRAo9wl36SQPkh/UFzgEIOO1rBuju7/h5Lu8fJMDUNDG0HUcL3AhBNEqcYT1UUZkmBHa9.8r/5eh5qXwA8zcr."
+
+    user == username && pass.crypt("$6$#{salt}$") == password_hash
   end
 
   # Custom error handling can be added here

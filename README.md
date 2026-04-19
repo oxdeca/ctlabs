@@ -21,18 +21,98 @@ Key Features
 * **Concurrency Protection:** Playbook execution lock prevents dangerous concurrent runs between CLI and web interfaces.
 * **CLI and WebUI** Can be used via cli and WebUI
 
+Quick Start
+-----------
 
-Installation
-----------------------
+1. Create a new/Use an existing VM and make sure `nested virtualization` is enabled.
+We can test if `nested virtualization` is enabled with the command `grep -cw vmx /proc/cpuinfo`. If the result is greater zero, it is enabled, e.g.
 
-### CentOS
+_VM with enabled `nested virtualiztion`_
+```
+root@vm1:~# grep -cw vmx /proc/cpuinfo
+4
+```
 
-- Tested successfully with CentOS 9
-- enabled nested virtualisation
+The VM should have at least following resources:
+
+| vCPUs | Memory | Storage |
+|------|---------|---------|
+|   2  |   4GB   |   20GB  |
+
+e.g. we can create a vm in `GCP` with:
+
+```bash
+gcloud compute instances create centos9-vm \
+    --zone=us-central1-a                   \
+    --machine-type=n1-standard-1           \  # 2 vCPU, 4GB RAM
+    --image-family=centos-stream-9         \
+    --image-project=centos-cloud           \
+    --boot-disk-size=20GB                  \
+    --enable-nested-virtualization         \
+    --provisioning-model=SPOT              \
+    --instance-termination-action=STOP     \
+    --max-run-duration=8h
+```
+
+2. Login into the vm and run the `install.sh` script
 
 ```sh
-curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install.sh | bash
+curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/install.sh | bash
 ```
+
+```bash
+[root@vm1 ctlabs]# sh ./install.sh 
+Starting CT Labs Deployment...
+Configuring SELinux...                             [  OK  ]
+Configuring system...                              [  OK  ]
+Configuring tmux...                                [  OK  ]
+Updating OS...                                     [  OK  ]
+Installing packages...                             [  OK  ]
+Configuring services...                            [  OK  ]
+Cloning repositories...                            [  OK  ]
+-----------------------------------------------------------------------------
+WEB UI SECURITY
+-----------------------------------------------------------------------------
+Suggested secure password: /r********M
+Enter password for 'ctlabs' user (leave empty to use suggested): 
+Password set to: /rvUIviOCCD7yAtM
+-----------------------------------------------------------------------------
+Building container images...                       [  OK  ]
+Performing final status checks...
+Waiting for ctlabs-server to start... UP
+
+=============================================================================
+CT LABS DEPLOYMENT SUCCESSFUL
+=============================================================================
+Web UI is ready at: https://192.168.45.3:4567
+Default user      : ctlabs
+Password          : /r********M
+=============================================================================
+```
+
+3. Enter a password for the `ctlabs` user used by the `WebUI` when prompted:
+
+```
+-----------------------------------------------------------------------------
+WEB UI SECURITY
+-----------------------------------------------------------------------------
+Suggested secure password: z********H
+Enter password for 'ctlabs' user (leave empty to use suggested): 
+Password set to: z********H
+-----------------------------------------------------------------------------
+```
+
+4. Login into the `WebUI`
+
+- <https://${CENTOS9-VM-IP}:4567>
+
+```
+username: ctlabs
+password: <was_set_during_installation>
+```
+
+---
+
 
 Web Interface
 -------------
@@ -53,15 +133,6 @@ The Lab Details view is the central hub for managing a specific lab environment.
 
 ---
 
-### Modals & Editors
-
-The UI employs various modals to provide focused editing experiences:
-
-* **Node Editor**: Configure hardware resources, network interfaces, and startup images for individual nodes.
-* **Link Editor**: Define connections, VLANs, and interface mappings between lab components.
-* **Automation Editors**: Full-screen CodeMirror editors for Ansible, Terraform, and Dockerfiles with syntax highlighting.
-* **Container Image Manager**: Tools to pull new images or create custom ones via Dockerfiles.
-* **Vault Login**: Securely manage credentials for integrated services.
 
 ### Network Topologies
 
@@ -73,13 +144,6 @@ ctlabs provides automated, real-time visualization of your lab's network structu
 
 
 ![Network Topology](./docs/pics/screenshot-topology_data_01.png)
-
-### Ansible Inventories
-
-Inventories are dynamically generated based on the current lab state:
-
-*   **Management Inventory**: Targets the `eth0` interface on the isolated management plane. Used for initial provisioning and out-of-band management.
-*   **Data Inventory**: Targets the data plane interfaces (`eth1`, etc.). Used for configuring services that run over the simulated lab network.
 
 ### Connections & Terminals
 
@@ -118,3 +182,21 @@ ctlabs automatically creates separate network planes to enhance lab isolation an
       * Used for nodes requiring NAT, public IPs, or providing external access points.
       * Often serves as the termination point for cloud-integrated nodes (GCP, AWS).
 
+
+### Modals & Editors
+
+The UI employs various modals to provide focused editing experiences:
+
+* **Node Editor**: Configure hardware resources, network interfaces, and startup images for individual nodes.
+* **Link Editor**: Define connections, VLANs, and interface mappings between lab components.
+* **Automation Editors**: Full-screen CodeMirror editors for Ansible, Terraform, and Dockerfiles with syntax highlighting.
+* **Container Image Manager**: Tools to pull new images or create custom ones via Dockerfiles.
+* **Vault Login**: Securely manage credentials for integrated services.
+
+
+### Ansible Inventories
+
+Inventories are dynamically generated based on the current lab state:
+
+*   **Management Inventory**: Targets the `eth0` interface on the isolated management plane. Used for initial provisioning and out-of-band management.
+*   **Data Inventory**: Targets the data plane interfaces (`eth1`, etc.). Used for configuring services that run over the simulated lab network.
