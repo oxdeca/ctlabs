@@ -27,9 +27,22 @@ class BaseController < Sinatra::Base
 
   # --- Middleware (Basic Auth) ---
   use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
+    # Default credentials
     username      = 'ctlabs'
     salt          = "GGV78Ib5vVRkTc"
     password_hash = "$6$GGV78Ib5vVRkTc$cRAo9wl36SQPkh/UFzgEIOO1rBuju7/h5Lu8fJMDUNDG0HUcL3AhBNEqcYT1UUZkmBHa9.8r/5eh5qXwA8zcr."
+
+    # Override with credentials from ~/.ctlabs-server/auth if it exists
+    auth_file = File.expand_path('~/.ctlabs-server/auth')
+    if File.exist?(auth_file)
+      begin
+        auth_content = File.read(auth_file).strip
+        f_user, f_pass = auth_content.split(':', 2)
+        next user == f_user && pass == f_pass
+      rescue
+        # Fallback to default on error
+      end
+    end
 
     user == username && pass.crypt("$6$#{salt}$") == password_hash
   end
