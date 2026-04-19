@@ -4,7 +4,7 @@ CtLabs
 `ctlabs` is a tool designed to streamline the creation of repeatable lab environments.
 It automates the setup and configuration of lab components, which are all run as containers. When full virtualization is required, ctlabs creates QEMU instances within those containers and connects them to the container's network via TAP interfaces. This approach allows for a consistent and straightforward lab setup, regardless of the virtualization needs.
 
-![CtLabs](./lab_setup.gif) 
+![CtLabs](docs/pics/lab_setup.gif) 
 
 
 Key Features
