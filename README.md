@@ -34,8 +34,8 @@ Installation
 curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install.sh | bash
 ```
 
-Web Interface (`server.rb`)
----------------------------
+Web Interface
+-------------
 
 The web interface provides a comprehensive management console for your labs.
 
