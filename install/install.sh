@@ -84,10 +84,10 @@ GEMS=(
 )
 
 CTIMGS=(
-  "${PWD}/images/centos/c9"
-  "${PWD}/images/debian/d12"
-  "${PWD}/images/kali"
-  "${PWD}/images/parrot"
+  "${HOME}/ctlabs/images/centos/c9"
+  "${HOME}/ctlabs/images/debian/d12"
+  "${HOME}/ctlabs/images/kali"
+  "${HOME}/ctlabs/images/parrot"
 )
 
 BASHRC_KALI="https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/bashrc.kali"
@@ -137,7 +137,7 @@ services() {
 
 
 tmux() {
-  ${CURL} -skL "${TMUX_CONF}" -o /root/.tmux.conf
+  ${CURL} -skL "${TMUX_CONF}" -o /etc/tmux.conf
 }
 
 ansible() {
@@ -149,20 +149,24 @@ ansible() {
 }
 
 clone_repo() {
-  local CURRENT_DIR="${PWD}"
-  # If we are already in a ctlabs directory, we might not want to clone into it
-  # But the original script does: cd /root/; rm -rf ctlabs ...
-  # Let's make it more robust.
+  if [ !-d "ctlabs" ]; then
+    ${GIT} clone https://github.com/oxdeca/ctlabs 
+  fi
+  if [ !-d "ctlabs-ansible" ]; then
+    ${GIT} clone https://github.com/oxdeca/ctlabs-ansible
+  fi
   
-  ${MKDIR} -vp /srv/ctlabs-server/public/ > /dev/null 2>&1
-  ${LN} -svf "${CURRENT_DIR}/ctlabs/js/"  /srv/ctlabs-server/public/js > /dev/null 2>&1
-  ${LN} -svf "${CURRENT_DIR}/ctlabs/css/" /srv/ctlabs-server/public/css > /dev/null 2>&1
+  if [ !-d "/srv/ctlabs-server/public" ]; then
+    ${MKDIR} -vp /srv/ctlabs-server/public/ > /dev/null 2>&1
+  fi
+  ${LN} -svf "${HOME}/ctlabs/ctlabs/js/"  /srv/ctlabs-server/public/js > /dev/null 2>&1
+  ${LN} -svf "${HOME}/ctlabs/ctlabs/css/" /srv/ctlabs-server/public/css > /dev/null 2>&1
   
   # Update the service file dynamically
-  ${SED} -i "s|WorkingDirectory=.*|WorkingDirectory=${CURRENT_DIR}/ctlabs|" ctlabs/ctlabs-server.service
-  ${SED} -i "s|ExecStart=.*|ExecStart=${CURRENT_DIR}/ctlabs/server.rb|" ctlabs/ctlabs-server.service
+  ${SED} -i "s|WorkingDirectory=.*|WorkingDirectory=${HOME}/ctlabs|"    ctlabs/ctlabs/ctlabs-server.service
+  ${SED} -i "s|ExecStart=.*|ExecStart=${HOME}/ctlabs/ctlabs/server.rb|" ctlabs/ctlabs/ctlabs-server.service
 
-  ${CP} ctlabs/ctlabs-server.service /etc/systemd/system/
+  ${CP} ctlabs/ctlabs/ctlabs-server.service /etc/systemd/system/
   ${SYSTEMCTL} daemon-reload
   ${SYSTEMCTL} enable --now ctlabs-server.service > /dev/null 2>&1
 }
@@ -196,7 +200,7 @@ set_password() {
   
   # Replace in base_controller.rb
   # Using @ as delimiter for sed to avoid issues with / in the hash
-  ${SED} -i "s@password_hash = \".*\"@password_hash = \"${HASH}\"@" ctlabs/controllers/base_controller.rb
+  ${SED} -i "s@password_hash = \".*\"@password_hash = \"${HASH}\"@" ctlabs/ctlabs/controllers/base_controller.rb
   echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
 }
 
