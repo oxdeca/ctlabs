@@ -61,33 +61,7 @@ curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/instal
 ```
 
 
-```bash
-[root@vm1 ~]# curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/install.sh | bash
-Starting CT Labs Deployment...
-Configuring SELinux...                             [  OK  ]
-Configuring system...                              [  OK  ]
-Configuring tmux...                                [  OK  ]
-Disable mandb...                                   [  OK  ]
-Updating OS...                                     [  OK  ]
-Autoload kernel modules...                         [  OK  ]
-Installing packages...                             [  OK  ]
-Configuring services...                            [  OK  ]
-Cloning repositories...                            [  OK  ]
-Building container images (background)...          [  OK  ]
-Performing final status checks...
-Waiting for ctlabs-server to start.... UP
-
-=============================================================================
-CTLABS DEPLOYMENT SUCCESSFUL
-=============================================================================
-Web UI is ready at: https://192.168.45.3:4567
-Default user      : ctlabs
-Password          : sycSH/8kl4pMzopV
-
-Note: Container images are being built in the background.
-=============================================================================
-```
-
+![screenshot](docs/pics/screenshot-20260419-155347.png)
 4. Login into the `WebUI` with the information given in the summary:
 
 ![screenshot](docs/pics/screenshot-20260419-142655.png)
