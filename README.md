@@ -19,6 +19,7 @@ Key Features
 * **Dynamic Topology Mapping:** Automated SVG generation for both Data and Management network planes.
 * **Ad-hoc DNAT Management:** Runtime port forwarding with a full audit trail visible in operational logs.
 * **Concurrency Protection:** Playbook execution lock prevents dangerous concurrent runs between CLI and web interfaces.
+* **CLI and WebUI** Can be used via cli and WebUI
 
 
 Installation
@@ -31,70 +32,6 @@ Installation
 
 ```sh
 curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install.sh | bash
-```
-
-
-Manual Installation
--------------------
-
-### Prerequisites
-
-* CentOS 9
-* enabled nested virtualisation
-
-**System Dependencies:**
-
-```bash
-sh# dnf install git ruby graphviz ipvsadm make podman-docker qemu-img cloud-utils-growpart python3-pip tmux vim ruby-devel gcc make redhat-rpm-config
-sh# gem install webrick sinatra rackup faye-websocket puma
-```
-
-_optional_
-```bash
-sh# dnf install epel-release htop irb wireshark-cli tcpdump perf bpftrace kernel-modules-extra-$(uname -r)
-```
-
-Container Images
-----------------
-
-ctlabs relies on a set of pre-built container images for various lab components. 
-The make command in the images directory builds the necessary container images using Podman.
-This process may take some time.
-
-```bash
-git clone https://github.com/oxdeca/ctlabs
-cd ctlabs/images && make
-cd -
-```
-
-Using ctlabs
-------------
-
-Clone the `ctlabs-ansible` and `ctlabs-terraform` repositories which contains all the ansible playbooks/roles and terraform modules that are used to setup lab environments.
-
-```bash
-git clone https://github.com/oxdeca/ctlabs-ansible
-git clone https://github.com/oxdeca/ctlabs-terraform
-```
-
-**Run ctlabs:**
-
-This command uses the `ctlabs.rb` script to create a lab environment defined in the `lpic208.yml` file.
-
-```bash
-cd ctlabs/ctlabs
-./ctlabs.rb 
-Usage: ctlabs [options]
-    -c, --conf=CFG                   Configuration File
-    -u, --up                         Start the Environment
-    -d, --down                       Stop the Environment
-    -g, --graph                      Create a graphviz dot export file
-    -i, --ini                        Create an inventory ini-file
-    -t, --print                      Print inspect output
-    -p, --play [CMD]                 Run playbook
-    -l, --list                       List all available labs
-    -L, --log-level=LEVEL            Set the log level
-    -s, --status                     Show status of currently running lab
 ```
 
 Web Interface (`server.rb`)
