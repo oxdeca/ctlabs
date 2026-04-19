@@ -59,6 +59,7 @@ PKGS=(
   'htop'
   'ruby'
   'irb'
+  'openssl'
   'podman-docker'
   'wireshark-cli'
   'tcpdump'
