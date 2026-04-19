@@ -118,19 +118,3 @@ ctlabs automatically creates separate network planes to enhance lab isolation an
       * Used for nodes requiring NAT, public IPs, or providing external access points.
       * Often serves as the termination point for cloud-integrated nodes (GCP, AWS).
 
-Installation as a Service
--------------------------
-
-The `server.rb` app can be installed as systemd service by simply copying the provided unit file and reloading systemd.
-
-```bash
-cd ctlabs/ctlabs
-cp ctlabs-server.service /etc/systemd/system/ctlabs-server.service
-systemctl daemon-reload
-systemctl enable --now ctlabs-server.service
-```
-
-By default the interface can be accessed via `https://<your_host>:4567`.
-
-![img](./ctlabs-server_overview.png)
-
