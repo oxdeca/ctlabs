@@ -281,5 +281,5 @@ run_task "Cloning repositories" clone_repo
 set_password
 printf "${BLUE}%-50s${NC} " "Building container images (background)..."
 ctimages > /tmp/ctlabs-images.log 2>&1 &
-printf "[  ${GREEN}RUNNING${NC}  ]\n"
+printf "[  ${GREEN}OK${NC}  ]\n"
 status_check
