@@ -18,6 +18,7 @@ PIP=/usr/bin/pip3
 DNF=/usr/bin/dnf
 SED=/usr/bin/sed
 BASH=/bin/bash
+GREP=/usr/bin/egrep
 ECHO=/usr/bin/echo
 CURL=/usr/bin/curl
 SCTL=/usr/bin/systemctl
@@ -102,18 +103,26 @@ os_update() {
   ${DNF} -y update > /dev/null 2>&1
 }
 
+nodocs() {
+  if ! ${GREP} -iq "^tsflags=.*nodocs" /etc/yum.conf; then
+    ${ECHO} "tsflags=nodocs" >> /etc/yum.conf
+  fi
+}
+
 kmods() {
   ${ECHO} openvswitch > /etc/modules-load.d/ctlabs.conf
   ${MODPROBE} openvswitch
 }
 
 packages() {
-  for p in "${PKGS[@]}"; do
-    ${DNF} -y install "${p}" > /dev/null 2>&1
-  done
+  # Install EPEL first so subsequent packages from EPEL can be resolved
+  ${DNF} -y install epel-release > /dev/null 2>&1
+
+  # Install all other packages in one batch for speed
+  ${DNF} -y install "${PKGS[@]}" > /dev/null 2>&1
 
   ${TOUCH} /etc/containers/nodocker
-  ${GEM} install --no-document ${GEMS[*]} > /dev/null 2>&1
+  ${GEM} install --no-document "${GEMS[@]}" > /dev/null 2>&1
 }
 
 config() {
@@ -178,8 +187,7 @@ clone_repo() {
 
 ctimages() {
   for d in "${CTIMGS[@]}"; do
-    cd ${d}
-    ${MAKE} -s > /dev/null 2>&1
+    (cd "${d}" && ${MAKE} -s)
   done
 }
 
@@ -198,14 +206,6 @@ set_password() {
   ${CHMOD} 700 "${AUTH_DIR}" > /dev/null 2>&1
   ${ECHO} "ctlabs:${HASH}" > "${AUTH_FILE}"
   ${CHMOD} 600 "${AUTH_FILE}" > /dev/null 2>&1
-
-  echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
-  echo -e "${MAGENTA}WEB UI SECURITY${NC}"
-  echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
-  echo -e "Web UI credentials automatically generated and stored in: ${GREEN}${AUTH_FILE}${NC}"
-  echo -e "Username: ${CYAN}ctlabs${NC}"
-  echo -e "Password: ${CYAN}${PASS}${NC}"
-  echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
 }
 
 status_check() {
@@ -226,6 +226,7 @@ status_check() {
       echo -e "Web UI is ready at: ${CYAN}${URL}${NC}"
       echo -e "Default user      : ${CYAN}ctlabs${NC}"
       echo -e "Password          : ${CYAN}${PASS}${NC}"
+      echo -e "\n${YELLOW}Note: Container images are being built in the background.${NC}"
       echo -e "${GREEN}=============================================================================${NC}"
       return 0
     fi
@@ -270,11 +271,14 @@ echo -e "${CYAN}Starting CT Labs Deployment...${NC}"
 run_task "Configuring SELinux" selinux
 run_task "Configuring system" config
 run_task "Configuring tmux" tmux
+run_task "Disable mandb" nodocs
 run_task "Updating OS" os_update
 run_task "Autoload kernel modules" kmods
 run_task "Installing packages" packages
 run_task "Configuring services" services
 run_task "Cloning repositories" clone_repo
 set_password
-run_task "Building container images" ctimages
+printf "${BLUE}%-50s${NC} " "Building container images (background)..."
+ctimages > /tmp/ctlabs-images.log 2>&1 &
+printf "[  ${GREEN}RUNNING${NC}  ]\n"
 status_check
