@@ -28,8 +28,9 @@ PYTHON=/usr/bin/python3
 DOCKER=/usr/bin/docker
 TOUCH=/usr/bin/touch
 BASE64=/usr/bin/base64
-SYSTEMCTL=/usr/bin/systemctl
 OPENSSL=/usr/bin/openssl
+MODPROBE=/usr/sbin/modprobe
+SYSTEMCTL=/usr/bin/systemctl
 
 
 # -----------------------------------------------------------------------------
@@ -101,6 +102,11 @@ os_update() {
   ${DNF} -y update > /dev/null 2>&1
 }
 
+kmods() {
+  ${ECHO} openvswitch > /etc/modules-load.d/ctlabs.conf
+  ${MODPROBE} openvswitch
+}
+
 packages() {
   for p in "${PKGS[@]}"; do
     ${DNF} -y install "${p}" > /dev/null 2>&1
@@ -135,7 +141,6 @@ services() {
   ${SCTL} disable --now firewalld.service > /dev/null 2>&1
 }
 
-
 tmux() {
   ${CURL} -skL "${TMUX_CONF}" -o /etc/tmux.conf
 }
@@ -149,14 +154,14 @@ ansible() {
 }
 
 clone_repo() {
-  if [ !-d "ctlabs" ]; then
+  if [ ! -d "./ctlabs" ]; then
     ${GIT} clone https://github.com/oxdeca/ctlabs 
   fi
-  if [ !-d "ctlabs-ansible" ]; then
+  if [ ! -d "./ctlabs-ansible" ]; then
     ${GIT} clone https://github.com/oxdeca/ctlabs-ansible
   fi
   
-  if [ !-d "/srv/ctlabs-server/public" ]; then
+  if [ ! -d "/srv/ctlabs-server/public" ]; then
     ${MKDIR} -vp /srv/ctlabs-server/public/ > /dev/null 2>&1
   fi
   ${LN} -svf "${HOME}/ctlabs/ctlabs/js/"  /srv/ctlabs-server/public/js > /dev/null 2>&1
@@ -184,23 +189,21 @@ selinux() {
 }
 
 set_password() {
-  SUGGESTED_PASS=$(${OPENSSL} rand -base64 12)
+  PASS=$(${OPENSSL} rand -base64 12)
+  AUTH_DIR="${HOME}/.ctlabs-server"
+  AUTH_FILE="${AUTH_DIR}/auth"
+
+  ${MKDIR} -p "${AUTH_DIR}" > /dev/null 2>&1
+  ${CHMOD} 700 "${AUTH_DIR}" > /dev/null 2>&1
+  ${ECHO} "ctlabs:${PASS}" > "${AUTH_FILE}"
+  ${CHMOD} 600 "${AUTH_FILE}" > /dev/null 2>&1
+
   echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
   echo -e "${MAGENTA}WEB UI SECURITY${NC}"
   echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
-  echo -e "Suggested secure password: ${GREEN}${SUGGESTED_PASS}${NC}"
-  echo -ne "Enter password for 'ctlabs' user (${YELLOW}leave empty to use suggested${NC}): "
-  read PASS
-  PASS=${PASS:-${SUGGESTED_PASS}}
-  echo -e "Password set to: ${GREEN}${PASS}${NC}"
-  
-  SALT="GGV78Ib5vVRkTc"
-  # Generate SHA-512 hash
-  HASH=$(${OPENSSL} passwd -6 -salt "${SALT}" "${PASS}")
-  
-  # Replace in base_controller.rb
-  # Using @ as delimiter for sed to avoid issues with / in the hash
-  ${SED} -i "s@password_hash = \".*\"@password_hash = \"${HASH}\"@" ctlabs/ctlabs/controllers/base_controller.rb
+  echo -e "Web UI credentials automatically generated and stored in: ${GREEN}${AUTH_FILE}${NC}"
+  echo -e "Username: ${CYAN}ctlabs${NC}"
+  echo -e "Password: ${CYAN}${PASS}${NC}"
   echo -e "${CYAN}-----------------------------------------------------------------------------${NC}"
 }
 
@@ -267,6 +270,7 @@ run_task "Configuring SELinux" selinux
 run_task "Configuring system" config
 run_task "Configuring tmux" tmux
 run_task "Updating OS" os_update
+run_task "Autoload kernel modules" kmods
 run_task "Installing packages" packages
 run_task "Configuring services" services
 run_task "Cloning repositories" clone_repo
