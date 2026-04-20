@@ -32,7 +32,7 @@
 <script src="/js/live_log.js"></script>
 
 <div id="log-data-container" 
-     data-log-file="<%= ERB::Util.html_escape(@log_file) %>"
+     data-log-id="<%= ERB::Util.html_escape(@log_id) %>"
      data-lab-name="<%= ERB::Util.html_escape(@lab_name) %>"
      data-action="<%= ERB::Util.html_escape(@action) %>"
      style="display: contents;">
@@ -58,9 +58,15 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; height: 16px;">
         <div id="scroll-status" style="font-size: 0.8em; color: #94a3b8;"></div>
         
-        <button type="button" onclick="const p = document.getElementById('log-content'); if(p.style.whiteSpace === 'pre-wrap') { p.style.whiteSpace = 'pre'; this.innerHTML = '<i class=\'fas fa-align-left\'></i> Enable Word Wrap'; } else { p.style.whiteSpace = 'pre-wrap'; this.innerHTML = '<i class=\'fas fa-align-justify\'></i> Disable Word Wrap'; }" class="w3-button w3-tiny w3-transparent w3-text-gray w3-hover-text-white" style="padding: 0 4px;" title="Toggle Word Wrap">
-          <i class="fas fa-align-justify"></i> Disable Word Wrap
-        </button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <a id="download-log" href="/logs/download?file=<%= URI.encode_www_form_component(@log_file) %>" class="w3-button w3-tiny w3-transparent w3-text-blue w3-hover-text-white" style="padding: 0 4px;" title="Download Full Log">
+            <i class="fas fa-download"></i> Download Full Log
+          </a>
+          
+          <button type="button" onclick="const p = document.getElementById('log-content'); if(p.style.whiteSpace === 'pre-wrap') { p.style.whiteSpace = 'pre'; this.innerHTML = '<i class=\'fas fa-align-left\'></i> Enable Word Wrap'; } else { p.style.whiteSpace = 'pre-wrap'; this.innerHTML = '<i class=\'fas fa-align-justify\'></i> Disable Word Wrap'; }" class="w3-button w3-tiny w3-transparent w3-text-gray w3-hover-text-white" style="padding: 0 4px;" title="Toggle Word Wrap">
+            <i class="fas fa-align-justify"></i> Disable Word Wrap
+          </button>
+        </div>
       </div>
 
     </div>

@@ -164,7 +164,8 @@ class LabsController < BaseController
       end
     end
     
-    redirect "/logs?file=#{URI.encode_www_form_component(log.path)}"
+    log_id = register_log(log.path)
+    redirect "/logs?id=#{log_id}"
   end
 
   # --- Lab Action (Legacy start/stop via CLI) ---

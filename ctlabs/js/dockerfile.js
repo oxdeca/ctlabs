@@ -298,9 +298,8 @@ window.triggerImageBuild = async function(event) {
         const data = await res.json();
         if (res.ok) {
             document.getElementById('dockerfile-editor').style.display = 'none';
-            window.location.href = `/logs?file=${encodeURIComponent(data.log_path)}&lab=ImageBuilder&action=build`;
-        } else throw new Error(data.error);
-    } catch (err) {
+            window.location.href = `/logs?id=${data.log_id}&lab=ImageBuilder&action=build`;
+        } else throw new Error(data.error);    } catch (err) {
         resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
         resultDiv.innerHTML = '❌ ' + err.message;
         if (btn) { btn.innerHTML = originalHtml; btn.disabled = false; }

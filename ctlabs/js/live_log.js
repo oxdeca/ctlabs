@@ -9,22 +9,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('log-data-container');
   if (!container) return;
 
-  const logFile = container.dataset.logFile;
+  const logId = container.dataset.logId;
   const labName = container.dataset.labName;
   const action  = container.dataset.action;
   const logContent = document.getElementById('log-content');
   const scrollStatus = document.getElementById('scroll-status');
 
   // 1. PREVENT SILENT FAILURES
-  if (!logFile || logFile.trim() === '') {
-      if (logContent) logContent.innerHTML = "<span style='color: #ef4444;'>❌ Error: No log file path provided by backend. Check your Sinatra variables!</span>";
+  if (!logId || logId.trim() === '') {
+      if (logContent) logContent.innerHTML = "<span style='color: #ef4444;'>❌ Error: No log ID provided by backend.</span>";
       return;
   }
   if (!logContent) return;
 
   // === Save log context to localStorage ===
   localStorage.setItem('ctlabs_last_log', JSON.stringify({
-    file:      logFile,
+    id:        logId,
     lab:       labName,
     action:    action,
     timestamp: Date.now()
@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // === Bulletproof Fetch Engine ===
+  let currentOffset = 0;
+
   function fetchLog() {
     // If paused OR already fetching, wait 1 second and check again
     if (!isAutoScroll || isFetching) {
@@ -53,8 +55,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     isFetching = true;
 
-    // Cache-busting timestamp + explicit no-store
-    const fetchUrl = `/logs/content?file=${encodeURIComponent(logFile)}&t=${Date.now()}`;
+    // Cache-busting timestamp + explicit no-store + offset + json format
+    const fetchUrl = `/logs/content?id=${encodeURIComponent(logId)}&offset=${currentOffset}&format=json&t=${Date.now()}`;
 
     fetch(fetchUrl, { cache: 'no-store' })
       .then(async response => {
@@ -62,12 +64,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const errText = await response.text();
             throw new Error(`HTTP ${response.status}: ${errText}`);
         }
-        return response.text();
+        return response.json();
       })
-      .then(html => {
+      .then(data => {
+        const { content, offset, truncated } = data;
+        
+        // Update the current offset for the next request
+        currentOffset = offset;
+
         // Only update the DOM if the server actually sent data
-        if (html.trim() !== '') {
-            logContent.innerHTML = html;
+        if (content && content.trim() !== '') {
+            if (logContent.innerHTML.includes('Waiting for log output...')) {
+                logContent.innerHTML = '';
+            }
+            
+            // Show truncation warning if this is the initial load and it was limited
+            if (truncated && !logContent.querySelector('.truncation-warning')) {
+              const warning = document.createElement('div');
+              warning.className = 'truncation-warning';
+              warning.style.cssText = 'color: #fbbf24; padding-bottom: 10px; border-bottom: 1px dashed #334155; margin-bottom: 10px; font-style: italic; font-size: 0.9em;';
+              warning.innerHTML = `<i class='fas fa-exclamation-triangle'></i> Large log file detected. Only showing the last 256KB. <a href="/logs/download?id=${encodeURIComponent(logId)}" style="color: #38bdf8; text-decoration: underline;">Download full log</a> for complete history.`;
+              logContent.appendChild(warning);
+            }
+
+            logContent.insertAdjacentHTML('beforeend', content);
         } else if (logContent.innerHTML === '') {
             logContent.innerHTML = "<i style='color: #64748b;'>Waiting for log output...</i>";
         }
@@ -79,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(err => {
         console.error("Log fetch failed:", err);
         // Print the error directly to the user's screen instead of failing silently!
-        logContent.innerHTML += `\n<span style='color: #ef4444;'>\n[Connection Error: ${err.message}]</span>`;
+        logContent.insertAdjacentHTML('beforeend', `\n<span style='color: #ef4444;'>\n[Connection Error: ${err.message}]</span>`);
       })
       .finally(() => {
         isFetching = false;

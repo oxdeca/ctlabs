@@ -107,8 +107,11 @@ class ImagesController < BaseController
       log_file = File.join(log_dir, "build_#{safe_img_name}_#{Time.now.to_i}.log")
       FileUtils.touch(log_file)
       
+      # Security: Register log in session map and return ID
+      log_id = register_log(log_file)
+      
       spawn("cd #{img_dir} && bash build.sh > #{log_file} 2>&1")
-      { message: "Build triggered", log_path: log_file }.to_json
+      { message: "Build triggered", log_id: log_id }.to_json
     rescue => e
       status 400
       { error: e.message }.to_json

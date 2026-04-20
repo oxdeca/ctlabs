@@ -11,6 +11,33 @@ class BaseController < Sinatra::Base
   helpers LabHelper
   helpers ImageHelper
 
+  helpers do
+    def register_log(path)
+      return nil unless path
+      session[:log_map] ||= {}
+      id = session[:log_map].key(path)
+      unless id
+        id = SecureRandom.hex(8)
+        session[:log_map][id] = path
+      end
+      id
+    end
+
+    def resolve_log_path(id)
+      path = session[:log_map]&.[](id)
+      return nil unless path
+      
+      log_dir = LabLog::LOG_DIR
+      basename = File.basename(path)
+      is_valid_prefix = basename.start_with?('ctlabs_') || basename.start_with?('build_') || basename == 'ctlabs.log'
+      
+      unless (path.start_with?(log_dir) || path == '/var/log/ctlabs.log') && is_valid_prefix && path.end_with?('.log')
+        return nil
+      end
+      path
+    end
+  end
+
   # --- Sinatra Settings ---
   configure do
     disable :logging

@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // Parse the string into an object FIRST
       const logData = JSON.parse(lastLogString);
-      const { file, lab, action, timestamp } = logData;
+      const { id, lab, action, timestamp } = logData;
 
       // Now we can safely check the timestamp (Expire after 1 hour / 3600000ms)
       if (Date.now() - timestamp > 3600000) {
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const url = `/logs?file=${encodeURIComponent(file)}&lab=${encodeURIComponent(lab)}&action=${encodeURIComponent(action)}`;
+      const url = `/logs?id=${encodeURIComponent(id)}&lab=${encodeURIComponent(lab)}&action=${encodeURIComponent(action)}`;
       
       // Auto-redirect after a brief delay (for UX feedback)
       statusEl.innerHTML = `

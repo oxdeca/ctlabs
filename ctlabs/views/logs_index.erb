@@ -16,7 +16,8 @@
       <strong style="color: #38bdf8;"><i class="fas fa-play-circle"></i> Currently running:</strong> <code><%= @running_lab %></code>
       <% latest_log = LabLog.latest_for_running_lab %>
       <% if latest_log %>
-        <a href="/logs?file=<%= URI.encode_www_form_component(latest_log) %>"
+        <% latest_log_id = register_log(latest_log) %>
+        <a href="/logs?id=<%= latest_log_id %>"
            class="w3-button w3-small w3-blue w3-round w3-margin-left" style="padding: 4px 10px;">
           <i class="fas fa-eye"></i> View Live Log
         </a>
@@ -44,6 +45,7 @@
     <div style="background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; overflow: hidden;">
       <% @log_files.each do |log_path| %>
         <% meta = parse_log_metadata(log_path) %>
+        <% log_id = register_log(log_path) %>
         
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #334155; transition: background 0.2s;" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" onmouseout="this.style.backgroundColor='transparent'">
           <div>
@@ -54,11 +56,11 @@
             </span>
           </div>
           <div style="display: flex; gap: 8px;">
-            <a href="/logs?file=<%= URI.encode_www_form_component(log_path) %>" class="w3-button w3-small w3-transparent w3-text-blue w3-hover-text-light-coral" title="View Log" style="padding: 4px 10px;">
+            <a href="/logs?id=<%= log_id %>" class="w3-button w3-small w3-transparent w3-text-blue w3-hover-text-light-coral" title="View Log" style="padding: 4px 10px;">
               <i class="fas fa-eye fa-lg"></i>
             </a>
             <form method="post" action="/logs/delete" style="margin: 0;" onsubmit="return confirm('Delete this log?')">
-              <input type="hidden" name="file" value="<%= URI.encode_www_form_component(log_path) %>">
+              <input type="hidden" name="id" value="<%= log_id %>">
               <button type="submit" class="w3-button w3-small w3-transparent w3-text-red w3-hover-text-light-coral" title="Delete Log" style="padding: 4px 10px;">
                 <i class="fas fa-trash fa-lg"></i>
               </button>
