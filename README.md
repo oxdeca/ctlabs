@@ -207,6 +207,25 @@ Every node in the lab is accessible via an integrated web terminal:
 
 ![Web Terminal](./docs/pics/screenshot-terminal_02.png)
 
+#### Open a terminal
+
+We can open a terminal in 3 ways:
+
+1. Topology View
+
+![screenshot](docs/pics/screenshot-20260419-200625.png)
+
+2. Connections View
+
+![screenshot](docs/pics/screenshot-20260419-200717.png)
+
+
+3. Nodes List
+s
+![screenshot](docs/pics/screenshot-20260419-200903.png)
+
+
+
 
 
 Automation
@@ -250,3 +269,34 @@ As with the Ansible Editor, we can have multiple open files at the same time, cr
 
 
 ![screenshot](docs/pics/screenshot-20260419-173122.png)
+
+
+Labs
+----
+
+### Starting a lab
+
+1. Choose a lab
+
+![screenshot](docs/pics/screenshot-20260419-194022.png)
+
+
+2. Make sure all needed images are created
+
+![screenshot](docs/pics/screenshot-20260419-194137.png)
+
+
+In the `Nodes` table we can see if images used for the node are available or not. If the cube next to the image in the `Image` column is green the image is availabe and if its white it's not available.
+
+![screenshot](docs/pics/screenshot-20260419-194217.png)
+
+To start the lab, we click the `Start` button which redirects us to the Logstream.
+
+![screenshot](docs/pics/screenshot-20260419-195448.png)
+
+
+If we return to the main page (`CTLABS` menu item), we see the message that a lab was already started. We can stop the lab by clicking the `Stop` button.
+
+![screenshot](docs/pics/screenshot-20260419-195523.png)
+
+
