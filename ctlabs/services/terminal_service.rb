@@ -118,7 +118,7 @@ class TerminalService
     cmd
   end
 
-  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown')
+  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil)
     pty_read   = nil
     pty_write  = nil
     pty_pid    = nil
@@ -134,6 +134,12 @@ class TerminalService
 
       begin
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
+        
+        # Apply initial terminal size if provided
+        if initial_cols && initial_rows && pty_write
+          winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
+          pty_write.ioctl(0x5414, winsize) rescue nil
+        end
         
         session_info = {
           id: SecureRandom.uuid,

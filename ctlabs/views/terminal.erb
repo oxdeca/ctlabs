@@ -73,22 +73,19 @@
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
       term.open(container);
+      fitAddon.fit();
       
       const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName);
+      const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) + 
+                    `?cols=${term.cols}&rows=${term.rows}`;
       const ws = new WebSocket(wsUrl);
       const statusEl = document.getElementById('status');
-
-      setTimeout(() => {
-        fitAddon.fit();
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-        }
-      }, 100);
 
       ws.onopen = () => {
         statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
         term.focus();
+        // Ensure backend has the most up-to-date size right after connection
+        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
       };
 
       ws.onmessage = (event) => term.write(event.data);

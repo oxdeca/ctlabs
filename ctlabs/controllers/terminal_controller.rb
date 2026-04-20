@@ -17,7 +17,9 @@ class TerminalController < BaseController
       node_name = params[:node_name]
       cmd = TerminalService.resolve_terminal_command(node_name, session)
       
-      TerminalService.handle_websocket(driver, cmd, io, ssl_mutex, node_name)
+      TerminalService.handle_websocket(driver, cmd, io, ssl_mutex, node_name, 
+                                       initial_cols: params[:cols], 
+                                       initial_rows: params[:rows])
 
       return [-1, {}, []]
     else
