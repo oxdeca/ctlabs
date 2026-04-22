@@ -213,15 +213,21 @@ We can open a terminal in 3 ways:
 
 1. Topology View
 
+`Right Mouse-Click` on a node and choose `Open Web Terminal` 
+
 ![screenshot](docs/pics/screenshot-20260419-200625.png)
 
 2. Connections View
+
+`Right Mouse-Click` on a node and choose `Open Web Terminal`
 
 ![screenshot](docs/pics/screenshot-20260419-200717.png)
 
 
 3. Nodes List
-s
+
+`Left Mouse-Click` on the `>_` symbol.
+
 ![screenshot](docs/pics/screenshot-20260419-200903.png)
 
 

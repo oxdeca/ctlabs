@@ -170,6 +170,9 @@ clone_repo() {
   if [ ! -d "./ctlabs-ansible" ]; then
     ${GIT} clone https://github.com/oxdeca/ctlabs-ansible
   fi
+  if [ ! -d "./ctlabs-terraform" ]; then
+    ${GIT} clone https://github.com/oxdeca/ctlabs-terraform
+  fi
   
   if [ ! -d "/srv/ctlabs-server/public" ]; then
     ${MKDIR} -vp /srv/ctlabs-server/public/ > /dev/null 2>&1
@@ -268,7 +271,7 @@ run_task() {
 # MAIN
 # -----------------------------------------------------------------------------
 #
-echo -e "${CYAN}Starting CT Labs Deployment...${NC}"
+echo -e "${CYAN}Starting CTLABS Deployment...${NC}"
 run_task "Configuring SELinux" selinux
 run_task "Configuring system" config
 run_task "Configuring tmux" tmux
