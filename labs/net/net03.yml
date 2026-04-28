@@ -29,15 +29,15 @@ topology:
           book: ctlabs.yml
           tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd]
       sw0:
-        type : switch
-        kind : mgmt
-        ipv4 : 192.168.99.10/24
-        gw   : 192.168.99.1
+        profile: mgmt
+        type: switch
+        ipv4: 192.168.99.10/24
+        gw  : 192.168.99.1
       ro0:
-        type : router
-        kind : frr
-        gw   : 192.168.15.1
-        nics :
+        profile: frr
+        type: router
+        gw  : 192.168.15.1
+        nics:
           eth0: 192.168.99.1/24
           eth1: 192.168.15.2/29
       natgw:
@@ -47,128 +47,136 @@ topology:
         dnat:
           data: isp1:eth1
       sw10:
+        profile: ovs
         type : switch
         desc : vlan10
       sw11:
+        profile: ovs
         type: switch
         desc: vlan11
       sw12:
+        profile: ovs
         type: switch
         desc: vlan12
       sw20:
+        profile: ovs
         type: switch
         desc: vlan20
       sw21:
+        profile: ovs
         type: switch
         desc: vlan21
       sw22:
+        profile: ovs
         type: switch
         desc: vlan22
       sw23:
+        profile: ovs
         type: switch
         desc: vlan23
       isp1:
-        type : router
-        kind : frr
-        dns  : [169.254.169.254]
-        gw   : 192.168.15.1
-        nics :
+        profile: ovs
+        profile: frr
+        type: router
+        dns : [169.254.169.254]
+        gw  : 192.168.15.1
+        nics:
           eth1: 192.168.15.3/29
           eth2: 192.168.16.1/30
           eth3: 192.168.17.1/30
       ro1:
-        type : router
-        kind : frr
-        snat : true
-        gw   : 192.168.16.1
-        nics :
+        profile: frr
+        type: router
+        snat: true
+        gw  : 192.168.16.1
+        nics:
           eth1: 192.168.10.1/24
           eth2: 192.168.113.1/30
           eth3: 192.168.16.2/30
       ro2:
-        type : router
-        kind : frr
-        snat : true
-        gw   : 192.168.17.1
-        nics :
+        profile: frr
+        type: router
+        snat: true
+        gw  : 192.168.17.1
+        nics:
           eth1: 192.168.20.1/24
           eth2: 192.168.17.2/30
           eth3: 192.168.21.1/24
           eth4: 192.168.124.1/30
       ro3:
-        type : router
-        kind : frr
-        gw   : 192.168.113.1
-        nics :
+        profile: frr
+        type: router
+        gw  : 192.168.113.1
+        nics:
           eth1: 192.168.113.2/30
           eth2: 192.168.11.1/24
           eth3: 192.168.12.1/24
       ro4:
-        type : router
-        kind : frr
-        gw   : 192.168.124.1
-        nics :
+        profile: frr
+        type: router
+        gw  : 192.168.124.1
+        nics:
           eth1: 192.168.22.1/24
           eth2: 192.168.124.2/30
           eth3: 192.168.23.1/24
       dc1:
-        type : host
-        kind : d12
-        gw   : 192.168.10.1
-        nics :
+        profile: d12
+        type: host
+        gw  : 192.168.10.1
+        nics:
           eth1: 192.168.10.14/24
       dc2:
-        type : host
-        kind : d12
-        gw   : 192.168.20.1
-        nics :
+        profile: d12
+        type: host
+        gw  : 192.168.20.1
+        nics:
           eth1: 192.168.20.14/24
       slapd1:
-        type  : host
-        gw    : 192.168.21.1
-        nics :
+        type: host
+        gw  : 192.168.21.1
+        nics:
           eth1: 192.168.21.21/24
       slapd2:
-        type  : host
-        kind  : d12
-        caps  : [SYS_PTRACE]
-        gw    : 192.168.22.1
-        nics :
+        profile: d12
+        type: host
+        caps: [SYS_PTRACE]
+        gw  : 192.168.22.1
+        nics:
           eth1: 192.168.22.22/24
       ns1:
-        type  : host
-        gw    : 192.168.10.1
-        nics  :
+        type: host
+        gw  : 192.168.10.1
+        nics:
           eth1: 192.168.10.11/24
       ns2:
-        type  : host
-        gw    : 192.168.20.1
-        nics  :
+        type: host
+        gw  : 192.168.20.1
+        nics:
           eth1: 192.168.20.11/24
       h3:
-        type  : host
-        gw    : 192.168.11.1
-        nics  :
+        type: host
+        gw  : 192.168.11.1
+        nics:
           eth1: 192.168.11.15/24
       h4:
-        type  : host
-        gw    : 192.168.22.1
-        nics  :
+        type: host
+        gw  : 192.168.22.1
+        nics:
           eth1: 192.168.22.16/24
       h5:
-        type  : host
-        gw    : 192.168.23.1
-        nics  :
+        type: host
+        gw  : 192.168.23.1
+        nics:
           eth1: 192.168.23.17/24
       h6:
-        type  : host
-        gw    : 192.168.21.1
-        nics  :
+        type: host
+        gw  : 192.168.21.1
+        nics:
           eth1: 192.168.21.18/24
       h7:
-        type  : host
-        gw    : 192.168.12.1
-        nics  :
+        type: host
+        gw  : 192.168.12.1
+        nics:
           eth1: 192.168.12.19/24
 
     links:

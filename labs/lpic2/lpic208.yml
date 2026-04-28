@@ -67,51 +67,54 @@ topology:
       data:
         nodes:
           sw1:
-            type : switch
+            profile: ovs
+            type: switch
           sw2:
-            type : switch
+            profile: ovs
+            type: switch
           sw3:
-            type : switch
+            profile: ovs
+            type: switch
           ns1:
-            type : host
-            gw   : 192.168.10.1
-            nics :
+            type: host
+            gw  : 192.168.10.1
+            nics:
               eth1: 192.168.10.11/24
           ns2:
-            type : host
-            profile : d12
-            gw   : 192.168.20.1
-            nics :
+            profile: d12
+            type: host
+            gw  : 192.168.20.1
+            nics:
               eth1: 192.168.20.11/24
           h1:
-            type : host
-            gw   : 192.168.10.1
-            nics :
+            type: host
+            gw  : 192.168.10.1
+            nics:
               eth1: 192.168.10.12/24
-            vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
-            dnat :
+            vols: ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
+            dnat:
               - [1088, 8888]
           h2:
-            type : host
-            profile : parrot
-            gw   : 192.168.20.1
-            nics :
+            profile: parrot
+            type: host
+            gw  : 192.168.20.1
+            nics:
               eth1: 192.168.20.12/24
-            vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
-            dnat :
+            vols: ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
+            dnat:
               - [2088, 8888]
           www1:
-            type : host
-            gw   : 192.168.30.1
-            nics :
+            type: host
+            gw  : 192.168.30.1
+            nics:
               eth1: 192.168.30.13/24
-            dnat :
+            dnat:
               - [8081, 443]
           www2:
-            type : host
-            profile : d12
-            gw   : 192.168.30.1
-            nics :
+            profile: d12
+            type: host
+            gw  : 192.168.30.1
+            nics:
               eth1: 192.168.30.14/24
             dnat :
               - [8082, 443]

@@ -31,15 +31,15 @@ topology:
             dnat  :
               - [9988, 8888]
           sw0:
-            type  : switch
-            profile : mgmt
-            ipv4  : 192.168.99.10/24
-            gw    : 192.168.99.1
+            profile: mgmt
+            type: switch
+            ipv4: 192.168.99.10/24
+            gw  : 192.168.99.1
           ro0:
-            type : router
-            profile : frr
-            gw   : 192.168.15.1
-            nics :
+            profile: frr
+            type: router
+            gw  : 192.168.15.1
+            nics:
               eth0: 192.168.99.1/24
               eth1: 192.168.15.2/29
 
@@ -55,10 +55,10 @@ topology:
       transit:
         nodes:
           ro1:
-            type : router
-            profile : frr
-            gw   : 192.168.15.1
-            nics :
+            profile: frr
+            type: router
+            gw  : 192.168.15.1
+            nics:
               eth1: 192.168.15.3/29
               eth2: 192.168.10.1/24
               eth3: 192.168.20.1/24
@@ -66,34 +66,36 @@ topology:
       data:
         nodes:
           sw1:
-            type : switch
+            profile: ovs
+            type: switch
           sw2:
-            type : switch
+            profile: ovs
+            type: switch
           ns1:
             type : host
             gw   : 192.168.10.1
             nics :
               eth1: 192.168.10.11/24
           ns2:
-            type : host
-            profile : d12
-            gw   : 192.168.20.1
-            nics :
+            profile: d12
+            type: host
+            gw  : 192.168.20.1
+            nics:
               eth1: 192.168.20.11/24
           h1:
-            type : host
-            profile : kali
-            gw   : 192.168.10.1
-            nics :
+            profile: kali
+            type: host
+            gw  : 192.168.10.1
+            nics:
               eth1: 192.168.10.12/24
             vols : ['/srv/jupyter/h1/:/srv/jupyter/work/:Z,rw']
             dnat :
               - [1088, 8888]
           h2:
-            type : host
-            profile : parrot
-            gw   : 192.168.20.1
-            nics :
+            profile: parrot
+            type: host
+            gw  : 192.168.20.1
+            nics:
               eth1: 192.168.20.12/24
             vols : ['/srv/jupyter/h2/:/srv/jupyter/work/:Z,rw']
             dnat :

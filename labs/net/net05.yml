@@ -28,15 +28,15 @@ topology:
           book: ctlabs.yml
           tags: [up, setup, bind]
       sw0:
-        type  : switch
-        kind  : mgmt
-        ipv4  : 192.168.99.10/24
-        gw    : 192.168.99.1
+        profile: mgmt
+        type: switch
+        ipv4: 192.168.99.10/24
+        gw  : 192.168.99.1
       ro0:
-        type : router
-        kind : frr
-        gw   : 192.168.15.1
-        nics :
+        profile: frr
+        type: router
+        gw  : 192.168.15.1
+        nics:
           eth0: 192.168.99.1/24
           eth1: 192.168.15.2/29
       natgw:
@@ -46,20 +46,22 @@ topology:
         dnat: 
           data: ro1:eth1
       sw1:
-        type : switch
+        profile: ovs
+        type: switch
       sw2:
-        type : switch
+        profile: ovs
+        type: switch
       sw3:
-        type : switch
-        kind : arista
+        profile: arista
+        type: switch
       sw4:
-        type : switch
-        kind : arista
+        profile: arista
+        type: switch
       ro1:
-        type : router
-        kind : frr
-        gw   : 192.168.15.1
-        nics :
+        profile: frr
+        type: router
+        gw  : 192.168.15.1
+        nics:
           eth1: 192.168.15.3/29
           eth2: 192.168.10.1/24
           eth3: 192.168.20.1/24
@@ -78,26 +80,26 @@ topology:
         nics :
           eth1: 192.168.10.11/24
       ns2:
-        type : host
-        kind : d12
-        gw   : 192.168.20.1
-        nics :
+        profile: d12
+        type: host
+        gw  : 192.168.20.1
+        nics:
           eth1: 192.168.20.11/24
       h1:
-        type : host
-        kind : qemu
-        kvm  : true
-        gw   : 192.168.10.1
-        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
-        nics :
+        profile: qemu
+        type: host
+        kvm : true
+        gw  : 192.168.10.1
+        vols: ['/media/volumes/sys01/:/media/vols/:rw,Z']
+        nics:
           eth1: 192.168.10.12/24
       h2:
-        type : host
-        kind : qemu
-        kvm  : true
-        gw   : 192.168.20.1
-        vols : ['/media/volumes/sys01/:/media/vols/:rw,Z']
-        nics :
+        profile: qemu
+        type: host
+        kvm : true
+        gw  : 192.168.20.1
+        vols: ['/media/volumes/sys01/:/media/vols/:rw,Z']
+        nics:
           eth1: 192.168.20.12/24
       h3:
         type : host

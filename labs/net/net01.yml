@@ -19,9 +19,8 @@ topology:
       gw    : 192.168.99.1
       nodes:
         ansible:
-          type    : controller
-          gw      : 192.168.99.1
-          profile : linux
+          type: controller
+          gw  : 192.168.99.1
           nics:
             eth0: 192.168.99.5/24
           vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
@@ -32,14 +31,14 @@ topology:
           dnat:
           - [ 9988, 8888 ]
         sw0:
-          type    : switch
-          ipv4    : 192.168.99.10/24
-          gw      : 192.168.99.1
-          profile : mgmt
+          profile: mgmt
+          type: switch
+          ipv4: 192.168.99.10/24
+          gw  : 192.168.99.1
         ro0:
-          type   : router
           profile: frr
-          gw: 192.168.15.1
+          type: router
+          gw  : 192.168.15.1
           nics:
             eth0: 192.168.99.1/24
             eth1: 192.168.15.2/29
@@ -56,9 +55,9 @@ topology:
     transit:
       nodes:
         ro1:
-          type: router
           profile: frr
-          gw: 192.168.15.1
+          type: router
+          gw  : 192.168.15.1
           devs:
           - "/dev/net/tun"
           nics:
@@ -66,15 +65,15 @@ topology:
             eth2: 192.168.10.1/24
             eth3: 192.168.12.1/30
         ro2:
-          type: router
           profile: frr
+          type: router
           nics:
             eth2: 192.168.20.1/24
             eth3: 192.168.12.2/30
         lab1-gw:
-          type: gateway
-          profile: remote
           provider: external
+          profile: remote
+          type: gateway
           gw: 192.168.110.115
           nics:
             tun0: 18.8.15.1
@@ -83,36 +82,34 @@ topology:
     data:
       nodes:
         sw1:
-          type: switch
           profile: ovs
+          type: switch
         sw2:
-          type: switch
           profile: ovs
+          type: switch
         sw3:
-          type: switch
           profile: ovs
+          type: switch
         ns1:
-          type    : host
-          gw      : 192.168.10.1
-          profile : linux
+          type: host
+          gw  : 192.168.10.1
           nics:
             eth1: 192.168.10.11/24
         ns2:
-          type    : host
-          gw      : 192.168.20.1
-          profile : linux
+          type: host
+          gw  : 192.168.20.1
           nics:
             eth1: 192.168.20.11/24
         h1:
-          type    : host
-          gw      : 192.168.10.1
-          profile : kali
+          profile: kali
+          type: host
+          gw  : 192.168.10.1
           nics:
             eth1: 192.168.10.12/24
         h2:
-          type    : host
-          gw      : 192.168.20.1
-          profile : kali
+          profile: kali
+          type: host
+          gw  : 192.168.20.1
           nics:
             eth1: 192.168.20.12/24
           provider: local
