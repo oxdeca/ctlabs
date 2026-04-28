@@ -31,7 +31,7 @@ topology:
             dnat  :
               - [9988, 8888]
           sw0:
-            profile: mgmt
+            profile: ovs
             type: switch
             ipv4: 192.168.99.10/24
             gw  : 192.168.99.1

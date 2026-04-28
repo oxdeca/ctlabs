@@ -3,9 +3,11 @@ ENV          container docker
 ENV          DEBIAN_FRONTEND=noninteractive
 ENV          TERM=linux
 
-RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpdump netcat-traditional htop  && \
-            apt -y install iptables iputils-ping syslog-ng openssh-server python3-apt curl gpg gawk sudo     && \
-            sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config && \
+RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpdump netcat-traditional htop      && \
+            apt -y install iptables iputils-ping syslog-ng openssh-server python3-apt curl gpg gawk sudo locales && \
+            sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config                                      && \
+            echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen                                            && \
+            echo 'LANG=en_US.UTF-8' > /etc/default/locale                                                        && \
             printf "set paste\n" >> /etc/vim/vimrc
 
 RUN         echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' > /etc/profile.d/ctlabs.sh      && \

@@ -507,13 +507,14 @@ class Node
           %x( ip netns exec #{@netns} ip link ls #{@name} 2>/dev/null )
           if $?.exitstatus > 0
             %x( docker exec #{@name} sh -c '/usr/bin/ovs-vsctl add-br #{@name}' )
-           # if(! @ipv4.nil? )
-           #   %x( ip netns exec #{@netns} ip addr add #{@ipv4} dev #{@name} )
-           # end
+            if(! @ipv4.nil? )
+              %x( ip netns exec #{@netns} ip link set #{@name} up )
+              %x( ip netns exec #{@netns} ip addr add #{@ipv4} dev #{@name} )
+            end
 
-           # if(! @gw.nil? )
-           #   %x( ip netns exec #{@netns} ip route add default via #{@gw} )
-           # end
+            if(! @gw.nil? )
+              %x( ip netns exec #{@netns} ip route add default via #{@gw} )
+            end
           end
         end
 

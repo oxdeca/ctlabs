@@ -26,13 +26,13 @@ topology:
         vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/avd:/root/avd:ro']
         play :
       sw0:
-        type  : switch
-        profile: mgmt
-        ipv4  : 192.168.99.10/24
-        gw    : 192.168.99.1
+        profile: ovs
+        type: switch
+        ipv4: 192.168.99.10/24
+        gw  : 192.168.99.1
       ro0:
-        type : router
         profile: frr
+        type : router
         gw   : 192.168.15.1
         nics :
           eth0: 192.168.99.1/24

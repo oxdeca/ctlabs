@@ -44,7 +44,7 @@ topology:
           - [ 8192, 4443 ]
           - [ 8193, 8080 ]
         sw0:
-          profile: mgmt
+          profile: ovs
           type: switch
           ipv4: 192.168.99.10/24
           gw  : 192.168.99.1

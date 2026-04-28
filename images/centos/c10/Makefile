@@ -1,4 +1,4 @@
-c10:	base_img frr_img ovs_img ctrl_img qemu_img
+c10:	base_img frr_img ovs_img ctrl_img
 
 xv6_img:	base_img
 	cd xv6 && sh ./build.sh

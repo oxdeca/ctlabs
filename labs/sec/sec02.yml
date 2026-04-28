@@ -29,7 +29,7 @@ topology:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, openvpn, xrdp, burp]
           sw0:
-            profile: mgmt
+            profile: ovs
             type: switch
             ipv4: 192.168.99.10/24
             gw  : 192.168.99.1
