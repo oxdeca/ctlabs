@@ -1,3 +1,70 @@
+# QEMU Images based on Debian
+
+## Environment Variables
+
+The following environment variables can be exported before running the provisioning script to customize the virtual machine's hardware topology, resources, and behavior.
+
+| Variable                     | Default                         | Description                                                                                               |
+|------------------------------|---------------------------------|-----------------------------------------------------------------------------------------------------------|
+| `QEMU_MEM`                   | `768M`                          | Total RAM allocated to the VM. Accepts standard QEMU suffixes (e.g., `M` for Megabytes, `G` for Gigabytes). *Note: When NUMA is enabled, this is split evenly across nodes.*   |
+| `QEMU_CPU`                   | `2`                             | Total number of virtual CPUs (vCPUs) assigned to the VM.                                                  |
+| `QEMU_NUMA_NODES`            | `0`                             | Number of NUMA nodes to emulate. Set to `0` to disable NUMA. Set to `2` (or more) to enable multi-node topology. When enabled, it automatically aligns CPU sockets to match the node count. |
+| `QEMU_CPU_SOCKETS`           | `1`*                            | Number of CPU sockets. *Defaults to `QEMU_NUMA_NODES` if NUMA is enabled (≥2), otherwise defaults to `1`. |
+| `QEMU_CPU_CORES`             | *Calculated*                    | Number of cores per socket. Automatically calculated as `QEMU_CPU / (QEMU_CPU_SOCKETS * QEMU_CPU_THREADS)`. Minimum value is enforced to `1`. |
+| `QEMU_CPU_THREADS`           | `2`                             | Number of threads per core (e.g., `2` enables SMT/Hyper-Threading emulation). |
+| `QEMU_VGA`                   | `none`                          | VGA display adapter type. Set to `none` for headless operation (recommended for servers/containers). Can be set to `std`, `qxl`, `virtio`, etc., if a display is needed. |
+| `IMG`                        | `debian-12-nocloud-amd64.qcow2` | Filename or path of the base Debian NoCloud image to be used as the primary boot disk. |
+| `DISK1`                      | `/media/vda.qcow2`              | Path for the secondary (ephemeral or data) disk. The script will automatically create a `500M` qcow2 file at this location if it does not exist. |
+| `HOSTNAME`                   | *(Required)*                    | The desired hostname for the guest OS. The script uses this to name the generated cloud-init ISO and to set the hostname inside the guest. |
+
+---
+
+## Usage Examples
+
+### 1. Standard Headless VM (Default)
+Creates a basic 2 vCPU, 768MB VM with no NUMA topology.
+```bash
+./qemu_init.sh
+```
+
+### 2. High-Performance 2-Node NUMA VM
+Creates a 4 vCPU, 4GB VM split evenly across 2 NUMA nodes (2 vCPUs and 2GB RAM per node).
+```bash
+export QEMU_CPU=4
+export QEMU_MEM=4G
+export QEMU_NUMA_NODES=2
+./qemu_init.sh
+```
+
+### 3. Custom Topology (4 Sockets, No NUMA)
+Creates an 8 vCPU VM with 4 distinct CPU sockets, 1 core per socket, and 2 threads per core (useful for testing software licensed per socket).
+```bash
+export QEMU_CPU=8
+export QEMU_MEM=8G
+export QEMU_CPU_SOCKETS=4
+export QEMU_CPU_CORES=1
+export QEMU_CPU_THREADS=2
+export QEMU_NUMA_NODES=0 # Explicitly disable NUMA
+./qemu_init.sh
+```
+
+---
+
+## NUMA Configuration Details
+
+When `QEMU_NUMA_NODES` is set to `2` or higher, the script automatically handles the complex QEMU topology mapping:
+
+1. **Memory Backend Creation**: It dynamically converts `QEMU_MEM` into Megabytes and creates explicit `-object memory-backend-ram` definitions for each node, ensuring modern QEMU `q35` compatibility.
+2. **CPU Pinning**: It calculates `cpus_per_node` and assigns contiguous vCPU ranges to each node (e.g., Node 0 gets `cpus=0-1`, Node 1 gets `cpus=2-3`). Any remainder CPUs are safely assigned to the final node.
+3. **Socket Alignment**: It automatically sets `QEMU_CPU_SOCKETS` to match `QEMU_NUMA_NODES`. This is a best practice, as guest operating systems natively map NUMA nodes to physical CPU sockets.
+4. **Distance Metrics**: It injects a default NUMA distance metric (`-numa dist,src=0,dst=1,val=20`), signaling to the guest OS that cross-node memory access is more expensive than local access (`10`).
+
+> **Tip:** You can verify the NUMA topology inside the running guest by executing:
+> ```bash
+> numactl --hardware
+> ```
+
+---
 
 # How to create qemu images compatible with ctlabs
 
