@@ -30,6 +30,10 @@ profiles:
       image: ctlabs/d12/base
     kali:
       image: ctlabs/kali/base
+    kali-ctf:
+      image: ctlabs/kali/ctf
+    parrot-ctf:
+      image: ctlabs/parrot/ctf
     parrot:
       image: ctlabs/parrot/base
     vault:

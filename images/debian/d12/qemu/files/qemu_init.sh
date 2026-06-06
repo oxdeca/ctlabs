@@ -8,6 +8,7 @@ DISK1="/media/vda.qcow2"
 ENABLE_KVM=
 QEMU_MEM=${QEMU_MEM:-768M}
 QEMU_CPU=${QEMU_CPU:-2}
+QEMU_CPU_SOCKETS=${QEMU_CPU_SOCKETS:-1}
 QEMU_CPU_THREADS=${QEMU_CPU_THREADS:-2}
 QEMU_CPU_CORES=${QEMU_CPU_CORES:-$((QEMU_CPU/QEMU_CPU_THREADS))}
 QEMU_VGA=${QEMU_VGA:-none}
@@ -81,7 +82,7 @@ qemu_base_cmd() {
 
   QEMU_BASE_CMD=(
     "qemu-system-x86_64 -nodefaults -display none ${qemu_vga} -m ${QEMU_MEM} -serial mon:stdio"
-    "-smp sockets=1,dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
+    "-smp sockets=${QEMU_CPU_SOCKETS},dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
     "-cpu host,hv_passthrough,kvm=on,l3-cache=on,migratable=no"
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm"
     "${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet"
