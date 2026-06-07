@@ -7,7 +7,7 @@ IMG="debian-12-nocloud-amd64.qcow2"
 DISK1="/media/vda.qcow2"
 ENABLE_KVM=
 QEMU_MEM=${QEMU_MEM:-768M}
-QEMU_CPU=${QEMU_CPU:-2}
+QEMU_CPU=${QEMU_CPU:-4} # Changed default to 4 to better demonstrate symmetry
 
 # --- NUMA CONFIGURATION ---
 # Set to 2 to enable a 2-node NUMA topology. Set to 0 to disable.
@@ -21,10 +21,16 @@ else
 fi
 
 QEMU_CPU_THREADS=${QEMU_CPU_THREADS:-2}
-# Calculate cores dynamically to match total QEMU_CPU
-QEMU_CPU_CORES=${QEMU_CPU_CORES:-$((QEMU_CPU / (QEMU_CPU_SOCKETS * QEMU_CPU_THREADS)))}
+
+# Calculate cores per socket based on desired QEMU_CPU
+QEMU_CPU_CORES=$((QEMU_CPU / (QEMU_CPU_SOCKETS * QEMU_CPU_THREADS)))
 # Ensure cores is at least 1
 [ "$QEMU_CPU_CORES" -lt 1 ] && QEMU_CPU_CORES=1
+
+# CRITICAL FIX: Calculate the ACTUAL total vCPUs that will be spawned.
+# We use THIS number to divide CPUs symmetrically across NUMA nodes, 
+# preventing unassigned CPUs from defaulting to Node 0.
+ACTUAL_VCPUS=$((QEMU_CPU_SOCKETS * 1 * QEMU_CPU_CORES * QEMU_CPU_THREADS))
 
 QEMU_VGA=${QEMU_VGA:-none}
 
@@ -34,7 +40,6 @@ SECONDS=0    # Bash builtin timer
 
 echo "Waiting for $FILE..." >&2
 
-# Wait for file to exist AND be readable
 until [ -f "$FILE" ] && [ -r "$FILE" ]; do
     if [ $SECONDS -ge $TIMEOUT ]; then
         echo "Error: Timeout waiting for $FILE after ${TIMEOUT}s" >&2
@@ -93,7 +98,8 @@ qemu_base_cmd() {
   fi
 
   if [ "$QEMU_NUMA_NODES" -ge 2 ]; then
-    local cpus_per_node=$((QEMU_CPU / QEMU_NUMA_NODES))
+    # Divide the ACTUAL spawned vCPUs evenly among the NUMA nodes for perfect symmetry
+    local cpus_per_node=$((ACTUAL_VCPUS / QEMU_NUMA_NODES))
     
     # 1. Convert total QEMU_MEM to Megabytes for safe, explicit division
     local mem_mb=0
@@ -112,9 +118,9 @@ qemu_base_cmd() {
       local start_cpu=$((i * cpus_per_node))
       local end_cpu=$((start_cpu + cpus_per_node - 1))
       
-      # Assign any remaining CPUs to the last node if division isn't perfect
+      # Assign any remaining CPUs to the last node if division isn't perfectly even
       if [ $i -eq $((QEMU_NUMA_NODES - 1)) ]; then
-        end_cpu=$((QEMU_CPU - 1))
+        end_cpu=$((ACTUAL_VCPUS - 1))
       fi
       
       local memdev_id="ram-node${i}"
@@ -154,7 +160,8 @@ qemu_add_disk() {
   QEMU_DISKS+=(
     "-object iothread,id=io${id}"
     "-drive file=${path},id=disk${id},format=qcow2,cache=none,aio=native,discard=unmap,detect-zeroes=unmap,if=none"
-    "-device virtio-scsi-pci,id=bus${id},bus=pcie.0,addr=${addr},iothread=io${id},num_queues=${QEMU_CPU}"
+    # Use ACTUAL_VCPUS for num_queues to match the true vCPU count
+    "-device virtio-scsi-pci,id=bus${id},bus=pcie.0,addr=${addr},iothread=io${id},num_queues=${ACTUAL_VCPUS}"
     "-device scsi-hd,drive=disk${id},bus=bus${id}.0,channel=0,scsi-id=0,lun=0,rotation_rate=1${bootx:+,bootx=${bootx}}"
   )
 }
