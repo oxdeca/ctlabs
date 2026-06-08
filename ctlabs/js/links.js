@@ -58,6 +58,10 @@ window.saveLinkConfig = async function() {
             body: formData.toString()
         });
         if (res.ok) setTimeout(() => location.reload(), 300);
-        else { const data = await res.json(); alert(data.error); }
+        else {
+            const contentType = res.headers.get('content-type') || '';
+            const data = contentType.includes('json') ? await res.json() : { error: await res.text() };
+            alert(data.error);
+        }
     } catch (err) { alert("Error: " + err.message); }
 };

@@ -25,7 +25,7 @@ class Node
     @peers      = args['peers']     || args[:peers] || {}
     @eos        = args['eos'  ]     || 'linux'
     @kind       = args['profile' ]  || args['kind'] || 'linux'
-    @kvm        = args['kvm'  ]     || false
+    @kvm        = args['kvm'  ]
     @image      = args['image']
     @env        = args['env'  ]     || []
     @cmd        = args['cmd'  ]
@@ -40,7 +40,7 @@ class Node
     @vxlan      = args['vxlan']
     @dnat       = args['dnat' ]
     @mtu        = args['mtu'  ]     || 1460
-    @priv       = args['priv' ]     || false
+    @priv       = args['priv' ]
     @devs       = args['devs' ]     || []
     @info       = args[:info  ]     || args['info' ]
     @urls       = args[:urls  ]     || args['urls' ]
@@ -81,8 +81,11 @@ class Node
         kind_defs = type_defs[@kind] || {}
         
         @caps  = @caps + kind_defs['caps'] if kind_defs['caps']
-        @ports = @ports || kind_defs['ports'] || 4
-        @devs  = kind_defs['devs'] || @devs
+        @ports = @ports                    || kind_defs['ports'] || 4
+        @devs  = kind_defs['devs']         || @devs
+        @env   = kind_defs['env'] + @env   if kind_defs['env']
+        @kvm   = kind_defs['kvm']          if @kvm.nil?
+        @priv  = kind_defs['priv']         if @priv.nil?
       when 'gateway'
         @ports = @ports || 2
 #        @caps  = (!@defaults[@type][@kind]['caps' ].nil?) ? @caps + @defaults[@type][@kind]['caps' ] : @caps

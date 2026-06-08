@@ -82,8 +82,12 @@ class BaseController < Sinatra::Base
 
   # Custom error handling can be added here
   error 400..599 do
-    # You can customize the error page if needed
-    # erb :error
-    "An error occurred: #{env['sinatra.error'].message if env['sinatra.error']}"
+    path = request.path_info
+    if path.start_with?('/labs/') || path.start_with?('/api/')
+      content_type :json
+      { success: false, error: env['sinatra.error']&.message || 'An error occurred' }.to_json
+    else
+      "An error occurred: #{env['sinatra.error']&.message}"
+    end
   end
 end

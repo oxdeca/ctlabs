@@ -84,6 +84,9 @@ Dir.mkdir(LOCK_DIR,   0755) unless Dir.exist?(LOCK_DIR)
 Dir.mkdir(UPLOAD_DIR, 0755) unless Dir.exist?(UPLOAD_DIR)
 
 # --- Mount Controllers ---
+# LinksController must precede LabsController so the more specific
+# /labs/*/link/save route is matched before the greedy /labs/*/save.
+use LinksController
 use LabsController
 use NodesController
 use AutomationController
@@ -95,7 +98,6 @@ use MainController
 use TerminalController
 use LogsController
 use DnatController
-use LinksController
 
 # ------------------------------------------------------------------------------
 # SECURE PUMA BOOTLOADER
