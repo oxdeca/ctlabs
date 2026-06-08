@@ -5,7 +5,7 @@ ENV         TERM=linux
 RUN         dnf config-manager --set-enabled crb                                            && \
             dnf -y install ninja-build autoconf automake libmpc-devel mpfr-devel gmp-devel  && \
             dnf -y install gawk bison flex pixman-devel make texinfo patchutils gcc gcc-c++ && \
-            dnf -y install zlib-devel expat-devel glib2-devel bzip2
+            dnf -y install zlib-devel expat-devel glib2-devel bzip2 bc
 
 RUN         mkdir /root/xv6 && cd /root/xv6 && git clone https://github.com/qemu/qemu   && \
             cd qemu && git checkout v8.0.0 && ./configure --target-list=riscv64-softmmu && \
