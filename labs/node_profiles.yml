@@ -44,6 +44,8 @@ profiles:
       caps: [SYS_PTRACE]
     qemu:
       image: ctlabs/d12/qemu
+      env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
+      kvm: true
     db2:
       image: ctlabs/misc/db2
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]

@@ -27,18 +27,8 @@ topology:
           vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
           play:
             book: ctlabs.yml
-            tags:
-            - up
-            - setup
-            - ca
-            - bind
-            - vault
-            - rundeck
-            - jenkins
-            - gitea
-            - atlantis
-            env:
-            - CTLABS_VAULT_SERVER=true
+            tags: [up, setup, ca, bind, vault, rundeck, jenkins, gitea, atlantis]
+            env: [CTLABS_VAULT_SERVER=true]
             inv: sys02.ini
           dnat:
           - [ 8192, 4443 ]

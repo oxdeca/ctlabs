@@ -22,10 +22,10 @@ topology:
             gw   : 192.168.99.1
             nics :
               eth0: 192.168.99.3/24
-            vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
+            vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/agents/ansible/:/root/ctlabs-ai/agents/ansible/:Z,rw']
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd, semaphore]
+              tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd]
               env : ['CTLABS_SSSD_BACKEND=LDAP', 'CTLABS_VAULT_SERVER=true']
             dnat:
               - [9981, 3010]

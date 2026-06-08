@@ -4,9 +4,9 @@ ENV         DEBIAN_FRONTEND=noneinteractive
 ENV         TERM=linux
 
 COPY        parrot.list /etc/apt/sources.list.d/parrot.list
-RUN         apt update && apt -y full-upgrade && apt -y install attr acl less systemd iproute2 tcpdump && \
-            apt -y install iptables openssh-server python3 htop iputils-ping pipx netcat-traditional   && \
-            apt -y install sudo locales fonts-noto-color-emoji dnsutils lsof gnupg nmap python3-apt    && \
+RUN         apt update && apt -y full-upgrade && apt -y install attr acl less systemd iproute2 tcpdump git curl && \
+            apt -y install iptables openssh-server python3 htop iputils-ping pipx netcat-traditional gnupg nmap && \
+            apt -y install sudo locales fonts-noto-color-emoji dnsutils lsof python3-apt bsdmainutils           && \
             sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config  && \
             echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen        && \
             echo 'export LANG=en_US.UTF-8' > /etc/profile.d/locale.sh        && \
