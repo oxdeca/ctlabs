@@ -9,11 +9,12 @@
 <script src="/js/code_editor.js"></script>
 <script src="/js/labs.js"></script>
 
-<div id="config" class="w3-panel w3-green">
-  <h2>⚙️ Lab Configuration</h2>
-</div>
-    
-<div class="w3-container w3-margin-bottom">
+<div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+  <div id="config" class="w3-panel w3-green">
+    <h2>⚙️ Lab Configuration</h2>
+  </div>
+
+  <div class="w3-container" style="flex: 1; min-height: 0; overflow-y: auto;">
   <% if @active_yaml %>
     <div class="w3-panel w3-round-large" style="background-color: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-top: 0;">
       <h4 style="color: #f59e0b; margin-top: 10px;"><i class="fas fa-exclamation-triangle"></i> Runtime YAML View</h4>
@@ -24,6 +25,7 @@
   <div class="w3-card-4 w3-round-large" style="border: 1px solid #475569; overflow: hidden; background-color: #0f172a;">
     <% yaml_content = @active_yaml ? @active_yaml : (File.file?(CONFIG) ? File.read(CONFIG) : "# Error: No Configuration found!") %>
     <textarea id="config-yaml-viewer"><%= ERB::Util.h(yaml_content) %></textarea>
+  </div>
   </div>
 </div>
 

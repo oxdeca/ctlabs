@@ -40,6 +40,8 @@
   </div>
 <% end %>
 
+<div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+
 <div class="w3-panel w3-green">
   <h2><i class="fas fa-flask"></i> Manage Labs</h2>
 </div>
@@ -120,9 +122,8 @@
   <% end %>
 
 </div>
-<br>
 
-<div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round">
+<div id="lab-info-section" class="w3-container w3-2021-inkwell w3-round" style="flex: 1; min-height: 0; overflow-y: auto;">
   <% if @lab_info %>
     <%= erb :lab_details, layout: false, locals: { info_hash: @lab_info } %>
   <% else %>
@@ -132,7 +133,7 @@
   <% end %>
 </div>
 
-<br>
+</div>
 
 <%= erb :'modals/new_lab' %>
 <%= erb :'modals/edit_lab' %>

@@ -12,10 +12,12 @@
 
 <% inv_contents = fetch_inventory_contents %>
 
-    <div id="inv-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
-      <h2><i class="fas fa-list-alt"></i> Ansible Inventories</h2>
-    </div>
+<div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+  <div id="inv-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
+    <h2><i class="fas fa-list-alt"></i> Ansible Inventories</h2>
+  </div>
 
+  <div style="flex: 1; min-height: 0; overflow-y: auto;">
     <div class="w3-bar w3-round-large w3-margin-bottom" style="background-color: #1e293b; border: 1px solid #334155;">
       <button class="w3-bar-item w3-button tablink w3-blue w3-round-large" onclick="openInvTab(event, 'MgmtInv')" style="font-weight: 600;">
         <i class="fas fa-network-wired"></i> Management Network
@@ -79,3 +81,5 @@
           }
       });
     </script>
+  </div>
+</div>

@@ -38,10 +38,10 @@
     .xterm-viewport { scrollbar-width: thin; scrollbar-color: #334155 #0f172a; }
     
     #terminal-container {
-      width: 100%; flex: 1 1 0; height: 0; min-height: 0;
-      padding: 2px; box-sizing: border-box; overflow: hidden;
+      width: 100%; flex: 1; min-height: 0;
+      padding: 0; box-sizing: border-box; overflow: hidden;
     }
-    .xterm { height: 100%; }
+    .xterm { height: 100%; padding: 0; }
   </style>
 </head>
 <body data-node-name="<%= ERB::Util.html_escape(@node_name) %>">
@@ -60,6 +60,9 @@
       const nodeName = document.body.dataset.nodeName;
 
       const term = new Terminal({
+        cols: 120,
+        rows: 40,
+        lineHeight: 1,
         theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
         fontFamily: '"Courier New", Courier, monospace',
         cursorBlink: true, fontSize: 14
@@ -74,6 +77,8 @@
       term.loadAddon(fitAddon);
       term.open(container);
       fitAddon.fit();
+      // Double-fit stabilizes the xterm renderer dimension calculation
+      requestAnimationFrame(() => fitAddon.fit());
       
       const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) + 
