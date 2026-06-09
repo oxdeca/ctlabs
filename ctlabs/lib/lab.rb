@@ -113,6 +113,7 @@ class Lab
     labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
     Dir.glob(File.join(labs_dir, "**", "*.yml"))
        .map { |f| f.sub(labs_dir + '/', '') }
+       .reject { |f| File.basename(f) == 'node_profiles.yml' }
        .sort
   end
 

@@ -10,33 +10,69 @@ require 'timeout'
 require 'securerandom'
 
 class TerminalService
-  @@sessions = Hash.new { |h, k| h[k] = [] }
+  @@sessions = {}
   @@mutex = Mutex.new
+  @@session_ttl = 24 * 60 * 60
 
   def self.register_session(node_name, session_info)
-    @@mutex.synchronize { @@sessions[node_name] << session_info }
+    @@mutex.synchronize do
+      @@sessions[node_name] ||= []
+      @@sessions[node_name] << session_info
+    end
   end
 
   def self.unregister_session(node_name, session_info)
-    @@mutex.synchronize { @@sessions[node_name].delete(session_info) }
+    @@mutex.synchronize do
+      next unless @@sessions[node_name]
+      @@sessions[node_name].delete(session_info)
+    end
   end
 
   def self.session_count(node_name)
-    @@mutex.synchronize { @@sessions[node_name].size }
+    cleanup_stale(node_name)
+    @@mutex.synchronize { (@@sessions[node_name] || []).size }
+  end
+
+  def self.register_if_available(node_name)
+    cleanup_stale(node_name)
+    @@mutex.synchronize do
+      @@sessions[node_name] ||= []
+      if @@sessions[node_name].size >= 3
+        [false, nil]
+      else
+        info = { id: SecureRandom.uuid, node: node_name, created_at: Time.now }
+        @@sessions[node_name] << info
+        [true, info]
+      end
+    end
   end
 
   def self.terminate_oldest(node_name)
     session = nil
-    @@mutex.synchronize { session = @@sessions[node_name].shift }
-    if session
-      begin
-        session[:close_proc].call if session[:close_proc]
-      rescue => e
-        puts "[Terminal Termination Error] #{e.message}"
+    @@mutex.synchronize do
+      return false unless @@sessions[node_name] && !@@sessions[node_name].empty?
+      session = @@sessions[node_name].shift
+    end
+    begin
+      session[:close_proc].call if session[:close_proc]
+    rescue => e
+      puts "[Terminal Termination Error] #{e.message}"
+    end
+    true
+  end
+
+  def self.cleanup_stale(node_name = nil)
+    now = Time.now
+    @@mutex.synchronize do
+      if node_name
+        arr = @@sessions[node_name]
+        return unless arr
+        arr.reject! { |s| s[:created_at] && (now - s[:created_at]) > @@session_ttl }
+      else
+        @@sessions.each_key do |key|
+          @@sessions[key].reject! { |s| s[:created_at] && (now - s[:created_at]) > @@session_ttl }
+        end
       end
-      true
-    else
-      false
     end
   end
 
@@ -119,34 +155,30 @@ class TerminalService
   end
 
   def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil)
-    pty_read   = nil
-    pty_write  = nil
-    pty_pid    = nil
-    pty_thread = nil
+    pty_read     = nil
+    pty_write    = nil
+    pty_pid      = nil
+    pty_thread   = nil
     session_info = nil
+    closed       = false
 
     driver.on(:open) do |_|
-      if session_count(node_name) >= 3
-        driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n")
-        driver.close
-        return
-      end
-
       begin
+        available, info = register_if_available(node_name)
+        unless available
+          driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n")
+          driver.close
+          return
+        end
+        session_info = info
+        session_info[:close_proc] = proc { driver.close rescue nil }
+
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
         
-        # Apply initial terminal size if provided
         if initial_cols && initial_rows && pty_write
           winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
           pty_write.ioctl(0x5414, winsize) rescue nil
         end
-        
-        session_info = {
-          id: SecureRandom.uuid,
-          node: node_name,
-          close_proc: proc { driver.close rescue nil }
-        }
-        register_session(node_name, session_info)
 
         pty_thread = Thread.new do
           loop do
@@ -167,6 +199,7 @@ class TerminalService
           driver.close rescue nil
         end
       rescue => e
+        unregister_session(node_name, session_info) if session_info
         driver.text("\r\n\x1b[31m[Error spawning terminal: #{e.message}]\x1b[0m\r\n") rescue nil
         driver.close rescue nil
       end
@@ -189,29 +222,36 @@ class TerminalService
     end
 
     driver.on(:close) do |_|
-      unregister_session(node_name, session_info) if session_info
-      pty_thread&.kill
-      pty_write&.close
-      pty_read&.close
-      if pty_pid
-        begin
-          Process.kill('TERM', -pty_pid) rescue nil
-          sleep 0.1
-          Process.kill('KILL', -pty_pid) rescue nil
-        rescue Errno::ESRCH
-        end
-        begin
-          Timeout.timeout(2) do
-            loop do
-              pid, _ = Process.waitpid2(pty_pid, Process::WNOHANG)
-              break if pid
-              sleep 0.05
-            end
+      next if closed
+      closed = true
+      begin
+        unregister_session(node_name, session_info) if session_info && session_info[:id]
+        pty_thread&.kill
+        pty_write&.close rescue nil
+        pty_read&.close  rescue nil
+        if pty_pid
+          begin
+            Process.kill('TERM', -pty_pid) rescue nil
+            sleep 0.1
+            Process.kill('KILL', -pty_pid) rescue nil
+          rescue Errno::ESRCH
           end
-        rescue Timeout::Error, Errno::ECHILD
+          begin
+            Timeout.timeout(2) do
+              loop do
+                pid, _ = Process.waitpid2(pty_pid, Process::WNOHANG)
+                break if pid
+                sleep 0.05
+              end
+            end
+          rescue Timeout::Error, Errno::ECHILD
+          end
         end
+      rescue => e
+        puts "[Terminal Close Error] #{e.message}"
+      ensure
+        ssl_mutex.synchronize { io.close } rescue nil
       end
-      ssl_mutex.synchronize { io.close } rescue nil
     end
 
     driver.start
@@ -225,22 +265,14 @@ class TerminalService
           end
           
           if data == :wait_readable || data == :wait_writable
-            begin
-              IO.select([io], nil, nil, 0.1)
-            rescue
-              sleep(0.01)
-            end
+            IO.select([io], nil, nil, 0.1) rescue sleep(0.01)
             next
           elsif data.nil?
             break
           end
           driver.parse(data) if data && !data.empty?
         rescue IO::WaitReadable
-          begin
-            IO.select([io], nil, nil, 0.1)
-          rescue
-            sleep(0.01)
-          end
+          IO.select([io], nil, nil, 0.1) rescue sleep(0.01)
           retry
         rescue IO::WaitWritable
           sleep(0.01)
