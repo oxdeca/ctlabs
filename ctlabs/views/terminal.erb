@@ -59,9 +59,12 @@
       const container = document.getElementById('terminal-container');
       const nodeName = document.body.dataset.nodeName;
 
+      const initialCols = 120;
+      const initialRows = 40;
+
       const term = new Terminal({
-        cols: 120,
-        rows: 40,
+        cols: initialCols,
+        rows: initialRows,
         lineHeight: 1,
         theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
         fontFamily: '"Courier New", Courier, monospace',
@@ -77,12 +80,11 @@
       term.loadAddon(fitAddon);
       term.open(container);
       fitAddon.fit();
-      // Double-fit stabilizes the xterm renderer dimension calculation
       requestAnimationFrame(() => fitAddon.fit());
       
       const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
       const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) + 
-                    `?cols=${term.cols}&rows=${term.rows}`;
+                    `?cols=${initialCols}&rows=${initialRows}`;
       const ws = new WebSocket(wsUrl);
       const statusEl = document.getElementById('status');
 
