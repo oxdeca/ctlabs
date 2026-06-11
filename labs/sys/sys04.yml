@@ -27,7 +27,7 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, vault, opa, jenkins, jupyter]
-              env : ['CTLABS_VAULT_SERVER=true']
+              env : ['CTLABS_VAULT_ROLE=server']
             dnat:
               - [9988, 8888]
               - [9980, 8080]

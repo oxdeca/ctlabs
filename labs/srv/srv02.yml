@@ -26,7 +26,7 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, vault, smbadc, slapd, sssd, rundeck]
-              env : ['CTLABS_VAULT_SERVER=true']
+              env : ['CTLABS_VAULT_ROLE=server']
             dnat :
               - [8192, 4443]
           sw0:

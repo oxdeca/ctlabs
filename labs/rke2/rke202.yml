@@ -27,7 +27,7 @@ topology:
             play :
               book: ctlabs.yml
               tags: [up, setup, ca, bind, rke2-server, rke2-agent, vault]
-              env : ['CTLABS_VAULT_SERVER=true']
+              env : ['CTLABS_VAULT_ROLE=server']
             dnat :
               - [9988, 8888]
           sw0:

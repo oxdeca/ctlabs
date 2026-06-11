@@ -27,7 +27,7 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, smbadc, slapd, elasticsearch, kibana, filebeat, vault]
-              env : ['CTLABS_VAULT_SERVER=true']
+              env : ['CTLABS_VAULT_ROLE=server']
             dnat  :
               - [8192, 4443]
           sw0:

@@ -28,7 +28,7 @@ topology:
           play:
             book: ctlabs.yml
             tags: [up, setup, ca, bind, vault, rundeck, jenkins, gitea, atlantis]
-            env: [CTLABS_VAULT_SERVER=true]
+            env: ['CTLABS_VAULT_ROLE=server']
             inv: sys02.ini
           dnat:
           - [ 8192, 4443 ]
