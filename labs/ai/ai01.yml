@@ -10,36 +10,23 @@ desc: openclaw lab
 topology:
 - hv: ai01-vm1
   provider: local
-  dns:
-  - 192.168.10.11
-  - 192.168.20.11
-  - 8.8.8.8
+  dns: [192.168.10.11, 192.168.20.11, 8.8.8.8]
   planes:
     mgmt:
       vrfid: 99
-      dns:
-      - 1.1.1.1
-      - 8.8.8.8
-      net: 192.168.99.0/24
-      gw: 192.168.99.1
+      dns  : [1.1.1.1, 8.8.8.8]
+      net  : 192.168.99.0/24
+      gw   : 192.168.99.1
       nodes:
         ansible:
           type: controller
           gw  : 192.168.99.1
           nics:
             eth0: 192.168.99.5/24
-          vols:
-          - "/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw"
-          - "/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw"
+          vols: ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/agents/ansible/:/root/ctlabs-ai/agents/ansible:Z,rw']
           play:
             book: ctlabs.yml
-            tags:
-            - up
-            - setup
-            - ca
-            - bind
-            - openclaw
-            - gemini_cli
+            tags: [up, setup, ca, bind, openclaw, gemini_cli, opencode]
             inv: ai01.ini
           dnat:
           - [ 9988, 8888 ]
@@ -70,8 +57,7 @@ topology:
           profile: frr
           type: router
           gw: 192.168.15.1
-          devs:
-          - "/dev/net/tun"
+          devs: ["/dev/net/tun"]
           nics:
             eth1: 192.168.15.3/29
             eth2: 192.168.10.1/24
