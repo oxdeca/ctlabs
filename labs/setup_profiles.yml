@@ -49,6 +49,207 @@ profiles:
       master: "dc1.ad.ctlabs.internal"
 
   # ----------------------------------------------------------------------------
+  # ctlabs_slapd
+  # ----------------------------------------------------------------------------
+  slapd:
+    role: slapd
+    slapd1:
+      dbs:
+        - type       : ldap
+          suffix     : "dc=ad,dc=ctlabs,dc=internal"
+          uri        : "ldaps://dc2.ctlabs.internal ldaps://dc1.ctlabs.internal"
+          bind_method: simple
+          bind_user  : "cn=slapd,ou=services,dc=ad,dc=ctlabs,dc=internal"
+          bind_pass  : "secret123!"
+    slapd2:
+      dbs:
+        - type       : ldap
+          suffix     : "dc=ad,dc=ctlabs,dc=internal"
+          uri        : "ldaps://dc2.ctlabs.internal ldaps://dc1.ctlabs.internal"
+          bind_method: simple
+          bind_user  : "cn=slapd,ou=services,dc=ad,dc=ctlabs,dc=internal"
+          bind_pass  : "secret123!"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_alloy
+  # ----------------------------------------------------------------------------
+  alloy:
+    role: alloy
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_promtail
+  # ----------------------------------------------------------------------------
+  promtail:
+    role: promtail
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_prometheus
+  # ----------------------------------------------------------------------------
+  prometheus:
+    role: prometheus
+    prometheus:
+      mode  : agent
+      config:
+        node_exporter    : true
+        blackbox_exporter: true
+        goflow2          : true
+        remote_write:
+          uri: "https://mimir.ctlabs.internal:9009/api/v1/push"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_openvpn
+  # ----------------------------------------------------------------------------
+  openvpn:
+    role: openvpn
+    ro1:
+      type     : server
+      server_ip: "10.8.15.1"
+      client_ip: "10.8.15.2"
+    ro2:
+      type     : client
+      server_ip: "10.8.15.1"
+      client_ip: "10.8.15.2"
+      remote   : "192.168.16.2"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_frr
+  # ----------------------------------------------------------------------------
+  frr:
+    role: frr
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_rundeck
+  # ----------------------------------------------------------------------------
+  rundeck:
+    role: rundeck
+    ansible:
+      server_url   : "https://ansible.ctlabs.internal:8192"
+      auth_provider: ad
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_kafka
+  # ----------------------------------------------------------------------------
+  kafka:
+    role: kafka
+    kafka1: &kafka_default
+      server_address: "kafka1.ctlabs.internal:9092"
+      auth_method   : SASL_PLAINTEXT
+    kafka2:
+      server_address: "kafka2.ctlabs.internal:9092"
+      auth_method   : SASL_PLAINTEXT
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_k3s
+  # ----------------------------------------------------------------------------
+  k3s:
+    role: k3s
+    k3s1:
+      role   : server
+      ingress:
+        type    : gateway_api
+        provider: traefik
+    k3s2:
+      role       : agent
+      server_node: k3s1
+      server_url : "https://k3s1.ctlabs.internal:6443"
+    k3s3:
+      role       : agent
+      server_node: k3s1
+      server_url : "https://k3s1.ctlabs.internal:6443"
+    k3s4:
+      role       : agent
+      server_node: k3s1
+      server_url : "https://k3s1.ctlabs.internal:6443"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_rke2
+  # ----------------------------------------------------------------------------
+  rke2:
+    role: rke2
+    rke21:
+      role   : server
+      ingress:
+        type    : gateway_api
+        provider: traefik
+        traefik :
+          host_network: true
+          service_type: ClusterIP
+    rke22:
+      role       : agent
+      server_node: rke21
+      server_url : "https://rke21.ctlabs.internal:9345"
+    rke23:
+      role       : agent
+      server_node: rke21
+      server_url : "https://rke21.ctlabs.internal:9345"
+    rke24:
+      role       : agent
+      server_node: rke21
+      server_url : "https://rke21.ctlabs.internal:9345"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_kind
+  # ----------------------------------------------------------------------------
+  kind:
+    role: kind
+    kind1:
+      plane  : single
+      ingress:
+        type    : gateway_api
+        provider: traefik
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_foreman
+  # ----------------------------------------------------------------------------
+  foreman:
+    role: foreman
+    fm1:
+      role    : server
+      scenario: katello
+    fm2:
+      role: proxy
+    fm3:
+      role: proxy
+    fm4:
+      role: proxy
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_wazuh
+  # ----------------------------------------------------------------------------
+  wazuh:
+    role: wazuh
+    wazuh1:
+      role: manager
+    wazuh2:
+      role       : agent
+      server_addr: "wazuh1.ctlabs.internal"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_opendkim
+  # ----------------------------------------------------------------------------
+  opendkim:
+    role: opendkim
+    mail1:
+      domain  : ctlabs.internal
+      selector: mail
+    mail2:
+      domain  : ctlabs.internal
+      selector: mail
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_chrony
+  # ----------------------------------------------------------------------------
+  chrony:
+    role: chrony
+    h3:
+      role   : server
+      sources: [ntp1.torrix.ca, ntp2.torrix.ca, ntp3.torrix.ca]
+      clients: [192.168.0.0/16]
+    h4:
+      role   : client
+      sources: [h3.ctlabs.internal]
+
+  # ----------------------------------------------------------------------------
   # ctlabs_claude_code
   # ----------------------------------------------------------------------------
   claude_anthropic:
