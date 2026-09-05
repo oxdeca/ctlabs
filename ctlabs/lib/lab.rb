@@ -1252,6 +1252,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     plays = (play_cfg['setup'] || {}).map do |role, cfg|
       hosts = Array(cfg['hosts'] || []).join(',')
       next if hosts.empty?
+      next unless File.file?("#{ANSIBLE_DIR}/roles/ctlabs#{role}/tasks/facts.yml")
       <<~PLAY
         - name : ctlabs.playbooks.setup.#{role}
           hosts: #{hosts}
