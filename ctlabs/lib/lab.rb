@@ -1229,7 +1229,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       result[profile_name] = base
     end
 
-    File.write(PLAY_SETUP_FILE, ( 'play_setup' => result ).to_json)
+    File.write(PLAY_SETUP_FILE, { 'play_setup' => result }.to_json)
     @log.write "#{__method__}(): wrote #{PLAY_SETUP_FILE}", "debug"
     result
   end
