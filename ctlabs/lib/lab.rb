@@ -1196,21 +1196,37 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   PLAY_SETUP_FILE = "#{ANSIBLE_DIR}/.play_setup.json"
 
   def build_play_setup(play_cfg)
-    profiles = File.file?(SETUP_PROFILES) ?
+    setup_profiles = File.file?(SETUP_PROFILES) ?
       (YAML.load_file(SETUP_PROFILES)['profiles'] || {}) : {}
+    role_profiles  = File.file?(ROLE_PROFILES) ?
+      (YAML.load_file(ROLE_PROFILES)['profiles'] || {}) : {}
 
-    result = {}
+    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
+    result    = {}
+
+    # process explicit play.setup entries (profile + per-host overrides)
     (play_cfg['setup'] || {}).each do |role, cfg|
       cfg  = cfg || {}
       base = {}
 
-      if cfg['profile'] && profiles[cfg['profile']]
-        base = Marshal.load(Marshal.dump(profiles[cfg['profile']]))
+      if cfg['profile'] && setup_profiles[cfg['profile']]
+        base = Marshal.load(Marshal.dump(setup_profiles[cfg['profile']]))
         base.delete('role')
       end
 
-      merged        = deep_merge(base, cfg.reject { |k, _| k == 'profile' })
-      result[role]  = merged
+      result[role] = deep_merge(base, cfg.reject { |k, _| k == 'profile' })
+    end
+
+    # for roles in play.tags but not play.setup, load setup_profile defaults
+    # matching by profile name == role profile name in role_profiles.yml
+    role_profiles.each do |profile_name, rp_cfg|
+      next if result.key?(profile_name)
+      role_tags = Array(rp_cfg['tags'] || []).map(&:to_s)
+      next unless (role_tags & play_tags).any?
+      next unless setup_profiles.key?(profile_name)
+      base = Marshal.load(Marshal.dump(setup_profiles[profile_name]))
+      base.delete('role')
+      result[profile_name] = base
     end
 
     File.write(PLAY_SETUP_FILE, result.to_json)
@@ -1349,10 +1365,8 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
 
       # generate ansible artifacts from lab topology + profiles
-      if play_cfg['setup']
-        build_play_setup(play_cfg)
-        generate_setup_yml(play_cfg)
-      end
+      build_play_setup(play_cfg)
+      generate_setup_yml(play_cfg)
       generate_ctlabs_yml(play_cfg)
 
       # Determine playbook command
@@ -1365,7 +1379,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         play_inv  = " -i ./inventories/#{inv_file}"
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
-        play_env += " -e @#{PLAY_SETUP_FILE}" if play_cfg['setup']
+        play_env += " -e @#{PLAY_SETUP_FILE}"
         play_book = " ./playbooks/#{play_cfg['book']}"
         play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
         play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
