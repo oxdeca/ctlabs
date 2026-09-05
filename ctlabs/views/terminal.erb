@@ -80,38 +80,44 @@
       term.loadAddon(fitAddon);
       term.open(container);
       fitAddon.fit();
-      requestAnimationFrame(() => fitAddon.fit());
-      
-      const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-      const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) + 
-                    `?cols=${initialCols}&rows=${initialRows}`;
-      const ws = new WebSocket(wsUrl);
-      const statusEl = document.getElementById('status');
+      // Two RAFs: catches late layout settling (popup window, DPR, scrollbar quirks)
+      requestAnimationFrame(() => {
+        fitAddon.fit();
+        requestAnimationFrame(() => {
+          fitAddon.fit();
+          // Now safe to open the WS — backend gets correct size from the start
+          const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+          const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
+                        `?cols=${term.cols}&rows=${term.rows}`;
+          const ws = new WebSocket(wsUrl);
+          const statusEl = document.getElementById('status');
 
-      ws.onopen = () => {
-        statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
-        term.focus();
-        // Ensure backend has the most up-to-date size right after connection
-        ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-      };
+          ws.onopen = () => {
+            statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+            term.focus();
+            // Re-confirm size after onopen; PTY was already spawned at correct size
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          };
 
-      ws.onmessage = (event) => term.write(event.data);
+          ws.onmessage = (event) => term.write(event.data);
 
-      ws.onclose = () => {
-        statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-        statusEl.classList.add('disconnected');
-        term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
-      };
+          ws.onclose = () => {
+            statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+            statusEl.classList.add('disconnected');
+            term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+          };
 
-      term.onData(data => {
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
+          term.onData(data => {
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
+          });
+
+          term.onResize(size => {
+            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
+          });
+
+          window.addEventListener('resize', () => fitAddon.fit());
+        });
       });
-
-      term.onResize(size => {
-        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
-      });
-
-      window.addEventListener('resize', () => fitAddon.fit());
     });
   </script>
 </body>

@@ -181,14 +181,34 @@ class TerminalService
         end
 
         pty_thread = Thread.new do
+          utf8_buf = ''.force_encoding('BINARY')
           loop do
             begin
-              data = pty_read.readpartial(8192)
-              driver.text(data.force_encoding('UTF-8').scrub) 
+              chunk = pty_read.readpartial(8192)
+              utf8_buf << chunk.force_encoding('BINARY')
+
+              # Convert buffered bytes to UTF-8. readpartial can split
+              # multi-byte sequences across chunks, so only emit when we
+              # have complete UTF-8; otherwise keep buffering.
+              utf8 = utf8_buf.dup.force_encoding('UTF-8')
+              if utf8.valid_encoding?
+                driver.text(utf8)
+                utf8_buf.clear
+              else
+                # Genuinely invalid bytes -> scrub and emit; otherwise
+                # an incomplete multibyte sequence is still pending.
+                scrubbed = utf8.scrub('?')
+                if scrubbed != utf8
+                  driver.text(scrubbed)
+                  utf8_buf.clear
+                end
+              end
             rescue IO::WaitReadable
               IO.select([pty_read], nil, nil, 0.1) rescue sleep(0.01)
               retry
             rescue EOFError, Errno::EIO, Errno::ECONNRESET, IOError
+              remainder = utf8_buf.force_encoding('UTF-8')
+              driver.text(remainder.scrub('?')) if remainder.bytesize > 0
               driver.text("\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n") rescue nil
               break
             rescue StandardError => e
