@@ -1219,6 +1219,13 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   end
 
   def generate_setup_yml(play_cfg)
+    profiles  = File.file?(ROLE_PROFILES) ?
+      (YAML.load_file(ROLE_PROFILES)['profiles'] || {}) : {}
+
+    existing  = @nodes.map(&:name)
+    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
+    setup_cfg = play_cfg['setup'] || {}
+
     header = <<~HEADER
       ---
 
@@ -1236,34 +1243,35 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
               path : "{{ ctg_facts_dir }}"
               state: directory
 
-      - name : ctlabs.playbooks.setup.ca
-        hosts: all:!rhosts
-        tags : setup
-        tasks:
-          - name: ctlabs.playbooks.setup.ca.facts
-            include_role:
-              name      : ctlabs_ca
-              tasks_from: facts.yml
-            vars:
-              ctlabs_role_facts: "{{ play_setup['ca'] | default({}) }}"
-
     HEADER
 
-    plays = (play_cfg['setup'] || {}).map do |role, cfg|
-      hosts = Array(cfg['hosts'] || []).join(',')
+    plays = profiles.map do |profile_name, cfg|
+      next unless cfg['role']
+      next unless File.file?("#{ANSIBLE_DIR}/roles/#{cfg['role']}/tasks/facts.yml")
+
+      role_tags = Array(cfg['tags'] || []).map(&:to_s)
+      next unless (role_tags & play_tags).any?
+
+      role_setup  = setup_cfg[profile_name]
+      setup_hosts = role_setup && role_setup['hosts']
+      hosts = if setup_hosts
+        setup_hosts == 'all' ? existing : (Array(setup_hosts) & existing)
+      else
+        cfg['hosts'] == 'all' ? existing : (Array(cfg['hosts']) & existing)
+      end
       next if hosts.empty?
-      next unless File.file?("#{ANSIBLE_DIR}/roles/ctlabs#{role}/tasks/facts.yml")
+
       <<~PLAY
-        - name : ctlabs.playbooks.setup.#{role}
-          hosts: #{hosts}
+        - name : ctlabs.playbooks.setup.#{profile_name}
+          hosts: #{hosts.join(',')}
           tags : setup
           tasks:
-            - name: ctlabs.playbooks.setup.#{role}.facts
+            - name: ctlabs.playbooks.setup.#{profile_name}.facts
               include_role:
-                name      : ctlabs_#{role}
+                name      : #{cfg['role']}
                 tasks_from: facts.yml
               vars:
-                ctlabs_role_facts: "{{ (play_setup['#{role}'] | default({})).get(inventory_hostname, {}) }}"
+                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({})).get(inventory_hostname, {}) }}"
 
       PLAY
     end.compact
