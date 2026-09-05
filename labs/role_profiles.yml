@@ -49,7 +49,7 @@ profiles:
     tags : [frr]
     hosts: [ro1, ro2, ro3, ro4]
 
-  dns:
+  bind:
     role : ctlabs_bind
     tags : [bind]
     hosts: [ns1, ns2]

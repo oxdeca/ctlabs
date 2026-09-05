@@ -31,10 +31,10 @@ topology:
               tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd]
               setup:
                 bind:
-                  profile: bind_default
+                  profile: bind
                   hosts: [ns1, ns2]
                 smbadc:
-                  profile: smbadc_default
+                  profile: smbadc
                   hosts: [dc1, dc2]
                 slapd:
                   hosts: [slapd1, slapd2]

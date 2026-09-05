@@ -30,7 +30,7 @@ topology:
             inv: net01.ini
             setup:
               bind:
-                profile: bind_default
+                profile: bind
                 hosts: [ns1, ns2]
           dnat:
           - [ 9988, 8888 ]

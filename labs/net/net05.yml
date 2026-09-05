@@ -29,7 +29,7 @@ topology:
               tags: [up, setup, bind]
               setup:
                 bind:
-                  profile: bind_default
+                  profile: bind
                   hosts: [ns1, ns2]
           sw0:
             profile: ovs

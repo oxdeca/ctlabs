@@ -30,7 +30,7 @@ topology:
               tags: [up, setup, ca, bind, frr, openvpn, jupyter]
               setup:
                 bind:
-                  profile: bind_default
+                  profile: bind
                   hosts: [ns1, ns2]
                 openvpn:
                   hosts: [ro1, h1]

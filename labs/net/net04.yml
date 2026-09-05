@@ -30,7 +30,7 @@ topology:
               tags: [up, setup, ca, bind, jupyter, smbadc, slapd, httpd, postgresql, redis, netbox, guacamole]
               setup:
                 bind:
-                  profile: bind_default
+                  profile: bind
                   hosts  : [ns1, ns2]
                 claude_code:
                   profile: claude_anthropic
