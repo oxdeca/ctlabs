@@ -1287,7 +1287,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                 name      : #{cfg['role']}
                 tasks_from: facts.yml
               vars:
-                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({})).get(inventory_hostname, {}) }}"
+                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({}))[inventory_hostname] | default({}) }}"
 
       PLAY
     end.compact
