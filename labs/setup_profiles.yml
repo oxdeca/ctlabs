@@ -19,11 +19,11 @@ profiles:
       zones :
         - name: ctlabs.internal
         - name: svc.ctlabs.internal
+          ddns :
+            allow: [127.0.0.1]
         - name: ad.ctlabs.internal
           type: forward
           forwarders: [192.168.10.14]
-          ddns :
-            allow: [127.0.0.1]
       slaves: [192.168.20.11]
     ns2:
       type   : slave
