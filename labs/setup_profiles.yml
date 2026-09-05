@@ -1,0 +1,61 @@
+---
+
+# ------------------------------------------------------------------------------
+# File        : ctlabs/labs/setup_profiles.yml
+# Description : reusable default fact config per role
+#               profile name is independent of role name
+#               lab.rb merges these with play.setup overrides
+# ------------------------------------------------------------------------------
+
+profiles:
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_bind
+  # ----------------------------------------------------------------------------
+  bind_default:
+    role: bind
+    ns1:
+      type  : master
+      zones :
+        - name: ctlabs.internal
+        - name: svc.ctlabs.internal
+          ddns :
+            allow: [127.0.0.1]
+      slaves: [192.168.20.11]
+    ns2:
+      type   : slave
+      zones  :
+        - name: ctlabs.internal
+        - name: svc.ctlabs.internal
+      masters: [192.168.10.11]
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_smbadc
+  # ----------------------------------------------------------------------------
+  smbadc_default:
+    role: smbadc
+    dc1:
+      role  : master
+      domain: "ad.ctlabs.internal"
+    dc2:
+      role  : slave
+      domain: "ad.ctlabs.internal"
+      master: "dc1.ad.ctlabs.internal"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_claude_code
+  # ----------------------------------------------------------------------------
+  claude_anthropic:
+    role: claude_code
+    provider:
+      active: anthropic
+
+  claude_openrouter:
+    role: claude_code
+    provider:
+      active: openrouter
+
+  claude_vertexai:
+    role: claude_code
+    provider:
+      active: vertexai

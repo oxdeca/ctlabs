@@ -1,0 +1,365 @@
+---
+
+# ------------------------------------------------------------------------------
+# File        : ctlabs/labs/role_profiles.yml
+# Description : maps role profile names to ansible roles and their canonical
+#               host patterns. lab.rb uses this to generate ctlabs.yml.
+#               hosts are filtered against nodes that actually exist in the lab.
+# ------------------------------------------------------------------------------
+
+profiles:
+
+  ca:
+    role : ctlabs_ca
+    tags : [ca]
+    hosts: all
+
+  semaphore_ui:
+    role : ctlabs_semaphore_ui
+    tags : [semaphore_ui]
+    hosts: [ansible]
+
+  openbao:
+    role : ctlabs_openbao
+    tags : [openbao]
+    hosts: [vdb1, vdb2]
+
+  vault:
+    role : ctlabs_vault
+    tags : [vault]
+    hosts: [vdb1, vdb2]
+
+  rundeck:
+    role : ctlabs_rundeck
+    tags : [rundeck]
+    hosts: [ansible]
+
+  kafka:
+    role : ctlabs_kafka
+    tags : [kafka]
+    hosts: [kafka1, kafka2]
+
+  openvpn:
+    role : ctlabs_openvpn
+    tags : [openvpn]
+    hosts: [ro1, ro2]
+
+  frr:
+    role : ctlabs_frr
+    tags : [frr]
+    hosts: [ro1, ro2, ro3, ro4]
+
+  dns:
+    role : ctlabs_bind
+    tags : [bind]
+    hosts: [ns1, ns2]
+
+  smbadc:
+    role : ctlabs_smbadc
+    tags : [smbadc]
+    hosts: [dc1, dc2]
+
+  slapd:
+    role : ctlabs_slapd
+    tags : [slapd]
+    hosts: [slapd1, slapd2]
+
+  sssd:
+    role : ctlabs_sssd
+    tags : [sssd]
+    hosts: hosts
+
+  haproxy:
+    role : ctlabs_haproxy
+    tags : [haproxy]
+    hosts: [slapd1, slapd2]
+
+  httpd:
+    role : ctlabs_httpd
+    tags : [httpd]
+    hosts: [www1, www2, nb1, nb2, gua1, gua2]
+
+  nginx:
+    role : ctlabs_nginx
+    tags : [nginx]
+    hosts: [www1, www2, nb1, nb2, gua1, gua2, h3, h4]
+
+  php:
+    role : ctlabs_php
+    tags : [php]
+    hosts: [www1, www2, nb1, nb2, gua1, gua2, h3, h4]
+
+  guacamole:
+    role : ctlabs_guacamole
+    tags : [guacamole]
+    hosts: [gua1, gua2]
+
+  syslog:
+    role : ctlabs_syslog
+    tags : [syslog]
+    hosts: [ns1]
+
+  prometheus:
+    role : ctlabs_prometheus
+    tags : [prometheus]
+    hosts: [prometheus]
+
+  grafana:
+    role : ctlabs_grafana
+    tags : [grafana]
+    hosts: [grafana]
+
+  node_exporter:
+    role : ctlabs_node_exporter
+    tags : [node_exporter]
+    hosts: hosts
+
+  blackbox_exporter:
+    role : ctlabs_blackbox_exporter
+    tags : [blackbox_exporter]
+    hosts: [prometheus]
+
+  mimir:
+    role : ctlabs_mimir
+    tags : [mimir]
+    hosts: [mimir]
+
+  alloy:
+    role : ctlabs_alloy
+    tags : [alloy]
+    hosts: hosts
+
+  promtail:
+    role : ctlabs_promtail
+    tags : [promtail]
+    hosts: hosts
+
+  goflow2:
+    role : ctlabs_goflow2
+    tags : [goflow2]
+    hosts: [prometheus]
+
+  fpm:
+    role : ctlabs_fpm
+    tags : [fpm]
+    hosts: [h3, h4]
+
+  hsflowd:
+    role : ctlabs_hsflowd
+    tags : [hsflowd]
+    hosts: router
+
+  loki:
+    role : ctlabs_loki
+    tags : [loki]
+    hosts: [loki]
+
+  postfix:
+    role : ctlabs_postfix
+    tags : [postfix]
+    hosts: [mail1, mail2]
+
+  opendkim:
+    role : ctlabs_opendkim
+    tags : [opendkim]
+    hosts: [mail1, mail2]
+
+  manticore:
+    role : ctlabs_manticore
+    tags : [manticore]
+    hosts: [h3, h4, mail1, mail2]
+
+  mailpiler:
+    role : ctlabs_mailpiler
+    tags : [mailpiler]
+    hosts: [h3, h4, mail1, mail2]
+
+  postgresql:
+    role : ctlabs_postgresql
+    tags : [postgresql]
+    hosts: [db1, db2]
+
+  mariadb:
+    role : ctlabs_mariadb
+    tags : [mariadb]
+    hosts: [db1, db2]
+
+  redis:
+    role : ctlabs_redis
+    tags : [redis]
+    hosts: [db1, db2]
+
+  netbox:
+    role : ctlabs_netbox
+    tags : [netbox]
+    hosts: [nb1, nb2]
+
+  auditbeat:
+    role : ctlabs_auditbeat
+    tags : [auditbeat]
+    hosts: [ns1]
+
+  elasticsearch:
+    role : ctlabs_elasticsearch
+    tags : [elasticsearch]
+    hosts: [es1, es2]
+
+  kibana:
+    role : ctlabs_kibana
+    tags : [kibana]
+    hosts: [kba1, kba2]
+
+  filebeat:
+    role : ctlabs_filebeat
+    tags : [filebeat]
+    hosts: hosts
+
+  minikube:
+    role : ctlabs_minikube
+    tags : [minikube]
+    hosts: [mkube1, mkube2]
+
+  kind:
+    role : ctlabs_kind
+    tags : [kind]
+    hosts: [kind1]
+
+  k3s:
+    role : ctlabs_k3s
+    tags : [k3s]
+    hosts: [k3s1, k3s2, k3s3, k3s4]
+
+  rke2:
+    role : ctlabs_rke2
+    tags : [rke2]
+    hosts: [rke21, rke22, rke23, rke24]
+
+  metallb:
+    role : ctlabs_metallb
+    tags : [metallb]
+    hosts: [rke21]
+
+  containerd:
+    role : ctlabs_containerd
+    tags : [containerd]
+    hosts: [k8s1]
+
+  k8s:
+    role : ctlabs_k8s
+    tags : [k8s]
+    hosts: [k8s1]
+
+  jenkins:
+    role : ctlabs_jenkins
+    tags : [jenkins]
+    hosts: [ansible]
+
+  juicefs:
+    role : ctlabs_juicefs
+    tags : [juicefs]
+    hosts: [localhost]
+
+  gitea:
+    role : ctlabs_gitea
+    tags : [gitea]
+    hosts: [git1, git2]
+
+  atlantis:
+    role : ctlabs_atlantis
+    tags : [atlantis]
+    hosts: [ats1, ats2]
+
+  opa:
+    role : ctlabs_opa
+    tags : [opa]
+    hosts: [opa1, opa2]
+
+  jupyter:
+    role : ctlabs_jupyter
+    tags : [jupyter]
+    hosts: [ansible, h1, h2]
+
+  airflow:
+    role : ctlabs_airflow
+    tags : [airflow]
+    hosts: [h1, h2]
+
+  foreman:
+    role : ctlabs_foreman
+    tags : [foreman]
+    hosts: [fm1, fm2]
+
+  xrdp:
+    role : ctlabs_xrdp
+    tags : [xrdp]
+    hosts: [h3, h4, burp1, burp2]
+
+  burp:
+    role : ctlabs_burp
+    tags : [burp]
+    hosts: [burp1, burp2]
+
+  graphify:
+    role : ctlabs_graphify
+    tags : [graphify]
+    hosts: [ansible]
+
+  openclaw:
+    role : ctlabs_openclaw
+    tags : [openclaw]
+    hosts: [ansible, h1, h2, h3]
+
+  gemini_cli:
+    role : ctlabs_gemini_cli
+    tags : [gemini_cli]
+    hosts: [ansible, h1, h2, h3]
+
+  antigravity_cli:
+    role : ctlabs_antigravity_cli
+    tags : [antigravity_cli]
+    hosts: [ansible, h1, h2, h3]
+
+  claude_code:
+    role : ctlabs_claude_code
+    tags : [claude_code]
+    hosts: [ansible, h1, h2, h3]
+
+  opencode:
+    role : ctlabs_opencode
+    tags : [opencode]
+    hosts: [ansible, h1, h2, h3]
+
+  picode:
+    role : ctlabs_picode
+    tags : [picode]
+    hosts: [ansible, h1, h2, h3]
+
+  hermes:
+    role : ctlabs_hermes
+    tags : [hermes]
+    hosts: [ansible, h1, h2, h3]
+
+  wazuh:
+    role : ctlabs_wazuh
+    tags : [wazuh]
+    hosts: hosts
+
+  zap:
+    role : ctlabs_zap
+    tags : [zap]
+    hosts: [burp1, burp2]
+
+  ghidra:
+    role : ctlabs_ghidra
+    tags : [ghidra]
+    hosts: [burp1, burp2]
+
+  tempo:
+    role : ctlabs_tempo
+    tags : [tempo]
+    hosts: hosts
+
+  aide:
+    role : ctlabs_aide
+    tags : [aide]
+    hosts: hosts

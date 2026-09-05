@@ -28,6 +28,16 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, frr, openvpn, jupyter]
+              setup:
+                bind:
+                  profile: bind_default
+                  hosts: [ns1, ns2]
+                openvpn:
+                  hosts: [ro1, h1]
+                  ro1:
+                    type: server
+                  h1:
+                    type: client
             dnat :
               - [9988, 8888]
           sw0:

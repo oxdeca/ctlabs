@@ -28,6 +28,15 @@ topology:
             book: ctlabs.yml
             tags: [up, setup, ca, bind, openclaw, gemini_cli, opencode]
             inv: ai01.ini
+            setup:
+              openclaw:
+                hosts: [h1]
+              claude_code:
+                hosts: [ansible]
+              gemini_cli:
+                hosts: [h2]
+              opencode:
+                hosts: [h3]
           dnat:
           - [ 9988, 8888 ]
         sw0:

@@ -28,6 +28,16 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, jupyter, smbadc, slapd, httpd, postgresql, redis, netbox, guacamole]
+              setup:
+                bind:
+                  profile: bind_default
+                  hosts  : [ns1, ns2]
+                claude_code:
+                  profile: claude_anthropic
+                  hosts  : [ansible, h1]
+                  h1:
+                    provider:
+                      active: openrouter
             dnat :
               - [9988, 8888]
           sw0:
