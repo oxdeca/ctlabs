@@ -187,19 +187,23 @@ profiles:
   k3s:
     role: k3s
     k3s1:
+      plane  : control
       role   : server
       ingress:
         type    : gateway_api
         provider: traefik
     k3s2:
+      plane      : control
       role       : agent
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
     k3s3:
+      plane      : control
       role       : agent
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
     k3s4:
+      plane      : data
       role       : agent
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
@@ -210,6 +214,7 @@ profiles:
   rke2:
     role: rke2
     rke21:
+      plane  : control
       role   : server
       ingress:
         type    : gateway_api
@@ -218,14 +223,17 @@ profiles:
           host_network: true
           service_type: ClusterIP
     rke22:
+      plane      : control
       role       : agent
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
     rke23:
+      plane      : control
       role       : agent
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
     rke24:
+      plane      : data
       role       : agent
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"

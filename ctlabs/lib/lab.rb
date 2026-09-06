@@ -1278,7 +1278,9 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       else
         Array(cfg['hosts'])
       end
-      hosts = if setup_hosts
+      hosts = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
+        setup_hosts.flat_map { |g| Array(g['group']) }.uniq & existing
+      elsif setup_hosts
         setup_hosts == 'all' ? existing : (Array(setup_hosts) & existing)
       else
         canonical_hosts & existing
@@ -1333,20 +1335,22 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       setup_cfg   = (play_cfg['setup'] || {})[profile_name]
       setup_hosts = setup_cfg && setup_cfg['hosts']
 
-      grouped = cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
-      if grouped
-        cfg['hosts'].filter_map do |grp|
-          grp_hosts = Array(grp['group'])
-          hosts = if setup_hosts
-            setup_hosts == 'all' ? (grp_hosts & existing) : (grp_hosts & Array(setup_hosts) & existing)
-          else
-            grp_hosts & existing
-          end
-          next if hosts.empty?
+      effective_groups = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
+        setup_hosts
+      elsif cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
+        cfg['hosts']
+      else
+        nil
+      end
+
+      if effective_groups
+        effective_groups.filter_map do |grp|
+          grp_hosts = Array(grp['group']) & existing
+          next if grp_hosts.empty?
           grp_tags = (Array(grp['tags']).map(&:to_s) + role_tags).uniq
           <<~PLAY
             - name : ctlabs.playbooks.ctlabs.#{profile_name}
-              hosts: #{hosts.join(',')}
+              hosts: #{grp_hosts.join(',')}
               tags : [#{grp_tags.join(', ')}]
               roles:
                 - roles/#{cfg['role']}
