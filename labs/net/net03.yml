@@ -31,12 +31,13 @@ topology:
               tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd]
               setup:
                 ca:
+                  hosts: all
                   domain: net03.ctlabs.internal
-                smbadc:
-                  profile: smbadc
-                  hosts: [dc1, dc2]
-                slapd:
-                  hosts: [slapd1, slapd2]
+                bind:
+                  hosts: [ns1, ns2]
+                  zones:
+                    - name: ctlabs.internal
+                    - name: net03.ctlabs.internal
                 frr:
                   hosts: [ro1, ro2, ro3, ro4, isp1]
                   ro1:
