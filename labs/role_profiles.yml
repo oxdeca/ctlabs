@@ -231,12 +231,20 @@ profiles:
   k3s:
     role : ctlabs_k3s
     tags : [k3s]
-    hosts: [k3s1, k3s2, k3s3, k3s4]
+    hosts: 
+      - group: [k3s1]
+        tags : [k3s-server]
+      - group: [k3s2, k3s3, k3s4]
+        tags : [k3s-agent]
 
   rke2:
     role : ctlabs_rke2
     tags : [rke2]
-    hosts: [rke21, rke22, rke23, rke24]
+    hosts: 
+      - group: [rke21]
+        tags : [rke2-server]
+      - group: [rke22, rke23, rke24]
+        tags : [rke2-agent]
 
   metallb:
     role : ctlabs_metallb
