@@ -76,13 +76,15 @@ k3s:
   hosts:
     - group: [k3s1]
       tags : [k3s-server]
-    - group: [k3s2, k3s3, k3s4]
-      tags : [k3s-agent]
+    - group: [k3s2, k3s3]
+      tags : [k3s-control]
+    - group: [k3s4]
+      tags : [k3s-worker]
 ```
 
 - Each group becomes a **separate sequential play** in the generated `ctlabs.yml`
 - Group `tags` are extra tags — the top-level role tag (`k3s`) is **always appended automatically**
-- Generated plays will have `tags: [k3s-server, k3s]` and `tags: [k3s-agent, k3s]`
+- Generated plays will have `tags: [k3s-server, k3s]`, `tags: [k3s-control, k3s]`, `tags: [k3s-worker, k3s]`
 - Facts are still written to all group members in a single `setup.yml` play
 
 Roles using grouped hosts: `smbadc`, `k3s`, `rke2`.
@@ -187,10 +189,29 @@ setup:
       - group: [k3s1, k3s2, k3s3]
         tags : [k3s-server]
       - group: [k3s4]
-        tags : [k3s-agent]
+        tags : [k3s-worker]
 ```
 
 This produces two sequential plays with the specified grouping, ignoring the profile default. The top-level role tag (`k3s`) is always appended to each group's tags automatically.
+
+#### Base profile always auto-loaded
+
+When a `play.setup` entry exists for a profile, `lab.rb` always loads the matching `setup_profiles.yml` entry as the base first, then deep-merges the lab overrides on top. This means you only need to specify what differs from the defaults:
+
+```yaml
+setup:
+  k3s:
+    k3s2:
+      role: worker    # overrides default 'control' for k3s2; all other k3s2 keys come from setup_profiles
+```
+
+A named `profile:` key overrides which profile is used as the base:
+
+```yaml
+setup:
+  claude_code:
+    profile: claude_openrouter   # use claude_openrouter profile as base instead of claude_code
+```
 
 #### Omitting play.setup for a profile
 
@@ -286,8 +307,14 @@ API keys and passwords must **never** appear in lab YAML or profile files. Alway
     - roles/ctlabs_k3s
 
 - name : ctlabs.playbooks.ctlabs.k3s
-  hosts: k3s2,k3s3,k3s4
-  tags : [k3s-agent, k3s]
+  hosts: k3s2,k3s3
+  tags : [k3s-control, k3s]
+  roles:
+    - roles/ctlabs_k3s
+
+- name : ctlabs.playbooks.ctlabs.k3s
+  hosts: k3s4
+  tags : [k3s-worker, k3s]
   roles:
     - roles/ctlabs_k3s
 ```
