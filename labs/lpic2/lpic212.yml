@@ -28,7 +28,36 @@ topology:
             play:
               book: lpic2.yml
               tags: [up, setup, ca, bind, frr, openvpn, smbadc, slapd]
-            dnat  :
+              setup:
+                frr:
+                  hosts: [ro1, ro2, isp1]
+                  ro1:
+                    daemons:
+                      enabled: [bgpd]
+                      profile: datacenter
+                    router:
+                      bpg:
+                        local_asn : 65001
+                        local_ip  : 10.8.15.1
+                        remote_ip : 10.8.15.2
+                        remote_asn: 65002
+                        nets:     : [192.168.10.0/24]
+                  ro2:
+                    daemons:
+                      enabled: [bgpd]
+                      profile: datacenter
+                    router:
+                      bpg:
+                        local_asn : 65002
+                        local_ip  : 10.8.15.2
+                        remote_ip : 10.8.15.1
+                        remote_asn: 65001
+                        nets      : [192.168.20.0/24]
+                  isp1:
+                    daemons:
+                      enabled: [bgpd]
+                      profile: datacenter
+            dnat:
               - [9988, 8888]
           sw0:
             profile: ovs

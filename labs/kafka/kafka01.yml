@@ -27,7 +27,7 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, smbadc, slapd, grafana, loki, alloy, kafka]
-            dnat  :
+            dnat:
               - [9988, 8888]
           sw0:
             profile: ovs

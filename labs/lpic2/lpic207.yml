@@ -28,7 +28,7 @@ topology:
             play:
               book: lpic2.yml
               tags: [up, setup, ca, bind]
-            dnat  :
+            dnat:
               - [9988, 8888]
           sw0:
             profile: ovs

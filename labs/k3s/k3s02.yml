@@ -32,7 +32,7 @@ topology:
               setup:
                 jupiter:
                   hosts: [ansible]
-            dnat :
+            dnat:
               - [9988, 8888]
           sw0:
             profile: ovs
