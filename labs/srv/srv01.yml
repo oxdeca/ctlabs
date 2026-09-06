@@ -25,7 +25,7 @@ topology:
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/agents/ansible/:/root/ctlabs-ai/agents/ansible/:Z,rw']
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, smbadc-master, smbadc-slave, slapd, sssd]
+              tags: [up, setup, ca, vault, bind, smbadc, slapd, sssd]
               env : ['CTLABS_SSSD_BACKEND=LDAP', 'CTLABS_VAULT_ROLE=server']
             dnat:
               - [9981, 3010]
