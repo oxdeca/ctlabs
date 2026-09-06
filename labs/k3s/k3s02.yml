@@ -27,8 +27,11 @@ topology:
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, bind, k3s-server, k3s-agent, jupyter, vault]
+              tags: [up, setup, ca, bind, k3s, vault, jupyter]
               env : ['CTLABS_VAULT_ROLE=server']
+              setup:
+                jupiter:
+                  hosts: [ansible]
             dnat :
               - [9988, 8888]
           sw0:
@@ -51,6 +54,7 @@ topology:
             snat: true
             dnat:
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes: 
