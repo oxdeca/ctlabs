@@ -47,7 +47,7 @@ profiles:
   frr:
     role : ctlabs_frr
     tags : [frr]
-    hosts: [ro1, ro2, ro3, ro4]
+    hosts: [ro1, ro2, ro3, ro4, isp1]
 
   bind:
     role : ctlabs_bind
@@ -363,3 +363,8 @@ profiles:
     role : ctlabs_aide
     tags : [aide]
     hosts: hosts
+
+  chrony:
+    role : ctlabs_chrony
+    tags : [chrony]
+    hosts: [h3,h4]
