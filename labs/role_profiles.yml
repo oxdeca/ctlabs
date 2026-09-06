@@ -57,7 +57,11 @@ profiles:
   smbadc:
     role : ctlabs_smbadc
     tags : [smbadc]
-    hosts: [dc1, dc2]
+    hosts:
+      - group: [dc1]
+        tags : [smbadc-master]
+      - group: [dc2]
+        tags : [smbadc-slave]
 
   slapd:
     role : ctlabs_slapd

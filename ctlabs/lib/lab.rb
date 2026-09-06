@@ -1270,10 +1270,18 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
       role_setup  = setup_cfg[profile_name]
       setup_hosts = role_setup && role_setup['hosts']
+      grouped     = cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
+      canonical_hosts = if grouped
+        cfg['hosts'].flat_map { |g| Array(g['group']) }.uniq
+      elsif cfg['hosts'] == 'all'
+        existing
+      else
+        Array(cfg['hosts'])
+      end
       hosts = if setup_hosts
         setup_hosts == 'all' ? existing : (Array(setup_hosts) & existing)
       else
-        cfg['hosts'] == 'all' ? existing : (Array(cfg['hosts']) & existing)
+        canonical_hosts & existing
       end
       next if hosts.empty?
 
@@ -1317,28 +1325,50 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
     HEADER
 
-    plays = profiles.map do |profile_name, cfg|
-      next unless cfg['role']
-      role_tags    = Array(cfg['tags'] || []).map(&:to_s)
-      next unless (role_tags & play_tags).any?
+    plays = profiles.flat_map do |profile_name, cfg|
+      next [] unless cfg['role']
+      role_tags = Array(cfg['tags'] || []).map(&:to_s)
+      next [] unless (role_tags & play_tags).any?
 
       setup_cfg   = (play_cfg['setup'] || {})[profile_name]
       setup_hosts = setup_cfg && setup_cfg['hosts']
-      profile_hosts = if setup_hosts
-        setup_hosts == 'all' ? existing : (Array(setup_hosts) & existing)
+
+      grouped = cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
+      if grouped
+        cfg['hosts'].filter_map do |grp|
+          grp_hosts = Array(grp['group'])
+          hosts = if setup_hosts
+            setup_hosts == 'all' ? (grp_hosts & existing) : (grp_hosts & Array(setup_hosts) & existing)
+          else
+            grp_hosts & existing
+          end
+          next if hosts.empty?
+          grp_tags = (Array(grp['tags']).map(&:to_s) + role_tags).uniq
+          <<~PLAY
+            - name : ctlabs.playbooks.ctlabs.#{profile_name}
+              hosts: #{hosts.join(',')}
+              tags : [#{grp_tags.join(', ')}]
+              roles:
+                - roles/#{cfg['role']}
+
+          PLAY
+        end
       else
-        cfg['hosts'] == 'all' ? existing : (Array(cfg['hosts']) & existing)
+        profile_hosts = if setup_hosts
+          setup_hosts == 'all' ? existing : (Array(setup_hosts) & existing)
+        else
+          cfg['hosts'] == 'all' ? existing : (Array(cfg['hosts']) & existing)
+        end
+        next [] if profile_hosts.empty?
+        [<<~PLAY]
+          - name : ctlabs.playbooks.ctlabs.#{profile_name}
+            hosts: #{profile_hosts.join(',')}
+            tags : [#{role_tags.join(', ')}]
+            roles:
+              - roles/#{cfg['role']}
+
+        PLAY
       end
-      next if profile_hosts.empty?
-
-      <<~PLAY
-        - name : ctlabs.playbooks.ctlabs.#{profile_name}
-          hosts: #{profile_hosts.join(',')}
-          tags : #{role_tags.join(',')}
-          roles:
-            - roles/#{cfg['role']}
-
-      PLAY
     end.compact
 
     path = "#{ANSIBLE_DIR}/playbooks/ctlabs.yml"
