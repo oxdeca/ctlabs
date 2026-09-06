@@ -1206,13 +1206,11 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
     # process explicit play.setup entries (profile + per-host overrides)
     (play_cfg['setup'] || {}).each do |role, cfg|
-      cfg  = cfg || {}
-      base = {}
-
-      if cfg['profile'] && setup_profiles[cfg['profile']]
-        base = Marshal.load(Marshal.dump(setup_profiles[cfg['profile']]))
-        base.delete('role')
-      end
+      cfg        = cfg || {}
+      named_prof = cfg['profile'] && setup_profiles[cfg['profile']]
+      base_prof  = named_prof || setup_profiles[role]
+      base       = base_prof ? Marshal.load(Marshal.dump(base_prof)) : {}
+      base.delete('role')
 
       result[role] = deep_merge(base, cfg.reject { |k, _| k == 'profile' })
     end
