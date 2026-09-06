@@ -234,8 +234,10 @@ profiles:
     hosts: 
       - group: [k3s1]
         tags : [k3s-server]
-      - group: [k3s2, k3s3, k3s4]
-        tags : [k3s-agent]
+      - group: [k3s2, k3s3]
+        tags : [k3s-control]
+      - group: [k3s4]
+        tags : [k3s-worker]
 
   rke2:
     role : ctlabs_rke2
@@ -243,8 +245,10 @@ profiles:
     hosts: 
       - group: [rke21]
         tags : [rke2-server]
-      - group: [rke22, rke23, rke24]
-        tags : [rke2-agent]
+      - group: [rke22, rke23]
+        tags : [rke2-control]
+      - group: [rke24]
+        tags : [rke2-worker]
 
   metallb:
     role : ctlabs_metallb
