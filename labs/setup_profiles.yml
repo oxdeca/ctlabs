@@ -116,48 +116,48 @@ profiles:
   # ----------------------------------------------------------------------------
   frr:
     role: frr
-    ro1:
-      daemons:
-        enabled: [bgpd, ospfd]
-        profile: datacenter
-      router:
-        bgp:
-          local_asn  : 65001
-          local_ip   : 10.8.15.1
-          remote_ip  : 10.8.15.2
-          remote_asn : 65002
-          nets       : [192.168.10.0/24, 192.168.11.0/24]
-        ospf:
-          nets: [192.168.10.0/24, 192.168.113.0/30]
-    ro2:
-      daemons:
-        enabled: [bgpd, ospfd]
-        profile: datacenter
-      router:
-        bgp:
-          local_asn  : 65002
-          local_ip   : 10.8.15.2
-          remote_ip  : 10.8.15.1
-          remote_asn : 65001
-          nets       : [192.168.20.0/24, 192.168.23.0/24]
-        ospf:
-          nets: [192.168.20.0/24, 192.168.21.0/24, 192.168.124.0/30]
-    ro3:
-      daemons:
-        enabled: [ospfd]
-      router:
-        ospf:
-          nets: [192.168.11.0/24, 192.168.12.0/24, 192.168.113.0/30]
-    ro4:
-      daemons:
-        enabled: [ospfd]
-      router:
-        ospf:
-          nets: [192.168.22.0/24, 192.168.23.0/24, 192.168.124.0/30]
-    isp1:
-      daemons:
-        enabled: [bgpd]
-        profile: datacenter
+#    ro1:
+#      daemons:
+#        enabled: [bgpd, ospfd]
+#        profile: datacenter
+#      router:
+#        bgp:
+#          local_asn  : 65001
+#          local_ip   : 10.8.15.1
+#          remote_ip  : 10.8.15.2
+#          remote_asn : 65002
+#          nets       : [192.168.10.0/24, 192.168.11.0/24]
+#        ospf:
+#          nets: [192.168.10.0/24, 192.168.113.0/30]
+#    ro2:
+#      daemons:
+#        enabled: [bgpd, ospfd]
+#        profile: datacenter
+#      router:
+#        bgp:
+#          local_asn  : 65002
+#          local_ip   : 10.8.15.2
+#          remote_ip  : 10.8.15.1
+#          remote_asn : 65001
+#          nets       : [192.168.20.0/24, 192.168.23.0/24]
+#        ospf:
+#          nets: [192.168.20.0/24, 192.168.21.0/24, 192.168.124.0/30]
+#    ro3:
+#      daemons:
+#        enabled: [ospfd]
+#      router:
+#        ospf:
+#          nets: [192.168.11.0/24, 192.168.12.0/24, 192.168.113.0/30]
+#    ro4:
+#      daemons:
+#        enabled: [ospfd]
+#      router:
+#        ospf:
+#          nets: [192.168.22.0/24, 192.168.23.0/24, 192.168.124.0/30]
+#    isp1:
+#      daemons:
+#        enabled: [bgpd]
+#        profile: datacenter
 
 
   # ----------------------------------------------------------------------------
