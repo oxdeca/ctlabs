@@ -141,6 +141,8 @@ topology:
               eth1: 192.168.30.14/24
             dnat :
               - [8082, 443]
+            urls:
+              guacamole: https://${ctlabs_host}:8082/guacamole
           db1:
             type : host
             gw   : 192.168.50.1
