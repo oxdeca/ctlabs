@@ -129,8 +129,8 @@ class Lab
 
   # Safely resolves the lab file path (Runtime vs Base) - Moved from LabHelper
   def self.get_file_path(lab_name)
-    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
-    lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
+    labs_dir     = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    lock_dir     = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
     runtime_path = File.join(lock_dir, "#{lab_name.gsub('/', '_')}")
     (running? && current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(labs_dir, lab_name)
   end
