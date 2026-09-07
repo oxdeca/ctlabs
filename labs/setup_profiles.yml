@@ -80,7 +80,6 @@ profiles:
       uri     : "ldap://slapd1.ctlabs.internal, ldap://slapd2.ctlabs.internal"
       base    : "dc=ad,dc=ctlabs,dc=internal"
 
-
   # ----------------------------------------------------------------------------
   # ctlabs_alloy
   # ----------------------------------------------------------------------------

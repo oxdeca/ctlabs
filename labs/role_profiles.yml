@@ -32,7 +32,7 @@ profiles:
   rundeck:
     role : ctlabs_rundeck
     tags : [rundeck]
-    hosts: [ansible]
+    hosts: [ansible,rdk1,rdk2]
 
   kafka:
     role : ctlabs_kafka
