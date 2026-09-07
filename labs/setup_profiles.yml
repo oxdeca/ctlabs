@@ -75,6 +75,9 @@ profiles:
   # ----------------------------------------------------------------------------
   alloy:
     role: alloy
+    loki:
+      url: "https://loki.ctlabs.internal:3100/loki/api/v1/push"
+    mtls: true
 
   # ----------------------------------------------------------------------------
   # ctlabs_promtail
