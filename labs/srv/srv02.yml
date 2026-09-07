@@ -146,7 +146,7 @@ topology:
             nics:
               eth1: 192.168.30.13/24
             dnat:
-              - [8091, 4440]
+              - [8091, 4443]
           rdk2:
             profile: d12
             type: host
@@ -154,7 +154,7 @@ topology:
             nics:
               eth1: 192.168.30.14/24
             dnat:
-              - [8092, 4440]
+              - [8092, 4443]
 
 
     links:
