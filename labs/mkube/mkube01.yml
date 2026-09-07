@@ -28,6 +28,9 @@ topology:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, minikube, smbadc, slapd, vault, xrdp]
               env : ['CTLABS_VAULT_ROLE=server']
+              setup:
+                xrdp:
+                  hosts: [mkube1]
             dnat :
               - [9988, 8888]
           sw0:
