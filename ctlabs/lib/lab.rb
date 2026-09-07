@@ -1228,17 +1228,20 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       result[profile_name] = base
     end
 
-    # Bake top-level defaults into each per-host entry so that
+    # Bake `defaults:` into each per-host entry so that
     # play_setup[role][hostname] always contains the full config.
+    # Per-host keys are node names; role-wide defaults live under `defaults:`.
     node_names = @nodes.map(&:name).to_set
     result.transform_values! do |role_cfg|
-      defaults  = role_cfg.reject { |k, _| node_names.include?(k) }
-      per_hosts = role_cfg.select { |k, _| node_names.include?(k) }
+      role_defaults = role_cfg['defaults'] || {}
+      per_hosts     = role_cfg.select { |k, _| node_names.include?(k) }
+      base          = role_cfg.reject { |k, _| k == 'defaults' || node_names.include?(k) }
+      shared        = deep_merge(base, role_defaults)
       if per_hosts.empty?
-        role_cfg
+        shared
       else
-        baked = per_hosts.transform_values { |hcfg| deep_merge(defaults, hcfg) }
-        defaults.merge(baked)
+        baked = per_hosts.transform_values { |hcfg| deep_merge(shared, hcfg) }
+        shared.merge(baked)
       end
     end
 
@@ -1313,7 +1316,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                 name      : #{cfg['role']}
                 tasks_from: facts.yml
               vars:
-                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({}))[inventory_hostname] | default({}) }}"
+                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({}))[inventory_hostname] | default(play_setup['#{profile_name}'] | default({})) }}"
 
       PLAY
     end.compact
