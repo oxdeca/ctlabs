@@ -12,8 +12,8 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
            echo alias vi='vim' >> /root/.bashrc_alias && printf "\nset paste\n" >> /etc/vimrc
 
 RUN        systemctl mask systemd-logind systemd-sysusers systemd-tmpfiles-setup dev-hugepages.mount systemd-tmpfiles-clean 
+RUN        cp /etc/skel/.bash* /root/
 
-COPY       /etc/skel/.bash* /root/
 COPY       bashrc.kali /etc/profile.d/ctlabs-bashrc.sh
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
 COPY       sshd.service /etc/systemd/system/sshd.service
