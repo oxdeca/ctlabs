@@ -13,7 +13,7 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
 
 RUN        systemctl mask systemd-logind systemd-sysusers systemd-tmpfiles-setup dev-hugepages.mount systemd-tmpfiles-clean 
 
-RUN        echo 'if [ -f "/etc/bashrc.kali" ]; then . /etc/bashrc.kali; fi' >> /etc/bashrc
+COPY       /etc/skel/.bash* /root/
 COPY       bashrc.kali /etc/profile.d/ctlabs-bashrc.sh
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
 COPY       sshd.service /etc/systemd/system/sshd.service
