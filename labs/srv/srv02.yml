@@ -1,4 +1,5 @@
 ---
+
 # -----------------------------------------------------------------------------
 # File        : ctlabs/labs/srv/srv02.yml
 # Description : Vault Lab configuration
@@ -30,7 +31,7 @@ topology:
                 rundeck:
                   hosts: [rdk1,rdk2]
             dnat :
-              - [8192, 4443]
+              - [9920, 8200]
           sw0:
             profile: ovs
             type: switch
@@ -52,6 +53,7 @@ topology:
             snat: true
             dnat: 
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:
@@ -154,7 +156,6 @@ topology:
               eth1: 192.168.30.14/24
             dnat:
               - [8092, 4443]
-
 
     links:
       - [ "ro0:eth1", "natgw:eth1"  ]

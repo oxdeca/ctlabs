@@ -162,13 +162,13 @@ profiles:
   rundeck:
     role: rundeck
     ansible:
-      server_url   : "https://ansible.ctlabs.internal:8192"
+      server_url   : "https://{{ CTLABS_HOST }}:8192"
       auth_provider: ad
     rdk1:
-      server_url   : "https://rdk1.ctlabs.internal:8091"
+      server_url   : "https://{{ CTLABS_HOST }}:8091"
       auth_provider: ad
     rdk2:
-      server_url   : "https://rdk2.ctlabs.internal:8092"
+      server_url   : "https://{{ CTLABS_HOST }}:8092"
       auth_provider: ad
 
   # ----------------------------------------------------------------------------
