@@ -26,7 +26,7 @@ topology:
           vols: ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/agents/ansible/:/root/ctlabs-ai/agents/ansible:Z,rw']
           play:
             book: ctlabs.yml
-            tags: [up, setup, ca, bind, openclaw, gemini_cli, opencode]
+            tags: [up, setup, ca, vault, bind, openclaw, gemini_cli, opencode]
             inv: ai01.ini
             setup:
               openclaw:

@@ -27,7 +27,7 @@ topology:
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, bind, openvpn, xrdp, burp]
+              tags: [up, setup, ca, vault, bind, openvpn, xrdp, burp]
           sw0:
             profile: ovs
             type: switch

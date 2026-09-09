@@ -27,7 +27,7 @@ topology:
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, bind, k3s, vault, jupyter]
+              tags: [up, setup, ca, vault, bind, k3s, jupyter]
               setup:
                 jupiter:
                   hosts: [ansible]
