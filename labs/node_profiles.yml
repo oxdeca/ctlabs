@@ -8,6 +8,7 @@ profiles:
   controller:
     linux:
       image: ctlabs/c9/ctrl
+      caps: [IPC_LOCK]
   switch:
     ovs:
       image: ctlabs/c9/ovs
