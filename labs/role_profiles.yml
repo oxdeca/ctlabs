@@ -27,7 +27,7 @@ profiles:
   vault:
     role : ctlabs_vault
     tags : [vault]
-    hosts: [vdb1, vdb2]
+    hosts: [ansible, vdb1, vdb2]
 
   rundeck:
     role : ctlabs_rundeck

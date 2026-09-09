@@ -28,7 +28,6 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, k3s, vault, jupyter]
-              env : ['CTLABS_VAULT_ROLE=server']
               setup:
                 jupiter:
                   hosts: [ansible]

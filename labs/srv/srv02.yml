@@ -26,7 +26,6 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, vault, smbadc, slapd, sssd, rundeck]
-              env : ['CTLABS_VAULT_ROLE=server']
               setup:
                 rundeck:
                   hosts: [rdk1,rdk2]
