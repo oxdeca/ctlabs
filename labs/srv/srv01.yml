@@ -26,7 +26,6 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, smbadc, slapd, sssd]
-              env : ['CTLABS_SSSD_BACKEND=LDAP']
             dnat:
               - [9981, 3010]
           sw0:

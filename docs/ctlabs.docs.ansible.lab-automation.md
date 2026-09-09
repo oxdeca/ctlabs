@@ -230,6 +230,24 @@ setup:
         api_key_env: OPENROUTER_API_KEY
 ```
 
+#### Per-host profiles
+
+A per-host entry can specify its own `profile:` to use a different base from `setup_profiles.yml`. This is useful when multiple hosts need the same role but with different default configurations:
+
+```yaml
+setup:
+  claude_code:
+    hosts: [ansible, h1]
+    ansible:
+      profile: claude_openrouter
+    h1:
+      profile: claude_anthropic
+      provider:
+        api_key_env: MY_ANTHROPIC_KEY
+```
+
+Each host's resolution order is: **named host profile → shared role config (from `hosts` and top-level keys) → per-host overrides**. The per-host `profile:` is consumed during baking and does not appear in the final `.play_setup.json`.
+
 ---
 
 ## 7. Local Facts

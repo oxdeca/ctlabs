@@ -1231,6 +1231,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     # Bake `defaults:` into each per-host entry so that
     # play_setup[role][hostname] always contains the full config.
     # Per-host keys are node names; role-wide defaults live under `defaults:`.
+    # Per-host `profile:` overrides the base profile for that host.
     node_names = @nodes.map(&:name).to_set
     result.transform_values! do |role_cfg|
       role_defaults = role_cfg['defaults'] || {}
@@ -1240,7 +1241,19 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       if per_hosts.empty?
         shared
       else
-        baked = per_hosts.transform_values { |hcfg| deep_merge(shared, hcfg) }
+        baked = per_hosts.transform_values do |hcfg|
+          host_prof_name = hcfg.delete('profile')
+          if host_prof_name && setup_profiles[host_prof_name]
+            host_base     = Marshal.load(Marshal.dump(setup_profiles[host_prof_name]))
+            host_base.delete('role')
+            host_defaults = host_base['defaults'] || {}
+            host_rest     = host_base.reject { |k, _| k == 'defaults' }
+            host_shared   = deep_merge(host_rest, host_defaults)
+            deep_merge(shared, deep_merge(host_shared, hcfg))
+          else
+            deep_merge(shared, hcfg)
+          end
+        end
         shared.merge(baked)
       end
     end

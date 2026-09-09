@@ -343,7 +343,7 @@ profiles:
   opencode:
     role : ctlabs_opencode
     tags : [opencode]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   picode:
     role : ctlabs_picode

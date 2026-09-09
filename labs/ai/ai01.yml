@@ -26,19 +26,19 @@ topology:
           vols: ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/agents/ansible/:/root/ctlabs-ai/agents/ansible:Z,rw']
           play:
             book: ctlabs.yml
-            tags: [up, setup, ca, vault, bind, openclaw, gemini_cli, opencode]
+            tags: [up, setup, ca, vault, bind, openclaw, claude_code, opencode]
             inv: ai01.ini
             setup:
               openclaw:
                 hosts: [h1]
               claude_code:
                 hosts: [ansible]
+                ansible:
+                  profile: claude_openrouter
               gemini_cli:
                 hosts: [h2]
-              opencode:
-                hosts: [h3]
           dnat:
-          - [ 9988, 8888 ]
+          - [ 9920, 8200 ]
         sw0:
           profile: ovs
           type: switch

@@ -28,7 +28,6 @@ topology:
             play:
               book: lpic2.yml
               tags: [up, setup, ca, vault, bind, smbadc, sssd, slapd, haproxy, httpd, postgresql]
-              env : ['CTLABS_SSSD_DOMAIN=ctlabs.internal', 'CTLABS_SSSD_BACKEND=ldap']
             dnat:
               - [9988, 8888]
           sw0:
