@@ -19,7 +19,10 @@ class Lab
 
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
-  PLAYBOOK_DIR       = '/root/ctlabs-ansible'.freeze
+  SETUP_PROFILES     = '/root/ctlabs/labs/setup_profiles.yml'
+  ROLE_PROFILES      = '/root/ctlabs/labs/role_profiles.yml'
+  ANSIBLE_DIR        = '/root/ctlabs-ansible'.freeze
+  PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
   PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
 
 
@@ -1191,10 +1194,6 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     end
   end
 
-  ANSIBLE_DIR    = '/root/ctlabs-ansible'
-  SETUP_PROFILES = '/root/ctlabs/labs/setup_profiles.yml'
-  ROLE_PROFILES  = '/root/ctlabs/labs/role_profiles.yml'
-  PLAY_SETUP_FILE = "#{ANSIBLE_DIR}/.play_setup.json"
 
   def build_play_setup(play_cfg)
     setup_profiles = File.file?(SETUP_PROFILES) ?
@@ -1452,8 +1451,8 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         inv_file  = play_cfg['inv'] || "#{@name}.ini"
         play_inv  = " -i ./inventories/#{inv_file}"
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-        play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_env += " -e @#{PLAY_SETUP_FILE}"
+        play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_book = " ./playbooks/#{play_cfg['book']}"
         play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
         play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
