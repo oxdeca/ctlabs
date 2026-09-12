@@ -274,7 +274,11 @@ profiles:
           interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
           wait        : true
           atomic      : true
-          values      :
+          gateway:
+            name        : traefig-gateway
+            namespace   : kube-system
+            refgrant_api: v1beta1
+          values:
             global:
               domain: argocd.ctlabs.internal
             configs:
