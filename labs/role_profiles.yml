@@ -265,6 +265,11 @@ profiles:
     tags : [k8s]
     hosts: [k8s1]
 
+  helm:
+    role : ctlabs_helm
+    tags : [helm]
+    hosts: [k3s1, k3s2, k3s3, k3s4, rke21, rke22, rke23, rke24, kind1, k8s1]
+
   jenkins:
     role : ctlabs_jenkins
     tags : [jenkins]

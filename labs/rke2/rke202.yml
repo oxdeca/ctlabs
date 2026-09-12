@@ -26,7 +26,7 @@ topology:
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
             play :
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, rke2]
+              tags: [up, setup, ca, vault, bind, rke2, helm]
             dnat :
               - [9988, 8888]
           sw0:

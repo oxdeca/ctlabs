@@ -27,7 +27,7 @@ profiles:
       zones :
         - name: ctlabs.internal
         - name: svc.ctlabs.internal
-          ddns :
+          ddns:
             allow: [127.0.0.1]
         - name: ad.ctlabs.internal
           type: forward
@@ -216,9 +216,6 @@ profiles:
       ingress:
         type    : gateway_api
         provider: traefik
-        traefik :
-          host_network: true
-          service_type: ClusterIP
     rke22:
       role       : control
       server_node: rke21
@@ -242,6 +239,106 @@ profiles:
       ingress:
         type    : gateway_api
         provider: traefik
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_helm
+  # ----------------------------------------------------------------------------
+  helm:
+    role: helm
+    defaults:
+      repos:
+        - name    : argo
+          repo_url: https://argoproj.github.io/argo-helm
+        - name    : traefik
+          repo_url: https://traefik.github.io/charts
+    k3s1:
+      charts:
+        - name        : argocd
+          chart       : argo/argo-cd
+          namespace   : argo
+          kubeconfig  : /etc/rancher/k3s/k3s.yaml
+          interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
+          wait        : true
+          atomic      : true
+          values      :
+            global:
+              domain: argocd.ctlabs.internal
+            configs:
+              secret:
+                argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+            server:
+              ingress:
+                enabled         : false
+                ingressClassName: traefik
+                hostname        : argocd.ctlabs.internal
+    rke21:
+      charts:
+        - name          : traefik
+          chart         : traefik/traefik
+          chart_version : "40.0.0"
+          namespace     : traefik
+          skip_crds     : true
+          update_repo_cache: true
+          wait          : true
+          values        :
+            providers:
+              kubernetesGateway:
+                enabled: true
+            deployment:
+              hostNetwork: true
+            ports:
+              web:
+                port    : 8000
+                hostPort: 8000
+              websecure:
+                port    : 8443
+                hostPort: 8443
+            service:
+              type: ClusterIP
+        - name        : argocd
+          chart       : argo/argo-cd
+          namespace   : argo
+          kubeconfig  : /etc/rancher/rke2/rke2.yaml
+          interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
+          wait        : true
+          atomic      : true
+          values      :
+            global:
+              domain: argocd.ctlabs.internal
+            configs:
+              secret:
+                argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+              params:
+                server.insecure: true
+            server:
+              ingress:
+                enabled         : false
+                ingressClassName: traefik
+                hostname        : argocd.ctlabs.internal
+    k8s1:
+      charts:
+        - name        : argocd
+          chart       : argo/argo-cd
+          namespace   : argo
+          kubeconfig  : /etc/kubernetes/admin.conf
+          interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
+          wait        : true
+          atomic      : true
+          values      :
+            global:
+              domain: ""
+            configs:
+              secret:
+                argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+              params:
+                server.insecure    : true
+                server.basehref    : /argo
+                server.rootpath    : /argo
+            server:
+              ingress:
+                enabled         : true
+                controller      : generic
+                ingressClassName: nginx
 
   # ----------------------------------------------------------------------------
   # ctlabs_foreman
