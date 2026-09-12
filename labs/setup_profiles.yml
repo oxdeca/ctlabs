@@ -275,7 +275,7 @@ profiles:
           wait        : true
           atomic      : true
           gateway:
-            name        : traefig-gateway
+            name        : traefik-gateway
             namespace   : kube-system
             refgrant_api: v1beta1
           values:
