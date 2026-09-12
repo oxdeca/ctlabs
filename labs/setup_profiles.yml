@@ -191,20 +191,34 @@ profiles:
     k3s1:
       role: server
       ingress:
-        type    : gateway_api
+        enabled : false
+      gateway_api:
+        enabled : true
         provider: traefik
     k3s2:
       role       : control
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
     k3s3:
       role       : control
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
     k3s4:
       role       : worker
       server_node: k3s1
       server_url : "https://k3s1.ctlabs.internal:6443"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
 
   # ----------------------------------------------------------------------------
   # ctlabs_rke2
