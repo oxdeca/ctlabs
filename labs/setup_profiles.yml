@@ -319,6 +319,8 @@ profiles:
           wait          : true
           update_repo_cache: true
           values:
+            gateway:
+              enabled: false
             providers:
               kubernetesGateway:
                 enabled: true
