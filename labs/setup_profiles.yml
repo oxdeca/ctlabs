@@ -190,6 +190,8 @@ profiles:
     role: k3s
     k3s1:
       role: server
+      servicelb:
+        enabled: true
       ingress:
         enabled : false
       gateway_api:
