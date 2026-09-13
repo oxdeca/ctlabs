@@ -314,7 +314,7 @@ profiles:
         - name          : traefik
           chart         : traefik/traefik
           chart_version : "40.0.0"
-          namespace     : kube-system
+          namespace     : traefik
           kubeconfig    : /etc/rancher/rke2/rke2.yaml
           interpreter   : "/usr/sbin/ip vrf exec default /usr/bin/python3"
           skip_crds     : true
@@ -346,7 +346,7 @@ profiles:
           atomic      : true
           gateway:
             name        : traefik-gateway
-            namespace   : kube-system
+            namespace   : traefik
             refgrant_api: v1beta1
           values      :
             global:
