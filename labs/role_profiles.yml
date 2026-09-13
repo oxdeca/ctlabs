@@ -250,11 +250,6 @@ profiles:
       - group: [rke24]
         tags : [rke2-worker]
 
-  metallb:
-    role : ctlabs_metallb
-    tags : [metallb]
-    hosts: [rke21]
-
   containerd:
     role : ctlabs_containerd
     tags : [containerd]
