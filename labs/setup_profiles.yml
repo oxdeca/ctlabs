@@ -302,6 +302,8 @@ profiles:
             configs:
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+              params:
+                server.insecure: true
             server:
               ingress:
                 enabled         : false
