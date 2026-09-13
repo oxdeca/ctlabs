@@ -346,8 +346,8 @@ profiles:
           atomic      : true
           gateway:
             name        : traefik-gateway
-            namespace   : traefik
-            refgrant_api: v1
+            namespace   : kube-system
+            refgrant_api: v1beta1
           values      :
             global:
               domain: argocd.ctlabs.internal
