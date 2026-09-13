@@ -226,22 +226,37 @@ profiles:
   rke2:
     role: rke2
     rke21:
-      role: server
+      role       : server
       ingress:
-        type    : gateway_api
+        enabled : false
+        type    : nginx
+      gateway_api:
+        enabled : true
         provider: traefik
     rke22:
       role       : control
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
     rke23:
       role       : control
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
     rke24:
       role       : worker
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
+      ingress:
+        enabled : false
+      gateway_api:
+        enabled : false
 
   # ----------------------------------------------------------------------------
   # ctlabs_kind
@@ -251,7 +266,10 @@ profiles:
     kind1:
       plane  : single
       ingress:
-        type    : gateway_api
+        enabled : false
+        type    : nginx
+      gateway_api:
+        enabled : true
         provider: traefik
 
   # ----------------------------------------------------------------------------
@@ -284,8 +302,6 @@ profiles:
             configs:
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
-              params:
-                server.insecure: true
             server:
               ingress:
                 enabled         : false
@@ -322,6 +338,10 @@ profiles:
           interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
           wait        : true
           atomic      : true
+          gateway:
+            name        : traefik-gateway
+            namespace   : traefik
+            refgrant_api: v1
           values      :
             global:
               domain: argocd.ctlabs.internal
