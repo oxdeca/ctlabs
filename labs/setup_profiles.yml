@@ -226,7 +226,9 @@ profiles:
   rke2:
     role: rke2
     rke21:
-      role       : server
+      role: server
+      servicelb:
+        enabled: true
       ingress:
         enabled : false
         type    : nginx
@@ -234,7 +236,7 @@ profiles:
         enabled : true
         provider: traefik
     rke22:
-      role       : control
+      role: control
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
       ingress:
@@ -242,7 +244,7 @@ profiles:
       gateway_api:
         enabled : false
     rke23:
-      role       : control
+      role: control
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
       ingress:
@@ -250,7 +252,7 @@ profiles:
       gateway_api:
         enabled : false
     rke24:
-      role       : worker
+      role: worker
       server_node: rke21
       server_url : "https://rke21.ctlabs.internal:9345"
       ingress:
