@@ -313,10 +313,12 @@ profiles:
           chart         : traefik/traefik
           chart_version : "40.0.0"
           namespace     : traefik
+          kubeconfig    : /etc/rancher/rke2/rke2.yaml
+          interpreter   : "/usr/sbin/ip vrf exec default /usr/bin/python3"
           skip_crds     : true
-          update_repo_cache: true
           wait          : true
-          values        :
+          update_repo_cache: true
+          values:
             providers:
               kubernetesGateway:
                 enabled: true
