@@ -261,13 +261,12 @@ profiles:
     hosts:
       - group: [k8s1]
         tags : [k8s-master]
-      # additional control-plane members:
-      # - group: [k8s2]
-      #   tags : [k8s-control]
-      # - group: [k8s3]
-      #   tags : [k8s-control]
-      # - group: [k8s4, k8s5]
-      #   tags : [k8s-worker]
+      - group: [k8s2]
+        tags : [k8s-control]
+      - group: [k8s3]
+        tags : [k8s-control]
+      - group: [k8s4]
+        tags : [k8s-worker]
 
   helm:
     role : ctlabs_helm
