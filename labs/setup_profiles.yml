@@ -275,6 +275,49 @@ profiles:
       gateway_api:
         enabled : true
         provider: traefik
+      repos:
+        - name    : traefik
+          repo_url: https://traefik.github.io/charts
+        - name    : argo
+          repo_url: https://argoproj.github.io/argo-helm
+      charts:
+        - name          : traefik
+          chart         : traefik/traefik
+          chart_version : "40.0.0"
+          namespace     : traefik
+          kubeconfig    : /root/.kube/config
+          skip_crds     : true
+          wait          : true
+          values:
+            gateway:
+              enabled: false
+            providers:
+              kubernetesGateway:
+                enabled: true
+            ports:
+              web:
+                hostPort: 80
+              websecure:
+                hostPort: 443
+        - name        : argocd
+          chart       : argo/argo-cd
+          namespace   : argo
+          kubeconfig  : /root/.kube/config
+          wait        : true
+          atomic      : true
+          values:
+            global:
+              domain: argocd.ctlabs.internal
+            configs:
+              secret:
+                argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+              params:
+                server.insecure: true
+            server:
+              ingress:
+                enabled         : false
+                ingressClassName: traefik
+                hostname        : argocd.ctlabs.internal
 
   # ----------------------------------------------------------------------------
   # ctlabs_helm
