@@ -276,11 +276,40 @@ profiles:
         enabled : true
         provider: traefik
       repos:
+        - name    : metallb
+          repo_url: https://metallb.github.io/metallb
         - name    : traefik
           repo_url: https://traefik.github.io/charts
         - name    : argo
           repo_url: https://argoproj.github.io/argo-helm
       charts:
+        - name          : metallb
+          chart         : metallb/metallb
+          chart_version : "0.16.1"
+          namespace     : metallb-system
+          kubeconfig    : /root/.kube/config
+          wait          : true
+          update_repo_cache: true
+          values:
+            frrk8s:
+              enabled: false
+          resources:
+            - apiVersion : metallb.io/v1beta1
+              kind       : IPAddressPool
+              metadata:
+                name      : default
+                namespace : metallb-system
+              spec:
+                addresses:
+                  - "10.89.0.240-10.89.0.250"
+            - apiVersion : metallb.io/v1beta1
+              kind       : L2Advertisement
+              metadata:
+                name      : default
+                namespace : metallb-system
+              spec:
+                ipAddressPools:
+                  - default
         - name          : traefik
           chart         : traefik/traefik
           chart_version : "40.0.0"
