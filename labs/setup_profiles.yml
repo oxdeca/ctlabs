@@ -270,6 +270,9 @@ profiles:
     k8s1:
       role: master
       storage: local                    # cluster-wide engine (master only): local | longhorn | none
+      gateway_api:
+        enabled : true
+        provider: traefik
     k8s2:
       role       : control
       master_node: k8s1
@@ -606,6 +609,13 @@ profiles:
           values:
             service:
               type: LoadBalancer
+            gateway:
+              enabled: false           # cluster role owns the Gateway (ctlabs_k8s gateway_api); chart just serves routes
+            gatewayClass:
+              enabled: false           # cluster role owns the GatewayClass too
+            providers:
+              kubernetesGateway:
+                enabled: true          # traefik serves Gateway API (HTTPRoute) alongside Ingress
         - name        : argocd
           chart       : argo/argo-cd
           namespace   : argo
@@ -613,21 +623,40 @@ profiles:
           interpreter : "/usr/sbin/ip vrf exec default /usr/bin/python3"
           wait        : true
           atomic      : true
+          gateway:
+            name        : traefik-gateway
+            namespace   : traefik
+            refgrant_api: v1
           values      :
             global:
-              domain: ""
+              domain: argocd.ctlabs.internal
             configs:
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
-                server.insecure    : true
-                server.basehref    : /argo
-                server.rootpath    : /argo
+                server.insecure: true
             server:
               ingress:
-                enabled         : true
-                controller      : generic
+                enabled         : false
                 ingressClassName: traefik
+                hostname        : argocd.ctlabs.internal
+            repoServer:
+              startupProbe:
+                enabled        : true
+                httpPath       : /healthz
+                timeoutSeconds : 5
+                periodSeconds  : 10
+                failureThreshold: 60
+              livenessProbe:
+                httpPath        : /healthz
+                timeoutSeconds  : 5
+                periodSeconds   : 30
+                failureThreshold: 3
+              readinessProbe:
+                httpPath        : /healthz?full=true
+                timeoutSeconds  : 5
+                periodSeconds   : 10
+                failureThreshold: 3
 
   # ----------------------------------------------------------------------------
   # ctlabs_foreman
