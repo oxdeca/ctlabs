@@ -108,7 +108,7 @@ topology:
             type   : host
             kvm    : true
             gw     : 192.168.30.1
-            env    : ['QEMU_MEM=3G','QEMU_CPU=4']
+            env    : ['QEMU_MEM=2G','QEMU_CPU=2']
             vols   : ['/media/volumes/k8s01/k8s1/:/media/vols/:rw,Z']
             nics :
               eth1: 192.168.30.31/24
@@ -119,7 +119,7 @@ topology:
             type   : host
             kvm    : true
             gw     : 192.168.30.1
-            env    : ['QEMU_MEM=3G','QEMU_CPU=4']
+            env    : ['QEMU_MEM=2G','QEMU_CPU=2']
             vols   : ['/media/volumes/k8s01/k8s2/:/media/vols/:rw,Z']
             nics :
               eth1: 192.168.30.32/24
@@ -130,7 +130,7 @@ topology:
             type   : host
             kvm    : true
             gw     : 192.168.30.1
-            env    : ['QEMU_MEM=3G','QEMU_CPU=4']
+            env    : ['QEMU_MEM=2G','QEMU_CPU=2']
             vols   : ['/media/volumes/k8s01/k8s3/:/media/vols/:rw,Z']
             nics :
               eth1: 192.168.30.33/24
@@ -141,7 +141,7 @@ topology:
             type   : host
             kvm    : true
             gw     : 192.168.30.1
-            env    : ['QEMU_MEM=3G','QEMU_CPU=4']
+            env    : ['QEMU_MEM=2G','QEMU_CPU=2']
             vols   : ['/media/volumes/k8s01/k8s4/:/media/vols/:rw,Z']
             nics :
               eth1: 192.168.30.34/24
