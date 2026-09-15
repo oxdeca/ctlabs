@@ -26,6 +26,8 @@ topology:
             nics :
               eth0: 192.168.99.5/24
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
+            dnat :
+              - [9988, 8200]
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, frr, openvpn, smbadc, slapd]
@@ -104,6 +106,7 @@ topology:
             snat: true
             dnat:
               data: isp1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:

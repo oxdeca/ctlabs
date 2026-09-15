@@ -29,6 +29,7 @@ topology:
               tags: [up, setup, ca, vault, bind, smbadc, slapd, elasticsearch, kibana, filebeat]
             dnat  :
               - [8192, 4443]
+              - [9888, 8200]
           sw0:
             profile: ovs
             type: switch
@@ -50,6 +51,7 @@ topology:
             snat: true
             dnat: 
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:

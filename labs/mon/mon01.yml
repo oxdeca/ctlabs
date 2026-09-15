@@ -28,7 +28,7 @@ topology:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, prometheus, node_exporter, blackbox_exporter, grafana, mimir, loki, alloy, postfix]
             dnat  :
-              - [9988, 8888]
+              - [9988, 8200]
           sw0:
             profile: ovs
             type: switch
@@ -50,6 +50,7 @@ topology:
             snat: true
             dnat: 
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:

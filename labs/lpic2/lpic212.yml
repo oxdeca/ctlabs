@@ -58,7 +58,7 @@ topology:
                       enabled: [bgpd]
                       profile: datacenter
             dnat:
-              - [9988, 8888]
+              - [9988, 8200]
           sw0:
             profile: ovs
             type: switch
@@ -80,6 +80,7 @@ topology:
             snat: true
             dnat:
               data: isp1:eth1
+              mgmt: ro0:eth1
 
           isp1:
             profile: frr

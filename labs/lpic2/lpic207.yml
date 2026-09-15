@@ -29,7 +29,7 @@ topology:
               book: lpic2.yml
               tags: [up, setup, ca, vault, bind]
             dnat:
-              - [9988, 8888]
+              - [9988, 8200]
           sw0:
             profile: ovs
             type: switch
@@ -51,6 +51,7 @@ topology:
             snat: true
             dnat:
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:

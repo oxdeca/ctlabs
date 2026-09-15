@@ -33,7 +33,7 @@ topology:
                 profile: bind
                 hosts: [ns1, ns2]
           dnat:
-          - [ 9988, 8888 ]
+          - [9988, 8200]
         sw0:
           profile: ovs
           type: switch

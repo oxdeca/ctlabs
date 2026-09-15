@@ -32,7 +32,7 @@ topology:
                 jupiter:
                   hosts: [ansible]
             dnat:
-              - [9988, 8888]
+              - [9988, 8200]
           sw0:
             profile: ovs
             type : switch

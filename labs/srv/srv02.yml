@@ -31,7 +31,7 @@ topology:
                 rundeck:
                   hosts: [rdk1,rdk2]
             dnat :
-              - [9920, 8200]
+              - [9988, 8200]
           sw0:
             profile: ovs
             type: switch

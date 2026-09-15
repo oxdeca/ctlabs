@@ -31,6 +31,8 @@ topology:
                 bind:
                   profile: bind
                   hosts: [ns1, ns2]
+            dnat :
+              - [9988, 8200]                  
           sw0:
             profile: ovs
             type: switch
@@ -52,6 +54,7 @@ topology:
             snat: true
             dnat: 
               data: ro1:eth1
+              mgmt: ro0:eth1
 
       transit:
         nodes:
