@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/d13/qemu
-IMG_VERS=0.4.1
+IMG_VERS=0.4.2
 
 MNTDIR=/media/ctlabs_d13_qemu
 QIMG_NAME=debian-13-nocloud-amd64.qcow2
@@ -22,12 +22,12 @@ create_qemu_img() {
   mount /dev/nbd0p1 ${MNTDIR}
 
   echo '' > ${MNTDIR}/etc/network/interfaces
+  install -m 0750 files/ctlabs_run_setup.sh    ${MNTDIR}/root/
+  install -m 0750 files/ctlabs-exec            ${MNTDIR}/usr/bin/
+  install -m 0644 files/bashrc-kali.sh         ${MNTDIR}/etc/profile.d/
   install -m 0644 files/99-ctlabs.sh           ${MNTDIR}/etc/profile.d/
   install -m 0640 files/ctlabs-net.service     ${MNTDIR}/etc/systemd/system/
-  install -m 0750 files/ctlabs-exec            ${MNTDIR}/usr/bin/
   install -m 0640 files/ssh.service            ${MNTDIR}/etc/systemd/system/
-  install -m 0750 files/ctlabs_run_setup.sh    ${MNTDIR}/root/
-  install -m 0644 files/bashrc.kali            ${MNTDIR}/etc/
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service ssh.service
   chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
@@ -43,7 +43,6 @@ create_qemu_img() {
   chroot ${MNTDIR} /bin/sh -c 'sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config'
   chroot ${MNTDIR} /bin/sh -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen'
   chroot ${MNTDIR} /bin/sh -c 'echo "LANG=en_US.UTF-8" > /etc/default/locale'
-
 
   umount ${MNTDIR}
   qemu-nbd -d /dev/nbd0

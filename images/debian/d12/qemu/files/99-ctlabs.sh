@@ -2,8 +2,8 @@
 
 export TERM=linux
 
-if [ -f /usr/bin/resize ]; then
-  resize > /dev/null
+if [ -f /usr/local/bin/resize ]; then
+  resize &> /dev/null
 fi
 
 if [ -f /etc/bashrc.kali ]; then

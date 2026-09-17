@@ -1,7 +1,7 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/d12/qemu
-IMG_VERS=0.4.2
+IMG_VERS=0.4.3
 
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2
@@ -22,12 +22,12 @@ create_qemu_img() {
   mount /dev/nbd0p1 ${MNTDIR}
 
   echo '' > ${MNTDIR}/etc/network/interfaces
+  install -m 0750 files/ctlabs_run_setup.sh    ${MNTDIR}/root/
+  install -m 0750 files/ctlabs-exec            ${MNTDIR}/usr/bin/
+  install -m 0644 files/bashrc-kali.sh         ${MNTDIR}/etc/profile.d/
   install -m 0644 files/99-ctlabs.sh           ${MNTDIR}/etc/profile.d/
   install -m 0640 files/ctlabs-net.service     ${MNTDIR}/etc/systemd/system/
-  install -m 0750 files/ctlabs-exec            ${MNTDIR}/usr/bin/
   install -m 0640 files/ssh.service            ${MNTDIR}/etc/systemd/system/
-  install -m 0750 files/ctlabs_run_setup.sh    ${MNTDIR}/root/
-  install -m 0644 files/bashrc.kali            ${MNTDIR}/etc/
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service ssh.service
   chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
