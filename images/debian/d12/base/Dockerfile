@@ -12,7 +12,7 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
             printf "set paste\n" >> /etc/vim/vimrc
 
 RUN        echo 'if [ -f "/etc/profile" ]; then . /etc/profile; fi' >> ~/.bashrc
-COPY       --chmod=0640 tmux.conf       /root/.tmux.conf
+COPY       --chmod=0644 tmux.conf       /etc/tmux.conf
 COPY       --chmod=0640 bashrc.kali     /etc/profile.d/bashrc-kali.sh
 COPY       --chmod=0755 ctlabs-exec     /usr/bin/ctlabs-exec 
 COPY       ssh.service /etc/systemd/system/ssh.service
