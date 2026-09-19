@@ -22,7 +22,7 @@ topology:
             type : controller
             gw   : 192.168.99.1
             nics :
-              eth0: 192.168.99.3/24
+              eth0: 192.168.99.5/24
             vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw']
             play:
               book: ctlabs.yml
