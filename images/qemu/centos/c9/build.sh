@@ -1,12 +1,12 @@
 #!/bin/bash
 
-IMG_NAME=ctlabs/c9/qemu
+IMG_NAME=ctlabs/qemu/c9
 IMG_VERS=0.1.1
 
 MNTDIR=/media/ctlabs_c9_qemu
-QIMG_SIZE=20G
 QIMG_NAME=CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2
 QIMG_URL=https://cloud.centos.org/centos/9-stream/x86_64/images/${QIMG_NAME}
+QIMG_SIZE=20G
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then
@@ -27,7 +27,6 @@ create_qemu_img() {
   install -m 0644 files/99-ctlabs.sh           ${MNTDIR}/etc/profile.d/
   install -m 0640 files/ctlabs-net.service     ${MNTDIR}/etc/systemd/system/
   install -m 0640 files/sshd.service           ${MNTDIR}/etc/systemd/system/
-  install -m 0640 files/tmux.conf              ${MNTDIR}/etc/
 
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service sshd.service
   chroot ${MNTDIR} /usr/bin/systemctl disable NetworkManager systemd-network-generator

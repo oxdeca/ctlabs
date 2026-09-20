@@ -3,9 +3,9 @@
 # import environment password to container
 export $(cat /proc/1/environ | tr '\0' '\n' | grep QEMU)
 
-QEMU_IMG=${QEMU_IMG:-qemu-img.qcow2}
 DISK1="/media/vda.qcow2"
 ENABLE_KVM=
+QEMU_IMG=${QEMU_IMG:-qemu-img.qcow2}
 QEMU_MEM=${QEMU_MEM:-768M}
 QEMU_CPU=${QEMU_CPU:-4} # Changed default to 4 to better demonstrate symmetry
 
