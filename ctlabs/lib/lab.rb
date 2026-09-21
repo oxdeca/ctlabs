@@ -141,6 +141,16 @@ class Lab
     File.join(lock_dir, 'runtime', "#{base}.yml")
   end
 
+  # THE single runtime-copy writer. Both the CLI (ctlabs.rb) and the webgui
+  # (labs_controller) MUST create runtime copies through this: it owns mkdir_p
+  # + cp so the runtime/ folder can never silently not-exist for one tier again
+  # (the exact ENOENT on /var/run/ctlabs/runtime/k3s_k3s01.yml we just fixed).
+  def self.create_runtime_copy(lab_name, source_path)
+    runtime_path = get_runtime_path(lab_name)
+    FileUtils.mkdir_p(File.dirname(runtime_path))
+    FileUtils.cp(source_path, runtime_path)
+    runtime_path
+  end
 
   # Safely resolves the lab file path (Runtime vs Base) - Moved from LabHelper
   def self.get_file_path(lab_name)

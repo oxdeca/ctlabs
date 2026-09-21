@@ -135,7 +135,8 @@ class LabsController < BaseController
     Thread.new do
       begin
         if action == 'up'
-          FileUtils.cp(source_path, runtime_path)
+          #FileUtils.cp(source_path, runtime_path)
+          runtime_path = Lab.create_runtime_copy(lab_name, source_path)
           lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
           lab_instance.up(v_token, v_addr)
           log.info "--- Lab #{lab_name} UP completed ---"
