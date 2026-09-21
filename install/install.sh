@@ -212,35 +212,37 @@ set_password() {
   ${CHMOD} 600 "${AUTH_FILE}" > /dev/null 2>&1
 }
 
-status_check() {
-  echo -e "${BLUE}Performing final status checks...${NC}"
-
-  # Get primary IP address
-  HOSTIP=$(hostname -I | awk '{print $1}')
-  URL="https://${HOSTIP}:4567"
-
-  # Wait for service to initialize
-  echo -ne "Waiting for ctlabs-server to start..."
-  for i in {1..30}; do
-    if ${CURL} -sk "${URL}" > /dev/null; then
-      echo -e " ${GREEN}UP${NC}"
-      echo -e "\n${GREEN}=============================================================================${NC}"
-      echo -e "${GREEN}CTLABS DEPLOYMENT SUCCESSFUL${NC}"
-      echo -e "${GREEN}=============================================================================${NC}"
-      echo -e "Web UI is ready at: ${CYAN}${URL}${NC}"
-      echo -e "Default user      : ${CYAN}ctlabs${NC}"
-      echo -e "Password          : ${CYAN}${PASS}${NC}"
-      echo -e "\n${YELLOW}Note: Container images are being built in the background.${NC}"
-      echo -e "${GREEN}=============================================================================${NC}"
-      return 0
-    fi
-    echo -ne "."
-    sleep 2
-  done
-
-  echo -e " ${RED}TIMED OUT${NC}"
-  echo -e "${YELLOW}Warning: The service didn't respond within 60s. Check 'systemctl status ctlabs-server'${NC}"
-  echo -e "Once running, access it at: ${CYAN}${URL}${NC}"
+status_check() {                                                                                                                            
+  echo -e "${BLUE}Performing final status checks...${NC}"                                                                                   
+                                                                                                                                            
+  # Get primary IP address                                                                                                                  
+  HOSTIPS=$(hostname -I)
+                                                                                                                                            
+  # Wait for service to initialize                                                                                                          
+  echo -ne "Waiting for ctlabs-server to start..."                                                                                          
+  for i in {1..30}; do                                                                                                                      
+    for ip in ${HOSTIPS}; do                                                                                                                
+      URL="https://${ip}:4567"                                                                                                              
+      if ${CURL} -sk --connect-timeout 3 "${URL}" > /dev/null; then                                                                                             
+        echo -e " ${GREEN}UP${NC}"                                                                                                          
+        echo -e "\n${GREEN}=============================================================================${NC}"                              
+        echo -e "${GREEN}CTLABS DEPLOYMENT SUCCESSFUL${NC}"                                                                                 
+        echo -e "${GREEN}=============================================================================${NC}"                                
+        echo -e "Web UI is ready at: ${CYAN}${URL}${NC}"                                                                                    
+        echo -e "Default user      : ${CYAN}ctlabs${NC}"                                                                                    
+        echo -e "Password          : ${CYAN}${PASS}${NC}"                                                                                   
+        echo -e "\n${YELLOW}Note: Container images are being built in the background.${NC}"                                                 
+        echo -e "${GREEN}=============================================================================${NC}"                                
+        return 0                                                                                                                            
+      fi                                                                                                                                    
+    done                                                                                                                                    
+    echo -ne "."                                                                                                                            
+    sleep 2                                                                                                                                 
+  done                                                                                                                                      
+                                                                                                                                            
+  echo -e " ${RED}TIMED OUT${NC}"                                                                                                           
+  echo -e "${YELLOW}Warning: The service didn't respond within 60s. Check 'systemctl status ctlabs-server'${NC}"                            
+  echo -e "Once running, access it at: ${CYAN}${URL}${NC}"                                                                                  
 }
 
 run_task() {
