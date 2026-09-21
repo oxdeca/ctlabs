@@ -101,7 +101,7 @@ topology:
             dnat:
               - [2088, 8888]
           h3:
-            profile: qemu
+            profile: qemu/d12
             type: host
             kvm : true
             gw  : 192.168.10.1
@@ -109,7 +109,7 @@ topology:
             nics:
               eth1: 192.168.10.17/24
           h4:
-            profile: qemu
+            profile: qemu/d12
             type: host
             kvm : true
             gw  : 192.168.20.1

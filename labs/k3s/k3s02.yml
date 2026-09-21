@@ -117,7 +117,7 @@ topology:
             dnat :
               - [8081, 8200]
           k3s1:
-            profile: qemu
+            profile: qemu/d12
             type : host
             kvm  : true
             gw   : 192.168.30.1
@@ -128,7 +128,7 @@ topology:
             dnat :
               - [1443, 443 ]
           k3s2:
-            profile: qemu
+            profile: qemu/d12
             type : host
             kvm  : true
             gw   : 192.168.30.1
@@ -139,7 +139,7 @@ topology:
             dnat :
               - [2443, 443 ]
           k3s3:
-            profile: qemu
+            profile: qemu/d12
             type : host
             kvm  : true
             gw   : 192.168.30.1
@@ -150,7 +150,7 @@ topology:
             dnat :
               - [3443, 443 ]
           k3s4:
-            profile: qemu
+            profile: qemu/d12
             type : host
             kvm  : true
             gw   : 192.168.30.1

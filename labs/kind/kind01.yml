@@ -105,7 +105,7 @@ topology:
             dnat :
               - [2088, 8888]
           kind1:
-            profile: qemu
+            profile: qemu/d12
             type : host
             kvm  : true
             gw   : 192.168.30.1

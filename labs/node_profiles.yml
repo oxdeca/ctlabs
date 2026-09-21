@@ -43,8 +43,12 @@ profiles:
     slapd:
       image: ctlabs/d12/base
       caps: [SYS_PTRACE]
-    qemu:
-      image: ctlabs/d12/qemu
+    qemu/d12:
+      image: ctlabs/qemu/d12
+      env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
+      kvm: true
+    qemu/c9:
+      image: ctlabs/qemu/c9
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
     db2:
