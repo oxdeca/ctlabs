@@ -126,8 +126,7 @@ class LabsController < BaseController
 
     labs_dir = LabRepository.labs_dir
     source_path = File.join(labs_dir, lab_name)
-    lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
-    runtime_path = "#{lock_dir}/#{lab_name.gsub('/', '_')}.yml"
+    runtime_path = Lab.get_runtime_path(lab_name)
     log = LabLog.for_lab(lab_name: lab_name, action: action)
 
     v_token = session[:vault_token]

@@ -130,11 +130,22 @@ class Lab
     new(cfg: path, relative_path: name)
   end
 
+  # Canonical runtime-copy path for a lab.
+  # Dedicated `runtime/` folder under the lock dir + a single `.yml` ending,
+  # so the filename alone makes it obvious this is a temporary runtime copy.
+  # Single source of truth shared by CLI (ctlabs.rb), webgui start (labs_controller)
+  # and the runtime resolver (get_file_path) — writers MUST use this helper.
+  def self.get_runtime_path(lab_name)
+    lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
+    base     = lab_name.to_s.sub(/\.yml$/, '').gsub('/', '_')
+    File.join(lock_dir, 'runtime', "#{base}.yml")
+  end
+
+
   # Safely resolves the lab file path (Runtime vs Base) - Moved from LabHelper
   def self.get_file_path(lab_name)
     labs_dir     = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
-    lock_dir     = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
-    runtime_path = File.join(lock_dir, "#{lab_name.gsub('/', '_')}")
+    runtime_path = get_runtime_path(lab_name)
     (running? && current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(labs_dir, lab_name)
   end
 
