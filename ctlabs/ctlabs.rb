@@ -54,6 +54,9 @@ OptionParser.new do |opts|
   opts.on("-i", "--ini", "Create an inventory ini-file") do
     options[:ini] = true
   end
+  opts.on("-D", "--dnsmasq", "Create a dnsmasq config for the mgmt hosts") do
+    options[:dnsmasq] = true
+  end
   opts.on("-t", "--print", "Print inspect output") do
     options[:print] = true
   end
@@ -230,7 +233,7 @@ end
 #
 # === STANDALONE UTILITY MODES ===
 #
-if options[:graph] || options[:ini] || options[:print]
+if options[:graph] || options[:ini] || options[:dnsmasq] || options[:print]
   # Initialize l1 if it wasn't already initialized by up/down/play
   unless defined?(l1) && l1
     if options[:config]
@@ -249,6 +252,7 @@ if options[:graph] || options[:ini] || options[:print]
 
   l1.visualize if options[:graph]
   l1.inventory if options[:ini]
+  l1.dnsmasq   if options[:dnsmasq]
   p l1 if options[:print]
 end
 

@@ -797,6 +797,36 @@ class Graph
     end
   end
 
+  def get_dnsmasq
+    @log.write "#{__method__}():  ", "debug"
+
+    %{
+# ctlabs - dnsmasq config for lab <%= @name %>
+# Maps the mgmt-vrf hosts so every node resolves under mgmt.<%= @domain %>
+# Consumed by the ansible controller: dnsmasq reads this via conf-dir=/etc/dnsmasq.d
+local=/mgmt.<%= @domain %>/
+
+<%- @nodes.each do |node| -%>
+<%-   ip = node.nics && node.nics['eth0'] -%>
+<%-   if ip.to_s.strip.empty? && ['mgmt'].include?(node.plane) -%>
+<%-     ip = node.ipv4 -%>
+<%-   end -%>
+<%-   next if ip.nil? || ip.to_s.strip.empty? -%>
+host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
+<%- end -%>
+    }
+  end
+
+  def to_dnsmasq(data, name)
+    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
+
+    out_dir = "../../ctlabs-ansible/dnsmasq.d"
+    FileUtils.mkdir_p(out_dir)
+    File.open("#{out_dir}/#{name}.conf", "w") do |f|
+      f.write( ERB.new(data, trim_mode:'-').result(@binding))
+    end
+  end
+
   def to_dot(data)
     @log.write "#{__method__}(): data=#{data}", "debug"
 

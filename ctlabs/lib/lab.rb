@@ -678,6 +678,12 @@ class Lab
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     @graph.to_ini(@graph.get_inventory, @name)
     @graph.to_data_ini(@graph.get_data_inventory, @name)
+    @graph.to_dnsmasq(@graph.get_dnsmasq, @name)
+  end
+
+  def dnsmasq
+    @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
+    @graph.to_dnsmasq(@graph.get_dnsmasq, @name)
   end
 
   def find_node(name)

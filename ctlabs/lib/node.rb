@@ -452,7 +452,13 @@ class Node
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
         @vmem    = %x( /usr/bin/printf "262144" > /proc/sys/vm/max_map_count )
-        %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+        if(@type == 'controller')
+          dns    = "nameserver 127.0.0.1\n" + dns
+          domain = "mgmt.#{@domain} #{@domain}"
+          %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+        else
+          %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+        end
         @netns = add_netns
         #add_nics
 
