@@ -134,7 +134,9 @@ if options[:up]
   end
 
   # Create Runtime Copy
-  runtime_path = Lab.get_file_path(config_path)
+  #runtime_path = Lab.get_file_path(config_path)
+  lock_dir     = defined?(::LOCK_DIR) ? ::LOCK_DIR : %q{/var/run/ctlabs}
+  runtime_path = File.join(lock_dir, %q{#{config_path.gsub("/", "_")}})
   FileUtils.mkdir_p(File.dirname(runtime_path))
   FileUtils.cp(full_path, runtime_path)
 
