@@ -822,9 +822,11 @@ host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
 
     out_dir = "../../ctlabs-ansible/dnsmasq.d"
     FileUtils.mkdir_p(out_dir)
-    File.open("#{out_dir}/#{name}.conf", "w") do |f|
+    conf_path = "#{out_dir}/#{name}.conf"
+    File.open(conf_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
+    conf_path
   end
 
   def to_dot(data)

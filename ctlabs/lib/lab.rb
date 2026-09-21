@@ -699,12 +699,39 @@ class Lab
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     @graph.to_ini(@graph.get_inventory, @name)
     @graph.to_data_ini(@graph.get_data_inventory, @name)
-    @graph.to_dnsmasq(@graph.get_dnsmasq, @name)
+    deploy_dnsmasq(@graph.to_dnsmasq(@graph.get_dnsmasq, @name))
   end
 
   def dnsmasq
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
-    @graph.to_dnsmasq(@graph.get_dnsmasq, @name)
+    deploy_dnsmasq(@graph.to_dnsmasq(@graph.get_dnsmasq, @name))
+  end
+    
+  # Deploys the generated dnsmasq zone into the lab's controller container
+  # (selected by type, never a hardcoded name): cp the conf into the
+  # container's /etc/dnsmasq.d/ and restart dnsmasq there. clamps the
+  # conf-dir=/etc/dnsmasq.d promise in lib/graph.rb:806.
+  def deploy_dnsmasq(conf_path)
+    return if conf_path.to_s.empty? || !File.file?(conf_path.to_s)
+    
+    controller = @nodes.find { |n| n.respond_to?(:type) && n.type.to_s == 'controller' }
+    if controller.nil?
+      @log.write "#{__method__}(): no controller node in #{@name}; skipping dnsmasq deploy", "warn"
+      return
+    end
+   
+    engine  = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    ctr     = controller.name
+    base    = File.basename(conf_path)
+    
+    @log.write "#{__method__}(): conf=#{conf_path},controller=#{ctr},engine=#{engine}", "debug"
+    
+    ran = %x( #{engine} cp "#{conf_path}" #{ctr}:/etc/dnsmasq.d/#{base} 2>&1 )
+    if $?.success?
+      %x( #{engine} exec #{ctr} systemctl restart dnsmasq 2>&1 )
+    end
+    @log.write "#{__method__}(): ran=#{ran.inspect},exit=#{$?.exitstatus}", "debug"
+    $?.success?
   end
 
   def find_node(name)
