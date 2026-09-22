@@ -1,8 +1,5 @@
 d12:  base_img
 	
-qemu_img: base_img
-	cd qemu && sh ./build.sh
-
 base_img: debian
 	cd base && sh ./build.sh
 

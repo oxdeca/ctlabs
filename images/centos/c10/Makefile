@@ -3,9 +3,6 @@ c10:	base_img frr_img ovs_img ctrl_img
 xv6_img:	base_img
 	cd xv6 && sh ./build.sh
 
-qemu_img:	base_img
-	cd qemu && sh ./build.sh
-
 ctrl_img:	base_img
 	cd ctrl && sh ./build.sh
 
