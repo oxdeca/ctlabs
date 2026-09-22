@@ -28,9 +28,6 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, k3s, helm]
-              setup:
-                jupiter:
-                  hosts: [ansible]
             dnat:
               - [9988, 8200]
           sw0:

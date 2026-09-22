@@ -29,9 +29,6 @@ topology:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, frr, openvpn]
               setup:
-                bind:
-                  profile: bind
-                  hosts: [ns1, ns2]
                 openvpn:
                   hosts: [ro1, h1]
                   ro1:

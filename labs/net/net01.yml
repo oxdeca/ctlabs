@@ -29,8 +29,6 @@ topology:
             tags: [up, setup, ca, vault, frr, bind]
             inv: net01.ini
             setup:
-              bind:
-                hosts: [ns1, ns2]
               frr:
                 hosts: [ro1, ro2]
                 daemons:

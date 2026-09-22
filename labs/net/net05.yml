@@ -27,10 +27,6 @@ topology:
             play:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind]
-              setup:
-                bind:
-                  profile: bind
-                  hosts: [ns1, ns2]
             dnat :
               - [9988, 8200]                  
           sw0:
