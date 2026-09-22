@@ -30,8 +30,28 @@ topology:
             inv: net01.ini
             setup:
               bind:
-                profile: bind
                 hosts: [ns1, ns2]
+              frr:
+                hosts: [ro1, ro2]
+                daemons:
+                  enabled: [bgpd]
+                  profile: datacenter
+                ro1:
+                  router:
+                    bgp:
+                      local_asn  : 65001
+                      local_ip   : 192.168.12.1
+                      remote_ip  : 192.168.12.2
+                      remote_asn : 65002
+                      nets: [192.168.10.0/24]
+                ro2:
+                  router:
+                    bgp:
+                      local_asn  : 65002
+                      local_ip   : 192.168.12.2
+                      remote_ip  : 192.168.12.1
+                      remote_asn : 65001
+                      nets: [192.168.20.0/24]
           dnat:
           - [9988, 8200]
         sw0:
