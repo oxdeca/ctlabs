@@ -43,7 +43,7 @@ topology:
                       local_ip   : 192.168.12.1
                       remote_ip  : 192.168.12.2
                       remote_asn : 65002
-                      nets: [192.168.10.0/24]
+                      nets: [192.168.10.0/24, 0.0.0.0/0]
                 ro2:
                   router:
                     bgp:
