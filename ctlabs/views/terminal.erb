@@ -57,6 +57,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const container = document.getElementById('terminal-container');
+      const headerEl = document.getElementById('header');
       const nodeName = document.body.dataset.nodeName;
 
       const initialCols = 120;
@@ -79,45 +80,99 @@
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
       term.open(container);
-      fitAddon.fit();
-      // Two RAFs: catches late layout settling (popup window, DPR, scrollbar quirks)
-      requestAnimationFrame(() => {
+
+      const cellSize = () => {
+        const d = term._core && term._core._renderService && term._core._renderService.dimensions;
+        if (d && d.css && d.css.cell) return d.css.cell;
+        if (d && d.actualCellHeight) return { width: d.actualCellWidth, height: d.actualCellHeight };
+        return null;
+      };
+
+      // Browser chrome (title bar + borders) so resizeTo() can target the exact
+      // INNER size that matches the cell grid.
+      const chromeW = window.outerWidth - window.innerWidth;
+      const chromeH = window.outerHeight - window.innerHeight;
+      // xterm renders its own overlay scrollbar; fit() subtracts scrollBarWidth
+      // from the available width, so the window must reserve it to end up with
+      // the full intended column count.
+      const scrollBarWidth = term._core && term._core.viewport ? term._core.viewport.scrollBarWidth : 0;
+
+      // fit() floors rows/cols, so the usable height always ends on a partial
+      // cell and the last text row floats above a variable band of background
+      // (the "sometimes there's an extra row" the user sees).
+      //
+      // Fix: resize the popup window ONCE to the exact inner size that holds
+      // the full 120x40 grid, then fit once more to adopt it. resizeTo is only
+      // ever called here — the resize listener below re-fits but never resizes
+//      the window, so a resizeTo -> fit -> resizeTo feedback loop
+      //      (which also shrank the window column-by-column via the scrollbar offset)
+      //      is impossible.
+      const pinToGrid = () => {
+        const cell = cellSize();
+        if (!cell || !window.resizeTo) return;
         fitAddon.fit();
+        window.resizeTo(
+          Math.round(initialCols * cell.width + scrollBarWidth) + chromeW,
+          Math.round(initialRows * cell.height + headerEl.offsetHeight) + chromeH
+        );
+        fitAddon.fit();
+      };
+
+      const openSocket = () => {
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
+                      `?cols=${term.cols}&rows=${term.rows}`;
+        const ws = new WebSocket(wsUrl);
+        const statusEl = document.getElementById('status');
+
+        ws.onopen = () => {
+          statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+          term.focus();
+          // Re-confirm size after onopen; PTY was already spawned at correct size
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        };
+
+        ws.onmessage = (event) => term.write(event.data);
+
+        ws.onclose = () => {
+          statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+          statusEl.classList.add('disconnected');
+          term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+        };
+
+        term.onData(data => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
+        });
+
+        term.onResize(size => {
+          if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
+        });
+
+        // Re-fit if the user drags the window or changes zoom. Fit-only:
+        // never resizeTo here, so synthetically sized windows can't feed back
+        // into a resize loop or shrink cascade.
+        window.addEventListener('resize', () => fitAddon.fit());
+      };
+
+      const start = () => {
+        // Pin the popup to the full 120x40 grid exactly once.
+        pinToGrid();
+        // Second pass after the window resize settles, so the WS opens with
+        // the exact post-pin cols/rows.
         requestAnimationFrame(() => {
           fitAddon.fit();
-          // Now safe to open the WS — backend gets correct size from the start
-          const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-          const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
-                        `?cols=${term.cols}&rows=${term.rows}`;
-          const ws = new WebSocket(wsUrl);
-          const statusEl = document.getElementById('status');
-
-          ws.onopen = () => {
-            statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
-            term.focus();
-            // Re-confirm size after onopen; PTY was already spawned at correct size
-            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-          };
-
-          ws.onmessage = (event) => term.write(event.data);
-
-          ws.onclose = () => {
-            statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-            statusEl.classList.add('disconnected');
-            term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
-          };
-
-          term.onData(data => {
-            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
-          });
-
-          term.onResize(size => {
-            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
-          });
-
-          window.addEventListener('resize', () => fitAddon.fit());
+          openSocket();
         });
-      });
+      };
+
+      // Don't measure the grid until the font is actually loaded, or the
+      // cell size (and thus the snapped window) could be computed from a
+      // fallback font and shift everything once Courier New arrives.
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(start).catch(() => start());
+      } else {
+        start();
+      }
     });
   </script>
 </body>
