@@ -1,4 +1,4 @@
-base: centos9_img debian12_img kali_img parrot_img
+base: centos9_img debian12_img kali_img parrot_img qemu_img
 	
 centos9_img:
 	cd centos/c9 && make
@@ -11,3 +11,6 @@ kali_img:
 
 parrot_img:
 	cd parrot && make
+
+qemu_img:
+	cd qemu && make
