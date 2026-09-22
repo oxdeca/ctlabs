@@ -117,7 +117,7 @@ topology:
             type: host
             kvm : true
             gw  : 192.168.30.1
-            env : ['QEMU_MEM=4G','QEMU_CPU=2']
+            env : ['QEMU_MEM=4G','QEMU_CPU=4']
             vols: ['/media/volumes/rke201/rke21/:/media/vols/:rw,Z']
             nics:
               eth1: 192.168.30.41/24
