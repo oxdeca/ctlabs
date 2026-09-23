@@ -26,9 +26,9 @@
 
     <div class="w3-bar slim-scroll" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
       <button class="w3-bar-item w3-button ans-tablink w3-text-blue" data-target-tab="AnsSettings" onclick="window.openAnsTab('AnsSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
-      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsRoleProfiles" onclick="window.openAnsTab('AnsRoleProfiles')" style="flex-shrink: 0;"><i class="fas fa-folder-open"></i> Role Profiles</button>
-      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsSetupProfiles" onclick="window.openAnsTab('AnsSetupProfiles')" style="flex-shrink: 0;"><i class="fas fa-file-alt"></i> Setup Profiles</button>
-      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlaySetup" onclick="window.openAnsTab('AnsPlaySetup')" style="flex-shrink: 0;"><i class="fas fa-tasks"></i> Play Setup</button>
+      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlaySetup" onclick="window.openAnsTab('AnsPlaySetup')" style="flex-shrink: 0;"><i class="fas fa-layer-group"></i> Play Setup</button>
+      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsSetupProfiles" onclick="window.openAnsTab('AnsSetupProfiles')" style="flex-shrink: 0;"><i class="fas fa-server"></i> Setup Profiles</button>
+      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsRoleProfiles" onclick="window.openAnsTab('AnsRoleProfiles')" style="flex-shrink: 0;"><i class="fas fa-tags"></i> Role Profiles</button>
       <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('ansible')" title="Browse Workspace"><i class="fas fa-plus"></i></button>
     </div>
 
@@ -65,11 +65,11 @@
           </div>
       </div>
 
-      <div id="AnsRoleProfiles" class="ans-tab" style="display: none;">
+      <div id="AnsPlaySetup" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Global file: <code>labs/role_profiles.yml</code> — maps role profiles to ansible roles/tags/hosts. Applied on next playbook run.
+          <i class="fas fa-info-circle"></i> Per-lab <code>play.setup</code> overrides (from <code>play:</code> in this lab's YAML) — merges over role/setup profiles per-role. Applied on next playbook run.
         </div>
-        <textarea id="editor-AnsRoleProfiles"></textarea>
+        <textarea id="editor-AnsPlaySetup"></textarea>
       </div>
 
       <div id="AnsSetupProfiles" class="ans-tab" style="display: none;">
@@ -79,11 +79,11 @@
         <textarea id="editor-AnsSetupProfiles"></textarea>
       </div>
 
-      <div id="AnsPlaySetup" class="ans-tab" style="display: none;">
+      <div id="AnsRoleProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Per-lab <code>play.setup</code> overrides (from <code>play:</code> in this lab's YAML) — merges over role/setup profiles per-role. Applied on next playbook run.
+          <i class="fas fa-info-circle"></i> Global file: <code>labs/role_profiles.yml</code> — maps role profiles to ansible roles/tags/hosts. Applied on next playbook run.
         </div>
-        <textarea id="editor-AnsPlaySetup"></textarea>
+        <textarea id="editor-AnsRoleProfiles"></textarea>
       </div>
 
       <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 1em; padding: 8px; margin-top: 15px;"></div>
