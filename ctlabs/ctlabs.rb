@@ -25,6 +25,7 @@ require './lib/node'
 require './lib/link'
 require './lib/graph'
 require './lib/lablog'
+require './lib/gcp_auth'
 
 
 #
@@ -83,12 +84,12 @@ if options[:status]
   if Lab.running?
     running_lab = Lab.current_name
     puts "✅ Lab is running: #{running_lab}"
-    
+
     # Optional: show full path
     labs_dir = File.expand_path('../labs', __dir__)
     full_path = File.join(labs_dir, running_lab)
     puts "   Config file: #{full_path}"
-    
+
     # Optional: show last log file
     log_dir = "/var/log/ctlabs"
     if Dir.exist?(log_dir)
@@ -185,10 +186,10 @@ if options[:play]
     # Reuse existing log file (append mode)
     log = LabLog.new(path: log_path)
     l1.instance_variable_set(:@log, log)
-    
+
     playbook_arg = options[:play] == true ? nil : options[:play]
     l1.run_playbook(playbook_arg, log_path)  # Dual-stream: CLI + log file
-    
+
     puts "\n✓ Playbook completed successfully"
   rescue => e
     puts "\n✗ Playbook failed: #{e.message}"
@@ -220,13 +221,13 @@ if options[:down]
 
   l1.instance_variable_set(:@log, log)
   l1.down
-  
+
   # Clean up runtime copy
   FileUtils.rm_f(runtime_path)
 
   log.info "✓ Lab stopped successfully"
   log.close
-  
+
   puts "✓ Lab stopped. View logs at: #{log.path}"
 end
 

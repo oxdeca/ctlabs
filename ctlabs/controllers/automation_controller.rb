@@ -19,7 +19,7 @@ class AutomationController < BaseController
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
       name, base_data, _ = Lab.find_automation_controller(vm)
-      
+
       raise "No controller node found in topology" unless name
 
       play = base_data['play'] || {}
@@ -95,7 +95,7 @@ class AutomationController < BaseController
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
       name, base_data, plane = Lab.find_automation_controller(vm)
-      
+
       raise "No ansible controller node found in topology" unless name
 
       play_cfg = base_data['play'] || {}
@@ -257,7 +257,7 @@ class AutomationController < BaseController
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
       name, base_data, plane = Lab.find_automation_controller(vm)
-      
+
       raise "No controller node found in topology" unless name
 
       tf_cfg = base_data['terraform'] || {}
@@ -279,26 +279,52 @@ class AutomationController < BaseController
         tf_cfg['commands'] = commands_str
       end
 
-      v_project = params[:vault_project].to_s.strip
-      v_roleset = params[:vault_roleset].to_s.strip
+      auth_method = params[:auth_method].to_s.strip
 
-      if v_project.empty?
-        tf_cfg.delete('vault')
+      case auth_method
+      when 'vault'
+        v_project = params[:vault_project].to_s.strip
+        v_roleset = params[:vault_roleset].to_s.strip
+
+        if v_project.empty?
+          tf_cfg.delete('auth')
+        else
+          tf_cfg['auth'] = {
+            'method'  => 'vault',
+            'project' => v_project,
+            'roleset' => v_roleset.empty? ? 'terraform-runner' : v_roleset
+          }
+        end
+      when 'wif'
+        wif_vault_role = params[:wif_vault_role].to_s.strip
+        wif_audience   = params[:wif_audience].to_s.strip
+        wif_sa         = params[:wif_service_account].to_s.strip
+
+        if wif_vault_role.empty? && wif_audience.empty? && wif_sa.empty?
+          tf_cfg.delete('auth')
+        else
+          tf_cfg['auth'] = {
+            'method'          => 'wif',
+            'vault_role'      => wif_vault_role,
+            'audience'        => wif_audience,
+            'service_account' => wif_sa
+          }
+        end
       else
-        tf_cfg['vault'] = {
-          'project' => v_project,
-          'roleset' => v_roleset.empty? ? 'terraform-runner' : v_roleset
-        }
+        tf_cfg.delete('auth')
       end
 
+      # Migrate away from the legacy `terraform.vault` key now that `auth` owns it.
+      tf_cfg.delete('vault')
+
       base_data['terraform'] = tf_cfg
-      
+
       if plane
         full_yaml['topology'][0]['planes'][plane]['nodes'][name] = base_data
       else
         full_yaml['topology'][0]['nodes'][name] = base_data
       end
-      
+
       LabRepository.write_formatted_yaml(lab_path, full_yaml)
 
       tf_files = JSON.parse(params[:tf_files] || '{}')

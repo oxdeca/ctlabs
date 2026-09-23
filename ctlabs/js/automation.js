@@ -10,19 +10,19 @@
 // ----------------------------------------------------------------------------
 window.openAnsTab = function(tabId) {
   document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
-      
+
   document.querySelectorAll(".ans-tablink").forEach(btn => {
     btn.classList.remove("w3-text-blue");
     btn.style.backgroundColor = "transparent";
     btn.style.borderBottom = "none";
-          
+
     if (btn.getAttribute("data-target-tab") === tabId) {
       btn.classList.add("w3-text-blue");
       btn.style.backgroundColor = "#1e293b";
       btn.style.borderBottom = "2px solid #38bdf8";
     }
   });
-      
+
   const activeTab = document.getElementById(tabId);
   if (activeTab) activeTab.style.display = "block";
 
@@ -33,7 +33,7 @@ window.openAnsTab = function(tabId) {
   if (window.cmEditors[taId]) {
     setTimeout(() => window.cmEditors[taId].refresh(), 50);
   }
-      
+
   // --- NEW: Remember the actively clicked tab! ---
   if (window.currentEditLab) {
     localStorage.setItem('ans_active_tab_' + window.currentEditLab, tabId);
@@ -75,7 +75,7 @@ window.openAnsTab = function(tabId) {
           const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/ansible/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
-          
+
           const data = await res.json();
           window.addAnsibleFileTab(filepath, data.content);
       } catch (err) {
@@ -93,13 +93,13 @@ window.openAnsTab = function(tabId) {
 
   window.loadActiveInventory = function() {
       let inv = document.getElementById('edit-ansible-inv').value.trim();
-      
+
       // If blank, calculate the default auto-generated inventory name!
-      if (!inv) { 
+      if (!inv) {
           const basename = window.currentEditLab.split('/').pop().replace('.yml', '.ini');
           inv = basename;
       }
-      
+
       const finalPath = inv.includes('/') ? inv : `inventories/${inv}`;
       window.fetchAnsibleFile(finalPath);
   };
@@ -126,16 +126,16 @@ window.openAnsTab = function(tabId) {
       btn.style.display = "flex";
       btn.style.alignItems = "center";
       btn.style.gap = "8px";
-      
+
       // Inject the data-target-tab attribute!
       btn.setAttribute("data-target-tab", tabId);
       btn.setAttribute("onclick", `window.openAnsTab('${tabId}')`);
-      
+
       btn.innerHTML = `
         <span><i class="fas fa-file-code"></i> ${basename}</span>
         <i class="fas fa-times w3-text-gray w3-hover-text-red" onclick="window.closeAnsibleTab(event, '${tabId}')" style="font-size: 1.1em; margin-top: 1px;"></i>
       `;
-      
+
       const tabBar = document.getElementById('ans-tab-bar');
       tabBar.insertBefore(btn, tabBar.lastElementChild);
 
@@ -146,7 +146,7 @@ window.openAnsTab = function(tabId) {
       div.style.height = "100%";
       div.setAttribute('data-filepath', filepath);
       div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
-      
+
       const container = document.getElementById('ans-editors-container');
       container.insertBefore(div, document.getElementById('ansible-editor-result'));
 
@@ -159,7 +159,7 @@ window.openAnsTab = function(tabId) {
 
       const editor = window.initCodeEditor(`editor-${tabId}`, mode);
       editor.setValue(content);
-      
+
       window.openAnsTab(tabId); // Open and highlight instantly
       window.updateAnsibleOpenTabs();
   };
@@ -170,9 +170,9 @@ window.loadAnsProfiles = async function() {
           const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/ansible/profiles?t=${Date.now()}`);
           if (!res.ok) throw new Error((await res.json()).error);
-          
+
           const data = await res.json();
-          
+
           const roleProf  = window.initCodeEditor('editor-AnsRoleProfiles',  'yaml');
           const setupProf = window.initCodeEditor('editor-AnsSetupProfiles', 'yaml');
           if (data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
@@ -195,11 +195,11 @@ window.loadAnsProfiles = async function() {
         const safeLab = labName.split('/').map(encodeURIComponent).join('/');
         const res = await fetch(`/labs/${safeLab}/ansible/config?t=${Date.now()}`);
         if (!res.ok) throw new Error("Could not fetch ansible node configuration");
-        
+
         const data = await res.json();
         let play = data.json.play || {};
         if (typeof play === 'string') play = { book: play };
-        
+
         const book = play.book || 'main.yml';
         const defaultInv = play.inv || window.currentEditLab.split('/').pop().replace('.yml', '.ini');
         const customInv = play.custom_inv || '';
@@ -208,12 +208,12 @@ window.loadAnsProfiles = async function() {
         document.getElementById('edit-ansible-custom-inv').value = customInv;
         document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
         document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
-        
+
         const playSetupEd = window.initCodeEditor('editor-AnsPlaySetup', 'yaml');
         playSetupEd.setValue(data.json.setup_yaml || '');
-        
+
         await window.loadAnsProfiles();
-        
+
         document.getElementById('ansible-editor-modal').style.display = 'block';
         document.querySelectorAll('.ans-tablink:not([data-pinned]):not(:first-child):not(:last-child)').forEach(e => e.remove());
         document.querySelectorAll('.ans-tab[data-filepath]').forEach(e => {
@@ -221,11 +221,11 @@ window.loadAnsProfiles = async function() {
             if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
             e.remove();
         });
-        
+
         // 🔥 RESTORE TABS FROM MEMORY 🔥
         const savedTabsStr = localStorage.getItem('ansible_tabs_' + window.currentEditLab);
         let savedTabs = savedTabsStr ? JSON.parse(savedTabsStr) : null;
-          
+
 
         if (savedTabs && savedTabs.length > 0) {
           for (const filepath of savedTabs) {
@@ -287,7 +287,7 @@ window.loadAnsProfiles = async function() {
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
           });
-          
+
           if (res.ok) {
               resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
               resultDiv.textContent = '✅ All files saved successfully.';
@@ -304,7 +304,7 @@ window.loadAnsProfiles = async function() {
           resultDiv.innerHTML = '❌ ' + err.message; // Will render Sinatra's HTML error directly in the box!
       }
   };
-  
+
   window.updateAnsibleOpenTabs = function() {
       if (!window.currentEditLab) return;
       const tabs = [];
@@ -318,7 +318,7 @@ window.loadAnsProfiles = async function() {
       e.stopPropagation();
       const tabBtn = e.currentTarget.closest('button');
       if (tabBtn) tabBtn.remove();
-      
+
       const tabDiv = document.getElementById(tabId);
       if (tabDiv) {
           const taId = tabDiv.querySelector('textarea')?.id;
@@ -344,14 +344,14 @@ window.loadAnsProfiles = async function() {
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ filepath: filepath }).toString()
           });
-          
+
           if (res.ok) {
               const tabBtn = document.querySelector(`button[onclick*="openAnsTab(event, '${activeTab.id}')"]`);
               if (tabBtn) tabBtn.remove();
               const taId = activeTab.querySelector('textarea')?.id;
               if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
               activeTab.remove();
-              
+
               document.querySelector('.ans-tablink').click();
               window.updateAnsibleOpenTabs(); // Update memory!
           } else throw new Error((await res.json()).error);
@@ -390,23 +390,23 @@ window.loadAnsProfiles = async function() {
 
 window.openTfTab = function(tabId) {
       document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
-      
+
       document.querySelectorAll(".tf-tablink").forEach(btn => {
           btn.classList.remove("w3-text-blue", "w3-text-purple");
           btn.style.backgroundColor = "transparent";
           btn.style.borderBottom = "none";
-          
+
           if (btn.getAttribute("data-target-tab") === tabId) {
               // Give the Execution Script tab a cool purple highlight, others blue
               const highlightColor = tabId === 'TfCommands' ? 'purple' : 'blue';
               const hexColor = tabId === 'TfCommands' ? '#a855f7' : '#38bdf8';
-              
+
               btn.classList.add(`w3-text-${highlightColor}`);
               btn.style.backgroundColor = "#1e293b";
               btn.style.borderBottom = `2px solid ${hexColor}`;
           }
       });
-      
+
       const activeTab = document.getElementById(tabId);
       if (activeTab) {
           // FIX: Only apply flex to the Commands tab so we don't destroy the Settings layout!
@@ -426,7 +426,7 @@ window.openTfTab = function(tabId) {
       if (window.cmEditors[taId]) {
           setTimeout(() => window.cmEditors[taId].refresh(), 50);
       }
-      
+
       if (window.currentEditLab) {
           localStorage.setItem('tf_active_tab_' + window.currentEditLab, tabId);
       }
@@ -447,15 +447,15 @@ window.openTfTab = function(tabId) {
       btn.style.display = "flex";
       btn.style.alignItems = "center";
       btn.style.gap = "8px";
-      
+
       btn.setAttribute("data-target-tab", tabId);
       btn.setAttribute("onclick", `window.openTfTab('${tabId}')`);
-      
+
       btn.innerHTML = `
         <span><i class="fas fa-file-code"></i> ${basename}</span>
         <i class="fas fa-times w3-text-gray w3-hover-text-red" onclick="window.closeTerraformTab(event, '${tabId}')" style="font-size: 1.1em; margin-top: 1px;"></i>
       `;
-      
+
       const tabBar = document.getElementById('tf-tab-bar');
       tabBar.insertBefore(btn, tabBar.lastElementChild);
 
@@ -466,7 +466,7 @@ window.openTfTab = function(tabId) {
       div.style.height = "100%";
       div.setAttribute('data-filepath', filepath);
       div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
-      
+
       const container = document.getElementById('tf-editors-container');
       container.insertBefore(div, document.getElementById('terraform-editor-result'));
 
@@ -480,6 +480,12 @@ window.openTfTab = function(tabId) {
 
       window.openTfTab(tabId);
       window.updateTerraformOpenTabs();
+  };
+
+  window.updateTfAuthMethodUI = function() {
+      const method = document.getElementById('edit-terraform-auth-method').value;
+      document.getElementById('tf-auth-vault-fields').style.display = (method === 'vault') ? 'flex' : 'none';
+      document.getElementById('tf-auth-wif-fields').style.display = (method === 'wif') ? 'flex' : 'none';
   };
 
   window.openTerraformEditor = async function(labName) {
@@ -496,10 +502,10 @@ window.openTfTab = function(tabId) {
           const safeLab = labName.split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/config?t=${Date.now()}`);
           if (!res.ok) throw new Error("Could not fetch terraform node configuration");
-          
+
           const data = await res.json();
           let tf = data.json.tf || {};
-          
+
           document.getElementById('edit-terraform-workdir').value = tf.work_dir || '';
           document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
           document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
@@ -510,15 +516,17 @@ window.openTfTab = function(tabId) {
           }
           window.cmEditors['edit-terraform-commands'].setValue(tf.commands || '');
 
-          // --- LOAD VAULT FIELDS INTO UI ---
-          if (tf.vault) {
-              document.getElementById('edit-terraform-vault-project').value = tf.vault.project || '';
-              document.getElementById('edit-terraform-vault-roleset').value = tf.vault.roleset || '';
-          } else {
-              document.getElementById('edit-terraform-vault-project').value = '';
-              document.getElementById('edit-terraform-vault-roleset').value = '';
-          }
-          
+          // --- LOAD GCP AUTH FIELDS INTO UI (auth.method, with legacy `vault` fallback) ---
+          const auth = tf.auth || (tf.vault ? Object.assign({ method: 'vault' }, tf.vault) : {});
+
+          document.getElementById('edit-terraform-auth-method').value = auth.method || '';
+          document.getElementById('edit-terraform-vault-project').value = auth.project || '';
+          document.getElementById('edit-terraform-vault-roleset').value = auth.roleset || '';
+          document.getElementById('edit-terraform-wif-vault-role').value = auth.vault_role || '';
+          document.getElementById('edit-terraform-wif-audience').value = auth.audience || '';
+          document.getElementById('edit-terraform-wif-service-account').value = auth.service_account || '';
+          window.updateTfAuthMethodUI();
+
           document.getElementById('terraform-editor-modal').style.display = 'block';
 
           // Safely clear old tabs, strictly ignoring our two permanent tabs! ---
@@ -537,7 +545,7 @@ window.openTfTab = function(tabId) {
               for (const filepath of savedTabs) {
                   await window.fetchTerraformFile(filepath);
               }
-              
+
               if (savedActiveTab && document.getElementById(savedActiveTab)) {
                   window.openTfTab(savedActiveTab);
               } else {
@@ -577,7 +585,7 @@ window.openTfTab = function(tabId) {
 
           const defaults = ['config.yml', 'main.tf', 'provider.tf', 'variables.tf', 'outputs.tf'];
           let loadedCount = 0;
-          
+
           for (const [filename, content] of Object.entries(data)) {
               if (defaults.includes(filename)) {
                   // Format as a path so the tab saves correctly!
@@ -586,7 +594,7 @@ window.openTfTab = function(tabId) {
                   loadedCount++;
               }
           }
-          
+
           if (loadedCount > 0) {
               const firstFileBtn = document.querySelectorAll('.tf-tablink')[2];
               if (firstFileBtn) firstFileBtn.querySelector('span').click();
@@ -602,7 +610,7 @@ window.openTfTab = function(tabId) {
   window.saveTerraformConfig = async function() {
       const resultDiv = document.getElementById('terraform-editor-result');
       const workDir = document.getElementById('edit-terraform-workdir').value.trim();
-      
+
       const filesData = {};
       document.querySelectorAll('.tf-tab[data-filepath]').forEach(tab => {
           const filepath = tab.getAttribute('data-filepath');
@@ -610,9 +618,13 @@ window.openTfTab = function(tabId) {
           filesData[filepath] = window.cmEditors[taId].getValue();
       });
 
-      // --- EXTRACT VAULT CONFIG ---
+      // --- EXTRACT GCP AUTH CONFIG ---
+      const authMethod     = document.getElementById('edit-terraform-auth-method').value;
       const vProject       = document.getElementById('edit-terraform-vault-project').value.trim();
       const vRoleset       = document.getElementById('edit-terraform-vault-roleset').value.trim();
+      const wifVaultRole   = document.getElementById('edit-terraform-wif-vault-role').value.trim();
+      const wifAudience    = document.getElementById('edit-terraform-wif-audience').value.trim();
+      const wifServiceAcct = document.getElementById('edit-terraform-wif-service-account').value.trim();
       const customCommands = window.cmEditors['edit-terraform-commands'] ? window.cmEditors['edit-terraform-commands'].getValue() : '';
 
       const formData = new URLSearchParams({
@@ -620,8 +632,12 @@ window.openTfTab = function(tabId) {
           workspace: document.getElementById('edit-terraform-workspace').value,
           vars: document.getElementById('edit-terraform-vars').value,
           commands: customCommands, // <-- Add it to the form payload!
+          auth_method: authMethod,
           vault_project: vProject,
-          vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '', 
+          vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '',
+          wif_vault_role: wifVaultRole,
+          wif_audience: wifAudience,
+          wif_service_account: wifServiceAcct,
           tf_files: JSON.stringify(filesData)
       });
 
@@ -665,7 +681,7 @@ window.openTfTab = function(tabId) {
       e.stopPropagation();
       const tabBtn = e.currentTarget.closest('button');
       if (tabBtn) tabBtn.remove();
-      
+
       const tabDiv = document.getElementById(tabId);
       if (tabDiv) {
           const taId = tabDiv.querySelector('textarea')?.id;
@@ -682,7 +698,7 @@ window.openTfTab = function(tabId) {
           const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
-          
+
           const data = await res.json();
           window.addTerraformFileTab(filepath, data.content);
       } catch (err) {
@@ -694,7 +710,7 @@ window.openTfTab = function(tabId) {
   window.deleteActiveTerraformFile = async function() {
       const activeTab = document.querySelector('.tf-tab[style*="display: block"]');
       if (!activeTab || activeTab.id === 'TfSettings') return;
-      
+
       // Look up using data-filepath
       const filepath = activeTab.getAttribute('data-filepath');
       if (!filepath) return;
@@ -708,7 +724,7 @@ window.openTfTab = function(tabId) {
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ filepath: filepath }).toString()
           });
-          
+
           if (res.ok) {
               const tabBtn = document.querySelector(`button[onclick*="openTfTab(event, '${activeTab.id}')"]`);
               if (tabBtn) tabBtn.remove();
@@ -819,15 +835,15 @@ window.openTfTab = function(tabId) {
   window.confirmTerraformDirBrowser = function() {
       const inputEl = document.getElementById('tf-dir-browser-input');
       if (!inputEl) return;
-      
+
       let val = inputEl.value.trim();
-      
+
       // Clean up the pretty '(root)' string back into a blank path for the backend
       if (val === '(root)' || val === '.') val = '';
 
       // 2. Retrieve the saved target ID (Defaults to global editor if missing)
       const targetId = window.currentTfDirTarget || 'edit-terraform-workdir';
-      
+
       const targetField = document.getElementById(targetId);
       if (targetField) {
           targetField.value = val;

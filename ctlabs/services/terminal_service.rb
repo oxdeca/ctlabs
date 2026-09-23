@@ -87,8 +87,7 @@ class TerminalService
 
     custom_term = nil
     node_type = nil
-    tf_vault_project = nil
-    tf_vault_roleset = nil
+    tf_cfg = nil
 
     if Lab.running?
       runtime_path = Lab.get_file_path(Lab.current_name)
@@ -98,16 +97,13 @@ class TerminalService
           if node = lab.find_node(node_name)
             node_type = node.type
             custom_term = node.term
-            
+
             if (!custom_term || custom_term.empty?) && node.remote?
               ip_target = node.gw || node.ipv4 || (node.nics && node.nics.values.first)
               custom_term = "ssh://root@#{ip_target.split('/').first}" if ip_target
             end
-            
-            if node.terraform && node.terraform['vault']
-              tf_vault_project = node.terraform['vault']['project']
-              tf_vault_roleset = node.terraform['vault']['roleset']
-            end
+
+            tf_cfg = node.terraform if node.terraform
           end
         rescue => e
           puts "[Terminal Lookup Error] #{e.message}"
@@ -120,7 +116,7 @@ class TerminalService
       uri = URI.parse(custom_term)
       user = uri.user || 'root'
       host = uri.host
-      
+
       cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'SetEnv="TERM=xterm-256color"']
       if Lab.running?
         safe_name = Lab.current_name.gsub('/', '_')
@@ -133,20 +129,11 @@ class TerminalService
       cmd = [engine, 'exec', '-it', '-w', '/root', '-e', 'TERM=xterm-256color']
 
       if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
-        v_project = tf_vault_project.to_s.strip
-        v_roleset = tf_vault_roleset.to_s.strip
-        v_roleset = 'terraform-runner' if v_roleset.empty?
-
-        if !v_project.empty?
-          begin
-            gcp_token = VaultAuth.get_gcp_token(session[:vault_addr], session[:vault_token], v_project, v_roleset)
-            if gcp_token
-              cmd.push('-e', "GOOGLE_OAUTH_ACCESS_TOKEN=#{gcp_token}")
-              cmd.push('-e', "CLOUDSDK_AUTH_ACCESS_TOKEN=#{gcp_token}")
-            end
-          rescue => e
-            puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
-          end
+        begin
+          gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] })
+          gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
+        rescue => e
+          puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
         end
       end
       cmd.push(node_name, 'bash')
@@ -174,7 +161,7 @@ class TerminalService
         session_info[:close_proc] = proc { driver.close rescue nil }
 
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
-        
+
         if initial_cols && initial_rows && pty_write
           winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
           pty_write.ioctl(0x5414, winsize) rescue nil
@@ -283,7 +270,7 @@ class TerminalService
           ssl_mutex.synchronize do
             data = io.read_nonblock(8192)
           end
-          
+
           if data == :wait_readable || data == :wait_writable
             IO.select([io], nil, nil, 0.1) rescue sleep(0.01)
             next
