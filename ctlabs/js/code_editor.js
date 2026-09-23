@@ -54,11 +54,22 @@ if (typeof CodeMirror.defineSimpleMode === 'function') {
 
 // --- UNIVERSAL EDITOR FACTORY ---
 window.initCodeEditor = function(textAreaId, langMode) {
-    // If it already exists, just return it!
-    if (window.cmEditors[textAreaId]) {
-        setTimeout(() => window.cmEditors[textAreaId].refresh(), 50);
-        return window.cmEditors[textAreaId];
+    const existing = window.cmEditors[textAreaId];
+
+    // Reuse the cached editor ONLY if its wrapper is still connected to the
+    // document. Switching labs re-renders the modal via innerHTML (labs.js
+    // fetchLabInfo), which destroys the old CodeMirror wrapper and leaves a
+    // fresh, unwrapped <textarea> behind. In that case the cached editor is
+    // orphaned and we must drop it and wrap the new textarea below.
+    if (existing) {
+        const wrapper = existing.getWrapperElement && existing.getWrapperElement();
+        if (wrapper && wrapper.isConnected) {
+            setTimeout(() => existing.refresh(), 50);
+            return existing;
+        }
+        delete window.cmEditors[textAreaId];
     }
+
     const ta = document.getElementById(textAreaId);
     if (!ta) return null;
     // Build the new editor dynamically
