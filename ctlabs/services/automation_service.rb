@@ -12,6 +12,9 @@ class AutomationService
   ANS_BASE_DIR = '/root/ctlabs-ansible'.freeze
   TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
+  ROLE_PROFILES_FILE  = defined?(Lab::ROLE_PROFILES) ? Lab::ROLE_PROFILES  : '/root/ctlabs/labs/role_profiles.yml'
+  SETUP_PROFILES_FILE = defined?(Lab::SETUP_PROFILES) ? Lab::SETUP_PROFILES : '/root/ctlabs/labs/setup_profiles.yml'
+
   def self.ansible_tree
     return [] unless Dir.exist?(ANS_BASE_DIR)
     Dir.glob(File.join(ANS_BASE_DIR, "**", "*"))
@@ -38,6 +41,29 @@ class AutomationService
   def self.delete_ansible_file(filepath)
     full_path = File.join(ANS_BASE_DIR, filepath)
     File.delete(full_path) if File.exist?(full_path)
+  end
+
+  # --- Global role/setup profile files (live under /root/ctlabs/labs/) ---
+  PROFILE_FILES = {
+    'role_profiles.yml'  => ROLE_PROFILES_FILE,
+    'setup_profiles.yml' => SETUP_PROFILES_FILE
+  }.freeze
+
+  def self.read_profile_files
+    PROFILE_FILES.transform_values { |path| File.file?(path) ? File.read(path) : nil }
+  end
+
+  def self.write_profile_files(files_hash)
+    files_hash.each do |filepath, content|
+      next unless PROFILE_FILES.key?(filepath)
+      next if content.nil?
+      begin
+        YAML.safe_load(content)
+      rescue => e
+        raise "Invalid YAML in #{filepath}: #{e.message}"
+      end
+      File.write(PROFILE_FILES[filepath], content)
+    end
   end
 
   def self.terraform_tree

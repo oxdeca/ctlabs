@@ -23,7 +23,8 @@ class AutomationController < BaseController
       raise "No controller node found in topology" unless name
 
       play = base_data['play'] || {}
-      { json: { play: play } }.to_json
+      setup_yaml = LabRepository.extract_play_setup_raw(lab_path)
+      { json: { play: play, setup_yaml: setup_yaml } }.to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -56,6 +57,36 @@ class AutomationController < BaseController
     end
   end
 
+  # Fetch the global role/setup profile files
+  get '/labs/*/ansible/profiles' do
+    content_type :json
+    begin
+      AutomationService.read_profile_files.to_json
+    rescue => e
+      status 400
+      { error: e.message }.to_json
+    end
+  end
+
+  post '/labs/*/ansible/profiles' do
+    content_type :json
+    begin
+      params[:role_profiles]  = params[:role_profiles].read if params[:role_profiles].respond_to?(:read)
+      params[:setup_profiles] = params[:setup_profiles].read if params[:setup_profiles].respond_to?(:read)
+
+      files = {
+        'role_profiles.yml'  => params[:role_profiles],
+        'setup_profiles.yml' => params[:setup_profiles]
+      }.select { |_, content| !content.nil? }
+
+      AutomationService.write_profile_files(files)
+      { success: true, message: "Profile files updated successfully." }.to_json
+    rescue Exception => e
+      status 400
+      { success: false, error: "Backend error: #{e.message}" }.to_json
+    end
+  end
+
   post '/labs/*/ansible/edit' do
     lab_name = params[:splat].first
     lab_path = Lab.get_file_path(lab_name)
@@ -69,6 +100,7 @@ class AutomationController < BaseController
 
       play_cfg = base_data['play'] || {}
       play_cfg = {} if play_cfg.is_a?(String)
+      old_play = Marshal.load(Marshal.dump(play_cfg))
 
       params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
       params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
@@ -88,25 +120,39 @@ class AutomationController < BaseController
 
       params[:tags] && !params[:tags].to_s.strip.empty? ? play_cfg['tags'] = params[:tags].to_s.split(",").map(&:strip).reject(&:empty?) : play_cfg.delete('tags')
 
-      base_data['play'] = play_cfg
-      
-      if plane
-        full_yaml['topology'][0]['planes'][plane]['nodes'][name] = base_data
+      setup_str = params[:setup].to_s.strip
+      if setup_str.empty?
+        play_cfg.delete('setup')
       else
-        full_yaml['topology'][0]['nodes'][name] = base_data
+        begin
+          parsed = YAML.safe_load(setup_str, aliases: true)
+          raise "must be a mapping of role -> config" unless parsed.is_a?(Hash)
+          play_cfg['setup'] = parsed
+        rescue => e
+          content_type :json
+          env['sinatra.error'] = e
+          halt 400, { success: false, error: "Invalid play.setup YAML: #{e.message}" }.to_json
+        end
       end
-      
-      LabRepository.write_formatted_yaml(lab_path, full_yaml)
+
+      base_data['play'] = play_cfg
+
+      LabRepository.update_ansible_play(lab_path, old_play, play_cfg, { 'setup' => params[:setup].to_s })
 
       ans_files = JSON.parse(params[:ans_files] || '{}')
       AutomationService.write_ansible_files(ans_files)
 
+      profile_files = {}
+      profile_files['role_profiles.yml']  = params[:role_profiles]  if params[:role_profiles]  && !params[:role_profiles].to_s.strip.empty?
+      profile_files['setup_profiles.yml'] = params[:setup_profiles] if params[:setup_profiles] && !params[:setup_profiles].to_s.strip.empty?
+      AutomationService.write_profile_files(profile_files) unless profile_files.empty?
+
       content_type :json
       { success: true, message: "Configuration and files updated successfully." }.to_json
     rescue Exception => e
-      status 400
       content_type :json
-      { success: false, error: "Backend error: #{e.message}" }.to_json
+      env['sinatra.error'] = e
+      halt 400, { success: false, error: "Backend error: #{e.message}" }.to_json
     end
   end
 

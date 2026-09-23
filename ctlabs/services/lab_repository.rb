@@ -34,94 +34,71 @@ class LabRepository
       name: #{base_name}
       desc: #{desc}
 
-      defaults:
-        controller:
-          linux:
-            image: ctlabs/c9/ctrl
-        switch:
-          mgmt:
-            image: ctlabs/c9/ctrl
-            ports: 16
-          linux:
-            image: ctlabs/c9/base
-            ports: 6
-        host:
-          linux:
-            image: ctlabs/c9/base
-          db2:
-            image: ctlabs/misc/db2
-            caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
-          cbeaver:
-            image: ctlabs/misc/cbeaver
-          d12:
-            image: ctlabs/d12/base
-          kali:
-            image: ctlabs/kali/base
-          parrot:
-            image: ctlabs/parrot/base
-          slapd:
-            image: ctlabs/d12/base
-            caps: [SYS_PTRACE]
-        router:
-          frr:
-            image: ctlabs/c9/frr
-            caps : [SYS_NICE,NET_BIND_SERVICE]
-          mgmt:
-            image: ctlabs/c9/frr
-            caps : [SYS_NICE,NET_BIND_SERVICE]
-
       topology:
-        - name: #{base_name}-vm1
+        - hv: #{base_name}-vm1
           dns : [192.168.10.11, 192.168.10.12, 8.8.8.8]
-          mgmt:
-            vrfid : 99
-            dns   : [1.1.1.1, 8.8.8.8]
-            net   : 192.168.99.0/24
-            gw    : 192.168.99.1
-          nodes:
-            ansible :
-              type : controller
-              gw   : 192.168.99.1
-              nics :
-                eth0: 192.168.99.3/24
-              vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
-              play: 
-                book: ctlabs.yml
-                tags: [up, setup, ca, bind, jupyter, smbadc, slapd, sssd]
-              dnat :
-                - [9988, 8888]
-            sw0:
-              type  : switch
-              kind  : mgmt
-              ipv4  : 192.168.99.11/24
+          planes:
+            mgmt:
+              vrfid : 99
+              dns   : [1.1.1.1, 8.8.8.8]
+              net   : 192.168.99.0/24
               gw    : 192.168.99.1
-            ro0:
-              type : router
-              kind : mgmt
-              gw   : 192.168.15.1
-              nics :
-                eth0: 192.168.99.1/24
-                eth1: 192.168.15.2/29
-            natgw:
-              type : gateway
-              ipv4 : 192.168.15.1/29
-              snat : true
-              dnat : ro1:eth1
-            sw1:
-              type : switch
-            sw2:
-              type : switch
-            sw3:
-              type : switch
-            ro1:
-              type : router
-              kind : frr
-              gw   : 192.168.15.1
-              nics :
-                eth1: 192.168.15.3/29
-                eth2: 192.168.10.1/24
-                eth3: 192.168.20.1/24
-                eth4: 192.168.30.1/24
+            nodes:
+              ansible :
+                type : controller
+                gw   : 192.168.99.1
+                nics :
+                  eth0: 192.168.99.3/24
+                vols : ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/srv/jupyter/ansible/:/srv/jupyter/work/:Z,rw']
+                play: 
+                  book: ctlabs.yml
+                  tags: [up, setup, ca, bind, jupyter, smbadc, slapd, sssd]
+                dnat :
+                  - [9988, 8888]
+              sw0:
+                profile: mgmt
+                type: switch
+                ipv4: 192.168.99.11/24
+                gw  : 192.168.99.1
+              ro0:
+                profile: mgmt
+                type: router
+                gw  : 192.168.15.1
+                nics:
+                  eth0: 192.168.99.1/24
+                  eth1: 192.168.15.2/29
+
+          edge:
+            nodes:
+              natgw:
+                type: gateway
+                ipv4: 192.168.15.1/29
+                snat: true
+                dnat: 
+                  data: ro1:eth1
+                  mgmt: ro0:eth1
+
+          transit:
+            nodes:
+              ro1:
+                profile: frr
+                type: router
+                gw  : 192.168.15.1
+                nics:
+                  eth1: 192.168.15.3/29
+                  eth2: 192.168.10.1/24
+                  eth3: 192.168.20.1/24
+                  eth4: 192.168.30.1/24
+
+          data:
+            nodes:
+              sw1:
+                type : switch
+              sw2:
+                type : switch
+              sw3:
+                type : switch
+
           links: []
     YAML
 
@@ -179,6 +156,175 @@ class LabRepository
 
     # 4. Write it to disk with the original header safely glued on top!
     File.write(path, header_text + yaml_str)
+  end
+
+  # Dedent + extract the raw `setup:` block of the ansible controller's `play:`
+  # section as text (for display/metadata). Returns '' when absent.
+  def self.extract_play_setup_raw(path)
+    lines = File.read(path).lines
+    play_idx = lines.index { |l| l =~ /^\s*play:\s*/ }
+    return '' unless play_idx
+
+    play_indent = lines[play_idx][/\A\s+/].to_s.length
+    block_end = play_idx + 1
+    while block_end < lines.length
+      l = lines[block_end]
+      break if l =~ /\S/ && l[/\A\s+/].to_s.length <= play_indent
+      block_end += 1
+    end
+
+    setup_idx = nil
+    (play_idx + 1...block_end).each do |i|
+      if lines[i] =~ /^(\s*)setup:/
+        setup_idx = i
+        break
+      end
+    end
+    return '' unless setup_idx
+
+    setup_indent = lines[setup_idx][/\A\s+/].to_s.length
+    end_idx = setup_idx + 1
+    end_idx += 1 while end_idx < block_end && lines[end_idx][/\A\s+/].to_s.length > setup_indent
+
+    body = lines[(setup_idx + 1)...end_idx]
+    base = body.reject { |l| l.strip.empty? }.map { |l| l[/\A\s+/].to_s.length }.min || setup_indent + 2
+    base = [base, setup_indent + 2].min
+    body.map do |l|
+      if l.strip.empty?
+        "\n"
+      else
+        l.sub(/\A {#{base}}/, '')
+      end
+    end.join
+  end
+
+  # Surgical patch of the ansible controller's `play:` block.
+  # Only the play keys that differ from `old_play` are rewritten; all other
+  # lines of the file are preserved byte-for-byte (comments, flow style,
+  # alignment, other nodes). `raw_overrides` maps a play key (e.g. 'setup') to
+  # the verbatim text the user typed in the editor; those keys are spliced
+  # verbatim instead of re-serialized. Returns true if any change was written.
+  def self.update_ansible_play(path, old_play, new_play, raw_overrides = {})
+    original = File.read(path)
+    lines = original.lines
+
+    play_idx = lines.index { |l| l =~ /^\s*play:\s*/ }
+    raise "No 'play:' block found in #{path}" unless play_idx
+
+    play_indent = lines[play_idx][/\A\s+/].to_s.length
+    # block spans from 'play:' line to the first line at same-or-lesser indent
+    block_end = play_idx + 1
+    while block_end < lines.length
+      l = lines[block_end]
+      break if l =~ /\S/ && l[/\A\s+/].to_s.length <= play_indent
+      block_end += 1
+    end
+
+    old_play = {} if old_play.nil? || !old_play.is_a?(Hash)
+    new_play = {} if new_play.nil? || !new_play.is_a?(Hash)
+
+    changed_keys = (old_play.keys | new_play.keys).select do |k|
+      next true if new_play.key?(k) && raw_overrides.key?(k) && !new_play[k].nil? # raw keys always spliced
+      old_play[k] != new_play[k]
+    end
+    return false if changed_keys.empty?
+
+    # Helper: locate each key's span within the play block (start..finish).
+    spans = {}
+    idx = play_idx + 1
+    while idx < block_end
+      indent = lines[idx][/\A\s+/].to_s.length
+      if indent == play_indent + 2 && lines[idx] =~ /^\s*([A-Za-z0-9_]+):/
+        key = $1
+        kstart = idx
+        kend = idx + 1
+        kend += 1 while kend < block_end && lines[kend][/\A\s+/].to_s.length > play_indent + 2
+        spans[key] = { start: kstart, finish: kend }
+      end
+      idx += 1
+    end
+
+    # Serialize a single play key value back into indented lines.
+    serializer = lambda do |key, value, base_indent|
+      key_line = " " * base_indent + "#{key}:"
+      return [key_line + "\n"] if value.nil? || value == false || value == true
+
+      if value.is_a?(String) || value.is_a?(Numeric)
+        [key_line + " " + value.to_s + "\n"]
+      elsif value.is_a?(Array)
+        flow = value.map { |v| v.is_a?(String) ? v : v.to_s }
+        [key_line + " [" + flow.join(", ") + "]\n"]
+      elsif value.is_a?(Hash)
+        out = [key_line + "\n"]
+        yaml_str = value.to_yaml
+        yaml_str.sub!(/\A---\r?\n/, "")
+        yaml_str.lines.each do |l|
+          next if l.strip.empty?
+          out << (" " * (base_indent + 2)) + l.sub(/^\s+/, "").sub(/\n\z/, "") + "\n"
+        end
+        out
+      else
+        [key_line + " " + value.to_s + "\n"]
+      end
+    end
+
+    # Re-indent a verbatim raw block under a key. Raw text is dedented to a
+    # base (rel=0 at the body's first key); map rel -> key_indent+2+rel so the
+    # user's exact relative structure byte-survives.
+    verbatim = lambda do |key, raw, key_indent|
+      out = [" " * key_indent + "#{key}:" + "\n"]
+      raw.each_line do |l|
+        l = l.sub(/\r?\n\z/, '')
+        next if l.strip.empty?
+        rel = l[/\A\s+/].to_s.length
+        content = l.strip
+        out << (" " * (key_indent + 2 + rel) + content + "\n")
+      end
+      out
+    end
+
+    body_indent = play_indent + 2
+
+    # Build the new block by splicing only changed keys in original key order.
+    rebuilt = []
+    used = {}
+    idx = play_idx + 1
+    while idx < block_end
+      line = lines[idx]
+      indent = line[/\A\s+/].to_s.length
+      if indent == body_indent && line =~ /^\s*([A-Za-z0-9_]+):/
+        key = $1
+        if changed_keys.include?(key)
+          span = spans[key]
+          if span && span[:finish]
+            if new_play.key?(key) && !new_play[key].nil?
+              if raw_overrides.key?(key) && !raw_overrides[key].to_s.strip.empty? && new_play[key].is_a?(Hash)
+                rebuilt.concat(verbatim.call(key, raw_overrides[key].to_s, body_indent))
+              else
+                rebuilt.concat(serializer.call(key, new_play[key], body_indent))
+              end
+            end
+            used[key] = true
+            idx = span[:finish]
+            next
+          end
+        end
+      end
+      rebuilt << line
+      idx += 1
+    end
+
+    # Append any brand-new keys (not already spliced) at the end of the play block.
+    (new_play.keys - old_play.keys - used.keys).each do |key|
+      if raw_overrides.key?(key) && new_play[key].is_a?(Hash) && !raw_overrides[key].to_s.strip.empty?
+        rebuilt.concat(verbatim.call(key, raw_overrides[key].to_s, body_indent))
+      else
+        rebuilt.concat(serializer.call(key, new_play[key], body_indent))
+      end
+    end
+
+    File.write(path, original.lines[0...play_idx].join + lines[play_idx] + rebuilt.join + original.lines[block_end..-1].join)
+    true
   end
 
   # Heavy text-replacement scanner for the Lab Meta Edit feature (Moved from YamlHelper)

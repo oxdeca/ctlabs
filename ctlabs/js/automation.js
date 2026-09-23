@@ -27,7 +27,7 @@ window.openAnsTab = function(tabId) {
   if (activeTab) activeTab.style.display = "block";
 
   const deleteBtn = document.getElementById('ans-delete-file-btn');
-  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings') ? 'none' : 'inline-block';
+  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings' || tabId === 'AnsRoleProfiles' || tabId === 'AnsSetupProfiles' || tabId === 'AnsPlaySetup') ? 'none' : 'inline-block';
 
   const taId = 'editor-' + tabId;
   if (window.cmEditors[taId]) {
@@ -164,7 +164,26 @@ window.openAnsTab = function(tabId) {
       window.updateAnsibleOpenTabs();
   };
 
-window.openAnsibleEditor = async function(labName) {
+window.loadAnsProfiles = async function() {
+      const resultDiv = document.getElementById('ansible-editor-result');
+      try {
+          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const res = await fetch(`/labs/${safeLab}/ansible/profiles?t=${Date.now()}`);
+          if (!res.ok) throw new Error((await res.json()).error);
+          
+          const data = await res.json();
+          
+          const roleProf  = window.initCodeEditor('editor-AnsRoleProfiles',  'yaml');
+          const setupProf = window.initCodeEditor('editor-AnsSetupProfiles', 'yaml');
+          if (data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
+          if (data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
+      } catch (err) {
+          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
+          resultDiv.innerHTML = '❌ ' + err.message;
+      }
+  };
+
+  window.openAnsibleEditor = async function(labName) {
     window.currentEditLab = labName;
     // --- READ MEMORY FIRST! ---
     const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
@@ -190,8 +209,13 @@ window.openAnsibleEditor = async function(labName) {
         document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
         document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
         
+        const playSetupEd = window.initCodeEditor('editor-AnsPlaySetup', 'yaml');
+        playSetupEd.setValue(data.json.setup_yaml || '');
+        
+        await window.loadAnsProfiles();
+        
         document.getElementById('ansible-editor-modal').style.display = 'block';
-        document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)').forEach(e => e.remove());
+        document.querySelectorAll('.ans-tablink:not([data-pinned]):not(:first-child):not(:last-child)').forEach(e => e.remove());
         document.querySelectorAll('.ans-tab[data-filepath]').forEach(e => {
             const taId = e.querySelector('textarea')?.id;
             if (taId && window.cmEditors[taId]) delete window.cmEditors[taId];
@@ -220,7 +244,7 @@ window.openAnsibleEditor = async function(labName) {
         if (savedActiveTab && document.getElementById(savedActiveTab)) {
               window.openAnsTab(savedActiveTab);
         } else {
-          const fileTabs = document.querySelectorAll('.ans-tablink:not(:first-child):not(:last-child)');
+          const fileTabs = document.querySelectorAll('.ans-tablink:not([data-pinned]):not(:first-child):not(:last-child)');
           if (fileTabs.length > 0) {
             fileTabs[fileTabs.length - 1].click();
           }
@@ -237,13 +261,20 @@ window.openAnsibleEditor = async function(labName) {
           filesData[filepath] = window.cmEditors[taId].getValue();
       });
 
+      const roleProf  = window.cmEditors['editor-AnsRoleProfiles']  ? window.cmEditors['editor-AnsRoleProfiles'].getValue()  : '';
+      const setupProf = window.cmEditors['editor-AnsSetupProfiles'] ? window.cmEditors['editor-AnsSetupProfiles'].getValue() : '';
+      const playSetup = window.cmEditors['editor-AnsPlaySetup']     ? window.cmEditors['editor-AnsPlaySetup'].getValue()     : '';
+
       const formData = new URLSearchParams({
           book: document.getElementById('edit-ansible-book').value,
           inv: document.getElementById('edit-ansible-inv').value,
           custom_inv: document.getElementById('edit-ansible-custom-inv').value,
           tags: document.getElementById('edit-ansible-tags').value,
           env: document.getElementById('edit-ansible-env').value,
-          ans_files: JSON.stringify(filesData)
+          setup: playSetup,
+          ans_files: JSON.stringify(filesData),
+          role_profiles: roleProf,
+          setup_profiles: setupProf
       });
 
       resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
@@ -809,4 +840,3 @@ window.openTfTab = function(tabId) {
           window.loadTerraformFiles();
       }
   };
-

@@ -66,7 +66,6 @@ topology:
           profile: frr
           type: router
           gw: 192.168.15.1
-          devs: ["/dev/net/tun"]
           nics:
             eth1: 192.168.15.3/29
             eth2: 192.168.10.1/24
