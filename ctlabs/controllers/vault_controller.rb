@@ -62,6 +62,7 @@ class VaultController < BaseController
               project: c[:project],
               roleset: c[:roleset],
               email: token_info['email'],
+              scope: token_info['scope'],
               expires_in: token_info['expires_in'],
               error: token_info['error']
             }
@@ -77,6 +78,7 @@ class VaultController < BaseController
               # tokens the way it does for directly-impersonated ones.
               service_account: c[:service_account],
               email: c[:service_account],
+              scope: token_info['scope'],
               expires_in: token_info['expires_in'],
               error: token_info['error']
             }

@@ -544,6 +544,7 @@ window.openTfTab = function(tabId) {
           document.getElementById('edit-terraform-wif-vault-role').value = auth.vault_role || '';
           document.getElementById('edit-terraform-wif-audience').value = auth.audience || '';
           document.getElementById('edit-terraform-wif-service-account').value = auth.service_account || '';
+          document.getElementById('edit-terraform-wif-scopes').value = (auth.scopes || []).join('\n');
           document.getElementById('edit-terraform-auth-profile').value = tf.profile || '';
           window.updateTfAuthMethodUI();
 
@@ -648,6 +649,7 @@ window.openTfTab = function(tabId) {
       const wifVaultRole   = document.getElementById('edit-terraform-wif-vault-role').value.trim();
       const wifAudience    = document.getElementById('edit-terraform-wif-audience').value.trim();
       const wifServiceAcct = document.getElementById('edit-terraform-wif-service-account').value.trim();
+      const wifScopes      = document.getElementById('edit-terraform-wif-scopes').value;
       const authProfile    = document.getElementById('edit-terraform-auth-profile').value.trim();
       const authProfilesYaml = window.cmEditors['editor-TfAuthProfiles'] ? window.cmEditors['editor-TfAuthProfiles'].getValue() : '';
       const customCommands = window.cmEditors['edit-terraform-commands'] ? window.cmEditors['edit-terraform-commands'].getValue() : '';
@@ -663,6 +665,7 @@ window.openTfTab = function(tabId) {
           wif_vault_role: wifVaultRole,
           wif_audience: wifAudience,
           wif_service_account: wifServiceAcct,
+          wif_scopes: wifScopes,
           auth_profile: authProfile,
           tf_auth_profiles: authProfilesYaml,
           tf_files: JSON.stringify(filesData)

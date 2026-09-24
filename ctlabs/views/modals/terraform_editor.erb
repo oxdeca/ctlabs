@@ -84,6 +84,11 @@
               <label style="font-size: 0.85em; color: #94a3b8;">Impersonated Service Account</label>
               <input type="text" id="edit-terraform-wif-service-account" class="w3-input w3-small w3-round" placeholder="terraform-runner@my-project.iam.gserviceaccount.com" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">OAuth Scopes (one per line, default: cloud-platform)</label>
+              <textarea id="edit-terraform-wif-scopes" class="w3-input w3-small w3-round slim-scroll" rows="3" placeholder="https://www.googleapis.com/auth/cloud-platform&#10;https://www.googleapis.com/auth/spreadsheets" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; resize: vertical;"></textarea>
+              <div style="font-size: 0.78em; color: #64748b; margin-top: 2px;"><i class="fas fa-info-circle"></i> Only grants access to Workspace resources explicitly shared with the service account's own email - not domain-wide access.</div>
+            </div>
           </div>
 
           <div id="tf-auth-profile-fields" style="display:none;">

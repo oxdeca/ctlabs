@@ -110,19 +110,21 @@ class GcpAuth
     vault_role = cfg['vault_role'].to_s.strip
     audience   = cfg['audience'].to_s.strip
     sa_email   = cfg['service_account'].to_s.strip
+    scopes     = Array(cfg['scopes']).map(&:to_s).map(&:strip).reject(&:empty?)
+    scopes     = [GCP_SCOPE] if scopes.empty?
 
     if vault_role.empty? || audience.empty? || sa_email.empty?
       raise "WIF auth requires vault_role, audience and service_account to be set."
     end
 
     @wif_cache ||= {}
-    cache_key = "#{vault_ctx[:addr]}_#{vault_role}_#{audience}_#{sa_email}"
+    cache_key = "#{vault_ctx[:addr]}_#{vault_role}_#{audience}_#{sa_email}_#{scopes.join(',')}"
     cached = @wif_cache[cache_key]
     return cached[:token] if cached && cached[:expires_at] > Time.now.to_i
 
     oidc_token      = fetch_vault_oidc_token(vault_ctx[:addr], vault_ctx[:token], vault_role)
     federated_token = exchange_for_federated_token(audience, oidc_token)
-    access_token, expires_in = generate_access_token(sa_email, federated_token)
+    access_token, expires_in = generate_access_token(sa_email, federated_token, scopes)
 
     safe_ttl = [expires_in - 60, 60].max
     @wif_cache[cache_key] = {
@@ -131,7 +133,8 @@ class GcpAuth
       addr: vault_ctx[:addr],
       vault_role: vault_role,
       audience: audience,
-      service_account: sa_email
+      service_account: sa_email,
+      scopes: scopes
     }
     access_token
   end
@@ -198,7 +201,12 @@ class GcpAuth
   # 3. Impersonate the target service account with the federated token to
   #    obtain a normal OAuth2 access token scoped to that SA's IAM roles.
   #    The service account itself lives only in GCP - no key is ever created.
-  def self.generate_access_token(sa_email, federated_token)
+  #    `scopes` controls what the FINAL token can actually be used for (e.g.
+  #    Workspace APIs like Sheets/Drive) - note this only grants access to
+  #    Workspace resources explicitly shared with the SA's own email, NOT
+  #    domain-wide access to any user's data (that's a separate, unrelated
+  #    Domain-Wide Delegation flow that doesn't compose with WIF this way).
+  def self.generate_access_token(sa_email, federated_token, scopes = [GCP_SCOPE])
     uri = URI.parse("https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/#{sa_email}:generateAccessToken")
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
@@ -207,7 +215,7 @@ class GcpAuth
       'Content-Type'  => 'application/json',
       'Authorization' => "Bearer #{federated_token}"
     })
-    request.body = { scope: [GCP_SCOPE] }.to_json
+    request.body = { scope: scopes }.to_json
 
     response = http.request(request)
     data = JSON.parse(response.body)

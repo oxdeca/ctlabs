@@ -74,11 +74,16 @@ window.openVaultLoginModal = async function() {
                             </div>
                         `;
                     } else {
+                        const scopeBadges = (g.scope || '').split(/\s+/).filter(Boolean).map(s => {
+                            const short = s.replace('https://www.googleapis.com/auth/', '');
+                            return `<span class="w3-tag w3-tiny w3-round" title="${s}" style="background-color: #334155; color: #cbd5e1; margin: 2px 4px 0 0; display: inline-block; padding: 2px 6px;">${short}</span>`;
+                        }).join('');
                         htmlContent += `
                             <div class="w3-panel w3-leftbar ${isWif ? 'w3-border-purple' : 'w3-border-orange'}" style="background-color: rgba(251,146,60,0.05); padding: 8px; font-size: 0.85em; margin-bottom: 8px; text-align: left;">
                                 <strong style="color: #fbd38d;">${title}</strong><br>
                                 <span style="color: #94a3b8;">Email:</span> <span style="color: #e2e8f0;">${g.email}</span><br>
                                 <span style="color: #94a3b8;">Expires in:</span> <span style="color: #34d399;">⏱️ ${formatTTL(parseInt(g.expires_in))}</span>
+                                ${scopeBadges ? `<br><span style="color: #94a3b8;">Scopes:</span><br>${scopeBadges}` : ''}
                             </div>
                         `;
                     }

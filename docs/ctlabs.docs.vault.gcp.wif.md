@@ -290,3 +290,45 @@ python3 gcp_wif_setup.py --cleanup --project my-project --subject <sub-claim>
 ```
 
 Both prompt for confirmation before deleting anything unless you pass `--yes`.
+
+---
+
+### Controlling the token's OAuth scope
+
+By default the final impersonated token is scoped to just
+`https://www.googleapis.com/auth/cloud-platform`. Add a `scopes` list to
+widen or narrow it (e.g. to reach Google Workspace APIs):
+
+```yaml
+terraform:
+  auth:
+    method: wif
+    vault_role: gcp-wif
+    audience: "..."
+    service_account: terraform-runner@my-project.iam.gserviceaccount.com
+    scopes:
+      - https://www.googleapis.com/auth/cloud-platform
+      - https://www.googleapis.com/auth/spreadsheets
+```
+
+Also exposed as a "OAuth Scopes" field (one per line) in the Terraform
+editor's WIF fields, and in `labs/terraform_profiles.yml` entries.
+
+**Important caveat for Workspace APIs**: this only grants the impersonated
+service account access to resources explicitly *shared with the SA's own
+email address* (e.g. sharing a specific Sheet with it, same as sharing with
+any other collaborator) - it is **not** domain-wide access to any user's
+data. Full Domain-Wide Delegation (acting *as* a specific Workspace user) is
+a separate, unrelated flow (a self-signed JWT with a `sub` claim naming the
+user, authorized in the Workspace Admin console) that does not compose with
+WIF this way.
+
+Only the `scope` of the *final* token (hop 3, `generateAccessToken`) is
+configurable this way - the intermediate STS-exchanged token (hop 2) always
+requests plain `cloud-platform`, since that's all it needs to make the hop 3
+call itself.
+
+The active scope of a cached token is visible in the webgui's Vault Login
+info panel ("Active GCP Tokens"), sourced from Google's own `tokeninfo`
+introspection of the live token - not from what was merely requested, so it
+reflects what the token can actually do.

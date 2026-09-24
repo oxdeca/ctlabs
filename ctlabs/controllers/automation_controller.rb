@@ -313,6 +313,7 @@ class AutomationController < BaseController
         wif_vault_role = params[:wif_vault_role].to_s.strip
         wif_audience   = params[:wif_audience].to_s.strip
         wif_sa         = params[:wif_service_account].to_s.strip
+        wif_scopes     = params[:wif_scopes].to_s.split(/\r?\n/).map(&:strip).reject(&:empty?)
 
         unless wif_vault_role.empty? && wif_audience.empty? && wif_sa.empty?
           tf_cfg['auth'] = {
@@ -321,6 +322,7 @@ class AutomationController < BaseController
             'audience'        => wif_audience,
             'service_account' => wif_sa
           }
+          tf_cfg['auth']['scopes'] = wif_scopes unless wif_scopes.empty?
         end
       when 'profile'
         profile_name = params[:auth_profile].to_s.strip
