@@ -52,26 +52,31 @@ window.openVaultLoginModal = async function() {
                 </table>
             `;
 
-            // Append GCP Leases if any exist!
+            // Append active GCP tokens if any exist, from either auth method!
             if (data.gcp && data.gcp.length > 0) {
                 htmlContent += `
                     <h6 style="color: #fbd38d; border-bottom: 1px solid #334155; padding-bottom: 4px; margin-top: 15px; margin-bottom: 10px; text-align: left;">
-                        <i class="fab fa-google"></i> Active GCP Leases
+                        <i class="fab fa-google"></i> Active GCP Tokens
                     </h6>
                 `;
-                
+
                 data.gcp.forEach(g => {
+                    const isWif = g.method === 'wif';
+                    const title = isWif
+                        ? `<i class="fas fa-key"></i> ${g.vault_role} <span style="color:#94a3b8; font-weight:normal;">(WIF)</span>`
+                        : `${g.project} <span style="color:#94a3b8; font-weight:normal;">(${g.roleset})</span>`;
+
                     if (g.error) {
                         htmlContent += `
                             <div class="w3-panel w3-leftbar w3-border-red" style="background-color: rgba(239,68,68,0.1); padding: 8px; font-size: 0.85em; margin-bottom: 8px; text-align: left;">
-                                <strong style="color: #ef4444;">${g.project} (${g.roleset})</strong><br>
+                                <strong style="color: #ef4444;">${title}</strong><br>
                                 <span style="color: #94a3b8;">Error: ${g.error}</span>
                             </div>
                         `;
                     } else {
                         htmlContent += `
-                            <div class="w3-panel w3-leftbar w3-border-orange" style="background-color: rgba(251,146,60,0.05); padding: 8px; font-size: 0.85em; margin-bottom: 8px; text-align: left;">
-                                <strong style="color: #fbd38d;">${g.project} <span style="color:#94a3b8; font-weight:normal;">(${g.roleset})</span></strong><br>
+                            <div class="w3-panel w3-leftbar ${isWif ? 'w3-border-purple' : 'w3-border-orange'}" style="background-color: rgba(251,146,60,0.05); padding: 8px; font-size: 0.85em; margin-bottom: 8px; text-align: left;">
+                                <strong style="color: #fbd38d;">${title}</strong><br>
                                 <span style="color: #94a3b8;">Email:</span> <span style="color: #e2e8f0;">${g.email}</span><br>
                                 <span style="color: #94a3b8;">Expires in:</span> <span style="color: #34d399;">⏱️ ${formatTTL(parseInt(g.expires_in))}</span>
                             </div>

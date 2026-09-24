@@ -127,7 +127,7 @@ if __FILE__ == $0
     cert.not_before = Time.now
     cert.not_after  = cert.not_before + (365 * 24 * 60 * 60)
     cert.sign(key, OpenSSL::Digest.new('SHA256'))
-
+    
     File.write(KEY_PATH, key.to_pem)
     File.write(CERT_PATH, cert.to_pem)
   end

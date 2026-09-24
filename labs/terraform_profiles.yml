@@ -1,0 +1,15 @@
+# -----------------------------------------------------------------------------
+# File    : ctlabs/labs/terraform_profiles.yml
+# Purpose : Reusable, named GCP auth configs for the Terraform automation.
+#           A lab node selects one via `terraform.profile: <name>` instead of
+#           an inline `terraform.auth` block - this file lives outside any
+#           lab's runtime copy, so it survives lab teardown/recreate.
+#           Edited from the ctlabs Terraform editor's "Auth Profiles" tab.
+#           See ctlabs/docs/ctlabs.docs.vault.gcp.wif.md for the setup.
+# -----------------------------------------------------------------------------
+profiles:
+  gcp-wif-default:
+    method: wif
+    vault_role: gcp-wif
+    audience: "//iam.googleapis.com/projects/210128266520/locations/global/workloadIdentityPools/ctlabs-vault-pool/providers/vault-provider"
+    service_account: terraform-runner@ctlabs-security.iam.gserviceaccount.com

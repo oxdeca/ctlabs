@@ -97,12 +97,12 @@ class TerminalService
           if node = lab.find_node(node_name)
             node_type = node.type
             custom_term = node.term
-
+            
             if (!custom_term || custom_term.empty?) && node.remote?
               ip_target = node.gw || node.ipv4 || (node.nics && node.nics.values.first)
               custom_term = "ssh://root@#{ip_target.split('/').first}" if ip_target
             end
-
+            
             tf_cfg = node.terraform if node.terraform
           end
         rescue => e
@@ -116,7 +116,7 @@ class TerminalService
       uri = URI.parse(custom_term)
       user = uri.user || 'root'
       host = uri.host
-
+      
       cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'SetEnv="TERM=xterm-256color"']
       if Lab.running?
         safe_name = Lab.current_name.gsub('/', '_')
@@ -161,7 +161,7 @@ class TerminalService
         session_info[:close_proc] = proc { driver.close rescue nil }
 
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
-
+        
         if initial_cols && initial_rows && pty_write
           winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
           pty_write.ioctl(0x5414, winsize) rescue nil
@@ -270,7 +270,7 @@ class TerminalService
           ssl_mutex.synchronize do
             data = io.read_nonblock(8192)
           end
-
+          
           if data == :wait_readable || data == :wait_writable
             IO.select([io], nil, nil, 0.1) rescue sleep(0.01)
             next

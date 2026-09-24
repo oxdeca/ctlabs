@@ -54,11 +54,11 @@ class VaultController < BaseController
       begin
         info = VaultAuth.lookup_self(addr, session[:vault_token])
         if info
-          # --- Fetch and introspect all active GCP leases! ---
-          gcp_active = VaultAuth.get_active_gcp_tokens(addr)
-          gcp_details = gcp_active.map do |c|
+          # --- Fetch and introspect all active GCP tokens, both auth methods! ---
+          vault_details = VaultAuth.get_active_gcp_tokens(addr).map do |c|
             token_info = VaultAuth.get_gcp_token_info(c[:token])
             {
+              method: 'vault',
               project: c[:project],
               roleset: c[:roleset],
               email: token_info['email'],
@@ -66,6 +66,22 @@ class VaultController < BaseController
               error: token_info['error']
             }
           end
+          wif_details = GcpAuth.get_active_tokens(addr).map do |c|
+            token_info = VaultAuth.get_gcp_token_info(c[:token])
+            {
+              method: 'wif',
+              vault_role: c[:vault_role],
+              # Use the service account we already know from our own config,
+              # not token_info['email'] - Google's tokeninfo endpoint doesn't
+              # reliably populate `email` for STS-exchanged/impersonated
+              # tokens the way it does for directly-impersonated ones.
+              service_account: c[:service_account],
+              email: c[:service_account],
+              expires_in: token_info['expires_in'],
+              error: token_info['error']
+            }
+          end
+          gcp_details = vault_details + wif_details
 
           # --- Fetch and introspect active SSH Certificates! ---
           ssh_certs = []
@@ -110,6 +126,7 @@ class VaultController < BaseController
 
     # Safely try to wipe the GCP cache, but never crash the route if it fails
     VaultAuth.clear_gcp_cache(session[:vault_addr]) rescue nil
+    GcpAuth.clear_wif_cache(session[:vault_addr]) rescue nil
 
     session.delete(:vault_token)
     session.delete(:vault_addr)

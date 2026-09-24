@@ -20,11 +20,13 @@ require 'uri'
 require 'json'
 require 'openssl'
 require 'time'
+require 'yaml'
 require_relative 'vault_auth'
 
 class GcpAuth
   DEFAULT_VAULT_ROLESET = 'terraform-runner'
   GCP_SCOPE             = 'https://www.googleapis.com/auth/cloud-platform'
+  TERRAFORM_PROFILES_FILE = defined?(Lab::TERRAFORM_PROFILES) ? Lab::TERRAFORM_PROFILES : '/root/ctlabs/labs/terraform_profiles.yml'
 
   # tf_cfg    : the node's `terraform` config hash (reads tf_cfg['auth'], with
   #             a fallback to the legacy tf_cfg['vault'] shape).
@@ -53,9 +55,11 @@ class GcpAuth
     end
   end
 
-  # Normalizes both the legacy `terraform.vault` block and the new
-  # `terraform.auth` block into one { 'method' => ..., ... } hash (or nil if
-  # GCP auth isn't configured for this node).
+  # Normalizes the inline `terraform.auth` block, a named `terraform.profile`
+  # (looked up in the global labs/terraform_profiles.yml, all-or-nothing - a
+  # profile is never merged with inline auth), and the legacy `terraform.vault`
+  # block into one { 'method' => ..., ... } hash (or nil if GCP auth isn't
+  # configured for this node).
   def self.resolve_auth_cfg(tf_cfg)
     tf_cfg = tf_cfg || {}
 
@@ -66,9 +70,24 @@ class GcpAuth
       return auth.merge('method' => method)
     end
 
+    profile_name = tf_cfg['profile'].to_s.strip
+    unless profile_name.empty?
+      profile = load_terraform_profile(profile_name)
+      raise "Terraform auth profile '#{profile_name}' not found in #{TERRAFORM_PROFILES_FILE}" unless profile
+      method = profile['method'].to_s.strip
+      return nil if method.empty?
+      return profile.merge('method' => method)
+    end
+
     legacy_vault = tf_cfg['vault']
     return nil unless legacy_vault && !legacy_vault['project'].to_s.strip.empty?
     legacy_vault.merge('method' => 'vault')
+  end
+
+  def self.load_terraform_profile(name)
+    return nil unless File.file?(TERRAFORM_PROFILES_FILE)
+    profiles = YAML.load_file(TERRAFORM_PROFILES_FILE)['profiles'] || {}
+    profiles[name]
   end
 
   # ------------------------------------------------------------------------
@@ -106,8 +125,23 @@ class GcpAuth
     access_token, expires_in = generate_access_token(sa_email, federated_token)
 
     safe_ttl = [expires_in - 60, 60].max
-    @wif_cache[cache_key] = { token: access_token, expires_at: Time.now.to_i + safe_ttl }
+    @wif_cache[cache_key] = {
+      token: access_token,
+      expires_at: Time.now.to_i + safe_ttl,
+      addr: vault_ctx[:addr],
+      vault_role: vault_role,
+      audience: audience,
+      service_account: sa_email
+    }
     access_token
+  end
+
+  # Returns all currently cached and valid WIF tokens for a specific Vault
+  # server (mirrors VaultAuth.get_active_gcp_tokens)
+  def self.get_active_tokens(addr)
+    @wif_cache ||= {}
+    now = Time.now.to_i
+    @wif_cache.values.select { |c| c[:addr] == addr && c[:expires_at] > now }
   end
 
   # 1. Ask Vault to sign a short-lived OIDC identity token for `role`.

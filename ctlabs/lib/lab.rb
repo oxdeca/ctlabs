@@ -21,6 +21,7 @@ class Lab
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
   SETUP_PROFILES     = '/root/ctlabs/labs/setup_profiles.yml'
   ROLE_PROFILES      = '/root/ctlabs/labs/role_profiles.yml'
+  TERRAFORM_PROFILES = '/root/ctlabs/labs/terraform_profiles.yml'
   ANSIBLE_DIR        = '/root/ctlabs-ansible'.freeze
   PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
   PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
@@ -50,11 +51,11 @@ class Lab
     # --- 2. Read, Expand, and Distribute Config ---
     if( File.file?(cfg) )
       raw_yaml = File.read(cfg)
-
+      
       # DYNAMIC VARIABLE EXPANSION
       # Replaces ${ctlabs_host} with the actual IP address
       expanded_yaml = raw_yaml.gsub('${ctlabs_host}', @server_ip)
-
+      
       # Write the EXPANDED config to the public dir so the frontend UI gets the real IPs
       File.open("#{@pubdir}/config.yml", 'w') do |f|
         f.write(expanded_yaml)
@@ -91,7 +92,7 @@ class Lab
     %x( echo 1 > /proc/sys/net/ipv4/ip_forward )
     # another hack, elastic search needs more virtual memory areas to start
     %( echo 262144 > /proc/sys/vm/max_map_count )
-
+    
     @nodes  = init_nodes(vm_name)
     @links  = init_links(vm_name)
     @links += init_mgmt_links(vm_name)
@@ -194,7 +195,7 @@ class Lab
       name = vm_cfg['nodes'].keys.find { |k| k == 'ansible' || vm_cfg['nodes'][k]['type'] == 'controller' }
       return name, vm_cfg['nodes'][name], nil if name
     end
-
+    
     if vm_cfg['planes']
       vm_cfg['planes'].each do |p_name, p_data|
         if p_data && p_data['nodes']
@@ -203,7 +204,7 @@ class Lab
         end
       end
     end
-
+    
     [nil, nil, nil]
   end
 
@@ -225,10 +226,10 @@ class Lab
     # Automatically flattens 'planes' into the legacy 'nodes' array
     if vm && vm['planes'] && vm['nodes'].nil?
       flat_nodes = {}
-
+      
       vm['planes'].each do |plane_name, plane_data|
         next unless plane_data && plane_data['nodes']
-
+        
         # Hoist Management Network Settings to the root VM level
         if plane_name == 'mgmt'
           vm['mgmt'] ||= {}
@@ -244,7 +245,7 @@ class Lab
           flat_nodes[n_name] = n_cfg
         end
       end
-
+      
       vm['nodes'] = flat_nodes
     end
 
@@ -262,7 +263,7 @@ class Lab
 
     lab_name = yaml_file_path.sub(labs_dir + '/', '')
     refresh_visuals(lab_name)
-
+    
     is_running = running? && current_name == lab_name
     actual_path = get_file_path(lab_name)
 
@@ -311,8 +312,8 @@ class Lab
               extras_yaml = extras.empty? ? "" : extras.to_yaml.sub("---\n", "").strip
 
               images << {
-                type: tk,
-                kind: kk,
+                type: tk, 
+                kind: kk, 
                 image: kv['image'] || 'N/A',
                 provider: kv['provider'] || 'local',
                 caps: kv['caps'] || [],
@@ -340,7 +341,7 @@ class Lab
         if lab.defaults && lab.defaults[node.type] && lab.defaults[node.type][node.kind || 'linux']
           image_ref = lab.defaults[node.type][node.kind || 'linux']['image'] || 'N/A'
         end
-
+          
         is_adhoc = !base_nodes_list.include?(node.name)
 
         node_info = {
@@ -352,7 +353,7 @@ class Lab
           cpus: 'N/A',
           memory: 'N/A',
           adhoc: is_adhoc,
-          running: node.is_running
+          running: node.is_running 
         }
         nodes << node_info
       end
@@ -370,7 +371,7 @@ class Lab
         # Calculate Default Inventory Name (e.g. net01.ini) if not explicitly set
         default_inv = "#{File.basename(yaml_file_path, '.yml')}.ini"
         ansible_info[:inventory]   = ctrl.play['inv'] && !ctrl.play['inv'].empty? ? ctrl.play['inv'] : default_inv
-
+        
         ansible_info[:playbook]    = ctrl.play['book']  || 'N/A'
         ansible_info[:environment] = ctrl.play['env']   || []
         ansible_info[:tags]        = ctrl.play['tags']  || []
@@ -386,7 +387,7 @@ class Lab
     # Terraform
     terraform_info = { workspace: 'default', work_dir: 'N/A', vars: [] }
     ctrl = lab.find_node("ansible")
-
+    
     if ctrl && ctrl.respond_to?(:terraform) && !ctrl.terraform.nil?
       terraform_info[:workspace] = ctrl.terraform['workspace'] || 'default'
       terraform_info[:work_dir]  = ctrl.terraform['work_dir']  || 'N/A'
@@ -423,8 +424,8 @@ class Lab
               external_port: "#{vip}:#{p[0]}",
               internal_port: "#{rip || 'N/A'}:#{p[1]}",
               adhoc: is_adhoc_dnat,
-              raw_ext: p[0],
-              raw_int: p[1]
+              raw_ext: p[0],   
+              raw_int: p[1]    
             }
             exposed_ports << node_info
           end
@@ -449,19 +450,19 @@ class Lab
       pubdir = '/srv/ctlabs-server/public'
       topo_file = File.join(pubdir, 'topo.png')
       tracker_file = File.join(pubdir, '.topo_tracker')
-
+      
       needs_rebuild = force
-
+      
       if !needs_rebuild
         # 1. Did we choose a different lab from the dropdown?
         last_drawn_lab = File.exist?(tracker_file) ? File.read(tracker_file).strip : ""
         if last_drawn_lab != lab_name
           needs_rebuild = true
-
+          
         # 2. Was the YAML edited (via UI or CLI) since we last drew the map?
         elsif File.exist?(topo_file) && File.exist?(actual_path)
           needs_rebuild = true if File.mtime(actual_path) > File.mtime(topo_file)
-
+          
         # 3. Are the images missing entirely?
         else
           needs_rebuild = true
@@ -475,10 +476,10 @@ class Lab
       lab = Lab.new(cfg: actual_path, log: LabLog.null)
       lab.visualize
       lab.inventory
-
+      
       # Update the tracker file with the currently drawn lab
       File.write(tracker_file, lab_name)
-
+      
     rescue => e
       puts "[Warning] Failed to generate visuals for #{lab_name}: #{e.message}"
     end
@@ -489,15 +490,15 @@ class Lab
   # ---------------------------------------------------------------------------
   def self.profile_in_use?(yaml, target_type, target_profile)
     vm = yaml['topology']&.first || {}
-
+    
     # Gather all nodes across all planes (or flat nodes array)
     nodes_to_scan = vm['planes'] ? vm['planes'].values.map { |p| p['nodes'] } : [vm['nodes']]
-
+    
     nodes_to_scan.compact.each do |node_group|
       node_group.values.each do |n|
         node_type = n['type'] || 'host'
         node_prof = n['profile'] || n['kind'] || 'linux'
-
+        
         # If we find a match, it is in use!
         if node_type.to_s == target_type.to_s && node_prof.to_s == target_profile.to_s
           return true
@@ -511,7 +512,7 @@ class Lab
   def self.acquire_playbook_lock!(lab_name, timeout: 30)
     lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
     FileUtils.mkdir_p(PLAYBOOK_LOCK_DIR)
-
+    
     # Check for stale lock (PID no longer exists)
     if File.file?(lock_path)
       begin
@@ -531,7 +532,7 @@ class Lab
         raise "Playbook already running for lab '#{lab_name}' (lock held by PID #{pid || 'unknown'})"
       end
     end
-
+    
     # Attempt to acquire lock with timeout
     timeout.times do
       begin
@@ -544,7 +545,7 @@ class Lab
         sleep 1
       end
     end
-
+    
     raise "Timeout: Playbook already running for lab '#{lab_name}' (lock file: #{lock_path})"
   end
 
@@ -559,7 +560,7 @@ class Lab
   def self.playbook_running?(lab_name)
     lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
     return false unless File.file?(lock_path)
-
+    
     # Verify lock isn't stale
     begin
       pid = File.read(lock_path).strip.to_i
@@ -581,7 +582,7 @@ class Lab
     # You may need to adjust the container naming convention based on how your CTLABS script names them!
     lab_base_name = File.basename(lab_path, '.yml')
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-
+    
     # Check running processes in the controller (assuming the container name contains the lab name and 'ansible' or 'controller')
     # This is a safe, non-blocking check
     cmd = "#{engine} ps --format '{{.Names}}' | grep #{lab_base_name} | head -n 1"
@@ -602,17 +603,17 @@ class Lab
     mgmt   = cfg['mgmt']   || cfg['planes']['mgmt'] || @mgmt
     net    = mgmt['net']   || "192.168.99.0/24"
 
-    #
+    # 
     tmp  = net.split('/')
     mask = tmp[1]
-    net  = tmp[0].split('.')[0..2].join('.') + '.'
+    net  = tmp[0].split('.')[0..2].join('.') + '.' 
 
     # start range for mgmt-ip's
     cnt = 20
 
     cfg['nodes'].each_key do |n|
       node_cfg = cfg['nodes'][n]
-
+      
       # Determine if the node lives outside the local Docker engine
       is_remote = ['rhost', 'external'].include?(node_cfg['type']) || ['gcp', 'external', 'aws', 'azure'].include?(node_cfg['provider'].to_s.downcase)
 
@@ -706,26 +707,26 @@ class Lab
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     deploy_dnsmasq(@graph.to_dnsmasq(@graph.get_dnsmasq, @name))
   end
-
+    
   # Deploys the generated dnsmasq zone into the lab's controller container
   # (selected by type, never a hardcoded name): cp the conf into the
   # container's /etc/dnsmasq.d/ and restart dnsmasq there. clamps the
   # conf-dir=/etc/dnsmasq.d promise in lib/graph.rb:806.
   def deploy_dnsmasq(conf_path)
     return if conf_path.to_s.empty? || !File.file?(conf_path.to_s)
-
+    
     controller = @nodes.find { |n| n.respond_to?(:type) && n.type.to_s == 'controller' }
     if controller.nil?
       @log.write "#{__method__}(): no controller node in #{@name}; skipping dnsmasq deploy", "warn"
       return
     end
-
+   
     engine  = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     ctr     = controller.name
     base    = File.basename(conf_path)
-
+    
     @log.write "#{__method__}(): conf=#{conf_path},controller=#{ctr},engine=#{engine}", "debug"
-
+    
     ran = %x( #{engine} cp "#{conf_path}" #{ctr}:/etc/dnsmasq.d/#{base} 2>&1 )
     if $?.success?
       %x( #{engine} exec #{ctr} systemctl restart dnsmasq 2>&1 )
@@ -750,7 +751,7 @@ class Lab
     @nodes.each { |n| n.resolve_runtime! if n.respond_to?(:resolve_runtime!) }
 
     Link.new({ 'links' => [ep1, ep2], 'nodes' => @nodes, 'mgmt' => @mgmt, 'log' => @log })
-
+    
     # Re-apply IPs after the physical pipe is constructed
     [ep1, ep2].each do |endpoint|
       node_name, nic = endpoint.split(':')
@@ -793,7 +794,7 @@ class Lab
         @log.write "#{__method__}(): node=#{node},vxlan=#{node.vxlan}", "debug"
 
         local, lport = node.vxlan['local'].split(':')
-
+        
         # Resolve VXLAN router dynamically
         target_route = natgw.dnat.is_a?(Hash) ? (natgw.dnat[node.plane] || natgw.dnat.values.first) : natgw.dnat
         router_name  = target_route.split(':')[0]
@@ -831,8 +832,8 @@ class Lab
         via = router.nics[router_nic].split('/')[0]
 
         # Target IP: Smart fallback (eth1, eth0, tun0, wg0)
-        target_ip = node.nics['eth1']&.split('/')&.first ||
-                    node.nics['eth0']&.split('/')&.first ||
+        target_ip = node.nics['eth1']&.split('/')&.first || 
+                    node.nics['eth0']&.split('/')&.first || 
                     node.nics['tun0']&.split('/')&.first ||
                     node.nics['wg0']&.split('/')&.first
 
@@ -842,7 +843,7 @@ class Lab
           proto    = r[2] || 'tcp'
 
           @log.info "#{vmip}:#{ext_port} -> #{target_ip}:#{int_port} (#{proto})"
-
+          
           if target_ip == via
             # OPTIMIZATION: Direct translation on the host
             %x( iptables -tnat -C #{chain} -p #{proto} -d #{vmip} --dport #{ext_port} -j DNAT --to-destination=#{via}:#{int_port} 2> /dev/null )
@@ -886,20 +887,20 @@ class Lab
 
     parts = target_route.to_s.split(':')
     raise "Invalid natgw route format: #{target_route}" unless parts.length == 2
-
+    
     router_name, nic = parts
     router = find_node(router_name)
     raise "Router '#{router_name}' not found" if router.nil?
     raise "Interface '#{nic}' missing on router" unless router.nics.key?(nic)
 
     via = router.nics[nic].split('/')[0]
-
+    
     # Target IP: Smart fallback
-    target_ip = node.nics['eth1']&.split('/')&.first ||
-                node.nics['eth0']&.split('/')&.first ||
+    target_ip = node.nics['eth1']&.split('/')&.first || 
+                node.nics['eth0']&.split('/')&.first || 
                 node.nics['tun0']&.split('/')&.first ||
                 node.nics['wg0']&.split('/')&.first
-
+                
     raise "Node #{node.name} missing suitable network interface" if target_ip.nil?
 
     if target_ip == via
@@ -922,7 +923,7 @@ class Lab
       end
 
       router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-
+      
       rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
       rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
 
@@ -940,7 +941,7 @@ class Lab
   # Generates a dedicated SSH key pair for the lab and distributes it
   def setup_lab_ssh_keys
     @log.info "Setting up Lab-wide Bootstrap SSH keys..."
-
+    
     FileUtils.mkdir_p('/var/run/ctlabs/keys')
     safe_name = @relative_path.gsub('/', '_')
     priv_key = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
@@ -979,7 +980,7 @@ class Lab
       # ALL nodes get the PUBLIC key in their authorized_keys
       system("docker exec #{node.name} sh -c \"echo '#{pub_key}' >> /root/.ssh/authorized_keys\"")
       system("docker exec #{node.name} chmod 600 /root/.ssh/authorized_keys")
-
+      
     rescue => e
       @log.write("Failed to inject SSH keys to #{node.name}: #{e.message}", "error")
     end
@@ -993,7 +994,7 @@ class Lab
         $1.to_i
       end
     end.compact
-
+    
     next_port = 1
     next_port += 1 while used_ports.include?(next_port)
     next_port
@@ -1019,33 +1020,33 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     vm_name = @vm_name || @cfg['topology'][0]['hv'] || @cfg['topology'][0]['name']
     cfg_vm  = find_vm(vm_name)
     mgmt    = cfg_vm['mgmt'] || @mgmt || {}
-
+    
     # 2. SMART IP CALCULATION
     target_nic = is_remote ? 'tun0' : 'eth0'
     node_cfg['nics'] ||= {}
-
+    
     if node_cfg['nics'][target_nic].to_s.strip.empty?
       net = mgmt['net'] || "192.168.99.0/24"
-
+      
       # Gather all IPs currently in use in memory to find the true highest IP
       used_ips = @nodes.flat_map do |n|
         ips = n.nics&.values&.map { |ip| ip.to_s.split('/')[0] } || []
         ips << n.ipv4.to_s.split('/')[0] if n.ipv4 && !n.ipv4.to_s.empty?
         ips
       end.compact.reject(&:empty?)
-
+      
       require 'ipaddr'
       subnet = IPAddr.new(net)
       ip_range = subnet.to_range.to_a
       start_idx = [20, ip_range.size - 2].min
-
+      
       next_ip = ip_range[start_idx..-2].find { |ip| !used_ips.include?(ip.to_s) }
       node_cfg['nics'][target_nic] = "#{next_ip}/#{subnet.prefix}" if next_ip
     end
 
     # 3. Instantiate Node
-    node_cfg['adhoc'] = true
-
+    node_cfg['adhoc'] = true 
+    
     node = Node.new({
       'name'      => node_name,
       'ephemeral' => @ephemeral,
@@ -1107,7 +1108,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
               # Read and update the file directly to avoid memory race conditions with the live lab
               if File.exist?(lab_file)
                 live_yaml = YAML.load_file(lab_file)
-
+                
                 # Navigate through the schema safely to find the node
                 target = live_yaml['topology'][0]['nodes'][node_name]
                 if target
@@ -1138,7 +1139,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
     # 4. SMART WIRING (Prevents dual-wiring eth1 in mgmt plane)
     data_link = nil
-
+    
     if is_remote
       # Remote node wiring
       if target_switch && !target_switch.strip.empty?
@@ -1165,7 +1166,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
           Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
         end
       end
-
+      
       if target_switch && !target_switch.strip.empty?
         if find_node(target_switch)
           next_port = get_next_switch_port(target_switch)
@@ -1200,17 +1201,17 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
   def up(web_v_token = nil, web_v_addr = nil)
     self.class.acquire_lock!(@relative_path)
-
+  
     @log.info "Starting Lab: #{@relative_path}"
     synchronize_lab_operation do
       @log.info "Starting Nodes:"
       @nodes.each { |node| node.run }
-
+  
       @log.info "Starting Links:"
       @links.each do |l|
         Link.new('nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt)
       end
-
+  
       @log.info "DNAT:"
       add_dnat
     end
@@ -1220,19 +1221,19 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
     if ctrl
       node_cfg = @cfg['topology'][0]['nodes'][ctrl.name] || {}
-
+      
       # Only run Terraform if a working directory is explicitly configured
       if node_cfg['terraform'] && node_cfg['terraform']['work_dir'] && !node_cfg['terraform']['work_dir'].strip.empty?
         @log.info "Executing Terraform provisioning phase..."
         begin
           # Call run_terraform synchronously. If it fails, the lab startup will abort here.
           run_terraform(ctrl.name, nil, web_v_token, web_v_addr, 'apply')
-
+          
           # CRITICAL: We must reload the lab YAML into memory because Terraform
           # may have injected new public/private IPs for the cloud VMs!
           @log.info "Reloading topology to capture Terraform IP assignments..."
           @cfg = YAML.load_file(@cfg_file)
-
+          
           # Re-initialize nodes so the new IPs are available for the Ansible inventory
           @nodes = init_nodes(@vm_name)
         rescue => e
@@ -1249,7 +1250,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     # Copy lab-specific flashcards if they exist
     lab_flashcards    = File.join(File.dirname(@cfg_file), 'flashcards.json')
     public_flashcards = '/srv/ctlabs-server/public/flashcards.json'
-
+    
     if File.file?(lab_flashcards)
       FileUtils.cp(lab_flashcards, public_flashcards)
       @log.info "Loaded flashcards from lab: #{lab_flashcards}"
@@ -1554,37 +1555,37 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
     workspace = tf_cfg['workspace'].to_s.strip
     workspace = 'default' if workspace.empty?
-
+    
     vars      = tf_cfg['vars'] || []
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
     tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
     work_dir = "/root/ctlabs-terraform/#{tf_work_dir}"
-
+    
     custom_script = tf_cfg['commands'].to_s.strip
 
     # --- NEW: Smart Execution Router ---
     if action == 'destroy'
       # 1. DESTROY ALWAYS WINS (Ignores custom scripts)
       base_tf_cmd = <<~CMD.gsub("\n", " ").strip
-        cd #{work_dir} &&
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) &&
-        terraform init -upgrade &&
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+        terraform init -upgrade && 
         terraform destroy -auto-approve #{var_args}
       CMD
     elsif !custom_script.empty?
       # 2. CUSTOM SCRIPT (Only runs if action is apply)
       base_tf_cmd = <<~CMD.strip
-        cd #{work_dir} &&
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) &&
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
         #{custom_script}
       CMD
     else
       # 3. STANDARD APPLY
       base_tf_cmd = <<~CMD.gsub("\n", " ").strip
-        cd #{work_dir} &&
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) &&
-        terraform init -upgrade &&
+        cd #{work_dir} && 
+        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
+        terraform init -upgrade && 
         terraform apply -auto-approve #{var_args}
       CMD
     end
@@ -1608,10 +1609,10 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     tf_command = base_tf_cmd
 
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-
+    
     full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 
-    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}"
+    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}" 
 
     # 4. Stream the output
     if log_path
@@ -1647,7 +1648,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       if action == 'apply'
         begin
           @log.info "Harvesting provisioned IPs from terraform.tfstate..."
-
+          
           # Handle Workspace paths correctly
           state_file = workspace == 'default' ? "#{work_dir}/terraform.tfstate" : "#{work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
 
@@ -1662,7 +1663,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                 (res['instances'] || []).each do |inst|
                   attrs = inst['attributes'] || {}
                   vm_name = attrs['name']
-
+                  
                   next unless vm_name
 
                   # Extract IPs from GCP network interface schema
@@ -1673,7 +1674,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                   # SCHEMA-AWARE LOOKUP: Check both legacy 'nodes' and modern 'planes'
                   vm_topology = live_yaml['topology']&.first || {}
                   target = nil
-
+                  
                   if vm_topology['nodes'] && vm_topology['nodes'][vm_name]
                     target = vm_topology['nodes'][vm_name]
                   elsif vm_topology['planes']
@@ -1693,7 +1694,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                       target['term'] = "ssh://ansible@#{pub_ip}"
                     end
                     updates_made = true
-
+                    
                     log_msg = "Mapped Terraform IPs for #{vm_name}: eth0=#{pub_ip || 'none'}, eth1=#{priv_ip || 'none'}"
                     @log.info log_msg
                     File.open(log_path, 'a') { |f| f.puts "[IP Harvest] #{log_msg}" } if log_path
@@ -1727,13 +1728,13 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   def stream_docker_exec(container_name, play_cmd, log_file_path = nil)
     inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
-
+  
     # Open log file ONCE before streaming (critical for web UI visibility)
     log_file = log_file_path ? File.open(log_file_path, 'a') : nil
-
+  
     Open3.popen3(*cmd) do |stdin, stdout, stderr, wait_thr|
       stdin.close
-
+  
       begin
         # Stream stdout → BOTH CLI ($stdout) AND log file
         Thread.new do
@@ -1744,7 +1745,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
             log_file&.flush
           end
         end
-
+  
         # Stream stderr → BOTH CLI ($stderr) AND log file
         Thread.new do
           while (err_line = stderr.gets)
@@ -1754,10 +1755,10 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
             log_file&.flush
           end
         end
-
+  
         # Wait for command completion
         wait_thr.value
-
+  
       rescue => e
         error_msg = "Error during playbook streaming: #{e.message}\n"
         $stderr.print(error_msg)
@@ -1782,13 +1783,13 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       if self.class.running? && self.class.current_name != @relative_path
         raise "Cannot stop '#{@relative_path}': currently running lab is '#{self.class.current_name}'"
       end
-
+  
       @log.info "Stopping Lab: #{@relative_path}"
-
+  
       synchronize_lab_operation do
         @log.info "Stopping Nodes:"
         @nodes.each { |node| node.stop }
-
+  
         @log.info "Removing DNAT rules..."
         del_dnat
       end
@@ -1813,7 +1814,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   def synchronize_lab_operation
     lock_dir = File.dirname(LAB_OPERATION_LOCK)
     Dir.mkdir(lock_dir, 0755) unless Dir.exist?(lock_dir)
-
+  
     File.open(LAB_OPERATION_LOCK, File::CREAT | File::RDWR) do |f|
       f.flock(File::LOCK_EX)  # ← THIS IS THE KEY LINE
       yield
@@ -1826,17 +1827,17 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   def self.save_runtime_to_base(lab_path)
     full_path = File.join("..", "labs", lab_path)
     runtime_file = "/var/run/ctlabs/#{lab_path.gsub('/', '_')}.adhoc"
-
+    
     return true unless File.exist?(runtime_file) # Nothing to save
     return false unless File.file?(full_path)
-
+    
     begin
       lines = File.readlines(full_path)
       adhoc_data = File.read(runtime_file)
-
+      
       new_nodes = []
       new_links = []
-
+      
       current_block = nil
       adhoc_data.each_line do |line|
         if line.strip == "===NODE==="
@@ -1850,27 +1851,27 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
       # Ensure the file ends with a newline so we don't mash words together
       lines << "\n" if !lines.last.to_s.end_with?("\n")
-
+      
       # 1. Inject Nodes
       if new_nodes.any?
         # Find `links:` with any amount of leading whitespace
         links_idx = lines.index { |l| l.match?(/^\s*links:/) }
-
+        
         if links_idx
           lines.insert(links_idx, *new_nodes)
         else
           lines.concat(new_nodes)
         end
       end
-
+      
       # 2. Inject Links at the absolute bottom of the file
       if new_links.any?
         lines.concat(new_links)
       end
-
+      
       File.write(full_path, lines.join)
-      FileUtils.rm_f(runtime_file)
-
+      FileUtils.rm_f(runtime_file) 
+      
       return true
     rescue => e
       puts "Error saving runtime to base: #{e.message}"
@@ -1899,12 +1900,12 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     local.each do |type, kinds|
       merged[type] ||= {}
       next unless kinds.is_a?(Hash)
-
+      
       kinds.each do |kind, attrs|
         merged[type][kind] ||= {}
         if attrs.is_a?(Hash)
           # Arrays like 'caps' or 'env' should be combined or overwritten
-          # Here we just use a standard hash merge for simplicity,
+          # Here we just use a standard hash merge for simplicity, 
           # which overwrites the global attributes with the local ones.
           merged[type][kind].merge!(attrs)
         end

@@ -18,23 +18,24 @@
 
 <div id="terraform-editor-modal" class="w3-modal" style="z-index: 9999; padding-top: 5vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 90%; max-width: 1400px; max-height: 90vh; display: flex; flex-direction: column;">
-
+    
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0;">
       <span onclick="document.getElementById('terraform-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-cubes"></i> Edit Terraform Config</h4>
     </header>
 
     <div class="w3-bar slim-scroll" id="tf-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
-      <button class="w3-bar-item w3-button tf-tablink w3-text-blue" data-target-tab="TfSettings" onclick="window.openTfTab('TfSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
-      <button class="w3-bar-item w3-button tf-tablink w3-text-purple" data-target-tab="TfCommands" onclick="window.openTfTab('TfCommands')" style="flex-shrink: 0;"><i class="fas fa-terminal"></i> Execution Script</button>
+      <button class="w3-bar-item w3-button tf-tablink w3-text-blue" data-pinned="1" data-target-tab="TfSettings" onclick="window.openTfTab('TfSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h"></i> Settings</button>
+      <button class="w3-bar-item w3-button tf-tablink w3-text-purple" data-pinned="1" data-target-tab="TfCommands" onclick="window.openTfTab('TfCommands')" style="flex-shrink: 0;"><i class="fas fa-terminal"></i> Execution Script</button>
+      <button class="w3-bar-item w3-button tf-tablink" data-pinned="1" data-target-tab="TfAuthProfiles" onclick="window.openTfTab('TfAuthProfiles')" style="flex-shrink: 0;"><i class="fas fa-id-badge"></i> Auth Profiles</button>
       <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('terraform')" title="Browse Workspace" style="flex-shrink: 0;"><i class="fas fa-plus"></i></button>
     </div>
 
     <div class="w3-container w3-padding slim-scroll" id="tf-editors-container" style="flex: 1; overflow-y: auto; min-height: 400px;">
-
+      
       <div id="TfSettings" class="tf-tab">
         <label style="font-size: 0.85em; color: #94a3b8;">Working Directory (Relative to ctlabs-terraform)</label>
-
+        
         <div style="display: flex; gap: 8px; margin-bottom: 16px;">
           <input type="text" id="edit-terraform-workdir" class="w3-input w3-small w3-round" placeholder="(root directory)" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; flex: 1;">
           <button type="button" onclick="window.openTerraformDirBrowser()" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;"><i class="fas fa-folder-open"></i> Browse</button>
@@ -55,32 +56,40 @@
               <option value="">Disabled</option>
               <option value="vault">Vault GCP Secrets Engine (dynamic/static secrets)</option>
               <option value="wif">Workload Identity Federation (via Vault OIDC)</option>
+              <option value="profile">Named Profile (see Auth Profiles tab)</option>
             </select>
           </div>
 
-          <div id="tf-auth-vault-fields" class="w3-row-padding" style="display:none; margin: 0 -8px;">
-            <div class="w3-col m6">
+          <div id="tf-auth-vault-fields" style="display:none;">
+            <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;">GCP Project ID</label>
               <input type="text" id="edit-terraform-vault-project" class="w3-input w3-small w3-round" placeholder="my-gcp-project" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
-            <div class="w3-col m6">
+            <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;">Vault Roleset</label>
               <input type="text" id="edit-terraform-vault-roleset" class="w3-input w3-small w3-round" placeholder="e.g., terraform-runner" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
           </div>
 
-          <div id="tf-auth-wif-fields" class="w3-row-padding" style="display:none; margin: 0 -8px;">
-            <div class="w3-col m4">
+          <div id="tf-auth-wif-fields" style="display:none;">
+            <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;">Vault OIDC Role</label>
               <input type="text" id="edit-terraform-wif-vault-role" class="w3-input w3-small w3-round" placeholder="e.g., gcp-wif" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
-            <div class="w3-col m4">
+            <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;">WIF Provider Audience</label>
               <input type="text" id="edit-terraform-wif-audience" class="w3-input w3-small w3-round" placeholder="//iam.googleapis.com/projects/.../workloadIdentityPools/.../providers/..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
-            <div class="w3-col m4">
+            <div class="w3-margin-bottom">
               <label style="font-size: 0.85em; color: #94a3b8;">Impersonated Service Account</label>
               <input type="text" id="edit-terraform-wif-service-account" class="w3-input w3-small w3-round" placeholder="terraform-runner@my-project.iam.gserviceaccount.com" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
+
+          <div id="tf-auth-profile-fields" style="display:none;">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Profile Name</label>
+              <input type="text" id="edit-terraform-auth-profile" class="w3-input w3-small w3-round" placeholder="e.g., gcp-wif-default" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
           </div>
         </div>
@@ -102,9 +111,16 @@
         </div>
       </div>
 
+      <div id="TfAuthProfiles" class="tf-tab" style="display:none;">
+        <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
+          <i class="fas fa-info-circle"></i> Global file: <code>labs/terraform_profiles.yml</code> — reusable named GCP auth configs, selected per-lab via Auth Method &rarr; Named Profile. Applied on next terraform run / terminal open.
+        </div>
+        <textarea id="editor-TfAuthProfiles"></textarea>
+      </div>
+
       <div id="terraform-editor-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-top: 15px;"></div>
     </div>
-
+    
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
       <div>
         <button type="button" id="tf-delete-file-btn" onclick="window.deleteActiveTerraformFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
@@ -119,22 +135,22 @@
 
 <div id="tf-dir-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 10vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
-
+    
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('tf-dir-browser-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
       <h4 style="margin: 0;"><i class="fas fa-folder-open w3-text-blue"></i> Select Terraform Folder</h4>
     </header>
-
+    
     <div class="w3-container w3-padding">
       <label style="font-size: 0.85em; color: #94a3b8;">Double-click input to view discovered directories:</label>
       <input type="text" id="tf-dir-browser-input" list="tf-dirs-datalist" class="w3-input w3-small w3-round" placeholder="Select a folder..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
       <datalist id="tf-dirs-datalist"></datalist>
     </div>
-
+    
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
       <button type="button" onclick="document.getElementById('tf-dir-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
       <button type="button" onclick="window.confirmTerraformDirBrowser()" class="w3-button w3-blue w3-round w3-small"><i class="fas fa-check"></i> Select & Load</button>
     </footer>
-
+    
   </div>
 </div>

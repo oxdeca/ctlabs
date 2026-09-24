@@ -99,19 +99,28 @@
       # Extract commands string safely
       commands  = tf_cfg['commands'] || tf_cfg[:commands] || ''
       
-      vault_cfg = tf_cfg['vault'] || tf_cfg[:vault] || {}
-      v_project = vault_cfg['project'] || vault_cfg[:project]
-      v_roleset = vault_cfg['roleset'] || vault_cfg[:roleset] || 'terraform-runner'
+      auth_cfg = nil
+      auth_error = nil
+      begin
+        auth_cfg = GcpAuth.resolve_auth_cfg(tf_cfg) || {}
+      rescue => e
+        auth_error = e.message
+      end
     %>
     <table class="w3-table">
       <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= work_dir && work_dir != '' ? work_dir : '(root)' %></code></td></tr>
-      
+
       <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= workspace && workspace != '' ? workspace : 'default' %></code></td></tr>
 
-      <tr><td style="color: #94a3b8;">Vault Auth:</td><td>
-        <% if v_project && !v_project.to_s.empty? %>
-          <span class="w3-badge w3-tiny w3-round w3-green" style="margin-right: 4px;"><i class="fas fa-lock"></i> GCP JIT</span>
-          <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v_project %> : <%= v_roleset %></code>
+      <tr><td style="color: #94a3b8;">GCP Auth:</td><td>
+        <% if auth_error %>
+          <span style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> <%= auth_error %></span>
+        <% elsif auth_cfg['method'] == 'vault' %>
+          <span class="w3-badge w3-tiny w3-round w3-green" style="margin-right: 4px;"><i class="fas fa-lock"></i> Vault GCP JIT</span>
+          <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= auth_cfg['project'] %> : <%= auth_cfg['roleset'] || 'terraform-runner' %></code>
+        <% elsif auth_cfg['method'] == 'wif' %>
+          <span class="w3-badge w3-tiny w3-round w3-purple" style="margin-right: 4px;"><i class="fas fa-key"></i> Workload Identity Federation</span>
+          <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= auth_cfg['service_account'] %></code>
         <% else %>
           <span style="color: #64748b; font-style: italic;">Disabled (Using Local Config)</span>
         <% end %>

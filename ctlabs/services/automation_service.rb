@@ -12,8 +12,9 @@ class AutomationService
   ANS_BASE_DIR = '/root/ctlabs-ansible'.freeze
   TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
-  ROLE_PROFILES_FILE  = defined?(Lab::ROLE_PROFILES) ? Lab::ROLE_PROFILES  : '/root/ctlabs/labs/role_profiles.yml'
-  SETUP_PROFILES_FILE = defined?(Lab::SETUP_PROFILES) ? Lab::SETUP_PROFILES : '/root/ctlabs/labs/setup_profiles.yml'
+  ROLE_PROFILES_FILE      = defined?(Lab::ROLE_PROFILES) ? Lab::ROLE_PROFILES  : '/root/ctlabs/labs/role_profiles.yml'
+  SETUP_PROFILES_FILE     = defined?(Lab::SETUP_PROFILES) ? Lab::SETUP_PROFILES : '/root/ctlabs/labs/setup_profiles.yml'
+  TERRAFORM_PROFILES_FILE = defined?(Lab::TERRAFORM_PROFILES) ? Lab::TERRAFORM_PROFILES : '/root/ctlabs/labs/terraform_profiles.yml'
 
   def self.ansible_tree
     return [] unless Dir.exist?(ANS_BASE_DIR)
@@ -45,8 +46,9 @@ class AutomationService
 
   # --- Global role/setup profile files (live under /root/ctlabs/labs/) ---
   PROFILE_FILES = {
-    'role_profiles.yml'  => ROLE_PROFILES_FILE,
-    'setup_profiles.yml' => SETUP_PROFILES_FILE
+    'role_profiles.yml'      => ROLE_PROFILES_FILE,
+    'setup_profiles.yml'     => SETUP_PROFILES_FILE,
+    'terraform_profiles.yml' => TERRAFORM_PROFILES_FILE
   }.freeze
 
   def self.read_profile_files

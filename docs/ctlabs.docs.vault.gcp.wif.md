@@ -30,9 +30,50 @@ anywhere.
    injected as `GOOGLE_OAUTH_ACCESS_TOKEN` / `CLOUDSDK_AUTH_ACCESS_TOKEN`,
    exactly like the Vault Secrets Engine path.
 
+### Three tokens, three independent lifetimes
+
+Each hop above produces its own token with its own TTL - they are **not**
+chained or capped by each other, which is easy to assume incorrectly (we did,
+2026-09-24):
+
+| # | Token                           | Lifetime governed by                                       | Cached / visible anywhere? |
+|---|---------------------------------|------------------------------------------------------------|-----------------------------|
+| 1 | Vault OIDC identity token       | `ttl=` on `identity/oidc/role/<name>` (e.g. `10m`)         | No - consumed immediately by step 2 |
+| 2 | Federated STS token             | Google's default for the token-exchange grant type         | No - consumed immediately by step 3 |
+| 3 | Final impersonated access token | `generateAccessToken`'s own default (**1 hour**, since `ctlabs/lib/gcp_auth.rb`'s `generate_access_token` doesn't pass a `lifetime` param) | **Yes** - this is what `GcpAuth`'s `@wif_cache` holds and what the `/vault/info` webgui panel and `$GOOGLE_OAUTH_ACCESS_TOKEN` both show |
+
+So a short Vault role `ttl` (e.g. `10m`) only bounds how long the *identity
+assertion* is valid for exchange - it has **no effect** on how long the
+resulting GCP credential actually lives. If you want the final GCP token to
+be shorter-lived too (tighter security posture, closer to how the Vault GCP
+Secrets Engine path ties the GCP token TTL directly to Vault's own lease),
+that requires explicitly passing a `lifetime` field in the `generateAccessToken`
+request body in `GcpAuth.generate_access_token` - not currently implemented.
+
 ---
 
 ### One-time Vault Setup
+
+0. **ACL policy.** The token running these commands (and `vault_oidc_setup.py`)
+   needs this attached. Note `identity/oidc/config` only needs `update`, never
+   `create` - it's a singleton that already exists the moment the identity
+   engine is up, so a policy with only `create` here 403s on the very first
+   write, not just on re-runs:
+
+```hcl
+path "identity/oidc/config" {
+  capabilities = ["read", "update"]
+}
+path "identity/oidc/key/*" {
+  capabilities = ["create", "read", "update", "delete"]
+}
+path "identity/oidc/role/*" {
+  capabilities = ["create", "read", "update", "delete"]
+}
+path "identity/oidc/token/*" {
+  capabilities = ["read"]
+}
+```
 
 1. **Pin Vault's OIDC issuer** to a fixed, externally-resolvable string. GCP
    will validate the `iss` claim on every token against exactly this string,
@@ -50,15 +91,30 @@ vault write identity/oidc/key/gcp-wif-key \
     allowed_client_ids="*" rotation_period=24h verification_ttl=24h
 ```
 
-3. **Define a role.** The `aud` (audience) claim on the issued token must
-   match what you configure as the "Allowed audiences" on the GCP provider
-   side (or GCP's default expected audience pattern, if you leave it out):
+3. **Define a role, with `client_id` set to the GCP audience string.** Vault's
+   `client_id` becomes the token's `aud` claim. If you leave it unset, Vault
+   auto-generates a random one (e.g. `z2GjUgfvrkXy0yLdKN8kCOgbFP`) - and GCP's
+   WIF provider rejects any token whose `aud` doesn't equal the provider's own
+   resource name (by default, unless you widen it with `--allowed-audiences`),
+   so an unset `client_id` **always** fails with `The audience in ID Token
+   [...] does not match the expected audience` (hit this exact bug
+   2026-09-23, right after fixing the issuer mismatch below). The audience
+   string is fully computable in advance - project number is fixed, pool/
+   provider names are whatever you choose - so get it before writing the role:
 
 ```bash
+PROJECT_NUMBER=$(gcloud projects describe my-project --format='value(projectNumber)')
+AUDIENCE="//iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/ctlabs-vault-pool/providers/vault-provider"
+
 vault write identity/oidc/role/gcp-wif \
     key=gcp-wif-key \
-    ttl=10m
+    ttl=10m \
+    client_id="${AUDIENCE}"
 ```
+
+   If you didn't do this up front, it's a safe idempotent fix after the fact -
+   just re-run the same `vault write` with `client_id` added once you know the
+   audience (`vault_oidc_setup.py --client-id ...` does the same).
 
 4. **Look up the `sub` claim** you'll bind IAM permissions to. Vault sets
    `sub` to the calling identity's **entity ID** (a stable UUID, not the
@@ -69,12 +125,21 @@ vault write identity/oidc/role/gcp-wif \
 TOKEN=$(vault read -field=token identity/oidc/token/gcp-wif)
 echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool
 # {
-#   "iss": "https://vdb1.ctlabs.internal:8200",
+#   "iss": "https://vdb1.ctlabs.internal:8200/v1/identity/oidc",   <- NOTE: Vault appends
+#                                                                       this suffix automatically -
+#                                                                       use the FULL string below,
+#                                                                       not the bare issuer= value
 #   "sub": "3f2c1a9e-....-....-....-............",   <- this is the value GCP will see
 #   "aud": "...",
 #   ...
 # }
 ```
+
+   **`vault_oidc_setup.py` prints this `iss` value directly** - always copy it
+   from the script's output rather than reusing the bare `--issuer`/`issuer=`
+   value; using the un-suffixed address as `--issuer-uri` on the GCP side
+   causes GCP to reject every token with `the issuer in ID Token ... does not
+   match the expected one in config` (hit this exact bug 2026-09-23).
 
 5. **Reachability note:** Google's STS service normally verifies the JWT
    signature by fetching Vault's OIDC discovery + JWKS documents over the
@@ -111,16 +176,16 @@ gcloud iam workload-identity-pools create ctlabs-vault-pool \
 ```
 
 2. **Create an OIDC provider** in that pool, pointing at Vault as the issuer.
-   The `--issuer-uri` must be **exactly** the string you pinned in
-   `identity/oidc/config issuer=...` on the Vault side (step 1 above) - not a
-   sub-path of it:
+   The `--issuer-uri` must be **exactly** the real `iss` claim from step 4
+   above - Vault appends `/v1/identity/oidc` to whatever you pinned in
+   `identity/oidc/config issuer=...`, so that suffix must be included here too:
 
 ```bash
 gcloud iam workload-identity-pools providers create-oidc vault-provider \
     --project=my-project \
     --workload-identity-pool=ctlabs-vault-pool \
     --location=global \
-    --issuer-uri="https://vdb1.ctlabs.internal:8200" \
+    --issuer-uri="https://vdb1.ctlabs.internal:8200/v1/identity/oidc" \
     --attribute-mapping="google.subject=assertion.sub"
 ```
 
@@ -150,7 +215,12 @@ gcloud projects add-iam-policy-binding my-project \
 
 4. **Grant the WIF pool permission to impersonate that SA**, scoped to the
    specific `sub` value you looked up in Vault step 4 (never grant the whole
-   pool - always scope to `.../subject/<value>` for a single identity):
+   pool - always scope to `.../subject/<value>` for a single identity). Note
+   the scheme is singular **`principal://`**, not `principalSet://` -
+   `principalSet://` is only for attribute-based *groups* of identities (or a
+   `/*` wildcard for the whole pool); binding one specific `subject` value
+   requires `principal://` or GCP rejects it with `INVALID_ARGUMENT: ... is
+   of an unknown type`:
 
 ```bash
 PROJECT_NUMBER=$(gcloud projects describe my-project --format='value(projectNumber)')
@@ -159,7 +229,7 @@ gcloud iam service-accounts add-iam-policy-binding \
     terraform-runner@my-project.iam.gserviceaccount.com \
     --project=my-project \
     --role=roles/iam.workloadIdentityUser \
-    --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/ctlabs-vault-pool/subject/3f2c1a9e-....-....-....-............"
+    --member="principal://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/ctlabs-vault-pool/subject/3f2c1a9e-....-....-....-............"
 ```
 
 5. **Note the provider's resource name** - this is the `audience` value used
@@ -197,4 +267,26 @@ terraform:
 
 The older `terraform.vault: {project, roleset}` shape is still read
 (auto-treated as `method: vault`) for backward compatibility, but is rewritten
-to `terraform.auth: {method: vault, ...}` on the next save from the editor
+to `terraform.auth: {method: vault, ...}` on the next save from the editor.
+
+---
+
+### Cleanup
+
+Both scripts accept `--cleanup` to tear down what they created. Neither is
+all-or-nothing by default - they only remove the specific things that are
+safe to assume aren't shared:
+
+```bash
+# Vault side: deletes the role, then the key
+python3 vault_oidc_setup.py --cleanup --role-name gcp-wif --key-name gcp-wif-key
+# add --reset-issuer to also clear identity/oidc/config issuer (global setting,
+# left alone by default in case something else depends on it)
+
+# GCP side: by default only removes the WIF impersonation binding for --subject
+python3 gcp_wif_setup.py --cleanup --project my-project --subject <sub-claim>
+# add --delete-provider / --delete-pool (30-day soft-delete) /
+# --delete-service-account / --remove-sa-roles to go further
+```
+
+Both prompt for confirmation before deleting anything unless you pass `--yes`.
