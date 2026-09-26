@@ -20,8 +20,9 @@ $ErrorActionPreference = "Stop"
 # Standard fix: run it via a scheduled task (SYSTEM, triggered locally),
 # which gets a full token WinRM's remote session doesn't provide.
 $taskName = "ctlabs-install-openssh"
+$logPath  = "C:\Windows\Temp\ctlabs-openssh-install.log"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`""
+  -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 *> '$logPath'`""
 $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
@@ -33,7 +34,12 @@ do {
 
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
 if ($info.LastTaskResult -ne 0) {
-    throw "OpenSSH install via scheduled task failed with code $($info.LastTaskResult)"
+    # Confirmed 2026-09-26: a bare LastTaskResult code (e.g. "1") is useless
+    # on its own -- capture the actual DISM/PowerShell error text the task
+    # produced so the next failure (if any) is diagnosable without another
+    # full rebuild cycle.
+    $detail = if (Test-Path $logPath) { Get-Content $logPath -Raw } else { "(no log at $logPath)" }
+    throw "OpenSSH install via scheduled task failed with code $($info.LastTaskResult): $detail"
 }
 
 Set-Service -Name sshd -StartupType Automatic
