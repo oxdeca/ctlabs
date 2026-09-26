@@ -170,7 +170,18 @@ source "qemu" "win2022" {
   # getDeviceAndDriveArgs, not through the qemuargs override path at all.
   cd_files = [var.virtio_drivers_dir]
 
-  shutdown_command = "C:\\Windows\\System32\\Sysprep\\sysprep.exe /generalize /oobe /shutdown /quiet"
+  # sysprep's own /shutdown switch is what was hanging (SConfig/an open
+  # interactive console blocks a graceful shutdown negotiation with nobody
+  # there to dismiss the "this app is preventing shutdown" dialog).
+  # Cross-checked against github.com/therayy/packer-windows2022-qemu
+  # (2026-09-26): their shutdown_command uses plain `shutdown /f`, which
+  # force-closes apps and skips that exact dialog entirely -- the clean fix,
+  # simpler than fighting SConfig itself. They skip sysprep altogether
+  # (fine for a single one-off VM, not for us: every ctlabs lab node cloned
+  # from this image needs a distinct machine SID). So: sysprep generalizes
+  # WITHOUT its own /shutdown, then a separate forced shutdown actually
+  # powers off, bypassing sysprep's internal graceful-shutdown path.
+  shutdown_command = "C:\\Windows\\System32\\Sysprep\\sysprep.exe /generalize /oobe /quiet & shutdown /s /t 0 /f"
   shutdown_timeout = "30m"
 }
 

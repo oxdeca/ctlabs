@@ -171,17 +171,30 @@
           <PlainText>true</PlainText>
         </AdministratorPassword>
       </UserAccounts>
-      <!-- No AutoLogon (removed 2026-09-26). WinRM and the provisioner need
-           no interactive console session at all, and AutoLogon was the
-           actual root cause of "SConfig isn't closing so shutdown never
-           happens": it forces an interactive sign-in, SConfig launches
-           "at sign-in" (its own words) in that session, and Windows can
-           throw a "this app is preventing shutdown" dialog for an open
-           interactive console with nobody there to dismiss it, hanging
-           sysprep's shutdown indefinitely. Confirmed AutoLaunch=0 registry
-           suppression alone wasn't enough on a real host; removing the
-           interactive logon entirely is the more direct fix: no sign-in
-           event, no SConfig launch trigger, nothing to block shutdown. -->
+      <!-- AutoLogon restored 2026-09-26: removing it entirely (tried
+           earlier the same day) broke something else: both h3 and a
+           second host independently hit "Windows could not parse or
+           process unattend answer file ... for pass [specialize]. The
+           answer file is invalid" on the very next run, despite the
+           specialize-pass content itself being byte-identical to a prior
+           run that worked fine. Root cause not fully understood, but the
+           correlation was unambiguous (only XML diff between a working run
+           and a broken one), so reverted rather than dig further, not
+           worth the risk given a working alternative exists: SConfig
+           itself gets disabled via Set-SConfig in ctlabs-firstboot.ps1,
+           and that same script explicitly logs off this interactive
+           session at the end so nothing lingers to block Packer's
+           shutdown_command, regardless of whether AutoLaunch suppression
+           is fully reliable on its own. -->
+      <AutoLogon>
+        <Enabled>true</Enabled>
+        <LogonCount>1</LogonCount>
+        <Username>Administrator</Username>
+        <Password>
+          <Value>ctlabs-BuildTime!1</Value>
+          <PlainText>true</PlainText>
+        </Password>
+      </AutoLogon>
     </component>
   </settings>
 
