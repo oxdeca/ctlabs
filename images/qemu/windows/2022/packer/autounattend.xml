@@ -1,35 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Notes (2026-09-26, fixed after two real parse failures):
-  this file previously failed to load at all with "could not parse or
-  process unattend answer file", root-caused to two bugs: double hyphens
-  (forbidden anywhere inside an XML comment body, which this very note
-  now deliberately avoids) in the old draft notes here, and the wcm
-  namespace being used throughout (wcm:action="add") without ever being
-  declared on the root element below. Confirmed well-formed now via
-  xmllint and python's xml.dom.minidom.
-
-  Remaining things to verify on the next real run:
-    - ImageInstall/InstallFrom/MetaData Value below must match this
-      specific ISO's edition names. List them with:
-        Get-WindowsImage -ImagePath D:\sources\install.wim
-      Deliberately targeting Server Core (SERVERSTANDARDCORE) not Desktop
-      Experience (SERVERSTANDARD): every ctlabs qemu node is headless and
-      SSH-managed already (QEMU_VGA=none convention), no GUI is ever used,
-      and Core's footprint is roughly a third the size (about 4 to 6G vs
-      10 to 13G used post-install). Swap back to SERVERSTANDARD if a lab
-      ever genuinely needs the GUI (e.g. RDP into a desktop-like target).
-    - Product key below is the public Microsoft KMS client setup key for
-      Server 2022 Standard (safe to publish, does not activate anything by
-      itself); swap it if targeting Datacenter or Core specifically.
-    - winrm quickconfig timing: needs the network to be up when the
-      specialize pass runs; if WinRM never comes up, this is the first
-      place to look.
--->
 <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-
   <settings pass="windowsPE">
-    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <SetupUILanguage>
         <UILanguage>en-US</UILanguage>
       </SetupUILanguage>
@@ -38,18 +10,14 @@
       <UILanguage>en-US</UILanguage>
       <UserLocale>en-US</UserLocale>
     </component>
-    <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <DriverPaths>
         <PathAndCredentials wcm:action="add" wcm:keyValue="1">
-          <!-- floppy_files flattens vioscsi + NetKVM's 2k22/amd64 files
-               into this same root; see win2022.pkr.hcl. Without this,
-               WinPE can't see the virtio-scsi disk at all, which is what
-               actually caused "could not apply <DiskConfiguration>". -->
           <Path>A:\</Path>
         </PathAndCredentials>
       </DriverPaths>
     </component>
-    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <DiskConfiguration>
         <Disk wcm:action="add">
           <DiskID>0</DiskID>
@@ -101,26 +69,19 @@
       </ImageInstall>
       <UserData>
         <AcceptEula>true</AcceptEula>
-        <!-- No ProductKey: this is evaluation media (WIM Edition ID
-             ServerStandardEval/ServerDatacenterEval, confirmed via
-             wimlib-imagex info 2026-09-26), pre-activated as a 180-day
-             trial. A retail/volume KMS client setup key here doesn't match
-             any Eval-SKU image, which is exactly what caused Setup's
-             "No images are available": every image got filtered out. -->
       </UserData>
     </component>
   </settings>
-
   <settings pass="specialize">
-    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <ComputerName>*</ComputerName>
       <TimeZone>Eastern Standard Time</TimeZone>
     </component>
-    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Description>Give local accounts (not just built-in RID-500 Administrator) a full, unfiltered token over network logons -- standard companion fix for WinRM/DISM remote-admin quirks, added 2026-09-26 per a documented recommendation. Cheap and safe even though our account already is RID-500 and our OpenSSH install now runs via a SYSTEM-context scheduled task (already unfiltered) rather than directly in the WinRM session.</Description>
+          <Description>Give local accounts a full, unfiltered token over network logons</Description>
           <Path>reg.exe add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
@@ -140,20 +101,19 @@
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>5</Order>
-          <Description>Enable Basic auth on WinRM -- the actual, root-caused fix (2026-09-26) for the "waiting for WinRM" stall</Description>
+          <Description>Enable Basic auth on WinRM</Description>
           <Path>winrm.exe set winrm/config/service/auth @{Basic="true"}</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>6</Order>
-          <Description>Basic auth's credentials aren't encrypted at the WinRM layer over plain HTTP, so the service refuses it unless this is set. Fine for a disposable, NAT-isolated build VM.</Description>
+          <Description>Allow unencrypted WinRM traffic (build VM only)</Description>
           <Path>winrm.exe set winrm/config/service @{AllowUnencrypted="true"}</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
     </component>
   </settings>
-
   <settings pass="oobeSystem">
-    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <OOBE>
         <HideEULAPage>true</HideEULAPage>
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
@@ -166,26 +126,10 @@
       </OOBE>
       <UserAccounts>
         <AdministratorPassword>
-          <!-- overridden by build.sh -> keep in sync with var.admin_password -->
           <Value>ctlabs-BuildTime!1</Value>
           <PlainText>true</PlainText>
         </AdministratorPassword>
       </UserAccounts>
-      <!-- AutoLogon restored 2026-09-26: removing it entirely (tried
-           earlier the same day) broke something else: both h3 and a
-           second host independently hit "Windows could not parse or
-           process unattend answer file ... for pass [specialize]. The
-           answer file is invalid" on the very next run, despite the
-           specialize-pass content itself being byte-identical to a prior
-           run that worked fine. Root cause not fully understood, but the
-           correlation was unambiguous (only XML diff between a working run
-           and a broken one), so reverted rather than dig further, not
-           worth the risk given a working alternative exists: SConfig
-           itself gets disabled via Set-SConfig in ctlabs-firstboot.ps1,
-           and that same script explicitly logs off this interactive
-           session at the end so nothing lingers to block Packer's
-           shutdown_command, regardless of whether AutoLaunch suppression
-           is fully reliable on its own. -->
       <AutoLogon>
         <Enabled>true</Enabled>
         <LogonCount>1</LogonCount>
@@ -197,5 +141,4 @@
       </AutoLogon>
     </component>
   </settings>
-
 </unattend>
