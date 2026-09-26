@@ -5,14 +5,37 @@
 # at every startup fills that role (see images/qemu/base/files/qemu_init.sh's
 # ctlabs_net_setup.ps1 emission -- this agent is what actually runs it).
 #
-# DRAFT / UNVALIDATED (2026-09-25): OpenSSH capability name, drive discovery,
-# and the "run at every boot, no drive letter assumed" logic below have not
-# been run against a real guest.
+# DRAFT / UNVALIDATED (2026-09-25): drive discovery and the "run at every
+# boot, no drive letter assumed" logic below have not been run against a
+# real guest.
 
 $ErrorActionPreference = "Stop"
 
 # --- OpenSSH Server ---
-Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0
+# NOT a direct Add-WindowsCapability call -- confirmed 2026-09-26 (both on
+# h3 and independently on a second host, same error): DISM-backed cmdlets
+# like this one fail with "Access is denied" (COMException) when invoked
+# directly inside a WinRM/PSRemoting session -- a known double-hop-style
+# restriction, not something wrong with the capability name or privileges.
+# Standard fix: run it via a scheduled task (SYSTEM, triggered locally),
+# which gets a full token WinRM's remote session doesn't provide.
+$taskName = "ctlabs-install-openssh"
+$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument "-NoProfile -ExecutionPolicy Bypass -Command `"Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`""
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Force | Out-Null
+Start-ScheduledTask -TaskName $taskName
+
+do {
+    Start-Sleep -Seconds 2
+    $info = Get-ScheduledTaskInfo -TaskName $taskName
+} while ($info.LastTaskResult -eq 267009) # SCHED_S_TASK_RUNNING
+
+Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+if ($info.LastTaskResult -ne 0) {
+    throw "OpenSSH install via scheduled task failed with code $($info.LastTaskResult)"
+}
+
 Set-Service -Name sshd -StartupType Automatic
 New-NetFirewallRule -Name sshd -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
 
