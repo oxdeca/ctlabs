@@ -100,9 +100,30 @@ source "qemu" "win2022" {
   winrm_password = var.admin_password
   winrm_timeout  = "6h" # unattended install + reboots can run long, unverified real-world duration
 
+  # WinPE has no inbox virtio-scsi/virtio-net drivers, so without these
+  # Setup can't even see disk 0 to partition it -- confirmed 2026-09-26,
+  # this is the actual cause of "Windows could not apply the unattend
+  # answer file's <DiskConfiguration> settings" (and would separately have
+  # broken WinRM/networking post-install too, via the missing NIC driver).
+  # floppy_files flattens everything into A:\ root (confirmed via Packer's
+  # own "Copying files flatly from floppy_files" log line) -- vioscsi's and
+  # NetKVM's files don't collide by name, so DriverPaths below just points
+  # at the floppy root.
+  #
+  # Packer's floppy is a real, size-capped FAT12 image (~1.44M) -- confirmed
+  # 2026-09-26 via "FAT FULL" when the whole NetKVM/2k22/amd64 dir (19M,
+  # mostly .pdb debug symbols and coinstaller .exe/.pdb not needed for
+  # driver binding) was added wholesale. Only .cat/.inf/.sys are actually
+  # required; those three per driver total ~320K, comfortably under the cap.
   floppy_files = [
     "autounattend.xml",
     "files/ctlabs-firstboot.ps1",
+    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
+    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.inf",
+    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.sys",
+    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.cat",
+    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.inf",
+    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.sys",
   ]
 
   # Second CD-ROM for virtio drivers Setup needs to see the virtio-scsi disk

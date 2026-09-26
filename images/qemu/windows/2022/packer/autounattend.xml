@@ -38,6 +38,17 @@
       <UILanguage>en-US</UILanguage>
       <UserLocale>en-US</UserLocale>
     </component>
+    <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <DriverPaths>
+        <PathAndCredentials wcm:action="add" wcm:keyValue="1">
+          <!-- floppy_files flattens vioscsi + NetKVM's 2k22/amd64 files
+               into this same root; see win2022.pkr.hcl. Without this,
+               WinPE can't see the virtio-scsi disk at all, which is what
+               actually caused "could not apply <DiskConfiguration>". -->
+          <Path>A:\</Path>
+        </PathAndCredentials>
+      </DriverPaths>
+    </component>
     <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <DiskConfiguration>
         <Disk wcm:action="add">

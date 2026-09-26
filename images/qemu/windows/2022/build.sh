@@ -44,6 +44,13 @@ WIN_ISO_CHECKSUM="${WIN_ISO_CHECKSUM:-sha256:3e4fa6d8507b554856fc9ca6079cc402df1
 build_qcow2() {
   mkdir -p "${BUILD_DIR}"
 
+  # A killed/interrupted run (e.g. Ctrl-C or `kill -9` on a stuck install)
+  # skips Packer's own cleanup, leaving generated CD/floppy scratch images
+  # behind under TMPDIR. Bit us 2026-09-26: grew to 8.8G across a few killed
+  # attempts and nearly ate all of BUILD_DIR's free space. TMPDIR is pure
+  # scratch, regenerated every run -- always safe to clear first.
+  rm -rf "${BUILD_DIR}/tmp"
+
   if [ ! -e "${VIRTIO_ISO}" ]; then
     curl -sLo "${VIRTIO_ISO}" ${VIRTIO_ISO_URL}
   fi
