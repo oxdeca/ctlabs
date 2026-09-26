@@ -29,9 +29,9 @@ variable "virtio_drivers_dir" {
 }
 
 variable "admin_password" {
-  type      = string
-  default   = "ctlabs-BuildTime!1"
-  sensitive = true
+  type        = string
+  default     = "ctlabs-BuildTime!1"
+  sensitive   = true
   description = "Only used during build (winrm + autounattend); sysprep wipes it. Not the lab-runtime credential."
 }
 
@@ -178,7 +178,7 @@ build {
   sources = ["source.qemu.win2022"]
 
   provisioner "powershell" {
-    script = "files/ctlabs-firstboot.ps1"
+    script            = "files/ctlabs-firstboot.ps1"
     elevated_user     = "Administrator"
     elevated_password = var.admin_password
   }

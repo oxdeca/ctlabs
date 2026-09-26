@@ -111,7 +111,7 @@
     </component>
   </settings>
 
-<settings pass="specialize">
+  <settings pass="specialize">
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <ComputerName>*</ComputerName>
       <TimeZone>Eastern Standard Time</TimeZone>
@@ -120,31 +120,36 @@
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
+          <Description>Disable SConfig AutoLaunch registry entry</Description>
+          <Path>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\SConfig" /v AutoLaunch /t REG_DWORD /d 0 /f</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>2</Order>
           <Description>Disable UAC remote token filtering for local Admin WinRM sessions</Description>
           <Path>reg.exe add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>2</Order>
+          <Order>3</Order>
           <Description>Enable WinRM service</Description>
           <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Enable-PSRemoting -Force"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>3</Order>
+          <Order>4</Order>
           <Description>Allow WinRM through Firewall</Description>
           <Path>netsh.exe advfirewall firewall add rule name="WinRM 5985" dir=in action=allow protocol=TCP localport=5985</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>4</Order>
+          <Order>5</Order>
           <Description>Set network location to Private</Description>
           <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>5</Order>
+          <Order>6</Order>
           <Description>Enable Basic authentication on WinRM service</Description>
           <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
-          <Order>6</Order>
+          <Order>7</Order>
           <Description>Allow unencrypted HTTP traffic on WinRM service</Description>
           <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true"</Path>
         </RunSynchronousCommand>
