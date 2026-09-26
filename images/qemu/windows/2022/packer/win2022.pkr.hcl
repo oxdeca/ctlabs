@@ -29,9 +29,9 @@ variable "virtio_drivers_dir" {
 }
 
 variable "admin_password" {
-  type        = string
-  default     = "ctlabs-BuildTime!1"
-  sensitive   = true
+  type      = string
+  default   = "ctlabs-BuildTime!1"
+  sensitive = true
   description = "Only used during build (winrm + autounattend); sysprep wipes it. Not the lab-runtime credential."
 }
 
@@ -94,11 +94,6 @@ source "qemu" "win2022" {
   disk_size       = var.disk_size
   disk_interface  = "virtio-scsi"
   net_device      = "virtio-net"
-
-  # Absolute pointer positioning to sync host & VNC mouse cursor
-  qemuargs = [
-    ["-device", "usb-tablet"]
-  ]
 
   # Root cause of "install never starts" confirmed 2026-09-26 on two
   # separate hosts (h3 ran 4+ hours, qcow2 grew 196K -> 324K the whole
@@ -184,6 +179,12 @@ build {
 
   provisioner "powershell" {
     script            = "files/ctlabs-firstboot.ps1"
+    # Packer's own mechanism for exactly the class of restriction that broke
+    # Add-WindowsCapability (2026-09-26): runs the script through a local
+    # elevated task instead of directly in the plain WinRM session. Kept the
+    # manual scheduled-task wrapper around Add-WindowsCapability in the
+    # script too rather than removing it now that this is set -- untested
+    # whether elevated_user alone would have been sufficient on its own.
     elevated_user     = "Administrator"
     elevated_password = var.admin_password
   }
