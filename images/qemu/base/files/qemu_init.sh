@@ -87,6 +87,30 @@ ip route add default via ${eth1_gw}
 
 echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
 EOF
+
+  # Windows-guest twin of the script above. Harmless on Linux guests (never
+  # read there); Windows guests have no bash/VRF, so a booted-every-time
+  # scheduled task (baked into the image, see images/qemu/windows/*) runs
+  # this instead. NIC naming assumes virtio-net enumeration order matches
+  # attach order (ens0=mgmt -> "Ethernet", ens1=data -> "Ethernet 2") --
+  # unverified against a real Windows guest, check first if network config
+  # doesn't apply.
+  local dns_servers=($(awk '/^nameserver/{print $2}' /etc/resolv.conf))
+cat > /mnt/ctlabs_net_setup.ps1 << EOF
+# ens3 (mgmt)
+netsh interface ipv4 set address name="Ethernet" static ${eth0_ip%/*} 255.255.255.0 ${eth0_gw}
+netsh interface ipv4 set subinterface "Ethernet" mtu=1460 store=persistent
+
+# ens4 (data)
+netsh interface ipv4 set address name="Ethernet 2" static ${eth1_ip%/*} 255.255.255.0 ${eth1_gw}
+netsh interface ipv4 set subinterface "Ethernet 2" mtu=1460 store=persistent
+
+$(i=1; for ns in "${dns_servers[@]}"; do echo "netsh interface ipv4 add dnsserver name=\"Ethernet\" address=${ns} index=${i} validate=no"; i=$((i+1)); done)
+
+if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${HOSTNAME}") {
+  Rename-Computer -NewName "${HOSTNAME}" -Force -Restart
+}
+EOF
 }
 
 qemu_base_cmd() {

@@ -51,6 +51,10 @@ profiles:
       image: ctlabs/qemu/c9
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
+    qemu/win2022:
+      image: ctlabs/qemu/win2022
+      env: ['QEMU_MEM=4G', 'QEMU_CPU=4']
+      kvm: true
     db2:
       image: ctlabs/misc/db2
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]

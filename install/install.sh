@@ -70,6 +70,12 @@ PKGS=(
   'python3-pip'
   'ipvsadm'
   'qemu-img'
+  'qemu-kvm'
+  'genisoimage'
+  'packer' # HashiCorp repo added in packages() below. NOTE: cracklib-packer
+           # (unrelated password-dictionary tool, present by default) is
+           # symlinked at /usr/sbin/packer and shadows this one in PATH order
+           # -- scripts must call /usr/bin/packer explicitly, never bare `packer`.
   'cloud-utils-growpart'
   'make'
   'gcc'
@@ -118,6 +124,12 @@ kmods() {
 packages() {
   # Install EPEL first so subsequent packages from EPEL can be resolved
   ${DNF} -y install epel-release > /dev/null 2>&1
+
+  # HashiCorp repo for packer (used by images/qemu/windows/* Packer builds).
+  # dnf-plugins-core provides config-manager -- not guaranteed present on a
+  # minimal install, so make sure it's there before relying on it.
+  ${DNF} -y install dnf-plugins-core > /dev/null 2>&1
+  ${DNF} config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo > /dev/null 2>&1
 
   # Install all other packages in one batch for speed
   ${DNF} -y install "${PKGS[@]}" > /dev/null 2>&1
