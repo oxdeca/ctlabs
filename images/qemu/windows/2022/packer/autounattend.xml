@@ -133,6 +133,16 @@
           <Description>Set network location to Private so WinRM/firewall rules take effect immediately</Description>
           <Path>cmd.exe /c powershell -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"</Path>
         </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <Description>Enable Basic auth on WinRM -- the actual, root-caused fix (2026-09-26) for the "waiting for WinRM" stall</Description>
+          <Path>cmd.exe /c winrm set winrm/config/service/auth @{Basic="true"}</Path>
+        </RunSynchronousCommand>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <Description>Basic auth's credentials aren't encrypted at the WinRM layer over plain HTTP, so the service refuses it unless this is set. Fine for a disposable, NAT-isolated build VM.</Description>
+          <Path>cmd.exe /c winrm set winrm/config/service @{AllowUnencrypted="true"}</Path>
+        </RunSynchronousCommand>
       </RunSynchronous>
     </component>
   </settings>

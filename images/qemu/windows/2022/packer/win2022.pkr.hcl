@@ -79,6 +79,16 @@ source "qemu" "win2022" {
   accelerator      = "kvm"
   headless         = true
 
+  # Default plugin CPU model is the deprecated, minimal "qemu64" (its own
+  # startup warning says as much). Confirmed 2026-09-26 on h3: the guest
+  # hung solid ~20+ min post-reboot at the boot logo, CPU pegged but real
+  # disk I/O (read_bytes/write_bytes in /proc/<pid>/io) completely flat --
+  # not slow NFS I/O, a genuine stall. Matches the other ctlabs qemu images'
+  # own convention (qemu_init.sh uses "-cpu host,...") -- exposing full host
+  # features is fine here since this is a one-shot build VM, not something
+  # needing live-migration compatibility across mismatched hosts.
+  cpu_model = "host"
+
   cpus   = var.cpus
   memory = var.memory
   disk_size       = var.disk_size
@@ -99,6 +109,20 @@ source "qemu" "win2022" {
   winrm_username = "Administrator"
   winrm_password = var.admin_password
   winrm_timeout  = "6h" # unattended install + reboots can run long, unverified real-world duration
+  # Deliberately NOT setting winrm_use_ntlm. Tried it (=true) first on the
+  # theory that Kerberos-first Negotiate can't work against a standalone
+  # WORKGROUP machine -- wrong theory, reverted 2026-09-26. Proven via a
+  # live interactive PowerShell session on a stuck build: the WinRM service
+  # only advertises "WWW-Authenticate: Negotiate" (confirmed with `winrm get
+  # winrm/config/service/auth`: Negotiate=true, Kerberos=true, Basic=false --
+  # no separate NTLM scheme), and `Test-WSMan -Authentication Negotiate`
+  # with the real Administrator credentials succeeded cleanly. Firewall/
+  # network-profile was also ruled out (`Get-NetFirewallRule` showed our own
+  # rule already Enabled/Profile=Any/Allow). winrm_use_ntlm=true forces
+  # Packer's raw-NTLM client transport, which a server that only advertises
+  # "Negotiate" (SPNEGO-wrapped) appears to silently reject -- Packer just
+  # retries forever rather than surfacing an auth error. Default (unset)
+  # uses the SPNEGO-wrapped path that the live test just proved works.
 
   # WinPE has no inbox virtio-scsi/virtio-net drivers, so without these
   # Setup can't even see disk 0 to partition it -- confirmed 2026-09-26,
@@ -113,14 +137,21 @@ source "qemu" "win2022" {
   # Packer's floppy is a real, size-capped FAT12 image (~1.44M) -- confirmed
   # 2026-09-26 via "FAT FULL" when the whole NetKVM/2k22/amd64 dir (19M,
   # mostly .pdb debug symbols and coinstaller .exe/.pdb not needed for
-  # driver binding) was added wholesale. Only .cat/.inf/.sys are actually
-  # required; those three per driver total ~320K, comfortably under the cap.
+  # driver binding) was added wholesale. Trimmed to .cat/.inf/.sys per
+  # driver, but that dropped the network adapter entirely (confirmed live:
+  # install completed fine, but Server Core's SConfig showed no NIC at
+  # all) -- netkvm.inf's own [Install.NT] CopyFiles directive requires
+  # netkvmp.exe (a real install-time dependency, not just a bonus config
+  # tool like the much larger netkvmco.exe, which genuinely isn't
+  # referenced anywhere in the INF and stays excluded). Adding it back:
+  # still well under the floppy cap (~501K total vs ~1.44M).
   floppy_files = [
     "autounattend.xml",
     "files/ctlabs-firstboot.ps1",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.inf",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.sys",
+    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvmp.exe",
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.cat",
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.inf",
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.sys",
