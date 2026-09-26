@@ -179,5 +179,7 @@ build {
 
   provisioner "powershell" {
     script = "files/ctlabs-firstboot.ps1"
+    elevated_user     = "Administrator"
+    elevated_password = var.admin_password
   }
 }

@@ -111,7 +111,7 @@
     </component>
   </settings>
 
-  <settings pass="specialize">
+<settings pass="specialize">
     <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
       <ComputerName>*</ComputerName>
       <TimeZone>Eastern Standard Time</TimeZone>
@@ -120,33 +120,33 @@
       <RunSynchronous>
         <RunSynchronousCommand wcm:action="add">
           <Order>1</Order>
-          <Description>Give local accounts (not just built-in RID-500 Administrator) a full, unfiltered token over network logons -- standard companion fix for WinRM/DISM remote-admin quirks, added 2026-09-26 per a documented recommendation. Cheap and safe even though our account already is RID-500 and our OpenSSH install now runs via a SYSTEM-context scheduled task (already unfiltered) rather than directly in the WinRM session.</Description>
-          <Path>cmd.exe /c reg add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f</Path>
+          <Description>Disable UAC remote token filtering for local Admin WinRM sessions</Description>
+          <Path>reg.exe add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>2</Order>
-          <Description>Enable WinRM so Packer's communicator can connect</Description>
-          <Path>cmd.exe /c winrm quickconfig -quiet</Path>
+          <Description>Enable WinRM service</Description>
+          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Enable-PSRemoting -Force"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>3</Order>
-          <Description>Allow WinRM through the firewall</Description>
-          <Path>cmd.exe /c netsh advfirewall firewall add rule name="WinRM 5985" dir=in action=allow protocol=TCP localport=5985</Path>
+          <Description>Allow WinRM through Firewall</Description>
+          <Path>netsh.exe advfirewall firewall add rule name="WinRM 5985" dir=in action=allow protocol=TCP localport=5985</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>4</Order>
-          <Description>Set network location to Private so WinRM/firewall rules take effect immediately</Description>
-          <Path>cmd.exe /c powershell -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"</Path>
+          <Description>Set network location to Private</Description>
+          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>5</Order>
-          <Description>Enable Basic auth on WinRM -- the actual, root-caused fix (2026-09-26) for the "waiting for WinRM" stall</Description>
-          <Path>cmd.exe /c winrm set winrm/config/service/auth @{Basic="true"}</Path>
+          <Description>Enable Basic authentication on WinRM service</Description>
+          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Item WSMan:\localhost\Service\Auth\Basic -Value $true"</Path>
         </RunSynchronousCommand>
         <RunSynchronousCommand wcm:action="add">
           <Order>6</Order>
-          <Description>Basic auth's credentials aren't encrypted at the WinRM layer over plain HTTP, so the service refuses it unless this is set. Fine for a disposable, NAT-isolated build VM.</Description>
-          <Path>cmd.exe /c winrm set winrm/config/service @{AllowUnencrypted="true"}</Path>
+          <Description>Allow unencrypted HTTP traffic on WinRM service</Description>
+          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Set-Item WSMan:\localhost\Service\AllowUnencrypted -Value $true"</Path>
         </RunSynchronousCommand>
       </RunSynchronous>
     </component>
