@@ -85,6 +85,16 @@ source "qemu" "win2022" {
   disk_interface  = "virtio-scsi"
   net_device      = "virtio-net"
 
+  # Root cause of "install never starts" confirmed 2026-09-26 on two
+  # separate hosts (h3 ran 4+ hours, qcow2 grew 196K -> 324K the whole
+  # time -- never actually booted the installer): the Windows ISO shows a
+  # BIOS "Press any key to boot from CD or DVD..." prompt, and with no
+  # boot_command at all the VM let that prompt time out and fell through to
+  # the empty hard disk instead, spinning forever with no OS to boot. This
+  # sends Enter early enough to catch it.
+  boot_wait    = "5s"
+  boot_command = ["<enter>"]
+
   communicator   = "winrm"
   winrm_username = "Administrator"
   winrm_password = var.admin_password
