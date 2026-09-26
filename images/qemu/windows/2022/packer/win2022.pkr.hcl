@@ -1,0 +1,121 @@
+packer {
+  required_plugins {
+    qemu = {
+      version = ">= 1.1.0"
+      source  = "github.com/hashicorp/qemu"
+    }
+  }
+}
+
+# DRAFT / UNVALIDATED (2026-09-25) -- built from documented Packer qemu-plugin
+# behavior, never run against real infra. iso_checksum, the WIM image_index
+# for "Server 2022 Standard (Desktop Experience)" vs Core, and winrm timing
+# all need live verification on the first real build. See build.sh.
+
+variable "iso_url" {
+  type        = string
+  description = "Path/URL to the Windows Server 2022 evaluation ISO (Microsoft eval center, manual download -- no stable script-fetchable URL)."
+}
+
+variable "iso_checksum" {
+  type        = string
+  description = "e.g. sha256:<hash>, printed on the Microsoft eval download page."
+}
+
+variable "virtio_drivers_dir" {
+  type        = string
+  default     = "virtio-win-extracted"
+  description = "Extracted contents of virtio-win.iso (a directory, not the .iso itself -- cd_files bundles loose files into a new CD, it can't attach a pre-built .iso as-is; build.sh extracts it via a loopback mount before invoking packer)."
+}
+
+variable "admin_password" {
+  type      = string
+  default   = "ctlabs-BuildTime!1"
+  sensitive = true
+  description = "Only used during build (winrm + autounattend); sysprep wipes it. Not the lab-runtime credential."
+}
+
+variable "cpus" {
+  type    = number
+  default = 4
+}
+
+variable "memory" {
+  type    = number
+  default = 4096
+}
+
+variable "output_dir" {
+  type        = string
+  default     = "output-win2022"
+  description = "Where the finished qcow2 lands. Point this at a volume with real free space (e.g. /media/nfs/...) -- root disk on h3 only has ~7G free."
+}
+
+variable "disk_size" {
+  type    = string
+  default = "20480" # MB -- sized for Server Core (~4-6G used post-install),
+  # not Desktop Experience. qcow2 is thin-provisioned so this is a ceiling,
+  # not eager allocation -- the packaged image will be close to actual
+  # usage, not this number. Deliberately below Microsoft's officially
+  # published 32G minimum; acceptable for disposable/rebuildable lab nodes,
+  # but if the guest ever runs Windows Update, WinSxS growth could eat
+  # into this fast -- bump it if that becomes a problem.
+}
+
+source "qemu" "win2022" {
+  # EL9's qemu-kvm package ships the binary at /usr/libexec/qemu-kvm, not
+  # /usr/bin/qemu-system-x86_64 (that name is a Debian/Ubuntu convention) --
+  # the qemu plugin defaults to the latter and errors "executable file not
+  # found in $PATH" otherwise. Confirmed missing entirely on h3 2026-09-25
+  # (only qemu-img/qemu-guest-agent were installed) -- `dnf install qemu-kvm
+  # genisoimage` first if this errors again on a fresh host.
+  qemu_binary = "/usr/libexec/qemu-kvm"
+
+  iso_url          = var.iso_url
+  iso_checksum     = var.iso_checksum
+  output_directory = var.output_dir
+  vm_name          = "windows-server-2022.qcow2"
+  format           = "qcow2"
+  accelerator      = "kvm"
+  headless         = true
+
+  cpus   = var.cpus
+  memory = var.memory
+  disk_size       = var.disk_size
+  disk_interface  = "virtio-scsi"
+  net_device      = "virtio-net"
+
+  communicator   = "winrm"
+  winrm_username = "Administrator"
+  winrm_password = var.admin_password
+  winrm_timeout  = "6h" # unattended install + reboots can run long, unverified real-world duration
+
+  floppy_files = [
+    "autounattend.xml",
+    "files/ctlabs-firstboot.ps1",
+  ]
+
+  # Second CD-ROM for virtio drivers Setup needs to see the virtio-scsi disk
+  # and virtio-net NIC at all. NOT via qemuargs -- confirmed 2026-09-25 by
+  # reading the installed v1.1.3 plugin's source (step_run.go): any qemuargs
+  # entry for a key (e.g. "-drive") REPLACES that key's entire default value
+  # wholesale, not appends. A raw ["-drive", "file=...,media=cdrom"] entry
+  # here silently ate BOTH the primary disk's drive AND the install ISO's
+  # cdrom drive (confirmed via PACKER_LOG=1: "Property 'scsi-hd.drive' can't
+  # find value 'drive0'" -- the disk device referenced a drive that no
+  # longer existed). cd_files is the actual supported mechanism: it's
+  # merged into state("cd_path") -> cdPaths alongside the install ISO in
+  # getDeviceAndDriveArgs, not through the qemuargs override path at all.
+  cd_files = [var.virtio_drivers_dir]
+
+  shutdown_command = "C:\\Windows\\System32\\Sysprep\\sysprep.exe /generalize /oobe /shutdown /quiet"
+  shutdown_timeout = "30m"
+}
+
+build {
+  sources = ["source.qemu.win2022"]
+
+  provisioner "powershell" {
+    script = "files/ctlabs-firstboot.ps1"
+  }
+}
