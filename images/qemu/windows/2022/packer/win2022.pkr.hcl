@@ -95,6 +95,11 @@ source "qemu" "win2022" {
   disk_interface  = "virtio-scsi"
   net_device      = "virtio-net"
 
+  # Absolute pointer positioning to sync host & VNC mouse cursor
+  qemuargs = [
+    ["-device", "usb-tablet"]
+  ]
+
   # Root cause of "install never starts" confirmed 2026-09-26 on two
   # separate hosts (h3 ran 4+ hours, qcow2 grew 196K -> 324K the whole
   # time -- never actually booted the installer): the Windows ISO shows a
