@@ -33,6 +33,7 @@ QEMU_CPU_CORES=$((QEMU_CPU / (QEMU_CPU_SOCKETS * QEMU_CPU_THREADS)))
 ACTUAL_VCPUS=$((QEMU_CPU_SOCKETS * 1 * QEMU_CPU_CORES * QEMU_CPU_THREADS))
 
 QEMU_VGA=${QEMU_VGA:-none}
+QEMU_VNC=${QEMU_VNC:-false}
 
 FILE="/root/.ssh/authorized_keys"
 TIMEOUT=120  # Wait max 2 minutes
@@ -97,11 +98,17 @@ EOF
   # doesn't apply.
   local dns_servers=($(awk '/^nameserver/{print $2}' /etc/resolv.conf))
 cat > /mnt/ctlabs_net_setup.ps1 << EOF
+# disable interfaces
+
 # ens3 (mgmt)
+netsh interface set interface "Ethernet" disable
+netsh interface set interface "Ethernet" enable
 netsh interface ipv4 set address name="Ethernet" static ${eth0_ip%/*} 255.255.255.0 ${eth0_gw}
 netsh interface ipv4 set subinterface "Ethernet" mtu=1460 store=persistent
 
 # ens4 (data)
+netsh interface set interface "Ethernet 2" disable
+netsh interface set interface "Ethernet 2" enable
 netsh interface ipv4 set address name="Ethernet 2" static ${eth1_ip%/*} 255.255.255.0 ${eth1_gw}
 netsh interface ipv4 set subinterface "Ethernet 2" mtu=1460 store=persistent
 
@@ -116,9 +123,14 @@ EOF
 qemu_base_cmd() {
   local qemu_vga=""
   local qemu_numa=""
+  local qemu_vnc=""
   
   if [ "$QEMU_VGA" != "none" ]; then
     qemu_vga="-vga $QEMU_VGA"
+  fi
+  if [ "$QEMU_VNC" == "true" ]; then
+    qemu_vga="-vga std"
+    qemu_vnc="-vnc :0"
   fi
 
   if [ "$QEMU_NUMA_NODES" -ge 2 ]; then
@@ -165,7 +177,7 @@ qemu_base_cmd() {
   fi
 
   QEMU_BASE_CMD=(
-    "qemu-system-x86_64 -nodefaults -display none ${qemu_vga} -m ${QEMU_MEM} -serial mon:stdio"
+    "qemu-system-x86_64 -nodefaults -display none ${qemu_vga} ${qemu_vnc} -m ${QEMU_MEM} -serial mon:stdio"
     "-smp sockets=${QEMU_CPU_SOCKETS},dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
     "-cpu host,hv_passthrough,kvm=on,l3-cache=on,migratable=no"
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm ${qemu_numa}"
