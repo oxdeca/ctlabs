@@ -51,9 +51,9 @@ profiles:
       image: ctlabs/qemu/c9
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
-    qemu/win2022:
-      image: ctlabs/qemu/win2022
-      env: ['QEMU_MEM=4G', 'QEMU_CPU=4']
+    qemu/win22:
+      image: ctlabs/qemu/win22
+      env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
     db2:
       image: ctlabs/misc/db2

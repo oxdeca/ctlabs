@@ -45,6 +45,18 @@ if ($info.LastTaskResult -ne 0) {
 Set-Service -Name sshd -StartupType Automatic
 New-NetFirewallRule -Name sshd -DisplayName "OpenSSH Server (sshd)" -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
 
+# --- root user, for Ansible SSH-key parity with the Linux hosts ---
+# Password is thrown away -- login is key-only via
+# administrators_authorized_keys, which OpenSSH applies to any member of
+# the local Administrators group regardless of username, so root just
+# needs to exist and be in that group (see qemu_init.d/10-net-setup.sh,
+# which deploys the actual key on every boot).
+if (-not (Get-LocalUser -Name "root" -ErrorAction SilentlyContinue)) {
+    $rootPassword = ConvertTo-SecureString (([System.Guid]::NewGuid().ToString()) + "!Aa1") -AsPlainText -Force
+    New-LocalUser -Name "root" -Password $rootPassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
+    Add-LocalGroupMember -Group "Administrators" -Member "root"
+}
+
 # --- boot-time net-setup agent ---
 New-Item -ItemType Directory -Path "C:\ProgramData\ctlabs" -Force | Out-Null
 $agentPath = "C:\ProgramData\ctlabs\ctlabs-net-agent.ps1"

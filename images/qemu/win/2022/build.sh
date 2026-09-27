@@ -13,7 +13,7 @@ set -Eeuo pipefail
 # check `docker system df` and prune unused images first rather than
 # guessing (confirm nothing "ACTIVE" gets touched before doing so).
 
-IMG_NAME=ctlabs/qemu/win2022
+IMG_NAME=ctlabs/qemu/win22
 IMG_VERS=0.1.0
 
 # cracklib-packer (an unrelated password-dictionary tool) is symlinked at
