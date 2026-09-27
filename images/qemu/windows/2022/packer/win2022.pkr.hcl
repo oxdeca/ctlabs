@@ -194,15 +194,14 @@ source "qemu" "win2022" {
 build {
   sources = ["source.qemu.win2022"]
 
-  # STAGE 1 (2026-09-26): placeholder provisioner, matching the exact
-  # config that proved the pipeline itself works. Our real payload (OpenSSH
-  # via a scheduled task, the boot-time net-agent, timezone) lives in
-  # files/ctlabs-firstboot.ps1 (untouched) -- swap this placeholder for
-  # that script as the next, separately-tested step, not bundled with this
-  # baseline confirmation run.
+  # STAGE 2 (2026-09-27): real payload -- OpenSSH via a SYSTEM-context
+  # scheduled task, the boot-time ctlabs-net-agent registration (which is
+  # what actually runs qemu_init.sh's generated ctlabs_net_setup.ps1 every
+  # boot), and timezone. Confirmed missing entirely from the image that
+  # first booted successfully 2026-09-27 -- that build only ran the Stage 1
+  # placeholder below, so neither OpenSSH nor the net-agent task were ever
+  # installed. This is the fix.
   provisioner "powershell" {
-    inline = [
-      "Write-Output 'WinRM is up. Packer provisioning started.'",
-    ]
+    script = "files/ctlabs-firstboot.ps1"
   }
 }

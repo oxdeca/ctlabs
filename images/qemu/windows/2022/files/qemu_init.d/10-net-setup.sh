@@ -24,6 +24,11 @@ create_net_setup_script() {
   local mac0_win=$( echo "${ENS0_MAC}" | tr '[:lower:]' '[:upper:]' | tr ':' '-' )
   local mac1_win=$( echo "${ENS1_MAC}" | tr '[:lower:]' '[:upper:]' | tr ':' '-' )
 
+  # Windows computer names can't contain dots -- $HOSTNAME here may be an
+  # FQDN (e.g. win1.ctlabs.internal), so Rename-Computer needs just the
+  # short label or it silently fails to apply.
+  local short_hostname="${HOSTNAME%%.*}"
+
   local dns_ps_list=""
   for ns in "${dns_servers[@]}"; do
     dns_ps_list+="'${ns}',"
@@ -78,8 +83,8 @@ if (Test-Path \$keySrc) {
     icacls.exe "\$authKeys" /inheritance:r /grant "SYSTEM:(F)" /grant "BUILTIN\Administrators:(F)" | Out-Null
 }
 
-if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${HOSTNAME}") {
-    Rename-Computer -NewName "${HOSTNAME}" -Force -Restart
+if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${short_hostname}") {
+    Rename-Computer -NewName "${short_hostname}" -Force -Restart
 }
 EOF
 }

@@ -271,7 +271,12 @@ ENS0_MAC=$(gen_mac)
 ENS1_MAC=$(gen_mac)
 
 create_net_setup_script
-mkisofs -r -o /tmp/${HOSTNAME}.iso /mnt/
+# -J (Joliet) is required for Windows guests to see real long filenames --
+# -r (Rock Ridge) alone leaves Windows seeing only mangled 8.3 names (e.g.
+# ctlabs_net_setup.ps1 -> CTLABS_N.PS1), which silently breaks any
+# Test-Path/fixed-name lookup on the Windows side. Harmless extra metadata
+# for Linux guests, which just keep reading the Rock Ridge names.
+mkisofs -r -J -o /tmp/${HOSTNAME}.iso /mnt/
 
 # start tmux session
 tmux new -d -s qemu
