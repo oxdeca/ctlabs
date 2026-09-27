@@ -14,10 +14,11 @@
 #
 # Only the data NIC (ens1) gets a default gateway. Windows has no VRF
 # equivalent to the Linux hosts' `vrf mgmt` isolation, so mgmt/data
-# separation here is approximated with: no gateway on mgmt, strong-host
-# mode (no cross-interface send/receive) on both, and sshd bound only to
-# the mgmt IP -- the closest analogue to the Linux hosts' `ip vrf exec
-# mgmt sshd` restricting SSH reachability to the mgmt side.
+# separation here is approximated with strong-host mode (no cross-interface
+# send/receive) on both. sshd is currently listening on both interfaces
+# (see the disabled mgmt-only ListenAddress block below) -- OpenSSH wasn't
+# listening at all as of 2026-09-27, root cause not yet found, so the
+# mgmt-only restriction is on hold until that's sorted out first.
 create_net_setup_script() {
   local eth0_ip=$( ip -br addr ls eth0 | awk '{print $3}' )
   local eth1_ip=$( ip -br addr ls eth1 | awk '{print $3}' )
@@ -88,14 +89,28 @@ if (\$nic1) {
 Enable-NetFirewallRule -Name "FPS-ICMP4-ERQ-In" -ErrorAction SilentlyContinue
 Enable-NetFirewallRule -Name "FPS-ICMP6-ERQ-In" -ErrorAction SilentlyContinue
 
-# Bind sshd to the mgmt IP only -- direct-config analogue of the Linux
-# hosts' `ip vrf exec mgmt sshd`, since Windows has no VRF to isolate the
-# listening socket that way.
+# mgmt-only ListenAddress binding is DISABLED 2026-09-27 -- root-caused:
+# sshd's Automatic start at boot races the IP actually being assigned
+# (this net-setup script, which assigns it, runs from a boot-time
+# scheduled task -- there's no guarantee it wins that race against sshd's
+# own service start). A stale ListenAddress pinned to a specific IP means
+# sshd fails to bind and just stays stopped, since Windows doesn't retry a
+# failed Automatic-start service. Listening on both interfaces for now
+# avoids the race entirely (0.0.0.0 doesn't need any specific IP to exist
+# yet). Still strip any ListenAddress line left over from before this fix
+# so it doesn't keep failing on boxes that already hit the race once.
 \$sshdConfig = "C:\ProgramData\ssh\sshd_config"
 if (Test-Path \$sshdConfig) {
     \$lines = Get-Content \$sshdConfig | Where-Object { \$_ -notmatch '^\s*ListenAddress\s' }
-    @("ListenAddress ${eth0_ip%/*}") + \$lines | Set-Content -Path \$sshdConfig -Encoding ASCII
-    Restart-Service sshd -ErrorAction SilentlyContinue
+    Set-Content -Path \$sshdConfig -Value \$lines -Encoding ASCII
+}
+
+# Self-heal: if sshd's own Automatic-start lost the boot-order race and
+# ended up Stopped, start it here instead of waiting for a full reboot --
+# this script (which just finished configuring the network) is guaranteed
+# to run after the IP is actually up.
+if ((Get-Service -Name sshd -ErrorAction SilentlyContinue).Status -ne "Running") {
+    Start-Service -Name sshd -ErrorAction SilentlyContinue
 }
 
 # OpenSSH admin key -- administrators_authorized_keys requires this exact
