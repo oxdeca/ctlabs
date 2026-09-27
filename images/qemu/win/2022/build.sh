@@ -13,8 +13,43 @@ set -Eeuo pipefail
 # check `docker system df` and prune unused images first rather than
 # guessing (confirm nothing "ACTIVE" gets touched before doing so).
 
-IMG_NAME=ctlabs/qemu/win22
-IMG_VERS=0.1.0
+# VARIANT (2026-09-27): Core (headless, small) vs Desktop Experience
+# (GUI, for running RSAT tools inside an isolated lab network without
+# punching AD's RPC/LDAP/Kerberos port set through a DNAT boundary to an
+# outside Windows box). These are two genuinely independent full installs
+# -- Windows does NOT support converting Core to Desktop Experience (or
+# back) after install; the GUI shell payload isn't present in Core media
+# at all -- so this always means a full separate Packer build per variant,
+# not a smaller incremental one.
+VARIANT="${1:-core}"
+case "${VARIANT}" in
+  core)
+    IMG_NAME=ctlabs/qemu/win22/core
+    IMAGE_NAME="Windows Server 2022 SERVERSTANDARDCORE"
+    # Confirmed against the real eval WIM via `wimlib-imagex info`
+    # (design-guide.md 2.7.1) -- trust this one.
+    DISK_SIZE="20480" # MB, ~4-6G actual post-install usage.
+    OUTPUT_SUBDIR="output-win22-core"
+    ;;
+  dtop)
+    IMG_NAME=ctlabs/qemu/win22/dtop
+    IMAGE_NAME="Windows Server 2022 SERVERSTANDARD"
+    # Standard Microsoft naming convention (Core's name minus the "CORE"
+    # suffix) but NOT yet independently confirmed against this specific
+    # ISO's WIM the way Core's value was -- check with `wimlib-imagex
+    # info` (or Get-WindowsImage) on the first real dtop build before
+    # trusting it; if Setup shows "No images are available" or similar,
+    # this value is the first thing to re-verify.
+    DISK_SIZE="40960" # MB -- Desktop Experience roughly triples Core's
+    # on-disk footprint (design-guide.md 2.7.1); this is a thin-provisioned
+    # ceiling, not eager allocation, but Core's 20G would be too tight.
+    OUTPUT_SUBDIR="output-win22-dtop"
+    ;;
+  *)
+    echo "usage: $0 [core|dtop]" >&2
+    exit 1
+    ;;
+esac
 
 # cracklib-packer (an unrelated password-dictionary tool) is symlinked at
 # /usr/sbin/packer and shadows the real HashiCorp packer at /usr/bin/packer
@@ -23,11 +58,13 @@ IMG_VERS=0.1.0
 # "0 0" instead of erroring. Always call by absolute path here.
 PACKER=/usr/bin/packer
 
+IMG_VERS=0.1.0
 QIMG_NAME=windows-server-2022.qcow2
 BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2022-build}"
 VIRTIO_ISO="${BUILD_DIR}/virtio-win.iso"
 VIRTIO_ISO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
 VIRTIO_DIR="${BUILD_DIR}/virtio-win-extracted"
+OUTPUT_DIR="${BUILD_DIR}/${OUTPUT_SUBDIR}"
 
 # Same artifact the eval center's HTML page hands you, just Microsoft's
 # direct PRSS CDN link instead of the click-through form -- sourced from
@@ -58,7 +95,7 @@ build_qcow2() {
   # cd_files (packer's supported way to attach extra content) bundles loose
   # files/dirs into a new CD -- it can't attach a pre-built .iso directly --
   # so extract virtio-win.iso once via loopback mount rather than pointing
-  # Packer at the .iso itself.
+  # Packer at the .iso itself. Shared between variants, not rebuilt per one.
   if [ ! -d "${VIRTIO_DIR}" ]; then
     mkdir -p "${VIRTIO_DIR}" "${BUILD_DIR}/virtio-mnt"
     mount -o loop,ro "${VIRTIO_ISO}" "${BUILD_DIR}/virtio-mnt"
@@ -82,23 +119,22 @@ build_qcow2() {
       -var "iso_url=${WIN_ISO_URL}" \
       -var "iso_checksum=${WIN_ISO_CHECKSUM}" \
       -var "virtio_drivers_dir=${VIRTIO_DIR}" \
-      -var "output_dir=${BUILD_DIR}/output-win2022" \
+      -var "output_dir=${OUTPUT_DIR}" \
+      -var "image_name=${IMAGE_NAME}" \
+      -var "disk_size=${DISK_SIZE}" \
       win2022.pkr.hcl
   )
 }
 
 build_qcow2
 
-echo "--- qcow2 built, checking root disk before docker build (that step still writes to / regardless of BUILD_DIR) ---"
-du -h "${BUILD_DIR}/output-win2022/${QIMG_NAME}"
+echo "--- qcow2 built (${VARIANT}), checking root disk before docker build (that step still writes to / regardless of BUILD_DIR) ---"
+du -h "${OUTPUT_DIR}/${QIMG_NAME}"
 df -h /
 
 # Docker build context is BUILD_DIR's output dir (has the qcow2), not this
 # repo dir -- stage the per-image qemu_init.sh extension alongside it so
 # the Dockerfile's COPY can see it.
-cp -a files/qemu_init.d "${BUILD_DIR}/output-win2022/"
+cp -a files/qemu_init.d "${OUTPUT_DIR}/"
 
-# Context = the NFS output dir (has the qcow2); -f points back at our
-# Dockerfile in the repo. Avoids an extra copy of the qcow2 onto root just
-# to satisfy `docker build .`'s context-must-contain-the-file rule.
-docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${BUILD_DIR}/output-win2022"
+docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${OUTPUT_DIR}"

@@ -7,10 +7,14 @@ packer {
   }
 }
 
-# DRAFT / UNVALIDATED (2026-09-25) -- built from documented Packer qemu-plugin
-# behavior, never run against real infra. iso_checksum, the WIM image_index
-# for "Server 2022 Standard (Desktop Experience)" vs Core, and winrm timing
-# all need live verification on the first real build. See build.sh.
+# Validated end-to-end 2026-09-27 (see design-guide.md 2.7.1): boot,
+# install, WinRM provisioning, capture, packaging, and a real ctlabs
+# runtime boot all confirmed working for the Core (`image_name` default
+# below) variant. The Desktop Experience `image_name` value is NOT yet
+# confirmed against the real WIM the way Core's was (originally verified
+# via `wimlib-imagex info` against the actual eval ISO) -- it's the
+# standard Microsoft naming convention, but check it the same way before
+# trusting it on a first dtop build.
 
 variable "iso_url" {
   type        = string
@@ -53,13 +57,29 @@ variable "output_dir" {
 
 variable "disk_size" {
   type    = string
-  default = "20480" # MB -- sized for Server Core (~4-6G used post-install),
-  # not Desktop Experience. qcow2 is thin-provisioned so this is a ceiling,
-  # not eager allocation -- the packaged image will be close to actual
-  # usage, not this number. Deliberately below Microsoft's officially
-  # published 32G minimum; acceptable for disposable/rebuildable lab nodes,
-  # but if the guest ever runs Windows Update, WinSxS growth could eat
-  # into this fast -- bump it if that becomes a problem.
+  default = "20480" # MB -- sized for Server Core (~4-6G used post-install).
+  # qcow2 is thin-provisioned so this is a ceiling, not eager allocation --
+  # the packaged image will be close to actual usage, not this number.
+  # Deliberately below Microsoft's officially published 32G minimum;
+  # acceptable for disposable/rebuildable lab nodes, but if the guest ever
+  # runs Windows Update, WinSxS growth could eat into this fast -- bump it
+  # if that becomes a problem. build.sh overrides this to a larger value
+  # for the Desktop Experience (`dtop`) variant, which needs meaningfully
+  # more room (GUI shell + roughly triples Core's footprint per
+  # design-guide.md).
+}
+
+variable "image_name" {
+  type    = string
+  default = "Windows Server 2022 SERVERSTANDARDCORE" # Core, confirmed
+  # against the real eval WIM via `wimlib-imagex info` (see
+  # design-guide.md 2.7.1). build.sh overrides this to
+  # "Windows Server 2022 SERVERSTANDARD" (no "CORE" suffix) for the
+  # Desktop Experience variant -- standard Microsoft naming convention,
+  # but NOT yet independently confirmed against this specific ISO's WIM
+  # the way Core's value was; verify with the same wimlib-imagex check
+  # before trusting it on a first dtop build.
+  description = "WIM /IMAGE/NAME value selecting which edition autounattend.xml installs."
 }
 
 source "qemu" "win2022" {
@@ -157,7 +177,6 @@ source "qemu" "win2022" {
   # referenced anywhere in the INF and stays excluded). Adding it back:
   # still well under the floppy cap (~501K total vs ~1.44M).
   floppy_files = [
-    "autounattend.xml",
     "files/enable-winrm.ps1",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.inf",
@@ -167,6 +186,20 @@ source "qemu" "win2022" {
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.inf",
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.sys",
   ]
+
+  # autounattend.xml is rendered from a template (floppy_content, not a
+  # static floppy_files entry) so the one line that differs between the
+  # Core and Desktop Experience variants (the WIM /IMAGE/NAME value) can be
+  # parameterized via var.image_name instead of maintaining two near-
+  # identical copies of the whole file. Confirmed the installed plugin
+  # (v1.1.3) supports floppy_content (`strings` on the binary shows
+  # `mapstructure:"floppy_content"`/`hcl:"floppy_content"`) and that it
+  # merges onto the same floppy as floppy_files above, not a separate one.
+  floppy_content = {
+    "autounattend.xml" = templatefile("${path.root}/autounattend.xml.pkrtpl.hcl", {
+      image_name = var.image_name
+    })
+  }
 
   # Second CD-ROM for virtio drivers Setup needs to see the virtio-scsi disk
   # and virtio-net NIC at all. NOT via qemuargs -- confirmed 2026-09-25 by

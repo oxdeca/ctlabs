@@ -88,7 +88,7 @@
           <InstallFrom>
             <MetaData wcm:action="add">
               <Key>/IMAGE/NAME</Key>
-              <Value>Windows Server 2022 SERVERSTANDARDCORE</Value>
+              <Value>${image_name}</Value>
             </MetaData>
           </InstallFrom>
 
