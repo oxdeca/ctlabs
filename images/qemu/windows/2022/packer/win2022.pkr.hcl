@@ -93,6 +93,10 @@ source "qemu" "win2022" {
   memory = var.memory
   disk_size       = var.disk_size
   disk_interface  = "virtio-scsi"
+  # Tried e1000 for the build VM briefly (2026-09-26) on the theory that
+  # NetKVM binding was flaky -- turned out not to be the issue at all (the
+  # real bug was the <AutoLogon> element order, see autounattend.xml).
+  # Reverted to virtio-net once a genuinely working config was confirmed.
   net_device      = "virtio-net"
 
   # Root cause of "install never starts" confirmed 2026-09-26 on two
@@ -109,6 +113,13 @@ source "qemu" "win2022" {
   winrm_username = "Administrator"
   winrm_password = var.admin_password
   winrm_timeout  = "6h" # unattended install + reboots can run long, unverified real-world duration
+  # Explicit, matching github.com/therayy/packer-windows2022-qemu's own
+  # template (their enable-winrm.ps1 comments note these "must match" the
+  # Packer side) -- both already equal Packer's defaults for a plain-HTTP
+  # WinRM setup, but being explicit guards against any environment where
+  # that default differs.
+  winrm_use_ssl  = false
+  winrm_insecure = true
   # Deliberately NOT setting winrm_use_ntlm. Tried it (=true) first on the
   # theory that Kerberos-first Negotiate can't work against a standalone
   # WORKGROUP machine -- wrong theory, reverted 2026-09-26. Proven via a
@@ -147,7 +158,7 @@ source "qemu" "win2022" {
   # still well under the floppy cap (~501K total vs ~1.44M).
   floppy_files = [
     "autounattend.xml",
-    "files/ctlabs-firstboot.ps1",
+    "files/enable-winrm.ps1",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.inf",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.sys",
@@ -170,33 +181,28 @@ source "qemu" "win2022" {
   # getDeviceAndDriveArgs, not through the qemuargs override path at all.
   cd_files = [var.virtio_drivers_dir]
 
-  # sysprep's own /shutdown switch is what was hanging (SConfig/an open
-  # interactive console blocks a graceful shutdown negotiation with nobody
-  # there to dismiss the "this app is preventing shutdown" dialog).
-  # Cross-checked against github.com/therayy/packer-windows2022-qemu
-  # (2026-09-26): their shutdown_command uses plain `shutdown /f`, which
-  # force-closes apps and skips that exact dialog entirely -- the clean fix,
-  # simpler than fighting SConfig itself. They skip sysprep altogether
-  # (fine for a single one-off VM, not for us: every ctlabs lab node cloned
-  # from this image needs a distinct machine SID). So: sysprep generalizes
-  # WITHOUT its own /shutdown, then a separate forced shutdown actually
-  # powers off, bypassing sysprep's internal graceful-shutdown path.
-  shutdown_command = "C:\\Windows\\System32\\Sysprep\\sysprep.exe /generalize /oobe /quiet & shutdown /s /t 0 /f"
+  # STAGE 1 (2026-09-26): plain forced shutdown, no sysprep, matching the
+  # exact config that finally got the whole pipeline working end-to-end
+  # (boot, install, WinRM connect, provision, shutdown, capture) after this
+  # session's long debugging saga. Deliberately validating the baseline
+  # pipeline before layering sysprep generalization back in as a separate,
+  # separately-tested step -- see TODO below.
+  shutdown_command = "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\""
   shutdown_timeout = "30m"
 }
 
 build {
   sources = ["source.qemu.win2022"]
 
+  # STAGE 1 (2026-09-26): placeholder provisioner, matching the exact
+  # config that proved the pipeline itself works. Our real payload (OpenSSH
+  # via a scheduled task, the boot-time net-agent, timezone) lives in
+  # files/ctlabs-firstboot.ps1 (untouched) -- swap this placeholder for
+  # that script as the next, separately-tested step, not bundled with this
+  # baseline confirmation run.
   provisioner "powershell" {
-    script            = "files/ctlabs-firstboot.ps1"
-    # Packer's own mechanism for exactly the class of restriction that broke
-    # Add-WindowsCapability (2026-09-26): runs the script through a local
-    # elevated task instead of directly in the plain WinRM session. Kept the
-    # manual scheduled-task wrapper around Add-WindowsCapability in the
-    # script too rather than removing it now that this is set -- untested
-    # whether elevated_user alone would have been sufficient on its own.
-    elevated_user     = "Administrator"
-    elevated_password = var.admin_password
+    inline = [
+      "Write-Output 'WinRM is up. Packer provisioning started.'",
+    ]
   }
 }

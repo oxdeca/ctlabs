@@ -93,6 +93,11 @@ echo "--- qcow2 built, checking root disk before docker build (that step still w
 du -h "${BUILD_DIR}/output-win2022/${QIMG_NAME}"
 df -h /
 
+# Docker build context is BUILD_DIR's output dir (has the qcow2), not this
+# repo dir -- stage the per-image qemu_init.sh extension alongside it so
+# the Dockerfile's COPY can see it.
+cp -a files/qemu_init.d "${BUILD_DIR}/output-win2022/"
+
 # Context = the NFS output dir (has the qcow2); -f points back at our
 # Dockerfile in the repo. Avoids an extra copy of the qcow2 onto root just
 # to satisfy `docker build .`'s context-must-contain-the-file rule.

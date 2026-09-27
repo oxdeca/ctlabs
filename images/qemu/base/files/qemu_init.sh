@@ -58,6 +58,11 @@ gen_mac() {
   echo ${premac}$(openssl rand -hex 3 | gawk '{gsub(/.{2}/,"&:")}1' | sed 's@.$@@')
 }
 
+# Linux-guest net setup. Windows images override this entirely (see
+# /root/qemu_init.d/, sourced below) since the guest-side setup is
+# completely different (PowerShell/netsh, no bash/VRF) -- keeping that out
+# of this shared script avoids piling OS-conditional branches in here as
+# more guest-specific features (AD-DC, firewall, ...) show up.
 create_net_setup_script() {
   local eth0_nic=enp0s1
   local eth0_ip=$( ip -br addr ls eth0 | awk '{print $3}' )
@@ -70,7 +75,7 @@ cat > /mnt/ctlabs_net_setup.sh << EOF
 
 hostnamectl set-hostname ${HOSTNAME}
 
-if [ ! -d "/root/.ssh" ]; then 
+if [ ! -d "/root/.ssh" ]; then
   mkdir -vp /root/.ssh
 fi
 cp /mnt/ssh/authorized_keys /root/.ssh/authorized_keys
@@ -88,49 +93,34 @@ ip route add default via ${eth1_gw}
 
 echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
 EOF
-
-  # Windows-guest twin of the script above. Harmless on Linux guests (never
-  # read there); Windows guests have no bash/VRF, so a booted-every-time
-  # scheduled task (baked into the image, see images/qemu/windows/*) runs
-  # this instead. NIC naming assumes virtio-net enumeration order matches
-  # attach order (ens0=mgmt -> "Ethernet", ens1=data -> "Ethernet 2") --
-  # unverified against a real Windows guest, check first if network config
-  # doesn't apply.
-  local dns_servers=($(awk '/^nameserver/{print $2}' /etc/resolv.conf))
-cat > /mnt/ctlabs_net_setup.ps1 << EOF
-# disable interfaces
-
-# ens3 (mgmt)
-netsh interface set interface "Ethernet" disable
-netsh interface set interface "Ethernet" enable
-netsh interface ipv4 set address name="Ethernet" static ${eth0_ip%/*} 255.255.255.0 ${eth0_gw}
-netsh interface ipv4 set subinterface "Ethernet" mtu=1460 store=persistent
-
-# ens4 (data)
-netsh interface set interface "Ethernet 2" disable
-netsh interface set interface "Ethernet 2" enable
-netsh interface ipv4 set address name="Ethernet 2" static ${eth1_ip%/*} 255.255.255.0 ${eth1_gw}
-netsh interface ipv4 set subinterface "Ethernet 2" mtu=1460 store=persistent
-
-$(i=1; for ns in "${dns_servers[@]}"; do echo "netsh interface ipv4 add dnsserver name=\"Ethernet\" address=${ns} index=${i} validate=no"; i=$((i+1)); done)
-
-if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${HOSTNAME}") {
-  Rename-Computer -NewName "${HOSTNAME}" -Force -Restart
 }
-EOF
-}
+
+# Per-image extensions (Windows net setup, AD-DC, extra firewall rules,
+# etc.) live in /root/qemu_init.d/*.sh, baked in by each image's own
+# Dockerfile via COPY. Sourced after the definitions above so an extension
+# can override any function here (e.g. redefine create_net_setup_script)
+# without forking this shared script.
+for _ext in /root/qemu_init.d/*.sh; do
+  [ -e "$_ext" ] || continue
+  source "$_ext"
+done
+unset _ext
 
 qemu_base_cmd() {
   local qemu_vga=""
   local qemu_numa=""
   local qemu_vnc=""
-  
+  local qemu_machine_extra=",graphics=off"
+
   if [ "$QEMU_VGA" != "none" ]; then
     qemu_vga="-vga $QEMU_VGA"
   fi
   if [ "$QEMU_VNC" == "true" ]; then
     qemu_vga="-vga std"
     qemu_vnc="-vnc :0"
+    # graphics=off disables the video adapter at the machine level
+    # regardless of -vga/-vnc -- drop it when VNC output is wanted.
+    qemu_machine_extra=""
   fi
 
   if [ "$QEMU_NUMA_NODES" -ge 2 ]; then
@@ -179,7 +169,14 @@ qemu_base_cmd() {
   QEMU_BASE_CMD=(
     "qemu-system-x86_64 -nodefaults -display none ${qemu_vga} ${qemu_vnc} -m ${QEMU_MEM} -serial mon:stdio"
     "-smp sockets=${QEMU_CPU_SOCKETS},dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
-    "-cpu host,hv_passthrough,kvm=on,l3-cache=on,migratable=no"
+    # hv_passthrough hung Windows guests solid right after SeaBIOS handed
+    # off to the boot disk (confirmed 2026-09-27: identical command, only
+    # this flag + graphics=off differed from a proven-working boot) --
+    # the exact Hyper-V CPUID leaf set it passes through doesn't match
+    # what Windows' boot-time HAL expects closely enough. These four are
+    # the specific enlightenments Windows actually wants; harmless no-ops
+    # for Linux guests (they only matter to a Hyper-V-aware kernel).
+    "-cpu host,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time,kvm=on,l3-cache=on,migratable=no"
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm ${qemu_numa}"
     "${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet"
     "-global ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=1"
@@ -207,6 +204,11 @@ qemu_add_nic() {
   local br="$2"
   local script="${3:-no}"
   local queues="${4:-${QEMU_CPU_CORES}}"
+  # Optional explicit MAC so callers can generate it ahead of time and
+  # reuse the same value elsewhere (e.g. a guest-side net-setup script that
+  # needs to identify the NIC by MAC) instead of only knowing it after the
+  # fact from this function's own gen_mac() call.
+  local mac="${5:-$(gen_mac)}"
   local cmd=""
 
   if [[ "$script" != "no" ]]; then
@@ -214,7 +216,7 @@ qemu_add_nic() {
   fi
 
   QEMU_NICS+=(
-    "-nic tap,ifname=${nic},br=${br}${cmd},model=virtio-net-pci,mac=$(gen_mac),queues=${queues}"
+    "-nic tap,ifname=${nic},br=${br}${cmd},model=virtio-net-pci,mac=${mac},queues=${queues}"
   )
 }
 
@@ -261,6 +263,13 @@ if [ -c /dev/kvm ]; then
   ENABLE_KVM="--enable-kvm"
 fi
 
+# Generated ahead of create_net_setup_script (not inside qemu_add_nic) so
+# a guest-side net-setup script (e.g. Windows, which must match NICs by
+# MAC rather than assumed enumeration order) can embed the same value that
+# actually ends up on the -nic line below.
+ENS0_MAC=$(gen_mac)
+ENS1_MAC=$(gen_mac)
+
 create_net_setup_script
 mkisofs -r -o /tmp/${HOSTNAME}.iso /mnt/
 
@@ -270,8 +279,8 @@ tmux new -d -s qemu
 qemu_add_disk 1 "/media/${QEMU_IMG}" "0xa" "3"
 qemu_add_disk 2 "/media/vda.qcow2"   "0xb"
 
-qemu_add_nic ens0 br0 "no"
-qemu_add_nic ens1 br1 "/root/if"
+qemu_add_nic ens0 br0 "no"          "$QEMU_CPU_CORES" "$ENS0_MAC"
+qemu_add_nic ens1 br1 "/root/if"    "$QEMU_CPU_CORES" "$ENS1_MAC"
 qemu_add_iso "/tmp/${HOSTNAME}.iso"
 
 qemu_start

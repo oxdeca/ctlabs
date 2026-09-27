@@ -1,27 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+
   <settings pass="windowsPE">
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+
+    <component name="Microsoft-Windows-International-Core-WinPE"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
       <SetupUILanguage>
         <UILanguage>en-US</UILanguage>
       </SetupUILanguage>
+
       <InputLocale>en-US</InputLocale>
       <SystemLocale>en-US</SystemLocale>
       <UILanguage>en-US</UILanguage>
       <UserLocale>en-US</UserLocale>
     </component>
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+
+    <component name="Microsoft-Windows-PnpCustomizationsWinPE"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
       <DriverPaths>
         <PathAndCredentials wcm:action="add" wcm:keyValue="1">
           <Path>A:\</Path>
         </PathAndCredentials>
       </DriverPaths>
     </component>
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+
+    <component name="Microsoft-Windows-Setup"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
       <DiskConfiguration>
         <Disk wcm:action="add">
           <DiskID>0</DiskID>
           <WillWipeDisk>true</WillWipeDisk>
+
           <CreatePartitions>
             <CreatePartition wcm:action="add">
               <Order>1</Order>
@@ -34,6 +61,7 @@
               <Extend>true</Extend>
             </CreatePartition>
           </CreatePartitions>
+
           <ModifyPartitions>
             <ModifyPartition wcm:action="add">
               <Order>1</Order>
@@ -51,8 +79,10 @@
             </ModifyPartition>
           </ModifyPartitions>
         </Disk>
+
         <WillShowUI>OnError</WillShowUI>
       </DiskConfiguration>
+
       <ImageInstall>
         <OSImage>
           <InstallFrom>
@@ -61,84 +91,94 @@
               <Value>Windows Server 2022 SERVERSTANDARDCORE</Value>
             </MetaData>
           </InstallFrom>
+
           <InstallTo>
             <DiskID>0</DiskID>
             <PartitionID>2</PartitionID>
           </InstallTo>
+
+          <WillShowUI>OnError</WillShowUI>
         </OSImage>
       </ImageInstall>
+
       <UserData>
         <AcceptEula>true</AcceptEula>
       </UserData>
     </component>
   </settings>
+
   <settings pass="specialize">
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <ComputerName>*</ComputerName>
+    <component name="Microsoft-Windows-Shell-Setup"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+      <ComputerName>PACKER-WS2022</ComputerName>
       <TimeZone>Eastern Standard Time</TimeZone>
     </component>
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
-      <RunSynchronous>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>1</Order>
-          <Description>Give local accounts a full, unfiltered token over network logons</Description>
-          <Path>reg.exe add HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v LocalAccountTokenFilterPolicy /t REG_DWORD /d 1 /f</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>2</Order>
-          <Description>Enable WinRM so Packer's communicator can connect</Description>
-          <Path>winrm.exe quickconfig -quiet</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>3</Order>
-          <Description>Allow WinRM through the firewall</Description>
-          <Path>netsh.exe advfirewall firewall add rule name="WinRM 5985" dir=in action=allow protocol=TCP localport=5985</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>4</Order>
-          <Description>Set network location to Private so WinRM/firewall rules take effect immediately</Description>
-          <Path>powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private"</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>5</Order>
-          <Description>Enable Basic auth on WinRM</Description>
-          <Path>winrm.exe set winrm/config/service/auth @{Basic="true"}</Path>
-        </RunSynchronousCommand>
-        <RunSynchronousCommand wcm:action="add">
-          <Order>6</Order>
-          <Description>Allow unencrypted WinRM traffic (build VM only)</Description>
-          <Path>winrm.exe set winrm/config/service @{AllowUnencrypted="true"}</Path>
-        </RunSynchronousCommand>
-      </RunSynchronous>
-    </component>
   </settings>
+
   <settings pass="oobeSystem">
-    <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+    <component name="Microsoft-Windows-International-Core"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+      <InputLocale>en-US</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+
+    <component name="Microsoft-Windows-Shell-Setup"
+      processorArchitecture="amd64"
+      publicKeyToken="31bf3856ad364e35"
+      language="neutral"
+      versionScope="nonSxS"
+      xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
       <OOBE>
         <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>true</HideLocalAccountScreen>
         <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
         <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
         <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
         <NetworkLocation>Work</NetworkLocation>
-        <ProtectYourPC>3</ProtectYourPC>
-        <SkipMachineOOBE>true</SkipMachineOOBE>
-        <SkipUserOOBE>true</SkipUserOOBE>
+        <ProtectYourPC>1</ProtectYourPC>
       </OOBE>
+
       <UserAccounts>
         <AdministratorPassword>
           <Value>ctlabs-BuildTime!1</Value>
           <PlainText>true</PlainText>
         </AdministratorPassword>
       </UserAccounts>
+
       <AutoLogon>
         <Enabled>true</Enabled>
-        <LogonCount>1</LogonCount>
         <Username>Administrator</Username>
         <Password>
           <Value>ctlabs-BuildTime!1</Value>
           <PlainText>true</PlainText>
         </Password>
+        <LogonCount>1</LogonCount>
       </AutoLogon>
+
+      <FirstLogonCommands>
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Description>Enable WinRM for Packer</Description>
+          <CommandLine>powershell.exe -ExecutionPolicy Bypass -File A:\enable-winrm.ps1</CommandLine>
+          <RequiresUserInput>false</RequiresUserInput>
+        </SynchronousCommand>
+      </FirstLogonCommands>
     </component>
   </settings>
 </unattend>
