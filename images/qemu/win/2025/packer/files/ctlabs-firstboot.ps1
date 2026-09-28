@@ -57,6 +57,34 @@ if (-not (Get-LocalUser -Name "root" -ErrorAction SilentlyContinue)) {
     Add-LocalGroupMember -Group "Administrators" -Member "root"
 }
 
+# --- RDP + ctlabs user, Desktop Experience only ---
+# core and dtop run this exact same script (the variant only changes
+# which image autounattend.xml installs, see win2025.pkr.hcl/build.sh) --
+# gate on the actual installation type rather than needing a separate
+# Packer variable threaded through, so this stays correctly scoped even
+# if that ever changes. HKLM...CurrentVersion's InstallationType is
+# "Server" for Desktop Experience, "Server Core" for Core -- same
+# registry value Get-ComputerInfo reads, checked directly here to skip
+# its slow full-system inventory.
+$installType = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name InstallationType).InstallationType
+if ($installType -eq "Server") {
+    # Enable Remote Desktop
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+    Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+    # ctlabs local admin user -- fixed/known password by request, matching
+    # the rest of ctlabs' lab-credential convention (e.g. the Linux
+    # images' own "root:secret"), not a secure production credential.
+    # Being in Administrators also means it automatically picks up SSH
+    # key access via administrators_authorized_keys, same as root.
+    if (-not (Get-LocalUser -Name "ctlabs" -ErrorAction SilentlyContinue)) {
+        $ctlabsPassword = ConvertTo-SecureString "secret123!" -AsPlainText -Force
+        New-LocalUser -Name "ctlabs" -Password $ctlabsPassword -PasswordNeverExpires -AccountNeverExpires | Out-Null
+        Add-LocalGroupMember -Group "Administrators" -Member "ctlabs"
+    }
+}
+
 # --- boot-time net-setup agent ---
 New-Item -ItemType Directory -Path "C:\ProgramData\ctlabs" -Force | Out-Null
 $agentPath = "C:\ProgramData\ctlabs\ctlabs-net-agent.ps1"
