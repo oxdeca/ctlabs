@@ -20,3 +20,7 @@ d12_img: base_img
 
 base_img: debian
 	cd base && sh ./build.sh
+
+clean:
+	cd win/2022 && sh ./build.sh clean
+	cd win/2025 && sh ./build.sh clean

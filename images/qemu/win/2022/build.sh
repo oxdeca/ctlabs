@@ -13,6 +13,20 @@ set -Eeuo pipefail
 # check `docker system df` and prune unused images first rather than
 # guessing (confirm nothing "ACTIVE" gets touched before doing so).
 
+# cracklib-packer (an unrelated password-dictionary tool) is symlinked at
+# /usr/sbin/packer and shadows the real HashiCorp packer at /usr/bin/packer
+# in PATH order on this box (and inside the ansible/ctrl container too) --
+# confirmed 2026-09-25, `packer version` silently ran cracklib and printed
+# "0 0" instead of erroring. Always call by absolute path here.
+PACKER=/usr/bin/packer
+
+IMG_VERS=0.1.0
+QIMG_NAME=windows-server-2022.qcow2
+BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2022-build}"
+VIRTIO_ISO="${BUILD_DIR}/virtio-win.iso"
+VIRTIO_ISO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
+VIRTIO_DIR="${BUILD_DIR}/virtio-win-extracted"
+
 # VARIANT (2026-09-27): Core (headless, small) vs Desktop Experience
 # (GUI, for running RSAT tools inside an isolated lab network without
 # punching AD's RPC/LDAP/Kerberos port set through a DNAT boundary to an
@@ -21,7 +35,23 @@ set -Eeuo pipefail
 # back) after install; the GUI shell payload isn't present in Core media
 # at all -- so this always means a full separate Packer build per variant,
 # not a smaller incremental one.
+#
+# "clean" removes both variants' Packer output directories -- needed
+# because Packer's qemu builder refuses to run if output_directory already
+# exists ("It must not exist"), and a normal successful build.sh run
+# already removes its own output dir afterward (see the end of this
+# script) so this is really only for recovering after a failed/
+# interrupted run that never reached that cleanup. Deliberately does NOT
+# touch virtio-win.iso/virtio-win-extracted/packer_cache -- those are
+# reusable across both variants and every rerun, expensive to
+# redownload/reextract, and unrelated to the "already exists" error.
 VARIANT="${1:-core}"
+if [ "${VARIANT}" == "clean" ]; then
+  echo "--- removing Packer output directories under ${BUILD_DIR} ---"
+  rm -rf "${BUILD_DIR}/output-win22-core" "${BUILD_DIR}/output-win22-dtop"
+  exit 0
+fi
+
 case "${VARIANT}" in
   core)
     IMG_NAME=ctlabs/qemu/win22/core
@@ -46,24 +76,11 @@ case "${VARIANT}" in
     OUTPUT_SUBDIR="output-win22-dtop"
     ;;
   *)
-    echo "usage: $0 [core|dtop]" >&2
+    echo "usage: $0 [core|dtop|clean]" >&2
     exit 1
     ;;
 esac
 
-# cracklib-packer (an unrelated password-dictionary tool) is symlinked at
-# /usr/sbin/packer and shadows the real HashiCorp packer at /usr/bin/packer
-# in PATH order on this box (and inside the ansible/ctrl container too) --
-# confirmed 2026-09-25, `packer version` silently ran cracklib and printed
-# "0 0" instead of erroring. Always call by absolute path here.
-PACKER=/usr/bin/packer
-
-IMG_VERS=0.1.0
-QIMG_NAME=windows-server-2022.qcow2
-BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2022-build}"
-VIRTIO_ISO="${BUILD_DIR}/virtio-win.iso"
-VIRTIO_ISO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
-VIRTIO_DIR="${BUILD_DIR}/virtio-win-extracted"
 OUTPUT_DIR="${BUILD_DIR}/${OUTPUT_SUBDIR}"
 
 # Same artifact the eval center's HTML page hands you, just Microsoft's
@@ -138,3 +155,13 @@ df -h /
 cp -a files/qemu_init.d "${OUTPUT_DIR}/"
 
 docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${OUTPUT_DIR}"
+
+# Packer's qemu builder refuses to run if output_directory already exists
+# ("It must not exist") -- the qcow2 is already baked into the podman
+# image committed above, so the loose copy here is redundant weight (up
+# to ~40G for dtop) and, left in place, breaks the next `build.sh` run
+# for this exact variant. Removed only after docker build succeeds (this
+# line is unreachable if it failed, thanks to `set -e`), so a failed
+# build's output stays around to inspect/retry against.
+echo "--- image built successfully, removing Packer output dir ${OUTPUT_DIR} ---"
+rm -rf "${OUTPUT_DIR}"
