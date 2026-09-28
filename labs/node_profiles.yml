@@ -59,6 +59,14 @@ profiles:
       image: ctlabs/qemu/win22/dtop
       env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
+    qemu/win25/core:
+      image: ctlabs/qemu/win25/core
+      env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
+      kvm: true
+    qemu/win25/dtop:
+      image: ctlabs/qemu/win25/dtop
+      env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
+      kvm: true
     db2:
       image: ctlabs/misc/db2
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
