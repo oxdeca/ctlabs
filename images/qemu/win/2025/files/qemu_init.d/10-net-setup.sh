@@ -27,6 +27,11 @@ create_net_setup_script() {
   cp /root/.ssh/authorized_keys /mnt/ssh/authorized_keys
 
 cat > /mnt/ctlabs_net_setup.ps1 << EOF
+if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${short_hostname}") {
+    Rename-Computer -NewName "${short_hostname}" -Force -Restart
+    exit
+}
+
 \$nic0 = Get-NetAdapter | Where-Object { \$_.MacAddress -eq "${mac0_win}" }
 if (\$nic0) {
     Rename-NetAdapter -InputObject \$nic0 -NewName "eth0" -ErrorAction SilentlyContinue
@@ -69,10 +74,6 @@ if (Test-Path \$keySrc) {
     New-Item -ItemType Directory -Path \$sshDir -Force -ErrorAction SilentlyContinue | Out-Null
     Copy-Item -Path \$keySrc -Destination \$authKeys -Force
     icacls.exe "\$authKeys" /inheritance:r /grant "SYSTEM:(F)" /grant "BUILTIN\Administrators:(F)" | Out-Null
-}
-
-if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${short_hostname}") {
-    Rename-Computer -NewName "${short_hostname}" -Force -Restart
 }
 EOF
 }
