@@ -1345,8 +1345,15 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         hosts: all:!rhosts
         tags : setup
         tasks:
-          - name: ctlabs.playbooks.setup.facts_dir
+          - name: ctlabs.playbooks.setup.facts_dir.linux
+            when: ansible_shell_type | default('sh') != 'powershell'
             file:
+              path : "{{ ctg_facts_dir }}"
+              state: directory
+            
+          - name: ctlabs.playbooks.setup.facts_dir.windows
+            when: ansible_shell_type | default('sh') == 'powershell'
+            win_file:
               path : "{{ ctg_facts_dir }}"
               state: directory
 

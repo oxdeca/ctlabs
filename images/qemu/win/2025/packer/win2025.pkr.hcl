@@ -67,6 +67,7 @@ source "qemu" "win2025" {
   format           = "qcow2"
   accelerator      = "kvm"
   headless         = true
+  #vnc_bind_address = "0.0.0.0"
 
   cpu_model = "host"
 
