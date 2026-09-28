@@ -7,15 +7,6 @@ packer {
   }
 }
 
-# Validated end-to-end 2026-09-27 (see design-guide.md 2.7.1): boot,
-# install, WinRM provisioning, capture, packaging, and a real ctlabs
-# runtime boot all confirmed working for the Core (`image_name` default
-# below) variant. The Desktop Experience `image_name` value is NOT yet
-# confirmed against the real WIM the way Core's was (originally verified
-# via `wimlib-imagex info` against the actual eval ISO) -- it's the
-# standard Microsoft naming convention, but check it the same way before
-# trusting it on a first dtop build.
-
 variable "iso_url" {
   type        = string
   description = "Path/URL to the Windows Server 2022 evaluation ISO (Microsoft eval center, manual download -- no stable script-fetchable URL)."
@@ -57,38 +48,16 @@ variable "output_dir" {
 
 variable "disk_size" {
   type    = string
-  default = "20480" # MB -- sized for Server Core (~4-6G used post-install).
-  # qcow2 is thin-provisioned so this is a ceiling, not eager allocation --
-  # the packaged image will be close to actual usage, not this number.
-  # Deliberately below Microsoft's officially published 32G minimum;
-  # acceptable for disposable/rebuildable lab nodes, but if the guest ever
-  # runs Windows Update, WinSxS growth could eat into this fast -- bump it
-  # if that becomes a problem. build.sh overrides this to a larger value
-  # for the Desktop Experience (`dtop`) variant, which needs meaningfully
-  # more room (GUI shell + roughly triples Core's footprint per
-  # design-guide.md).
+  default = "20480"
 }
 
 variable "image_name" {
   type    = string
-  default = "Windows Server 2022 SERVERSTANDARDCORE" # Core, confirmed
-  # against the real eval WIM via `wimlib-imagex info` (see
-  # design-guide.md 2.7.1). build.sh overrides this to
-  # "Windows Server 2022 SERVERSTANDARD" (no "CORE" suffix) for the
-  # Desktop Experience variant -- standard Microsoft naming convention,
-  # but NOT yet independently confirmed against this specific ISO's WIM
-  # the way Core's value was; verify with the same wimlib-imagex check
-  # before trusting it on a first dtop build.
+  default = "Windows Server 2022 SERVERSTANDARDCORE"
   description = "WIM /IMAGE/NAME value selecting which edition autounattend.xml installs."
 }
 
 source "qemu" "win2022" {
-  # EL9's qemu-kvm package ships the binary at /usr/libexec/qemu-kvm, not
-  # /usr/bin/qemu-system-x86_64 (that name is a Debian/Ubuntu convention) --
-  # the qemu plugin defaults to the latter and errors "executable file not
-  # found in $PATH" otherwise. Confirmed missing entirely on h3 2026-09-25
-  # (only qemu-img/qemu-guest-agent were installed) -- `dnf install qemu-kvm
-  # genisoimage` first if this errors again on a fresh host.
   qemu_binary = "/usr/libexec/qemu-kvm"
 
   iso_url          = var.iso_url
@@ -99,83 +68,24 @@ source "qemu" "win2022" {
   accelerator      = "kvm"
   headless         = true
 
-  # Default plugin CPU model is the deprecated, minimal "qemu64" (its own
-  # startup warning says as much). Confirmed 2026-09-26 on h3: the guest
-  # hung solid ~20+ min post-reboot at the boot logo, CPU pegged but real
-  # disk I/O (read_bytes/write_bytes in /proc/<pid>/io) completely flat --
-  # not slow NFS I/O, a genuine stall. Matches the other ctlabs qemu images'
-  # own convention (qemu_init.sh uses "-cpu host,...") -- exposing full host
-  # features is fine here since this is a one-shot build VM, not something
-  # needing live-migration compatibility across mismatched hosts.
   cpu_model = "host"
 
   cpus   = var.cpus
   memory = var.memory
   disk_size       = var.disk_size
   disk_interface  = "virtio-scsi"
-  # Tried e1000 for the build VM briefly (2026-09-26) on the theory that
-  # NetKVM binding was flaky -- turned out not to be the issue at all (the
-  # real bug was the <AutoLogon> element order, see autounattend.xml).
-  # Reverted to virtio-net once a genuinely working config was confirmed.
   net_device      = "virtio-net"
 
-  # Root cause of "install never starts" confirmed 2026-09-26 on two
-  # separate hosts (h3 ran 4+ hours, qcow2 grew 196K -> 324K the whole
-  # time -- never actually booted the installer): the Windows ISO shows a
-  # BIOS "Press any key to boot from CD or DVD..." prompt, and with no
-  # boot_command at all the VM let that prompt time out and fell through to
-  # the empty hard disk instead, spinning forever with no OS to boot. This
-  # sends Enter early enough to catch it.
   boot_wait    = "5s"
   boot_command = ["<enter>"]
 
   communicator   = "winrm"
   winrm_username = "Administrator"
   winrm_password = var.admin_password
-  winrm_timeout  = "6h" # unattended install + reboots can run long, unverified real-world duration
-  # Explicit, matching github.com/therayy/packer-windows2022-qemu's own
-  # template (their enable-winrm.ps1 comments note these "must match" the
-  # Packer side) -- both already equal Packer's defaults for a plain-HTTP
-  # WinRM setup, but being explicit guards against any environment where
-  # that default differs.
+  winrm_timeout  = "6h"
   winrm_use_ssl  = false
   winrm_insecure = true
-  # Deliberately NOT setting winrm_use_ntlm. Tried it (=true) first on the
-  # theory that Kerberos-first Negotiate can't work against a standalone
-  # WORKGROUP machine -- wrong theory, reverted 2026-09-26. Proven via a
-  # live interactive PowerShell session on a stuck build: the WinRM service
-  # only advertises "WWW-Authenticate: Negotiate" (confirmed with `winrm get
-  # winrm/config/service/auth`: Negotiate=true, Kerberos=true, Basic=false --
-  # no separate NTLM scheme), and `Test-WSMan -Authentication Negotiate`
-  # with the real Administrator credentials succeeded cleanly. Firewall/
-  # network-profile was also ruled out (`Get-NetFirewallRule` showed our own
-  # rule already Enabled/Profile=Any/Allow). winrm_use_ntlm=true forces
-  # Packer's raw-NTLM client transport, which a server that only advertises
-  # "Negotiate" (SPNEGO-wrapped) appears to silently reject -- Packer just
-  # retries forever rather than surfacing an auth error. Default (unset)
-  # uses the SPNEGO-wrapped path that the live test just proved works.
 
-  # WinPE has no inbox virtio-scsi/virtio-net drivers, so without these
-  # Setup can't even see disk 0 to partition it -- confirmed 2026-09-26,
-  # this is the actual cause of "Windows could not apply the unattend
-  # answer file's <DiskConfiguration> settings" (and would separately have
-  # broken WinRM/networking post-install too, via the missing NIC driver).
-  # floppy_files flattens everything into A:\ root (confirmed via Packer's
-  # own "Copying files flatly from floppy_files" log line) -- vioscsi's and
-  # NetKVM's files don't collide by name, so DriverPaths below just points
-  # at the floppy root.
-  #
-  # Packer's floppy is a real, size-capped FAT12 image (~1.44M) -- confirmed
-  # 2026-09-26 via "FAT FULL" when the whole NetKVM/2k22/amd64 dir (19M,
-  # mostly .pdb debug symbols and coinstaller .exe/.pdb not needed for
-  # driver binding) was added wholesale. Trimmed to .cat/.inf/.sys per
-  # driver, but that dropped the network adapter entirely (confirmed live:
-  # install completed fine, but Server Core's SConfig showed no NIC at
-  # all) -- netkvm.inf's own [Install.NT] CopyFiles directive requires
-  # netkvmp.exe (a real install-time dependency, not just a bonus config
-  # tool like the much larger netkvmco.exe, which genuinely isn't
-  # referenced anywhere in the INF and stays excluded). Adding it back:
-  # still well under the floppy cap (~501K total vs ~1.44M).
   floppy_files = [
     "files/enable-winrm.ps1",
     "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
@@ -187,39 +97,14 @@ source "qemu" "win2022" {
     "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.sys",
   ]
 
-  # autounattend.xml is rendered from a template (floppy_content, not a
-  # static floppy_files entry) so the one line that differs between the
-  # Core and Desktop Experience variants (the WIM /IMAGE/NAME value) can be
-  # parameterized via var.image_name instead of maintaining two near-
-  # identical copies of the whole file. Confirmed the installed plugin
-  # (v1.1.3) supports floppy_content (`strings` on the binary shows
-  # `mapstructure:"floppy_content"`/`hcl:"floppy_content"`) and that it
-  # merges onto the same floppy as floppy_files above, not a separate one.
   floppy_content = {
     "autounattend.xml" = templatefile("${path.root}/autounattend.xml.pkrtpl.hcl", {
       image_name = var.image_name
     })
   }
 
-  # Second CD-ROM for virtio drivers Setup needs to see the virtio-scsi disk
-  # and virtio-net NIC at all. NOT via qemuargs -- confirmed 2026-09-25 by
-  # reading the installed v1.1.3 plugin's source (step_run.go): any qemuargs
-  # entry for a key (e.g. "-drive") REPLACES that key's entire default value
-  # wholesale, not appends. A raw ["-drive", "file=...,media=cdrom"] entry
-  # here silently ate BOTH the primary disk's drive AND the install ISO's
-  # cdrom drive (confirmed via PACKER_LOG=1: "Property 'scsi-hd.drive' can't
-  # find value 'drive0'" -- the disk device referenced a drive that no
-  # longer existed). cd_files is the actual supported mechanism: it's
-  # merged into state("cd_path") -> cdPaths alongside the install ISO in
-  # getDeviceAndDriveArgs, not through the qemuargs override path at all.
   cd_files = [var.virtio_drivers_dir]
 
-  # STAGE 1 (2026-09-26): plain forced shutdown, no sysprep, matching the
-  # exact config that finally got the whole pipeline working end-to-end
-  # (boot, install, WinRM connect, provision, shutdown, capture) after this
-  # session's long debugging saga. Deliberately validating the baseline
-  # pipeline before layering sysprep generalization back in as a separate,
-  # separately-tested step -- see TODO below.
   shutdown_command = "shutdown /s /t 10 /f /d p:4:1 /c \"Packer Shutdown\""
   shutdown_timeout = "30m"
 }
@@ -227,13 +112,6 @@ source "qemu" "win2022" {
 build {
   sources = ["source.qemu.win2022"]
 
-  # STAGE 2 (2026-09-27): real payload -- OpenSSH via a SYSTEM-context
-  # scheduled task, the boot-time ctlabs-net-agent registration (which is
-  # what actually runs qemu_init.sh's generated ctlabs_net_setup.ps1 every
-  # boot), and timezone. Confirmed missing entirely from the image that
-  # first booted successfully 2026-09-27 -- that build only ran the Stage 1
-  # placeholder below, so neither OpenSSH nor the net-agent task were ever
-  # installed. This is the fix.
   provisioner "powershell" {
     script = "files/ctlabs-firstboot.ps1"
   }

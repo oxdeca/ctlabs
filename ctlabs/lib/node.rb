@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers, :os
   attr_writer :nics
   attr_accessor :is_running
 
@@ -64,6 +64,12 @@ class Node
     # Fallback 3: Default to root for local containers
     @user = (parsed_user && !parsed_user.empty?) ? parsed_user : 'root'
     # ------------------------------------------
+
+    parsed_os = args['os'] || args[:os]
+    if (parsed_os.nil? || parsed_os.empty?) && @defaults && @defaults[@type] && @defaults[@type][@kind]
+      parsed_os = @defaults[@type][@kind]['os']
+    end
+    @os = (parsed_os && !parsed_os.empty?) ? parsed_os : 'linux'
 
     dcaps       = [ 'NET_ADMIN', 'NET_RAW', 'SYS_ADMIN', 'AUDIT_WRITE', 'AUDIT_CONTROL' ]
     dvols       = [] # [ '/sys/fs/cgroup:/sys/fs/cgroup:ro' ]
