@@ -108,7 +108,7 @@ profiles:
                 color-depth : 24
             - name: dc1-rdp
               protocol: rdp
-                params:
+              params:
                 hostname      : 192.168.10.14
                 port          : 3389
                 ignore-cert   : true
