@@ -90,6 +90,47 @@ profiles:
       base    : "dc=ad,dc=ctlabs,dc=internal"
 
   # ----------------------------------------------------------------------------
+  # ctlabs_guacamole
+  # ----------------------------------------------------------------------------
+  guacamole:
+    role: guacamole
+    defaults:
+      users:
+        - username: ctlabs
+          password: secret123!
+          connections:
+            - name: dc1-vnc
+              protocol: vnc
+              params:
+                hostname    : 192.168.10.114
+                port        : 5900
+                ignore-cert : true
+                color-depth : 24
+            - name: dc1-rdp
+              protocol: rdp
+                params:
+                hostname      : 192.168.10.14
+                port          : 3389
+                ignore-cert   : true
+                color-depth   : 24
+                resize-method : display-update
+            - name: dc2-vnc
+              protocol: vnc
+              params:
+                hostname    : 192.168.20.114
+                port        : 5900
+                ignore-cert : true
+                color-depth : 24
+            - name: dc2-rdp
+              protocol: rdp
+              params:
+                hostname      : 192.168.20.14
+                port          : 3389
+                ignore-cert   : true
+                color-depth   : 24
+                resize-method : display-update
+
+  # ----------------------------------------------------------------------------
   # ctlabs_alloy
   # ----------------------------------------------------------------------------
   alloy:

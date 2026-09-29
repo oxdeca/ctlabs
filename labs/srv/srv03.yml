@@ -32,49 +32,6 @@ topology:
           play:
             book: ctlabs.yml
             tags: [up, setup, ca, vault, bind, httpd, guacamole]
-            setup:
-              guacamole:
-                hosts: [gua1]
-                users:
-                  - username: ctlabs
-                    password: secret123!
-                    connections:
-                      - name: dc1-vnc
-                        protocol: vnc
-                        params:
-                          hostname    : 192.168.10.114
-                          port        : 5900
-                          ignore-cert : true
-                          color-depth : 24
-                          width       : 1920
-                          height      : 1200
-                      - name: dc1-rdp
-                        protocol: rdp
-                        params:
-                          hostname    : 192.168.10.14
-                          port        : 3389
-                          ignore-cert : true
-                          color-depth : 24
-                          width       : 1920
-                          height      : 1200
-                      - name: dc2-vnc
-                        protocol: vnc
-                        params:
-                          hostname    : 192.168.20.114
-                          port        : 5900
-                          ignore-cert : true
-                          color-depth : 24
-                          width       : 1920
-                          height      : 1200
-                      - name: dc2-rdp
-                        protocol: rdp
-                        params:
-                          hostname    : 192.168.20.14
-                          port        : 3389
-                          ignore-cert : true
-                          color-depth : 24
-                          width       : 1920
-                          height      : 1200
           dnat:
           - [ 9988, 8200 ]
         sw0:
