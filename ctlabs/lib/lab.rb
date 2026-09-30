@@ -19,9 +19,24 @@ class Lab
 
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
-  SETUP_PROFILES     = '/root/ctlabs/labs/setup_profiles.yml'
-  ROLE_PROFILES      = '/root/ctlabs/labs/role_profiles.yml'
-  TERRAFORM_PROFILES = '/root/ctlabs/labs/terraform_profiles.yml'
+
+  # Box-local overrides live under /root/.ctlabs/labs/<file> and, when present,
+  # shadow the repo-shipped default entirely (no merging - see design-guide.md).
+  # Resolved fresh on every call (NOT cached into a constant) so the long-lived
+  # webgui process picks up a box-local file dropped in after boot, same as the
+  # ~/.ctlabs-server/auth override (base_controller.rb) - a frozen constant would
+  # only re-check at the next process start (CLI runs are fine either way since
+  # each invocation is a fresh process, but the puma server is not).
+  def self.profile_override_path(basename)
+    override = "/root/.ctlabs/labs/#{basename}"
+    File.exist?(override) ? override : "/root/ctlabs/labs/#{basename}"
+  end
+
+  def self.setup_profiles_path;     profile_override_path('setup_profiles.yml');     end
+  def self.role_profiles_path;      profile_override_path('role_profiles.yml');      end
+  def self.terraform_profiles_path; profile_override_path('terraform_profiles.yml'); end
+  def self.global_profiles_path;    profile_override_path('node_profiles.yml');      end
+
   ANSIBLE_DIR        = '/root/ctlabs-ansible'.freeze
   PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
   PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
@@ -74,7 +89,8 @@ class Lab
     @ephemeral  = @cfg['ephemeral'] || true
     @desc       = @cfg['desc']      || ''
 
-    global_data = File.file?(::GLOBAL_PROFILES) ? YAML.load_file(::GLOBAL_PROFILES) : {}
+    global_profiles_path = Lab.global_profiles_path
+    global_data = File.file?(global_profiles_path) ? YAML.load_file(global_profiles_path) : {}
     global_profiles = global_data['profiles'] || global_data['defaults'] || {}
 
     local_profiles  = @cfg['profiles'] || @cfg['defaults'] || {}
@@ -1259,10 +1275,12 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
 
   def build_play_setup(play_cfg)
-    setup_profiles = File.file?(SETUP_PROFILES) ?
-      (YAML.load_file(SETUP_PROFILES)['profiles'] || {}) : {}
-    role_profiles  = File.file?(ROLE_PROFILES) ?
-      (YAML.load_file(ROLE_PROFILES)['profiles'] || {}) : {}
+    setup_profiles_path = Lab.setup_profiles_path
+    role_profiles_path  = Lab.role_profiles_path
+    setup_profiles = File.file?(setup_profiles_path) ?
+      (YAML.load_file(setup_profiles_path)['profiles'] || {}) : {}
+    role_profiles  = File.file?(role_profiles_path) ?
+      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
     result    = {}
@@ -1326,8 +1344,9 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   end
 
   def generate_setup_yml(play_cfg)
-    profiles  = File.file?(ROLE_PROFILES) ?
-      (YAML.load_file(ROLE_PROFILES)['profiles'] || {}) : {}
+    role_profiles_path = Lab.role_profiles_path
+    profiles  = File.file?(role_profiles_path) ?
+      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
@@ -1409,8 +1428,9 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   end
 
   def generate_ctlabs_yml(play_cfg)
-    profiles = File.file?(ROLE_PROFILES) ?
-      (YAML.load_file(ROLE_PROFILES)['profiles'] || {}) : {}
+    role_profiles_path = Lab.role_profiles_path
+    profiles = File.file?(role_profiles_path) ?
+      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)

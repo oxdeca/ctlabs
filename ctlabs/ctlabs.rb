@@ -77,7 +77,6 @@ end.parse!
 
 LABS_DIR        = File.expand_path('../labs', __dir__)
 LOG_DIR         = '/var/log/ctlabs'
-GLOBAL_PROFILES = File.expand_path('../labs/node_profiles.yml', __dir__)
 
 # Handle --status first
 if options[:status]

@@ -74,7 +74,6 @@ INVENTORY       = '/srv/ctlabs-server/public/inventory.ini'
 UPLOAD_DIR      = '/srv/ctlabs-server/uploads'
 SCRIPT_DIR      = File.dirname(File.expand_path(__FILE__))
 LABS_DIR        = "#{SCRIPT_DIR}/../labs"
-GLOBAL_PROFILES = "#{SCRIPT_DIR}/../labs/node_profiles.yml"
 CTLABS_SCRIPT   = './ctlabs.rb'
 LOCK_DIR        = '/var/run/ctlabs'
 LOCK_FILE       = "#{LOCK_DIR}/running_lab"

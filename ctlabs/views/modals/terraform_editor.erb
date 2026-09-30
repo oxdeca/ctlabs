@@ -118,7 +118,7 @@
 
       <div id="TfAuthProfiles" class="tf-tab" style="display:none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Global file: <code>labs/terraform_profiles.yml</code> — reusable named GCP auth configs, selected per-lab via Auth Method &rarr; Named Profile. Applied on next terraform run / terminal open.
+          <i class="fas fa-info-circle"></i> Global file: <code><%= Lab.terraform_profiles_path %></code><% if Lab.terraform_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — reusable named GCP auth configs, selected per-lab via Auth Method &rarr; Named Profile. Applied on next terraform run / terminal open.
         </div>
         <textarea id="editor-TfAuthProfiles"></textarea>
       </div>

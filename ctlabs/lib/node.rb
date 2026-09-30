@@ -274,7 +274,10 @@ class Node
     return if full_yaml.dig(profile_key, type, profile)
 
     # 2. Check the global profiles dictionary
-    global_profiles_path = defined?(::GLOBAL_PROFILES) ? ::GLOBAL_PROFILES : File.expand_path('../../../labs/node_profiles.yml', __FILE__)
+    global_profiles_path = defined?(Lab) ? Lab.global_profiles_path :
+      (File.exist?('/root/.ctlabs/labs/node_profiles.yml') ?
+        '/root/.ctlabs/labs/node_profiles.yml' :
+        File.expand_path('../../../labs/node_profiles.yml', __FILE__))
     if File.exist?(global_profiles_path)
       global_yaml = YAML.load_file(global_profiles_path) || {}
       global_key = global_yaml.key?('profiles') ? 'profiles' : 'defaults'
