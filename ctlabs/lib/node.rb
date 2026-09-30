@@ -90,6 +90,7 @@ class Node
         @ports = @ports                    || kind_defs['ports'] || 4
         @devs  = kind_defs['devs']         || @devs
         @env   = kind_defs['env'] + @env   if kind_defs['env']
+        @vols  = kind_defs['vols'] + @vols if kind_defs['vols']
         @kvm   = kind_defs['kvm']          if @kvm.nil?
         @priv  = kind_defs['priv']         if @priv.nil?
       when 'gateway'

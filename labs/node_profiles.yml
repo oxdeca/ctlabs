@@ -9,6 +9,7 @@ profiles:
     linux:
       image: ctlabs/c9/ctrl
       caps: [IPC_LOCK]
+      vols: ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/:/root/ctlabs-ai/:Z,rw']
   switch:
     ovs:
       image: ctlabs/c9/ovs
