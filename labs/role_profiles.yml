@@ -390,3 +390,8 @@ profiles:
     role : ctlabs_chrony
     tags : [chrony]
     hosts: [h3,h4]
+
+  argoapp:
+    role : ctlabs_argoapp
+    tags : [argoapp]
+    hosts: [rke21]
