@@ -785,7 +785,6 @@ profiles:
     role: argoapp
     defaults:
       namespace: argo
-      kubeconfig: /etc/rancher/rke2/rke2.yaml
       interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
       applications:
         - name: cert-manager
@@ -818,3 +817,6 @@ profiles:
               - ServerSideApply=true
           destination:
             namespace: external-secrets
+
+    rke21:
+      kubeconfig: /etc/rancher/rke2/rke2.yaml
