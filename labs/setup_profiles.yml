@@ -408,10 +408,18 @@ profiles:
             global:
               domain: argocd.ctlabs.internal
             configs:
+              cm:
+                accounts.ctlabs      : login
+                accounts.ctlabs.enabled: "true"
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+                extra:
+                  accounts.ctlabs.password: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
                 server.insecure: true
+              rbac:
+                policy.csv: |
+                  g, ctlabs, role:admin
             server:
               ingress:
                 enabled         : false
@@ -470,10 +478,18 @@ profiles:
             global:
               domain: argocd.ctlabs.internal
             configs:
+              cm:
+                accounts.ctlabs      : login
+                accounts.ctlabs.enabled: "true"
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+                extra:
+                  accounts.ctlabs.password: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
                 server.insecure: true
+              rbac:
+                policy.csv: |
+                  g, ctlabs, role:admin
             server:
               ingress:
                 enabled         : true
@@ -530,10 +546,18 @@ profiles:
             global:
               domain: argocd.ctlabs.internal
             configs:
+              cm:
+                accounts.ctlabs      : login
+                accounts.ctlabs.enabled: "true"
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+                extra:
+                  accounts.ctlabs.password: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
                 server.insecure: true
+              rbac:
+                policy.csv: |
+                  g, ctlabs, role:admin
             server:
               ingress:
                 enabled         : false
@@ -599,10 +623,18 @@ profiles:
             global:
               domain: argocd.ctlabs.internal
             configs:
+              cm:
+                accounts.ctlabs      : login
+                accounts.ctlabs.enabled: "true"
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+                extra:
+                  accounts.ctlabs.password: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
                 server.insecure: true
+              rbac:
+                policy.csv: |
+                  g, ctlabs, role:admin
             server:
               ingress:
                 enabled         : false
@@ -679,10 +711,18 @@ profiles:
             global:
               domain: argocd.ctlabs.internal
             configs:
+              cm:
+                accounts.ctlabs      : login
+                accounts.ctlabs.enabled: "true"
               secret:
                 argocdServerAdminPassword: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
+                extra:
+                  accounts.ctlabs.password: $2a$10$su0tAsqr1mOHxP4EoT7ExOZLSGw4C9GiG30GHaLVCA1ceW6CXl4r2
               params:
                 server.insecure: true
+              rbac:
+                policy.csv: |
+                  g, ctlabs, role:admin
             server:
               ingress:
                 enabled         : false
