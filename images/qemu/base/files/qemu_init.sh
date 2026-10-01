@@ -228,7 +228,11 @@ ENS0_MAC=$(gen_mac)
 ENS1_MAC=$(gen_mac)
 
 create_net_setup_script
-mkisofs -r -J -o /tmp/${HOSTNAME}.iso /mnt/
+# -x qemu-base: /mnt/qemu-base is the read-only bind mount of the shared base
+# qcow2 (labs/node_profiles.yml vols); it must never be pulled into this ISO
+# alongside the net-setup files, or a base image >4GiB-1 (seen with Windows)
+# makes genisoimage abort.
+mkisofs -r -J -x qemu-base -o /tmp/${HOSTNAME}.iso /mnt/
 
 tmux new -d -s qemu
 
