@@ -212,6 +212,14 @@ if [ -n "${DISK1}" ]; then
   qemu-img create -f qcow2 ${DISK1} 500M
 fi
 
+# Root disk is a thin per-container overlay backed by the shared, read-only
+# base image mounted at /mnt/qemu-base/ (see labs/node_profiles.yml's `vols:`
+# for qemu/* profiles). Only created once per container lifetime - a
+# qemu.service restart within the same container must not wipe guest state.
+if [ ! -f "/media/${QEMU_IMG}" ]; then
+  qemu-img create -f qcow2 -b "/mnt/qemu-base/${QEMU_IMG}" -F qcow2 "/media/${QEMU_IMG}"
+fi
+
 if [ -c /dev/kvm ]; then
   ENABLE_KVM="--enable-kvm"
 fi

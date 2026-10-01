@@ -3,6 +3,7 @@
 IMG_NAME=ctlabs/qemu/d12
 IMG_VERS=0.4.4
 
+BASE_IMAGES_DIR=${BASE_IMAGES_DIR:-/root/ctlabs-images/qemu-base}
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2
 QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/${QIMG_NAME}
@@ -50,4 +51,6 @@ create_qemu_img() {
 
 create_qemu_img
 docker build --rm -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest .
-rm ${QIMG_NAME}
+
+mkdir -p "${BASE_IMAGES_DIR}/d12"
+mv ${QIMG_NAME} "${BASE_IMAGES_DIR}/d12/"

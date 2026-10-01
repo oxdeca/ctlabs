@@ -3,6 +3,7 @@
 IMG_NAME=ctlabs/qemu/c9
 IMG_VERS=0.1.1
 
+BASE_IMAGES_DIR=${BASE_IMAGES_DIR:-/root/ctlabs-images/qemu-base}
 MNTDIR=/media/ctlabs_c9_qemu
 QIMG_NAME=CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2
 QIMG_URL=https://cloud.centos.org/centos/9-stream/x86_64/images/${QIMG_NAME}
@@ -50,4 +51,6 @@ create_qemu_img() {
 
 create_qemu_img
 docker build --rm -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest .
-rm ${QIMG_NAME}
+
+mkdir -p "${BASE_IMAGES_DIR}/c9"
+mv ${QIMG_NAME} "${BASE_IMAGES_DIR}/c9/"

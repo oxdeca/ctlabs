@@ -5,6 +5,7 @@ PACKER=/usr/bin/packer
 
 IMG_VERS=0.1.0
 QIMG_NAME=windows-server-2022.qcow2
+BASE_IMAGES_DIR="${BASE_IMAGES_DIR:-/root/ctlabs-images/qemu-base}"
 BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2022-build}"
 VIRTIO_ISO="${BUILD_DIR}/virtio-win.iso"
 VIRTIO_ISO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
@@ -80,6 +81,9 @@ build_qcow2
 echo "--- qcow2 built (${VARIANT}), checking root disk before docker build (that step still writes to / regardless of BUILD_DIR) ---"
 du -h "${OUTPUT_DIR}/${QIMG_NAME}"
 df -h /
+
+mkdir -p "${BASE_IMAGES_DIR}/win22-${VARIANT}"
+mv "${OUTPUT_DIR}/${QIMG_NAME}" "${BASE_IMAGES_DIR}/win22-${VARIANT}/"
 
 cp -a files/qemu_init.d "${OUTPUT_DIR}/"
 
