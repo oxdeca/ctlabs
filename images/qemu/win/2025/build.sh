@@ -5,7 +5,7 @@ PACKER=/usr/bin/packer
 
 IMG_VERS=0.1.0
 QIMG_NAME=windows-server-2025.qcow2
-BASE_IMAGES_DIR="${BASE_IMAGES_DIR:-/root/ctlabs-images/qemu-base}"
+BASE_IMAGES_DIR="${BASE_IMAGES_DIR:-/media/ctlabs-images/qemu}"
 BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2025-build}"
 VIRTIO_ISO="${BUILD_DIR}/virtio-win.iso"
 VIRTIO_ISO_URL=https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso

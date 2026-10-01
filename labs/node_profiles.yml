@@ -48,36 +48,36 @@ profiles:
       image: ctlabs/qemu/d12
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
-      vols: ['/root/ctlabs-images/qemu-base/d12/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/d12/:/mnt/qemu-base/:ro']
     qemu/c9:
       image: ctlabs/qemu/c9
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
-      vols: ['/root/ctlabs-images/qemu-base/c9/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/c9/:/mnt/qemu-base/:ro']
     qemu/win22/core:
       image: ctlabs/qemu/win22/core
       env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
-      vols: ['/root/ctlabs-images/qemu-base/win22-core/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/win22-core/:/mnt/qemu-base/:ro']
     qemu/win22/dtop:
       image: ctlabs/qemu/win22/dtop
       env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
-      vols: ['/root/ctlabs-images/qemu-base/win22-dtop/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/win22-dtop/:/mnt/qemu-base/:ro']
     qemu/win25/core:
       image: ctlabs/qemu/win25/core
       env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
-      vols: ['/root/ctlabs-images/qemu-base/win25-core/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/win25-core/:/mnt/qemu-base/:ro']
     qemu/win25/dtop:
       image: ctlabs/qemu/win25/dtop
       env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
-      vols: ['/root/ctlabs-images/qemu-base/win25-dtop/:/mnt/qemu-base/:ro']
+      vols: ['/media/ctlabs-images/qemu/win25-dtop/:/mnt/qemu-base/:ro']
     db2:
       image: ctlabs/misc/db2
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]

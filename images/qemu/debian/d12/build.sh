@@ -3,7 +3,7 @@
 IMG_NAME=ctlabs/qemu/d12
 IMG_VERS=0.4.4
 
-BASE_IMAGES_DIR=${BASE_IMAGES_DIR:-/root/ctlabs-images/qemu-base}
+BASE_IMAGES_DIR=${BASE_IMAGES_DIR:-/media/ctlabs-images/qemu}
 MNTDIR=/media/ctlabs_d12_qemu
 QIMG_NAME=debian-12-nocloud-amd64.qcow2
 QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/${QIMG_NAME}
