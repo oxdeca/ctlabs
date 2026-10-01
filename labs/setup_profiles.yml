@@ -13,7 +13,6 @@ profiles:
   # ctlabs_vault
   # ----------------------------------------------------------------------------
   vault:
-    role: vault
     defaults:
       install_type: server
     
@@ -21,7 +20,6 @@ profiles:
   # ctlabs_bind
   # ----------------------------------------------------------------------------
   bind:
-    role: bind
     ns1:
       type  : master
       zones :
@@ -47,7 +45,6 @@ profiles:
   # ctlabs_smbadc
   # ----------------------------------------------------------------------------
   smbadc:
-    role: smbadc
     dc1:
       role  : master
       domain: "ad.ctlabs.internal"
@@ -60,7 +57,6 @@ profiles:
   # ctlabs_slapd
   # ----------------------------------------------------------------------------
   slapd:
-    role: slapd
     slapd1:
       dbs:
         - type       : ldap
@@ -82,7 +78,6 @@ profiles:
   # ctlabs_sssd
   # ----------------------------------------------------------------------------
   sssd:
-    role: sssd
     defaults:
       backend : ldap
       domain  : ad.ctlabs.internal
@@ -93,7 +88,6 @@ profiles:
   # ctlabs_guacamole
   # ----------------------------------------------------------------------------
   guacamole:
-    role: guacamole
     defaults:
       users:
         - username: ctlabs
@@ -134,7 +128,6 @@ profiles:
   # ctlabs_alloy
   # ----------------------------------------------------------------------------
   alloy:
-    role: alloy
     defaults:
       loki:
         url: "https://loki.ctlabs.internal:3100/loki/api/v1/push"
@@ -144,7 +137,6 @@ profiles:
   # ctlabs_node_exporter
   # ----------------------------------------------------------------------------
   node_exporter:
-    role: node_exporter
     defaults:
       mtls: true
 
@@ -152,7 +144,6 @@ profiles:
   # ctlabs_blackbox_exporter
   # ----------------------------------------------------------------------------
   blackbox_exporter:
-    role: blackbox_exporter
     defaults:
       mtls: true
 
@@ -166,7 +157,6 @@ profiles:
   # ctlabs_prometheus
   # ----------------------------------------------------------------------------
   prometheus:
-    role: prometheus
     defaults:
       mode  : agent
       config:
@@ -180,7 +170,6 @@ profiles:
   # ctlabs_openvpn
   # ----------------------------------------------------------------------------
   openvpn:
-    role: openvpn
     ro1:
       type     : server
       server_ip: "10.8.15.1"
@@ -201,7 +190,6 @@ profiles:
   # ctlabs_rundeck
   # ----------------------------------------------------------------------------
   rundeck:
-    role: rundeck
     ansible:
       server_url   : "https://{{ CTLABS_HOST }}:8192"
       auth_provider: ad
@@ -216,7 +204,6 @@ profiles:
   # ctlabs_kafka
   # ----------------------------------------------------------------------------
   kafka:
-    role: kafka
     kafka1: &kafka_default
       server_address: "kafka1.ctlabs.internal:9092"
       auth_method   : SASL_PLAINTEXT
@@ -228,7 +215,6 @@ profiles:
   # ctlabs_k3s
   # ----------------------------------------------------------------------------
   k3s:
-    role: k3s
     k3s1:
       role: server
       servicelb:
@@ -267,7 +253,6 @@ profiles:
   # ctlabs_rke2
   # ----------------------------------------------------------------------------
   rke2:
-    role: rke2
     rke21:
       role: server
       servicelb:
@@ -307,7 +292,6 @@ profiles:
   # ctlabs_k8s
   # ----------------------------------------------------------------------------
   k8s:
-    role: k8s
     k8s1:
       role: master
       storage: local                    # cluster-wide engine (master only): local | longhorn | none
@@ -336,7 +320,6 @@ profiles:
   # ctlabs_kind
   # ----------------------------------------------------------------------------
   kind:
-    role: kind
     kind1:
       plane  : single
       ingress:
@@ -447,7 +430,6 @@ profiles:
   # ctlabs_minikube
   # ----------------------------------------------------------------------------
   minikube:
-    role  : minikube
     mkube1:
       repos:
         - name    : traefik
@@ -518,7 +500,6 @@ profiles:
   # ctlabs_helm
   # ----------------------------------------------------------------------------
   helm:
-    role: helm
     defaults:
       repos:
         - name    : argo
@@ -750,7 +731,6 @@ profiles:
   # ctlabs_foreman
   # ----------------------------------------------------------------------------
   foreman:
-    role: foreman
     fm1:
       role    : server
       scenario: katello
@@ -765,7 +745,6 @@ profiles:
   # ctlabs_wazuh
   # ----------------------------------------------------------------------------
   wazuh:
-    role: wazuh
     wazuh1:
       role: manager
     wazuh2:
@@ -776,7 +755,6 @@ profiles:
   # ctlabs_opendkim
   # ----------------------------------------------------------------------------
   opendkim:
-    role: opendkim
     mail1:
       domain  : ctlabs.internal
       selector: mail
@@ -788,7 +766,6 @@ profiles:
   # ctlabs_chrony
   # ----------------------------------------------------------------------------
   chrony:
-    role: chrony
     h3:
       role   : server
       sources: [ntp1.torrix.ca, ntp2.torrix.ca, ntp3.torrix.ca]
@@ -822,7 +799,6 @@ profiles:
   # ctlabs_argoapp
   # ----------------------------------------------------------------------------
   argoapp:
-    role: argoapp
     defaults:
       namespace: argo
       interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
