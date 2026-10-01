@@ -82,12 +82,16 @@ echo "--- qcow2 built (${VARIANT}), checking root disk before docker build (that
 du -h "${OUTPUT_DIR}/${QIMG_NAME}"
 df -h /
 
+cp -a files/qemu_init.d "${OUTPUT_DIR}/"
+
+# qcow2 must still be present in ${OUTPUT_DIR} here - the Dockerfile COPYs it
+# in to make the image self-contained (embedded/default mode, see
+# design-guide.md §2.7). Archiving to BASE_IMAGES_DIR happens AFTER the build.
+docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${OUTPUT_DIR}"
+
+echo "--- image built successfully, archiving base qcow2 for optional external/shared-base mode ---"
 mkdir -p "${BASE_IMAGES_DIR}/win25-${VARIANT}"
 mv "${OUTPUT_DIR}/${QIMG_NAME}" "${BASE_IMAGES_DIR}/win25-${VARIANT}/"
 
-cp -a files/qemu_init.d "${OUTPUT_DIR}/"
-
-docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${OUTPUT_DIR}"
-
-echo "--- image built successfully, removing Packer output dir ${OUTPUT_DIR} ---"
+echo "--- removing Packer output dir ${OUTPUT_DIR} ---"
 rm -rf "${OUTPUT_DIR}"

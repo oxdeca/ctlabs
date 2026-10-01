@@ -212,10 +212,16 @@ if [ -n "${DISK1}" ]; then
   qemu-img create -f qcow2 ${DISK1} 500M
 fi
 
-# Root disk is a thin per-container overlay backed by the shared, read-only
-# base image mounted at /mnt/qemu-base/ (see labs/node_profiles.yml's `vols:`
-# for qemu/* profiles). Only created once per container lifetime - a
-# qemu.service restart within the same container must not wipe guest state.
+# Root disk supports two deployment modes, auto-detected by file presence
+# (see design-guide.md §2.7):
+#   1) Embedded (default): the image's Dockerfile COPYs the base qcow2
+#      straight to /media/${QEMU_IMG} - it's used as-is below, no overlay.
+#   2) External/shared-base (opt-in, via a box-local node_profiles.yml
+#      override adding `vols:` for this profile): nothing baked in, so this
+#      branch creates a thin per-container qcow2 overlay backed by the
+#      shared, read-only base bind-mounted at /mnt/qemu-base/.
+# Only created once per container lifetime either way - a qemu.service
+# restart within the same container must not wipe guest state.
 if [ ! -f "/media/${QEMU_IMG}" ]; then
   qemu-img create -f qcow2 -b "/mnt/qemu-base/${QEMU_IMG}" -F qcow2 "/media/${QEMU_IMG}"
 fi
