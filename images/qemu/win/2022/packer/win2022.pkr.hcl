@@ -69,10 +69,14 @@ source "qemu" "win2022" {
   headless         = true
   #vnc_bind_address = "0.0.0.0"
 
-  cpu_model = "host"
+  disk_compression   = true
+  disk_discard       = "unmap"
+  disk_detect_zeroes = "unmap"
 
-  cpus   = var.cpus
-  memory = var.memory
+  cpu_model = "host"
+  cpus      = var.cpus
+  memory    = var.memory
+
   disk_size       = var.disk_size
   disk_interface  = "virtio-scsi"
   net_device      = "virtio-net"
@@ -115,5 +119,9 @@ build {
 
   provisioner "powershell" {
     script = "files/ctlabs-firstboot.ps1"
+  }
+
+  provisioner "powershell" {
+    script = "files/cleanup.ps1"
   }
 }
