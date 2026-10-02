@@ -25,12 +25,12 @@ topology:
             eth0: 192.168.99.5/24
           play:
             book: ctlabs.yml
-            tags: [up, setup, ca, vault, bind, openclaw, claude_code, opencode]
+            tags: [up, setup, ca, vault, bind, openclaw, claude, opencode]
             inv: ai01.ini
             setup:
               openclaw:
                 hosts: [h1]
-              claude_code:
+              claude:
                 hosts: [ansible]
                 ansible:
                   profile: claude_openrouter

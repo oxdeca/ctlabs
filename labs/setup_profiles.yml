@@ -775,22 +775,22 @@ profiles:
       sources: [h3.ctlabs.internal]
 
   # ----------------------------------------------------------------------------
-  # ctlabs_claude_code
+  # ctlabs_claude
   # ----------------------------------------------------------------------------
   claude_anthropic:
-    role: claude_code
+    role: claude
     defaults:
       provider:
         active: anthropic
 
   claude_openrouter:
-    role: claude_code
+    role: claude
     defaults:
       provider:
         active: openrouter
 
   claude_vertexai:
-    role: claude_code
+    role: claude
     defaults:
       provider:
         active: vertexai

@@ -28,7 +28,7 @@ topology:
               book: ctlabs.yml
               tags: [up, setup, ca, bind, vault, smbadc, slapd, httpd, postgresql, redis, netbox, guacamole]
               setup:
-                claude_code:
+                claude:
                   profile: claude_anthropic
                   hosts  : [ansible, h1]
                   h1:

@@ -40,7 +40,7 @@ One name is used everywhere for a given role:
 role_profiles key  =  setup_profiles key  =  ansible tag  =  play.setup key
 ```
 
-Example: `bind`, `smbadc`, `k3s`, `claude_code`.
+Example: `bind`, `smbadc`, `k3s`, `claude`.
 
 This means a lab's `play.tags` list, `play.setup` keys, and `role_profiles.yml` keys all use the same identifier.
 
@@ -209,8 +209,8 @@ A named `profile:` key overrides which profile is used as the base:
 
 ```yaml
 setup:
-  claude_code:
-    profile: claude_openrouter   # use claude_openrouter profile as base instead of claude_code
+  claude:
+    profile: claude_openrouter   # use claude_openrouter profile as base instead of claude
 ```
 
 #### Omitting play.setup for a profile
@@ -223,7 +223,7 @@ A `play.setup` entry may reference a named profile from `setup_profiles.yml` as 
 
 ```yaml
 setup:
-  claude_code:
+  claude:
     profile: claude_openrouter
     ansible:
       provider:
@@ -236,7 +236,7 @@ A per-host entry can specify its own `profile:` to use a different base from `se
 
 ```yaml
 setup:
-  claude_code:
+  claude:
     hosts: [ansible, h1]
     ansible:
       profile: claude_openrouter

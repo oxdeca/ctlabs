@@ -341,9 +341,9 @@ profiles:
     tags : [antigravity_cli]
     hosts: [ansible, h1, h2, h3]
 
-  claude_code:
-    role : ctlabs_claude_code
-    tags : [claude_code]
+  claude:
+    role : ctlabs_claude
+    tags : [claude]
     hosts: [ansible, h1, h2, h3]
 
   opencode:
