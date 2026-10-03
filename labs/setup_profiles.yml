@@ -837,4 +837,4 @@ profiles:
     rke21:
       kubeconfig: /etc/rancher/rke2/rke2.yaml
     k3s1:
-      kubeconfig: /etc/rancher/3ks/3ks.yaml
+      kubeconfig: /etc/rancher/k3s/k3s.yaml
