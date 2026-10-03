@@ -93,13 +93,13 @@ source "qemu" "win2025" {
 
   floppy_files = [
     "files/enable-winrm.ps1",
-    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.cat",
-    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.inf",
-    "${var.virtio_drivers_dir}/vioscsi/2k22/amd64/vioscsi.sys",
-    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvmp.exe",
-    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.cat",
-    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.inf",
-    "${var.virtio_drivers_dir}/NetKVM/2k22/amd64/netkvm.sys",
+    "${var.virtio_drivers_dir}/vioscsi/2k25/amd64/vioscsi.cat",
+    "${var.virtio_drivers_dir}/vioscsi/2k25/amd64/vioscsi.inf",
+    "${var.virtio_drivers_dir}/vioscsi/2k25/amd64/vioscsi.sys",
+    "${var.virtio_drivers_dir}/NetKVM/2k25/amd64/netkvmp.exe",
+    "${var.virtio_drivers_dir}/NetKVM/2k25/amd64/netkvm.cat",
+    "${var.virtio_drivers_dir}/NetKVM/2k25/amd64/netkvm.inf",
+    "${var.virtio_drivers_dir}/NetKVM/2k25/amd64/netkvm.sys",
   ]
 
   floppy_content = {
