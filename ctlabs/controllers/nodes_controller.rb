@@ -22,8 +22,7 @@ class NodesController < BaseController
     node_cfg ||= { 'type' => 'host', 'profile' => 'linux', 'gw' => '', 'nics' => {} }
 
     yaml_str = node_cfg.to_yaml
-    yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}, #{$4}]\n" }
-    yaml_str = yaml_str.gsub(/^(\s*)- -\s*(.+?)\n\1  -\s*(.+?)\n/) { "#{$1}- [#{$2}, #{$3}]\n" }
+    yaml_str = yaml_str.sub(/\A---\r?\n/, '')
 
     # --- FETCH CLOUD VM CONFIG ---
     cloud_vm_yaml = ""
@@ -93,14 +92,9 @@ class NodesController < BaseController
       Node.sync_to_terraform!(node_name, new_node, yaml, params[:cloud_vm_yaml])
       target_plane = new_node['plane'] || 'data'
 
-      if vm['planes']
-        vm['planes'][target_plane] ||= {}
-        vm['planes'][target_plane]['nodes'] ||= {}
-        vm['planes'][target_plane]['nodes'][node_name] = new_node
-      else
-        vm['nodes'] ||= {}
-        vm['nodes'][node_name] = new_node
-      end
+      vm['planes'][target_plane] ||= {}
+      vm['planes'][target_plane]['nodes'] ||= {}
+      vm['planes'][target_plane]['nodes'][node_name] = new_node
 
       LabRepository.write_formatted_yaml(lab_path, yaml)
       { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
@@ -129,14 +123,9 @@ class NodesController < BaseController
       vm = data['topology'][0]
       target_plane = cfg_out['plane'] || 'data'
 
-      if vm['planes']
-        vm['planes'][target_plane] ||= {}
-        vm['planes'][target_plane]['nodes'] ||= {}
-        vm['planes'][target_plane]['nodes'][node_name] = cfg_out
-      else
-        vm['nodes'] ||= {}
-        vm['nodes'][node_name] = cfg_out
-      end
+      vm['planes'][target_plane] ||= {}
+      vm['planes'][target_plane]['nodes'] ||= {}
+      vm['planes'][target_plane]['nodes'][node_name] = cfg_out
 
       vm['links'] ||= []
       if data_link
@@ -196,16 +185,12 @@ class NodesController < BaseController
 
       new_plane = new_cfg['plane'] || old_plane || 'data'
 
-      if vm['planes']
-        if old_plane && old_plane != new_plane && vm['planes'][old_plane] && vm['planes'][old_plane]['nodes']
-          vm['planes'][old_plane]['nodes'].delete(node_name)
-        end
-        vm['planes'][new_plane] ||= {}
-        vm['planes'][new_plane]['nodes'] ||= {}
-        vm['planes'][new_plane]['nodes'][node_name] = new_cfg
-      else
-        vm['nodes'][node_name] = new_cfg
+      if old_plane && old_plane != new_plane && vm['planes'][old_plane] && vm['planes'][old_plane]['nodes']
+        vm['planes'][old_plane]['nodes'].delete(node_name)
       end
+      vm['planes'][new_plane] ||= {}
+      vm['planes'][new_plane]['nodes'] ||= {}
+      vm['planes'][new_plane]['nodes'][node_name] = new_cfg
 
       LabRepository.write_formatted_yaml(lab_path, full_yaml)
 
@@ -253,12 +238,8 @@ class NodesController < BaseController
       yaml = YAML.load_file(lab_path)
       vm = yaml['topology'][0]
 
-      if vm['nodes']
-        vm['nodes'].delete(node_name)
-      elsif vm['planes']
-        vm['planes'].each do |_, p_data|
-          p_data['nodes'].delete(node_name) if p_data && p_data['nodes']
-        end
+      vm['planes'].each do |_, p_data|
+        p_data['nodes'].delete(node_name) if p_data && p_data['nodes']
       end
 
       vm['links']&.reject! do |l|

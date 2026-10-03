@@ -23,7 +23,7 @@ topology:
             gw   : 192.168.99.1
             nics :
               eth0: 192.168.99.5/24
-            play :
+            play:
               book: ctlabs.yml
               tags: [up, setup, ca, vault, bind, rke2, helm, argoapp]
             dnat :

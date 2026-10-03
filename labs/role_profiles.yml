@@ -306,6 +306,11 @@ profiles:
     tags : [airflow]
     hosts: [h1, h2]
 
+  asciinema:
+    role : ctlabs_asciinema
+    tags : [asciinema]
+    hosts: [ansible]
+
   foreman:
     role : ctlabs_foreman
     tags : [foreman]

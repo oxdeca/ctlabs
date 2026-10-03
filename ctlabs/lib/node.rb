@@ -230,11 +230,11 @@ class Node
     node_cfg['nics'] ||= {}
 
     if node_cfg['nics'][target_nic].to_s.empty?
-      mgmt_net_str = full_yaml.dig('topology', 0, 'planes', 'mgmt', 'net') || full_yaml.dig('topology', 0, 'mgmt', 'net') || "192.168.99.0/24"
+      mgmt_net_str = full_yaml.dig('topology', 0, 'planes', 'mgmt', 'net') || "192.168.99.0/24"
       used_ips = []
 
       vm = full_yaml['topology'][0]
-      nodes_to_scan = vm['planes'] ? vm['planes'].values.map { |p| p['nodes'] } : [vm['nodes']]
+      nodes_to_scan = vm['planes'].values.map { |p| p['nodes'] }
 
       nodes_to_scan.compact.each do |node_group|
         node_group.each do |_, n|

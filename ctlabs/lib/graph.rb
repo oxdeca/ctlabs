@@ -262,7 +262,7 @@ class Graph
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = (@cfg&.dig('topology', 0, 'hv') rescue nil) || 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
           subgraph cluster_ctlabs_host {
@@ -413,7 +413,7 @@ class Graph
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = (@cfg&.dig('topology', 0, 'hv') rescue nil) || 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
           subgraph cluster_ctlabs_host {
@@ -454,7 +454,7 @@ class Graph
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['hv'] || vm['name'])
+              nodes = init_nodes(vm['hv'])
               nodes.each do |node|
                 if node.kind == "mgmt" || node.plane == "mgmt" || node.type == "controller"
                   next
@@ -476,7 +476,7 @@ class Graph
         <%- end -%>
 
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv']) -%>
         <%-   nodes.each do |node|
                 if node.kind == 'mgmt' || node.plane == 'mgmt'
                   next
@@ -490,7 +490,7 @@ class Graph
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['hv'] || vm['name'])
+              nodes = init_nodes(vm['hv'])
               nodes.each do |node|
                 if node.kind == 'mgmt' || node.plane == 'mgmt'
                   next
@@ -558,7 +558,7 @@ class Graph
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = (@cfg&.dig('topology', 0, 'hv') rescue nil) || 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]
@@ -588,7 +588,7 @@ class Graph
         node  [shape=rect, style="rounded,filled", fillcolor="#0f172a", penwidth="2.5", fontname="Helvetica, Arial, sans-serif", fontcolor="#f8fafc", margin="0.25,0.15"]
         edge  [color="#64748b", penwidth="3.0", fontname="Helvetica, Arial, sans-serif", fontsize="12", fontcolor="#94a3b8"]
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if ['host', 'vhost', 'controller'].include?(node.type) || node.remote?
                   server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
@@ -615,7 +615,7 @@ class Graph
         <%- end -%>
 
         <%- @cfg['topology'].each do |vm| -%>
-        <%-   nodes = init_nodes(vm['hv'] || vm['name']) -%>
+        <%-   nodes = init_nodes(vm['hv']) -%>
         <%-   nodes.each do |node| -%>
         <%-     if node.type == 'router' -%>
         <%=       node.name.gsub(/[.-]/, "_") %> [color="#f59e0b", tooltip="<%= @graph.build_tooltip(node) %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#f59e0b" point-size="16">🔀 <%= node.name %></font></b></td></tr></table> >]
@@ -625,7 +625,7 @@ class Graph
 
         <%-
             @cfg['topology'].each do |vm|
-              nodes = init_nodes(vm['hv'] || vm['name'])
+              nodes = init_nodes(vm['hv'])
               nodes.each do |node|
         -%>
         <%-     if node.type == 'switch' && node.snat.nil? -%>
@@ -688,7 +688,7 @@ class Graph
 
         <%-
             server_ip = Socket::getaddrinfo(Socket.gethostname,"echo",Socket::AF_INET)[0][3] rescue "127.0.0.1"
-            host_name = @cfg ? (@cfg.dig('topology', 0, 'hv') || @cfg.dig('topology', 0, 'vm', 'name') || @cfg.dig('topology', 0, 'name') || 'CTLABS_HOST' rescue 'CTLABS_HOST') : 'CTLABS_HOST'
+            host_name = (@cfg&.dig('topology', 0, 'hv') rescue nil) || 'CTLABS_HOST'
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]

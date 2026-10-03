@@ -74,12 +74,10 @@
           yaml_data = YAML.load_file(real_path)
           vm = yaml_data['topology'][0] || {}
           
-          # Gather all nodes from both flat schemas and nested 'planes' schemas
-          all_nodes = vm['nodes'] ? vm['nodes'].values : []
-          if vm['planes']
-            vm['planes'].values.each do |p_data|
-              all_nodes.concat(p_data['nodes'].values) if p_data['nodes']
-            end
+          # Gather all nodes across the nested 'planes' schema
+          all_nodes = []
+          vm['planes'].values.each do |p_data|
+            all_nodes.concat(p_data['nodes'].values) if p_data['nodes']
           end
 
           # Find the controller node anywhere in the topology

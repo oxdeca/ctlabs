@@ -11,6 +11,7 @@ require 'json'
 require 'set'
 require 'socket'
 require 'fileutils'
+require_relative '../services/lab_repository'
 
 class Lab
   attr_writer :dotfile, :dtype, :diagram
@@ -229,7 +230,7 @@ class Lab
 
     vm = nil
     @cfg['topology'].each_with_index do |v, i|
-      if( v['name'] == name || v['hv'] == name )
+      if( v['hv'] == name )
         vm = @cfg['topology'][i]
         break
       end
@@ -238,8 +239,10 @@ class Lab
       vm = @cfg['topology'][0]
     end
 
-    # --- v2.0 SCHEMA NORMALIZER ---
-    # Automatically flattens 'planes' into the legacy 'nodes' array
+    # --- SCHEMA NORMALIZER (in-memory only) ---
+    # Flattens 'planes' into a single 'nodes' hash and hoists 'planes.mgmt' up
+    # to vm['mgmt'] so node/link lookup code can stay plane-agnostic.
+    # On disk every lab is 'hv' + 'planes'; this never writes a flat schema.
     if vm && vm['planes'] && vm['nodes'].nil?
       flat_nodes = {}
       
@@ -507,8 +510,8 @@ class Lab
   def self.profile_in_use?(yaml, target_type, target_profile)
     vm = yaml['topology']&.first || {}
     
-    # Gather all nodes across all planes (or flat nodes array)
-    nodes_to_scan = vm['planes'] ? vm['planes'].values.map { |p| p['nodes'] } : [vm['nodes']]
+    # Gather all nodes across all planes
+    nodes_to_scan = vm['planes'].values.map { |p| p['nodes'] }
     
     nodes_to_scan.compact.each do |node_group|
       node_group.values.each do |n|
@@ -1033,7 +1036,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     plane = node_cfg['plane'] || 'data'
     is_remote = ['rhost', 'external'].include?(type) || ['gcp', 'external', 'aws', 'azure'].include?(node_cfg['provider'].to_s.downcase)
 
-    vm_name = @vm_name || @cfg['topology'][0]['hv'] || @cfg['topology'][0]['name']
+    vm_name = @vm_name || @cfg['topology'][0]['hv']
     cfg_vm  = find_vm(vm_name)
     mgmt    = cfg_vm['mgmt'] || @mgmt || {}
     
@@ -1131,7 +1134,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                   target['nics'] ||= {}
                   target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
                   target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
-                  File.write(lab_file, live_yaml.to_yaml)
+                  LabRepository.write_formatted_yaml(lab_file, live_yaml, lab_file)
                 end
               end
             end
@@ -1698,18 +1701,14 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
                   priv_ip = nic['network_ip']
                   pub_ip  = nic.dig('access_config', 0, 'nat_ip') rescue nil
 
-                  # SCHEMA-AWARE LOOKUP: Check both legacy 'nodes' and modern 'planes'
+                  # Find the node in the modern planes schema
                   vm_topology = live_yaml['topology']&.first || {}
                   target = nil
-                  
-                  if vm_topology['nodes'] && vm_topology['nodes'][vm_name]
-                    target = vm_topology['nodes'][vm_name]
-                  elsif vm_topology['planes']
-                    vm_topology['planes'].each do |_, p_data|
-                      if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
-                        target = p_data['nodes'][vm_name]
-                        break
-                      end
+
+                  vm_topology['planes'].each do |_, p_data|
+                    if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
+                      target = p_data['nodes'][vm_name]
+                      break
                     end
                   end
 
@@ -1732,7 +1731,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
             # Write the updated IPs back to the base lab file
             if updates_made
-              File.write(@cfg_file, live_yaml.to_yaml)
+              LabRepository.write_formatted_yaml(@cfg_file, live_yaml, @cfg_file)
               @log.info "Successfully saved new IPs to lab YAML."
               File.open(log_path, 'a') { |f| f.puts "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}" } if log_path
             end

@@ -249,12 +249,12 @@ class LabsController < BaseController
     begin
       cfg = YAML.load_file(full_path) || {}
       vm = cfg['topology']&.first || {}
-      mgmt = vm['mgmt'] || {}
+      mgmt = vm.dig('planes', 'mgmt') || {}
       
       {
         name: cfg['name'] || '',
         desc: cfg['desc'] || '',
-        vm_name: vm['name'] || '',
+        vm_name: vm['hv'] || '',
         vm_dns: (vm['dns'] || []).join(', '),
         mgmt_vrfid: mgmt['vrfid'] || '',
         mgmt_dns: (mgmt['dns'] || []).join(', '),
