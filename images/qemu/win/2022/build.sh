@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 PACKER=/usr/bin/packer
 
-IMG_VERS=0.1.0
+IMG_VERS=0.1.1
 QIMG_NAME=windows-server-2022.qcow2
 BASE_IMAGES_DIR="${BASE_IMAGES_DIR:-/media/ctlabs-images/qemu}"
 BUILD_DIR="${BUILD_DIR:-/media/nfs/ctlabs-win2022-build}"
