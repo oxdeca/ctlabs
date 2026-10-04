@@ -67,7 +67,7 @@ source "qemu" "win2022" {
   format           = "qcow2"
   accelerator      = "kvm"
   headless         = true
-  #vnc_bind_address = "0.0.0.0"
+  vnc_bind_address = "0.0.0.0"
 
   disk_compression   = true
   disk_discard       = "unmap"
