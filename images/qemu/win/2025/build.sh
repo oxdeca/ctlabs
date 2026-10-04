@@ -89,9 +89,9 @@ cp -a files/qemu_init.d "${OUTPUT_DIR}/"
 # design-guide.md §2.7). Archiving to BASE_IMAGES_DIR happens AFTER the build.
 docker build --rm -f Dockerfile -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest "${OUTPUT_DIR}"
 
-echo "--- image built successfully, archiving base qcow2 for optional external/shared-base mode ---"
-mkdir -p "${BASE_IMAGES_DIR}/win25-${VARIANT}"
-mv "${OUTPUT_DIR}/${QIMG_NAME}" "${BASE_IMAGES_DIR}/win25-${VARIANT}/"
+#echo "--- image built successfully, archiving base qcow2 for optional external/shared-base mode ---"
+#mkdir -p "${BASE_IMAGES_DIR}/win25-${VARIANT}"
+#mv "${OUTPUT_DIR}/${QIMG_NAME}" "${BASE_IMAGES_DIR}/win25-${VARIANT}/"
 
 echo "--- removing Packer output dir ${OUTPUT_DIR} ---"
 rm -rf "${OUTPUT_DIR}"
