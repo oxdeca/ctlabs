@@ -30,7 +30,7 @@ if (-not (Get-LocalUser -Name "root" -ErrorAction SilentlyContinue)) {
 }
 if (-not (Get-LocalUser -Name "ansible" -ErrorAction SilentlyContinue)) {
     $ansiblePassword = ConvertTo-SecureString (([System.Guid]::NewGuid().ToString()) + "!Aa1") -AsPlainText -Force
-    New-LocalUser -Name "root" -Password $ansiblePassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
+    New-LocalUser -Name "ansible" -Password $ansiblePassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
     Add-LocalGroupMember -Group "Administrators" -Member "ansible"
 }
 if (-not (Get-LocalUser -Name "ctlabs" -ErrorAction SilentlyContinue)) {
