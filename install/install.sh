@@ -160,7 +160,14 @@ config() {
 }
 
 services() {
-  ${SCTL} disable --now firewalld.service > /dev/null 2>&1
+  local services=('firewalld.service')
+
+  local service
+  for service in "${services[@]}"; do
+    if ${SCTL} list-unit-files "${service}" > /dev/null 2>&1; then
+      ${SCTL} disable --now "${service}" > /dev/null 2>&1
+    fi
+  done
 }
 
 tmux() {
