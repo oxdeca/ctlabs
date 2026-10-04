@@ -33,6 +33,8 @@ create_qemu_img() {
   chroot ${MNTDIR} /usr/bin/systemctl enable ctlabs-net.service ssh.service
   chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
   chroot ${MNTDIR} /usr/bin/systemctl mask    systemd-networkd.service
+  
+  chroot ${MNTDIR} /bin/sh -c 'useradd -U -s /bin/bash -d /home/ansible -m ansible && echo "ansible ALL=NOPASSWD:ALL" > /etc/sudoers.d/ansible'
   chroot ${MNTDIR} /bin/sh -c 'rm /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.2" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'

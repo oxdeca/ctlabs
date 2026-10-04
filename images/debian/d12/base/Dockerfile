@@ -11,6 +11,7 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
             echo 'export LANG=en_US.UTF-8' > /etc/profile.d/locale.sh                                  && \
             printf "set paste\n" >> /etc/vim/vimrc
 
+RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=NOPASSWD:ALL' > /etc/sudoers.d/ansible
 RUN        echo 'if [ -f "/etc/profile" ]; then . /etc/profile; fi' >> ~/.bashrc
 COPY       tmux.conf   /etc/tmux.conf
 COPY       --chmod=0640 bashrc.kali     /etc/profile.d/bashrc-kali.sh

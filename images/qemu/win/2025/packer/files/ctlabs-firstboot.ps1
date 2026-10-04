@@ -28,18 +28,22 @@ if (-not (Get-LocalUser -Name "root" -ErrorAction SilentlyContinue)) {
     New-LocalUser -Name "root" -Password $rootPassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
     Add-LocalGroupMember -Group "Administrators" -Member "root"
 }
+if (-not (Get-LocalUser -Name "ansible" -ErrorAction SilentlyContinue)) {
+    $ansiblePassword = ConvertTo-SecureString (([System.Guid]::NewGuid().ToString()) + "!Aa1") -AsPlainText -Force
+    New-LocalUser -Name "root" -Password $ansiblePassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
+    Add-LocalGroupMember -Group "Administrators" -Member "ansible"
+}
+if (-not (Get-LocalUser -Name "ctlabs" -ErrorAction SilentlyContinue)) {
+    $ctlabsPassword = ConvertTo-SecureString "secret123!" -AsPlainText -Force
+    New-LocalUser -Name "ctlabs" -Password $ctlabsPassword -PasswordNeverExpires -AccountNeverExpires -UserMayNotChangePassword | Out-Null
+    Add-LocalGroupMember -Group "Administrators" -Member "ctlabs"
+}
 
 $installType = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name InstallationType).InstallationType
 if ($installType -eq "Server") {
     Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
     Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
     Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
-
-    if (-not (Get-LocalUser -Name "ctlabs" -ErrorAction SilentlyContinue)) {
-        $ctlabsPassword = ConvertTo-SecureString "secret123!" -AsPlainText -Force
-        New-LocalUser -Name "ctlabs" -Password $ctlabsPassword -PasswordNeverExpires -AccountNeverExpires | Out-Null
-        Add-LocalGroupMember -Group "Administrators" -Member "ctlabs"
-    }
 }
 
 New-Item -ItemType Directory -Path "C:\ProgramData\ctlabs" -Force | Out-Null
