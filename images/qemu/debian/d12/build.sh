@@ -53,6 +53,4 @@ create_qemu_img() {
 
 create_qemu_img
 docker build --rm -t ${IMG_NAME}:${IMG_VERS} -t ${IMG_NAME}:latest .
-
-mkdir -p "${BASE_IMAGES_DIR}/d12"
-mv ${QIMG_NAME} "${BASE_IMAGES_DIR}/d12/"
+rm ${QIMG_NAME}
