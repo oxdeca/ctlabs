@@ -24,7 +24,19 @@ create_net_setup_script() {
   mgmt_dns_ps_list="${mgmt_dns_ps_list%,}"
 
   mkdir -p /mnt/ssh
-  cp /root/.ssh/authorized_keys /mnt/ssh/authorized_keys
+  # ctlabs injects the lab public key into this container before qemu starts;
+  # prefer the login user's home (see qemu_init.sh) and fall back to root's.
+  _ctlabs_ssh_user="${CTLABS_SSH_USER:-ansible}"
+  if id -u "$_ctlabs_ssh_user" >/dev/null 2>&1; then
+    _ctlabs_auth="/home/${_ctlabs_ssh_user}/.ssh/authorized_keys"
+  else
+    _ctlabs_auth="/root/.ssh/authorized_keys"
+  fi
+  # Loud on failure but non-fatal: the rest of this script still has to
+  # configure the network, and a guest with no key is still better than one
+  # that never got configured. Grep the qemu journal for this line.
+  cp "$_ctlabs_auth" /mnt/ssh/authorized_keys || \
+    echo "ERROR: failed to copy $_ctlabs_auth to /mnt/ssh/authorized_keys - guest will have no SSH key" >&2
 
 cat > /mnt/ctlabs_net_setup.ps1 << EOF
 if ((Get-CimInstance Win32_ComputerSystem).Name -ne "${short_hostname}") {

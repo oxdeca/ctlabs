@@ -3,46 +3,71 @@
 # -----------------------------------------------------------------------------
 # File        : ctlabs/labs/node_profiles.yml
 # -----------------------------------------------------------------------------
+#
+# `user:` is the SSH login user ctlabs uses to reach the node (it becomes
+# `ansible_user=` in the generated inventories). Since 2026-10-04 that is the
+# non-root `ansible` user, which every Linux base image creates alongside
+# `/etc/sudoers.d/ansible` (`ansible ALL=NOPASSWD:ALL`); tasks then escalate with
+# sudo via the inventory's `ansible_become=yes` / `ansible-playbook -b`.
+# Node#initialize reads this key as its first profile fallback, so a lab YAML can
+# still override it per node with `user:`.
+#
+# Exceptions, deliberately left on root:
+#   switch.arista - EOS/CEOS has no `ansible` account and escalates with
+#                   `enable`, not sudo, so it cannot join the scheme.
 
 profiles:
   controller:
     linux:
       image: ctlabs/c9/ctrl
+      user: ansible
       caps: [IPC_LOCK]
-      vols: ['/root/ctlabs-ansible/:/root/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/root/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/:/root/ctlabs-ai/:Z,rw', '/var/backups/:/var/backups/:Z,rw']
+      vols: ['/root/ctlabs-ansible/:/srv/ctlabs/ctlabs-ansible/:Z,rw', '/root/ctlabs-terraform/:/srv/ctlabs/ctlabs-terraform/:Z,rw', '/root/ctlabs-ai/:/srv/ctlabs/ctlabs-ai/:Z,rw', '/var/backups/:/var/backups/:Z,rw']
   switch:
     ovs:
       image: ctlabs/c9/ovs
+      user: ansible
       ports: 4
       caps: [SYS_NICE, NET_BIND_SERVICE, IPC_LOCK, NET_BROADCAST]
     mgmt:
       image: ctlabs/c9/ovs
+      user: ansible
       ports: 14
       caps: [SYS_NICE, NET_BIND_SERVICE, IPC_LOCK, NET_BROADCAST]
     linux:
       image: ctlabs/c9/base
+      user: ansible
       ports: 8
     arista:
       image: ctlabs/misc/ceos
-      ports: 5      
+      user: root
+      ports: 5
   host:
     linux:
       image: ctlabs/c9/base
+      user: ansible
     d12:
       image: ctlabs/d12/base
+      user: ansible
     kali:
       image: ctlabs/kali/base
+      user: ansible
     kali-ctf:
       image: ctlabs/kali/ctf
+      user: ansible
     parrot-ctf:
       image: ctlabs/parrot/ctf
+      user: ansible
     parrot:
       image: ctlabs/parrot/base
+      user: ansible
     vault:
       image: ctlabs/d12/base
+      user: ansible
       caps: [IPC_LOCK]
     slapd:
       image: ctlabs/d12/base
+      user: ansible
       caps: [SYS_PTRACE]
     # qemu/* profiles default to embedded base images (qcow2 baked into the
     # image itself, see each image's Dockerfile) - self-contained, no `vols:`
@@ -53,51 +78,69 @@ profiles:
     # profile(s) you want it for - see design-guide.md §2.7 and §9.1.
     qemu/d12:
       image: ctlabs/qemu/d12
+      user: ansible
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
     qemu/c9:
       image: ctlabs/qemu/c9
+      user: ansible
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
     qemu/win22/core:
       image: ctlabs/qemu/win22/core
+      user: ansible
       env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
     qemu/win22/dtop:
       image: ctlabs/qemu/win22/dtop
+      user: ansible
       env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
     qemu/win25/core:
       image: ctlabs/qemu/win25/core
+      user: ansible
       env: ['QEMU_MEM=4G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
     qemu/win25/dtop:
       image: ctlabs/qemu/win25/dtop
+      user: ansible
       env: ['QEMU_MEM=6G', 'QEMU_CPU=4', 'QEMU_VNC=true']
       kvm: true
       os: windows
     db2:
       image: ctlabs/misc/db2
+      user: ansible
       caps: [SYS_NICE,IPC_LOCK,IPC_OWNER]
     cbeaver:
       image: ctlabs/misc/cbeaver
+      user: ansible
     juice:
       image: ctlabs/owasp/juice
+      user: ansible
     win:
       image: ctlabs/qemu/win
+      user: ansible
       os: windows
   router:
     frr:
       image: ctlabs/c9/frr
+      user: ansible
       caps: [SYS_NICE, NET_BIND_SERVICE]
       devs: ['/dev/net/tun']
     mgmt:
       image: ctlabs/c9/frr
+      user: ansible
       caps: [SYS_NICE, NET_BIND_SERVICE]
       devs: ['/dev/net/tun']
   gateway:
+    # NOTE: no `user:` here on purpose. `profiles.gateway.remote` backs external
+    # hosts reached over SSH (e.g. ai01's lab1-gw, term: ssh://schaewo@...).
+    # Node#initialize would apply a profile `user:` *before* it parses the user
+    # out of the term URI, so any value set here would silently override the
+    # real login name. Gateway nodes are also skipped by inject_ssh_key_to_node,
+    # so ctlabs never pushes a key to them anyway.
     remote:
       image: ctlabs/c9/base

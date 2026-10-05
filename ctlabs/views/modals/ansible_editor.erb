@@ -74,14 +74,14 @@
 
       <div id="AnsSetupProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Global file: <code><%= Lab.setup_profiles_path %></code><% if Lab.setup_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — reusable default fact config per role. Applied on next playbook run.
+          <i class="fas fa-info-circle"></i> Global file: <code><%= Automation.setup_profiles_path %></code><% if Automation.setup_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — reusable default fact config per role. Applied on next playbook run.
         </div>
         <textarea id="editor-AnsSetupProfiles"></textarea>
       </div>
 
       <div id="AnsRoleProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Global file: <code><%= Lab.role_profiles_path %></code><% if Lab.role_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — maps role profiles to ansible roles/tags/hosts. Applied on next playbook run.
+          <i class="fas fa-info-circle"></i> Global file: <code><%= Automation.role_profiles_path %></code><% if Automation.role_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — maps role profiles to ansible roles/tags/hosts. Applied on next playbook run.
         </div>
         <textarea id="editor-AnsRoleProfiles"></textarea>
       </div>

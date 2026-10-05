@@ -165,7 +165,7 @@ if options[:play]
   running_lab = l1.instance_variable_get(:@relative_path)
 
   # CHECK FOR CONCURRENT EXECUTION BEFORE STARTING
-  if Lab.playbook_running?(running_lab)
+  if Automation.playbook_running?(running_lab)
     puts "⚠️  Warning: Playbook already running for '#{running_lab}'"
     puts "    Use 'ctlabs.rb -s' to check lab status."
     exit 1

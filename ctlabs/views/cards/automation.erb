@@ -18,10 +18,15 @@
     <div>
       <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
-        <% pb_running = Lab.playbook_running?(info_hash[:lab_path]) rescue false %>
+        <% pb_running = Automation.playbook_running?(info_hash[:lab_path]) rescue false %>
         <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 2px 8px;" <%= pb_running ? 'disabled' : '' %>>
           <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
         </button>
+        <% if pb_running %>
+          <button type="button" onclick="window.stopAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-red" style="padding: 2px 8px; margin-left: 4px;" title="Send SIGTERM to the running playbook">
+            <i class="fas fa-stop"></i> Stop
+          </button>
+        <% end %>
       <% end %>
     </div>
   </div>
@@ -42,7 +47,7 @@
       <button type="button" onclick="window.openTerraformEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 8px; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       
       <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] %>
-        <% tf_running = Lab.terraform_running?(info_hash[:lab_path]) rescue false %>
+        <% tf_running = Automation.terraform_running?(info_hash[:lab_path]) rescue false %>
         
         <button type="button" onclick="window.destroyTerraform(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-tiny w3-round w3-red w3-hover-dark-red" style="padding: 2px 8px; margin-right: 4px;" <%= tf_running ? 'disabled' : '' %> title="Destroy Terraform Resources">
           <i class="fas fa-trash-alt"></i> Destroy

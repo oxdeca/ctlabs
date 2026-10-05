@@ -72,7 +72,7 @@ class GcpAuth
     profile_name = tf_cfg['profile'].to_s.strip
     unless profile_name.empty?
       profile = load_terraform_profile(profile_name)
-      raise "Terraform auth profile '#{profile_name}' not found in #{Lab.terraform_profiles_path}" unless profile
+      raise "Terraform auth profile '#{profile_name}' not found in #{Automation.terraform_profiles_path}" unless profile
       method = profile['method'].to_s.strip
       return nil if method.empty?
       return profile.merge('method' => method)
@@ -84,7 +84,7 @@ class GcpAuth
   end
 
   def self.load_terraform_profile(name)
-    path = Lab.terraform_profiles_path
+    path = Automation.terraform_profiles_path
     return nil unless File.file?(path)
     profiles = YAML.load_file(path)['profiles'] || {}
     profiles[name]

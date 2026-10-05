@@ -18,7 +18,7 @@ class AutomationController < BaseController
     begin
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
-      name, base_data, _ = Lab.find_automation_controller(vm)
+      name, base_data, _ = Automation.find_automation_controller(vm)
       
       raise "No controller node found in topology" unless name
 
@@ -94,7 +94,7 @@ class AutomationController < BaseController
     begin
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
-      name, base_data, plane = Lab.find_automation_controller(vm)
+      name, base_data, plane = Automation.find_automation_controller(vm)
       
       raise "No ansible controller node found in topology" unless name
 
@@ -174,12 +174,19 @@ class AutomationController < BaseController
   post '/labs/*/playbook' do
     lab_name = params[:splat].first
     halt 400, { error: "No lab is running" }.to_json unless Lab.current_name == lab_name
-    halt 400, { error: "Playbook running!" }.to_json if Lab.playbook_running?(lab_name)
+    halt 400, { error: "Playbook running!" }.to_json if Automation.playbook_running?(lab_name)
 
     log_path = LabLog.latest_for_running_lab
     Thread.new do
       begin
-        lab_instance = Lab.new(cfg: Lab.get_file_path(lab_name), relative_path: lab_name)
+        # Bind the lab's real log to the instance. Lab#initialize falls back to
+        # LabLog.null (/dev/null) when no :log is given, and since Lab includes
+        # Automation, run_playbook's "Executing playbook: <full command>" line
+        # goes to that null logger - which is why a manual Run Playbook never
+        # showed the command it was about to run. The lab-up path in
+        # labs_controller.rb always passes a real log; this restores parity.
+        lab_log = log_path ? LabLog.append_to(log_path) : LabLog.null
+        lab_instance = Lab.new(cfg: Lab.get_file_path(lab_name), relative_path: lab_name, log: lab_log)
         File.open(log_path, 'a') { |f| f.puts "\n--- Manual Ansible playbook run triggered ---\n" }
         lab_instance.run_playbook(nil, log_path)
       rescue => e
@@ -188,6 +195,24 @@ class AutomationController < BaseController
     end
     content_type :json
     { success: true }.to_json
+  end
+
+  # --- Stop a running playbook -------------------------------------------
+  # The lock file alone cannot cancel a run: it holds Process.pid (the server).
+  # Automation.stop_playbook! signals the playbook inside the controller
+  # container and then the `docker exec` client, so the streaming thread unwinds
+  # and releases the lock by itself.
+  post '/labs/*/playbook/stop' do
+    lab_name = params[:splat].first
+    halt 400, { error: "No lab is running" }.to_json unless Lab.current_name == lab_name
+
+    ok, message = Automation.stop_playbook!(lab_name, request.env['REMOTE_USER'])
+    content_type :json
+    # Deliberately always 200: "nothing was running" is a normal answer for this
+    # button, not a client error. Returning 404 here would be swallowed by the
+    # app-wide `error 400..599` handler in base_controller.rb, which replaces
+    # the body with a generic "An error occurred".
+    { success: ok, message: message }.to_json
   end
 
 
@@ -203,7 +228,7 @@ class AutomationController < BaseController
     begin
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
-      name, node_cfg, _ = Lab.find_automation_controller(vm)
+      name, node_cfg, _ = Automation.find_automation_controller(vm)
       tf_cfg = node_cfg ? (node_cfg['terraform'] || {}) : {}
       { json: { tf: tf_cfg } }.to_json
     rescue => e
@@ -267,7 +292,7 @@ class AutomationController < BaseController
     begin
       full_yaml = YAML.load_file(lab_path)
       vm = full_yaml['topology']&.first || {}
-      name, base_data, plane = Lab.find_automation_controller(vm)
+      name, base_data, plane = Automation.find_automation_controller(vm)
       
       raise "No controller node found in topology" unless name
 
@@ -376,12 +401,13 @@ class AutomationController < BaseController
     action   = params[:action] || 'apply'
 
     halt 400, { error: "No lab is running" }.to_json unless Lab.current_name == lab_name
-    halt 400, { error: "Terraform already running!" }.to_json if Lab.terraform_running?(lab_name) rescue false
+    halt 400, { error: "Terraform already running!" }.to_json if Automation.terraform_running?(lab_name) rescue false
 
     log_path = LabLog.latest_for_running_lab
     Thread.new do
       begin
-        lab_instance = Lab.new(cfg: Lab.get_file_path(lab_name), relative_path: lab_name)
+        lab_log = log_path ? LabLog.append_to(log_path) : LabLog.null
+        lab_instance = Lab.new(cfg: Lab.get_file_path(lab_name), relative_path: lab_name, log: lab_log)
         File.open(log_path, 'a') { |f| f.puts "\n--- Manual Terraform apply triggered ---\n" }
         lab_instance.run_terraform(
           params[:node_name],

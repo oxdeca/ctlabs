@@ -719,30 +719,30 @@ class Graph
 [controller]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'controller' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
 [router]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'router' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
 [switches]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   elsif node.type == 'switch' and !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
 [hosts]
   <%- @nodes.each do |node| -%>
   <%-   if ['host', 'vhost', 'server'].include?(node.type) and node.nics && !node.nics['eth0'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth0'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
     }
@@ -756,7 +756,7 @@ class Graph
 [controller]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'controller' and node.nics && !node.nics['eth1'].to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.nics['eth1'].split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
@@ -764,14 +764,14 @@ class Graph
   <%- @nodes.each do |node| -%>
   <%-   ip = node.ipv4 || (node.nics && node.nics['eth1']) -%>
   <%-   if node.type == 'router' && !ip.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= ip.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= ip.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
 [switches]
   <%- @nodes.each do |node| -%>
   <%-   if node.type == 'switch' and !node.ipv4.to_s.empty? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= node.ipv4.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
 
@@ -780,7 +780,7 @@ class Graph
   <%-   is_target = ['host', 'vhost', 'server'].include?(node.type) -%>
   <%-   data_ip = node.nics ? (node.nics['eth1'] || node.nics['tun0']) : nil -%>
   <%-   if is_target && data_ip && !data_ip.to_s.empty? && !node.remote? -%>
-  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell' : '' %>
+  <%=     node.name.ljust(24) %> ansible_host=<%= data_ip.to_s.split('/')[0] %> ansible_user=<%= node.user %><%= (node.user == 'root' || node.os == 'windows') ? '' : ' ansible_become=yes' %><%= node.os == 'windows' ? ' ansible_shell_type=powershell ansible_become_user=' + node.user.to_s : '' %>
   <%-   end -%>
   <%- end -%>
     }

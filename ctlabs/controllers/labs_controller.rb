@@ -109,9 +109,14 @@ class LabsController < BaseController
   # --- Execute Lab Up/Down ---
   post '/labs/execute' do
     action = params[:action]
-    halt 400, "Invalid action" unless %w[up down].include?(action)
+    # 'up_playbook' = bring the nodes up, then run the playbook. That is what
+    # the Start button has always done.
+    # 'up'           = bring the nodes up only, for when you want to look at a
+    #                  lab before configuring it.
+    # 'down'         = tear it down.
+    halt 400, "Invalid action" unless %w[up up_playbook down].include?(action)
 
-    if action == 'up'
+    if action != 'down'
       lab_name = params[:lab_name]
       halt 400, "Invalid lab" unless lab_name && Lab.all.include?(lab_name)
       if Lab.running?
@@ -127,14 +132,16 @@ class LabsController < BaseController
     labs_dir = LabRepository.labs_dir
     source_path = File.join(labs_dir, lab_name)
     runtime_path = Lab.get_runtime_path(lab_name)
-    log = LabLog.for_lab(lab_name: lab_name, action: action)
+    # Keep the coarse action in the log name/header so existing log naming
+    # ('..._up.log' / '..._down.log') is unchanged by the new up mode.
+    log = LabLog.for_lab(lab_name: lab_name, action: (action == 'down' ? 'down' : 'up'))
 
     v_token = session[:vault_token]
     v_addr  = session[:vault_addr]
 
     Thread.new do
       begin
-        if action == 'up'
+        if action != 'down'
           #FileUtils.cp(source_path, runtime_path)
           runtime_path = Lab.create_runtime_copy(lab_name, source_path)
           lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
@@ -142,8 +149,19 @@ class LabsController < BaseController
           log.info "--- Lab #{lab_name} UP completed ---"
 
           begin
-            lab_instance.run_playbook(nil, log.path)
-            log.info "--- Ansible playbook completed ---"
+            if action == 'up'
+              log.info "--- Ansible playbook skipped (nodes only) ---"
+            else
+              status = lab_instance.run_playbook(nil, log.path)
+              # run_playbook returns the child's status. It raises on a real
+              # failure, so reaching here means success or a user-requested
+              # stop - do not call the latter "completed".
+              if Automation.playbook_stopped?(status)
+                log.info "--- Ansible playbook stopped by user (status #{status}) ---"
+              else
+                log.info "--- Ansible playbook completed ---"
+              end
+            end
           rescue => e
             log.info "⚠️  Playbook failed but lab is running: #{e.message}"
           end

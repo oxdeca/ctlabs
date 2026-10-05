@@ -61,9 +61,26 @@
         </select>
       </div>
       
-      <button type="submit" name="action" value="up" class="w3-button w3-green w3-round" <%= 'disabled' if running %> title="Start Lab">
-        <i class="fas fa-play"></i> Start
-      </button>
+      <!-- Split button: main action starts nodes + playbook; the caret opens the
+         mode submenu. Both live inside the one form above, so lab_name is
+         submitted either way, and only the clicked button sends `action`. -->
+      <div class="w3-dropdown" style="display: inline-block;">
+        <button type="submit" name="action" value="up_playbook" class="w3-button w3-green w3-round" <%= 'disabled' if running %> title="Start the lab nodes, then run the Ansible playbook">
+          <i class="fas fa-play"></i> Start
+        </button>
+        <button type="button" class="w3-button w3-green w3-round w3-rightangle" <%= 'disabled' if running %> title="Choose what Start does" onclick="var d=document.getElementById('start-mode-menu'); d.style.display = (d.style.display==='block') ? 'none' : 'block';">
+          <i class="fas fa-caret-down"></i>
+        </button>
+
+        <div id="start-mode-menu" class="w3-dropdown-content w3-card-2 w3-padding" style="display:none; min-width:230px;">
+          <button type="submit" name="action" value="up_playbook" class="w3-button w3-small w3-green w3-block" <%= 'disabled' if running %>>
+            <i class="fas fa-play"></i> Nodes + Playbook
+          </button>
+          <button type="submit" name="action" value="up" class="w3-button w3-small w3-light-green w3-block" style="margin-top:5px;" <%= 'disabled' if running %>>
+            <i class="fas fa-power-off"></i> Nodes only
+          </button>
+        </div>
+      </div>
       
       <% if running %>
         <button type="submit" name="action" value="down" class="w3-button w3-red w3-round" title="Stop Lab">

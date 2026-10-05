@@ -412,6 +412,20 @@ class Node
     end
   end
 
+  def scoped_run( cmd )
+    unless File.directory?('/run/systemd/system') && system('command -v systemd-run >/dev/null 2>&1')
+      @log.write "#{__method__}(): systemd unavailable, starting #{@name} in ctlabs-server cgroup", "warn"
+      return cmd
+    end
+
+    unit = "ctlabs-node-#{@name}"
+    load = %x( systemctl show #{unit} -p LoadState --value 2>/dev/null ).strip
+    unit = "#{unit}-#{Time.now.to_i}" unless load.empty? || load == 'not-found'
+
+    @log.write "#{__method__}(): isolating #{@name} in #{unit}.scope", "debug"
+    "systemd-run --scope --quiet --unit=#{unit} #{cmd}"
+  end
+
   def run
     @log.write "#{__method__}(): name=#{@name}", "debug"
 
@@ -456,7 +470,8 @@ class Node
 
 
         #%x( docker run -d #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
-        %x( docker run -d --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
+        run_cmd = "docker run -d --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd}"
+        %x( #{scoped_run(run_cmd)} 2>/dev/null )
         sleep 1
         @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
@@ -468,6 +483,19 @@ class Node
           %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
         else
           %x( docker exec #{@name} sh -c '/usr/bin/printf "domain #{@domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+        end
+
+        # The ctlabs-ansible / ctlabs-terraform repos are mounted at /srv/ctlabs
+        # so the `ansible` user can reach them (the image's /root is 0750
+        # root:root, so uid 1000 cannot traverse it). Several roles still
+        # hardcode the old /root path and run as root against
+        # `delegate_to: localhost` - ctlabs_vault bootstrap slurps
+        # /root/ctlabs-ansible/.ctlabs_vault_init_output_*.yml, and that task has
+        # failed_when: false, so without this the vault bootstrap is SILENTLY
+        # skipped while the playbook still reports success. Point the old path at
+        # the new one rather than bind-mounting the same directory twice.
+        if @type == 'controller'
+          %x( docker exec #{@name} sh -c 'ln -sfn /srv/ctlabs/ctlabs-ansible /root/ctlabs-ansible; ln -sfn /srv/ctlabs/ctlabs-terraform /root/ctlabs-terraform' 2>/dev/null )
         end
         @netns = add_netns
         #add_nics

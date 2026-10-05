@@ -26,7 +26,16 @@ ACTUAL_VCPUS=$((QEMU_CPU_SOCKETS * 1 * QEMU_CPU_CORES * QEMU_CPU_THREADS))
 QEMU_VGA=${QEMU_VGA:-none}
 QEMU_VNC=${QEMU_VNC:-false}
 
-FILE="/root/.ssh/authorized_keys"
+# ctlabs injects the lab's public key into THIS container before qemu starts
+# (Lab#inject_ssh_key_to_node), and this script ships it to the guest over the
+# boot ISO. Prefer the login user's home - that is where ctlabs puts it - and
+# fall back to root's for images/boxes that have no such account.
+CTLABS_SSH_USER="${CTLABS_SSH_USER:-ansible}"
+if id -u "$CTLABS_SSH_USER" >/dev/null 2>&1; then
+  FILE="/home/${CTLABS_SSH_USER}/.ssh/authorized_keys"
+else
+  FILE="/root/.ssh/authorized_keys"
+fi
 TIMEOUT=120
 SECONDS=0
 
@@ -42,7 +51,12 @@ done
 
 echo "File found, copying key..." >&2
 mkdir -p /mnt/ssh
-cp /root/.ssh/authorized_keys /mnt/ssh/
+# Fatal on failure: without the key the guest boots but nothing can log in, and
+# the symptom (ansible timeout) points nowhere near this script.
+cp "$FILE" /mnt/ssh/authorized_keys || {
+    echo "Error: Failed to copy $FILE to /mnt/ssh/authorized_keys" >&2
+    exit 1
+}
 
 gen_mac() {
   local premac="52:54:00:"
@@ -61,19 +75,41 @@ cat > /mnt/ctlabs_net_setup.sh << EOF
 
 hostnamectl set-hostname ${HOSTNAME}
 
-if [ ! -d "/root/.ssh" ]; then
-  mkdir -vp /root/.ssh
-fi
-cp /mnt/ssh/authorized_keys /root/.ssh/authorized_keys
-chmod 600 /root/.ssh/authorized_keys
+# NOTE on escaping: this heredoc is unquoted, so it interpolates as it is
+# generated. Every REFERENCE to ssh_user/ssh_home below needs a leading
+# backslash so the guest sees a literal dollar sign; the ASSIGNMENTS must have
+# no dollar sign at all. Escaping the assignment too (it looks right, but it
+# is not) makes bash treat it as a command named "=ansible", because assignment
+# names cannot contain a dollar sign - the variable is then never set and every
+# later line silently runs against an empty path.
+ssh_user=ansible
+id -u ansible >/dev/null 2>&1 || ssh_user=root
+ssh_home=\$(getent passwd "\$ssh_user" | cut -d: -f6)
+[ -n "\$ssh_home" ] || ssh_home=/root
+# The key install is the one step that must not fail silently: without it the
+# guest boots fine and looks healthy, but nothing can log in, and the symptom
+# points at ansible rather than at this script. Bail loudly instead.
+mkdir -vp "\$ssh_home/.ssh" || exit 1
+cp /mnt/ssh/authorized_keys "\$ssh_home/.ssh/authorized_keys" || exit 1
+chown -R "\$ssh_user":"\$ssh_user" "\$ssh_home/.ssh" || exit 1
+chmod 700 "\$ssh_home/.ssh"
+chmod 600 "\$ssh_home/.ssh/authorized_keys"
 
 ip addr add ${eth0_ip} dev ${eth0_nic}
 ip link set ${eth0_nic} master mgmt mtu 1460 up
 ip route add default via ${eth0_gw} vrf mgmt
 
-ip addr add ${eth1_ip} dev ${eth1_nic}
-ip link set ${eth1_nic} mtu 1460 up
-ip route add default via ${eth1_gw}
+# Data plane is optional - a node can be mgmt-only (e.g. an adhoc qemu host with
+# no eth1). eth1_ip can interpolate empty, which used to emit a bare
+# "ip addr add  dev enp0s2" and then die on "ip route add default via ".
+# Carry the values into the guest as strings so they can be tested there.
+eth1_addr='${eth1_ip}'
+eth1_gw='${eth1_gw}'
+if [ -n "\$eth1_addr" ]; then
+  ip addr add \$eth1_addr dev ${eth1_nic}
+  ip link set ${eth1_nic} mtu 1460 up
+  [ -n "\$eth1_gw" ] && ip route add default via \$eth1_gw
+fi
 
 echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
 EOF

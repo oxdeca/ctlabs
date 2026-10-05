@@ -76,6 +76,45 @@ class TerminalService
     end
   end
 
+  # Login names come from lab/profile YAML, so they are interpolated into a
+  # shell command below. Only accept a plain POSIX user name; anything else
+  # (or a nil/blank profile user) means "no opinion" and we fall back to root.
+  def self.sanitize_login_user(user)
+    u = user.to_s.strip
+    return nil unless u =~ %r{\A[a-zA-Z0-9_][a-zA-Z0-9_.-]*\z}
+    u
+  end
+
+  # Home directory of a user inside a running container, cached per
+  # container+user. Returns nil if it cannot be determined, in which case we
+  # simply omit -w: the shell then starts in / but HOME is still correct, which
+  # is far better than guessing a path that may not exist.
+  def self.resolve_home_dir(engine, container, user)
+    return nil if user.to_s.empty?
+    @home_dir_cache ||= {}
+    key = "#{container}:#{user}"
+    return @home_dir_cache[key] if @home_dir_cache.key?(key)
+
+    home = begin
+      out = `#{engine} exec #{container} sh -c 'getent passwd #{user} | cut -d: -f6' 2>/dev/null`.to_s
+      out.lines.first.to_s.strip
+    rescue
+      ''
+    end
+    home = nil unless home.start_with?('/') && !home.include?(' ')
+    @home_dir_cache[key] = home
+    home
+  end
+
+  # True if `path` is a directory inside the container. Checked before passing -w
+  # to `docker exec`, which fails outright if the working directory is missing -
+  # so this keeps the terminal usable on labs whose controller does not mount
+  # the repo.
+  def self.container_dir_exists?(engine, container, path)
+    return false if path.to_s.empty?
+    system("#{engine} exec #{container} test -d #{path} >/dev/null 2>&1")
+  end
+
   def self.resolve_terminal_command(node_name, session)
     if node_name == 'ctlabs_host'
       cmd = ['env', 'TERM=linux']
@@ -88,6 +127,7 @@ class TerminalService
     custom_term = nil
     node_type = nil
     tf_cfg = nil
+    node_user = nil
 
     if Lab.running?
       runtime_path = Lab.get_file_path(Lab.current_name)
@@ -97,10 +137,20 @@ class TerminalService
           if node = lab.find_node(node_name)
             node_type = node.type
             custom_term = node.term
-            
+            profile_user = sanitize_login_user(node.user)
+
+            # `user:` in the profile is ANSIBLE's login (it becomes to root for
+            # tasks), not the shell a human wants. Only the controller is logged
+            # in as that user; every other node gets root, which is what these
+            # terminals used before the non-root migration.
+            node_user = node_type == 'controller' ? profile_user : nil
+
+            # Fallback for remote nodes with no explicit term:. Here the profile
+            # user IS a real login credential - there is no become on a remote
+            # device - so keep using it rather than forcing root.
             if (!custom_term || custom_term.empty?) && node.remote?
               ip_target = node.gw || node.ipv4 || (node.nics && node.nics.values.first)
-              custom_term = "ssh://root@#{ip_target.split('/').first}" if ip_target
+              custom_term = "ssh://#{profile_user || 'root'}@#{ip_target.split('/').first}" if ip_target
             end
             
             tf_cfg = node.terraform if node.terraform
@@ -126,7 +176,23 @@ class TerminalService
       cmd.push("#{user}@#{host}")
     else
       engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-      cmd = [engine, 'exec', '-it', '-w', '/root', '-e', 'TERM=xterm-256color']
+
+      # The controller logs in as its profile user (see above); every other node
+      # runs with no -u, i.e. root, which is what an operator expects on a data
+      # node. Home dir is resolved only when we are overriding the user.
+      cmd = [engine, 'exec', '-it']
+      cmd.push('-u', node_user) if node_user
+
+      # The controller opens in the mounted repo workspace (the same path the
+      # playbook runs from), not $HOME. Other nodes keep root's default cwd.
+      work_dir = nil
+      if node_type == 'controller'
+        workspace = Automation::ANSIBLE_DIR_CTL
+        work_dir  = workspace if container_dir_exists?(engine, node_name, workspace)
+      end
+      work_dir ||= resolve_home_dir(engine, node_name, node_user) if node_user
+      cmd.push('-w', work_dir) if work_dir
+      cmd.push('-e', 'TERM=xterm-256color')
 
       if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
         begin

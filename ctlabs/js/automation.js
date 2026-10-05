@@ -384,6 +384,25 @@ window.loadAnsProfiles = async function() {
   };
 
 
+window.stopAnsiblePlaybook = async function(event, labName) {
+      const btn = event.currentTarget;
+
+      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      try {
+          btn.disabled = true;
+          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+          const res = await fetch(`/labs/${safeLab}/playbook/stop`, { method: 'POST' });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.message || data.error || 'Stop failed');
+          window.location.reload();
+      } catch (err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Stop failed';
+          btn.title = err.message;
+      }
+  };
+
+
 // ----------------------------------------------------------------------------
 // --- TERRAFORM ---
 // ----------------------------------------------------------------------------

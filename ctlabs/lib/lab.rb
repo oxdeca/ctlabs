@@ -4,16 +4,21 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
-require 'open3'
+# open3 + set moved to lib/automation.rb (stream_docker_exec / build_play_setup).
 require 'shellwords'
 require 'yaml'
 require 'json'
-require 'set'
 require 'socket'
 require 'fileutils'
 require_relative '../services/lab_repository'
+require_relative 'automation'
 
 class Lab
+  # Ansible + Terraform live in lib/automation.rb; mixed in here so Lab keeps
+  # lab.run_playbook / lab.run_terraform. See that module's header for what
+  # stays Lab's job (up, add_adhoc_node, metadata) vs. automation's.
+  include Automation
+
   attr_writer :dotfile, :dtype, :diagram
   attr_reader :name, :desc, :nodes, :links, :defaults, :topology, :cfg_file, :relative_path
   attr_accessor :log
@@ -21,27 +26,9 @@ class Lab
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
 
-  # Box-local overrides live under /root/.ctlabs/labs/<file> and, when present,
-  # shadow the repo-shipped default entirely (no merging - see design-guide.md).
-  # Resolved fresh on every call (NOT cached into a constant) so the long-lived
-  # webgui process picks up a box-local file dropped in after boot, same as the
-  # ~/.ctlabs-server/auth override (base_controller.rb) - a frozen constant would
-  # only re-check at the next process start (CLI runs are fine either way since
-  # each invocation is a fresh process, but the puma server is not).
-  def self.profile_override_path(basename)
-    override = "/root/.ctlabs/labs/#{basename}"
-    File.exist?(override) ? override : "/root/ctlabs/labs/#{basename}"
-  end
-
-  def self.setup_profiles_path;     profile_override_path('setup_profiles.yml');     end
-  def self.role_profiles_path;      profile_override_path('role_profiles.yml');      end
-  def self.terraform_profiles_path; profile_override_path('terraform_profiles.yml'); end
-  def self.global_profiles_path;    profile_override_path('node_profiles.yml');      end
-
-  ANSIBLE_DIR        = '/root/ctlabs-ansible'.freeze
-  PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
-  PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
-
+  # node_profiles.yml is node/container profile data, not ansible fact data, so
+  # this one stays here - but it shares Automation's box-local override mechanism.
+  def self.global_profiles_path; Automation.profile_override_path('node_profiles.yml'); end
 
   #def initialize(cfg, vm_name=nil, dlevel="warn")
   def initialize(args={})
@@ -202,27 +189,6 @@ class Lab
       end
     end
     [nil, nil]
-  end
-
-  # ---------------------------------------------------------------------------
-  # Helper: Find Controller in Raw YAML (Moved from automation route)
-  # ---------------------------------------------------------------------------
-  def self.find_automation_controller(vm_cfg)
-    if vm_cfg['nodes']
-      name = vm_cfg['nodes'].keys.find { |k| k == 'ansible' || vm_cfg['nodes'][k]['type'] == 'controller' }
-      return name, vm_cfg['nodes'][name], nil if name
-    end
-    
-    if vm_cfg['planes']
-      vm_cfg['planes'].each do |p_name, p_data|
-        if p_data && p_data['nodes']
-          name = p_data['nodes'].keys.find { |k| k == 'ansible' || p_data['nodes'][k]['type'] == 'controller' }
-          return name, p_data['nodes'][name], p_name if name
-        end
-      end
-    end
-    
-    [nil, nil, nil]
   end
 
   def find_vm(name)
@@ -525,91 +491,6 @@ class Lab
       end
     end
     false
-  end
-
-  # Acquire playbook execution lock (with stale lock cleanup)
-  def self.acquire_playbook_lock!(lab_name, timeout: 30)
-    lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
-    FileUtils.mkdir_p(PLAYBOOK_LOCK_DIR)
-    
-    # Check for stale lock (PID no longer exists)
-    if File.file?(lock_path)
-      begin
-        pid = File.read(lock_path).strip.to_i
-        if pid > 0
-          Process.kill(0, pid)  # Raises Errno::ESRCH if PID doesn't exist
-        else
-          # Invalid PID → stale lock
-          FileUtils.rm_f(lock_path)
-        end
-      rescue Errno::ESRCH
-        # PID doesn't exist → stale lock, clean it up
-        @log&.write "Cleaning stale playbook lock for #{lab_name} (PID #{pid} gone)", "debug"
-        FileUtils.rm_f(lock_path)
-      rescue => e
-        # Unknown error → assume lock is valid
-        raise "Playbook already running for lab '#{lab_name}' (lock held by PID #{pid || 'unknown'})"
-      end
-    end
-    
-    # Attempt to acquire lock with timeout
-    timeout.times do
-      begin
-        lock_file = File.open(lock_path, File::CREAT | File::EXCL | File::WRONLY)
-        lock_file.write(Process.pid.to_s)
-        lock_file.flush
-        return lock_path  # Return path to release later
-      rescue Errno::EEXIST
-        # Lock exists → wait and retry
-        sleep 1
-      end
-    end
-    
-    raise "Timeout: Playbook already running for lab '#{lab_name}' (lock file: #{lock_path})"
-  end
-
-  # Release playbook execution lock
-  def self.release_playbook_lock!(lock_path)
-    FileUtils.rm_f(lock_path) if lock_path && File.file?(lock_path)
-  rescue => e
-    @log&.write "Warning: Failed to release playbook lock #{lock_path}: #{e.message}", "debug"
-  end
-
-  # Check if playbook is currently running
-  def self.playbook_running?(lab_name)
-    lock_path = "#{PLAYBOOK_LOCK_DIR}/#{lab_name.gsub(%r{[^a-zA-Z0-9_.\-/]}, '_').gsub('/', '_')}.lock"
-    return false unless File.file?(lock_path)
-    
-    # Verify lock isn't stale
-    begin
-      pid = File.read(lock_path).strip.to_i
-      return false if pid == 0
-      Process.kill(0, pid)  # Raises if PID doesn't exist
-      true
-    rescue Errno::ESRCH
-      # Stale lock → clean up and return false
-      FileUtils.rm_f(lock_path)
-      false
-    rescue
-      true  # Unknown state → assume running
-    end
-  end
-
-  # Check if Terraform is currently running for a specific lab (used by the UI to disable the button)
-  def self.terraform_running?(lab_path)
-    # Simple check: see if a terraform process is running inside the lab's controller container
-    # You may need to adjust the container naming convention based on how your CTLABS script names them!
-    lab_base_name = File.basename(lab_path, '.yml')
-    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    
-    # Check running processes in the controller (assuming the container name contains the lab name and 'ansible' or 'controller')
-    # This is a safe, non-blocking check
-    cmd = "#{engine} ps --format '{{.Names}}' | grep #{lab_base_name} | head -n 1"
-    container_name = `#{cmd}`.strip
-    return false if container_name.empty?
-
-    # Check if 'terraform' is in the process list of that container
-    `#{engine} exec #{container_name} ps aux | grep -v grep | grep terraform`.strip != ""
   end
 
   def init_nodes(vm_name)
@@ -984,22 +865,50 @@ class Lab
     return if ['rhost', 'external', 'gateway'].include?(node.type)
 
     begin
-      # Ensure .ssh directory exists
-      system("docker exec #{node.name} mkdir -p /root/.ssh")
-      system("docker exec #{node.name} chmod 700 /root/.ssh")
+      # Login user for this node. The public key must land in THAT user's home
+      # (node_profiles.yml sets `user: ansible` for everything that has the
+      # account), otherwise sshd will never offer it to the login we use.
+      login_user = (node.user.nil? || node.user.to_s.empty?) ? 'root' : node.user.to_s
+      home       = login_user == 'root' ? '/root' : "/home/#{login_user}"
 
-      # The controller gets the PRIVATE key so it can SSH into other nodes/GCP
+      # Ensure .ssh directory exists
+      system("docker exec #{node.name} mkdir -p #{home}/.ssh")
+      system("docker exec #{node.name} chmod 700 #{home}/.ssh")
+      system("docker exec #{node.name} chown #{login_user}:#{login_user} #{home}/.ssh") unless login_user == 'root'
+
+      # The controller gets the PRIVATE key so it can SSH into other nodes/GCP.
+      # It goes into root's home AND the profile login user's home: the web
+      # terminal and any operator running `ansible -i ... -m ping` by hand use
+      # the profile user (ansible), whose ssh identity home is $HOME. With the
+      # key only under /root, every host came back UNREACHABLE from the
+      # terminal with "Permission denied (publickey,...)" even though the
+      # playbooks (exec'd as root) worked fine. Not a privilege escalation:
+      # the profile user has passwordless sudo and could read root's key anyway.
       if node.type == 'controller'
-        system("docker cp #{priv_key} #{node.name}:/root/.ssh/id_ed25519")
-        system("docker cp #{pub_key_path} #{node.name}:/root/.ssh/id_ed25519.pub")
-        system("docker exec #{node.name} chmod 600 /root/.ssh/id_ed25519")
-        system("docker exec #{node.name} chmod 644 /root/.ssh/id_ed25519.pub")
+        key_homes = ['/root']
+        key_homes << home unless login_user == 'root'
+
+        key_homes.each do |key_home|
+          next unless system("docker exec #{node.name} mkdir -p #{key_home}/.ssh")
+
+          system("docker cp #{priv_key} #{node.name}:#{key_home}/.ssh/id_ed25519")
+          system("docker cp #{pub_key_path} #{node.name}:#{key_home}/.ssh/id_ed25519.pub")
+          system("docker exec #{node.name} chmod 700 #{key_home}/.ssh")
+          system("docker exec #{node.name} chmod 600 #{key_home}/.ssh/id_ed25519")
+          system("docker exec #{node.name} chmod 644 #{key_home}/.ssh/id_ed25519.pub")
+          # docker cp preserves the host file's root ownership, and ssh refuses a
+          # private key the caller does not own.
+          system("docker exec #{node.name} chown -R #{login_user}:#{login_user} #{key_home}/.ssh") unless key_home == '/root'
+        end
       end
 
-      # ALL nodes get the PUBLIC key in their authorized_keys
-      system("docker exec #{node.name} sh -c \"echo '#{pub_key}' >> /root/.ssh/authorized_keys\"")
-      system("docker exec #{node.name} chmod 600 /root/.ssh/authorized_keys")
-      
+      # ALL nodes get the PUBLIC key in their login user's authorized_keys
+      system("docker exec #{node.name} sh -c \"echo '#{pub_key}' >> #{home}/.ssh/authorized_keys\"")
+      unless login_user == 'root'
+        system("docker exec #{node.name} chown #{login_user}:#{login_user} #{home}/.ssh/authorized_keys")
+      end
+      system("docker exec #{node.name} chmod 600 #{home}/.ssh/authorized_keys")
+
     rescue => e
       @log.write("Failed to inject SSH keys to #{node.name}: #{e.message}", "error")
     end
@@ -1095,7 +1004,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
             engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
 
             # 1. Run Terraform Apply directly in the container
-            tf_cmd = "cd /root/ctlabs-terraform/#{tf_dir} && " \
+            tf_cmd = "cd #{Automation::TF_DIR_CTL}/#{tf_dir} && " \
                      "(terraform workspace select #{workspace} || terraform workspace new #{workspace}) && " \
                      "terraform init -upgrade && terraform apply -auto-approve"
 
@@ -1114,7 +1023,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
             `#{engine} exec #{v_env}#{ctrl_name} bash -c '#{tf_cmd}'`
 
             # 2. Fetch the JSON output
-            tf_output_json = `#{engine} exec #{v_env}#{ctrl_name} bash -c 'cd /root/ctlabs-terraform/#{tf_dir} && terraform output -json provisioned_vms'`.strip
+            tf_output_json = `#{engine} exec #{v_env}#{ctrl_name} bash -c 'cd #{Automation::TF_DIR_CTL}/#{tf_dir} && terraform output -json provisioned_vms'`.strip
             vms_out = JSON.parse(tf_output_json)
 
             # 3. Safely update the YAML file with the new IPs
@@ -1276,533 +1185,6 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     end
   end
 
-
-  def build_play_setup(play_cfg)
-    setup_profiles_path = Lab.setup_profiles_path
-    role_profiles_path  = Lab.role_profiles_path
-    setup_profiles = File.file?(setup_profiles_path) ?
-      (YAML.load_file(setup_profiles_path)['profiles'] || {}) : {}
-    role_profiles  = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
-
-    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
-    result    = {}
-
-    # process explicit play.setup entries (profile + per-host overrides)
-    (play_cfg['setup'] || {}).each do |role, cfg|
-      cfg        = cfg || {}
-      named_prof = cfg['profile'] && setup_profiles[cfg['profile']]
-      base_prof  = named_prof || setup_profiles[role]
-      base       = base_prof ? Marshal.load(Marshal.dump(base_prof)) : {}
-      base.delete('role')
-
-      result[role] = deep_merge(base, cfg.reject { |k, _| k == 'profile' })
-    end
-
-    # for roles in play.tags but not play.setup, load setup_profile defaults
-    # matching by profile name == role profile name in role_profiles.yml
-    role_profiles.each do |profile_name, rp_cfg|
-      next if result.key?(profile_name)
-      role_tags = Array(rp_cfg['tags'] || []).map(&:to_s)
-      next unless (role_tags & play_tags).any?
-      next unless setup_profiles.key?(profile_name)
-      base = Marshal.load(Marshal.dump(setup_profiles[profile_name]))
-      base.delete('role')
-      result[profile_name] = base
-    end
-
-    # Bake `defaults:` into each per-host entry so that
-    # play_setup[role][hostname] always contains the full config.
-    # Per-host keys are node names; role-wide defaults live under `defaults:`.
-    # Per-host `profile:` overrides the base profile for that host.
-    node_names = @nodes.map(&:name).to_set
-    result.transform_values! do |role_cfg|
-      role_defaults = role_cfg['defaults'] || {}
-      per_hosts     = role_cfg.select { |k, _| node_names.include?(k) }
-      base          = role_cfg.reject { |k, _| k == 'defaults' || node_names.include?(k) }
-      shared        = deep_merge(base, role_defaults)
-      if per_hosts.empty?
-        shared
-      else
-        baked = per_hosts.transform_values do |hcfg|
-          host_prof_name = hcfg.delete('profile')
-          if host_prof_name && setup_profiles[host_prof_name]
-            host_base     = Marshal.load(Marshal.dump(setup_profiles[host_prof_name]))
-            host_base.delete('role')
-            host_defaults = host_base['defaults'] || {}
-            host_rest     = host_base.reject { |k, _| k == 'defaults' }
-            host_shared   = deep_merge(host_rest, host_defaults)
-            deep_merge(shared, deep_merge(host_shared, hcfg))
-          else
-            deep_merge(shared, hcfg)
-          end
-        end
-        shared.merge(baked)
-      end
-    end
-
-    File.write(PLAY_SETUP_FILE, JSON.pretty_generate({ 'play_setup' => result }))
-    @log.write "#{__method__}(): wrote #{PLAY_SETUP_FILE}", "debug"
-    result
-  end
-
-  def generate_setup_yml(play_cfg)
-    role_profiles_path = Lab.role_profiles_path
-    profiles  = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
-
-    existing  = @nodes.map(&:name)
-    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
-    setup_cfg = play_cfg['setup'] || {}
-
-    header = <<~HEADER
-      ---
-
-      # ------------------------------------------------------------------------------
-      # File        : ctlabs-ansible/playbooks/setup.yml
-      # Description : ctlabs phase 3 - write local facts (generated by lab.rb)
-      # ------------------------------------------------------------------------------
-
-      - name : ctlabs.playbooks.setup
-        hosts: all:!rhosts
-        tags : setup
-        tasks:
-          - name: ctlabs.playbooks.setup.facts_dir.linux
-            when: ansible_shell_type | default('sh') != 'powershell'
-            file:
-              path : "{{ ctg_facts_dir }}"
-              state: directory
-            
-          - name: ctlabs.playbooks.setup.facts_dir.windows
-            when: ansible_shell_type | default('sh') == 'powershell'
-            win_file:
-              path : "{{ ctg_facts_dir }}"
-              state: directory
-
-    HEADER
-
-    plays = profiles.map do |profile_name, cfg|
-      next unless cfg['role']
-      next unless File.file?("#{ANSIBLE_DIR}/roles/#{cfg['role']}/tasks/facts.yml")
-
-      role_tags = Array(cfg['tags'] || []).map(&:to_s)
-      next unless (role_tags & play_tags).any?
-
-      role_setup  = setup_cfg[profile_name]
-      setup_hosts = role_setup && role_setup['hosts']
-      grouped     = cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
-      hosts_pattern = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
-        resolved = setup_hosts.flat_map { |g| Array(g['group']) }.uniq & existing
-        resolved.empty? ? nil : resolved.join(',')
-      elsif setup_hosts.is_a?(String)
-        setup_hosts
-      elsif setup_hosts
-        resolved = Array(setup_hosts) & existing
-        resolved.empty? ? nil : resolved.join(',')
-      elsif grouped
-        resolved = cfg['hosts'].flat_map { |g| Array(g['group']) }.uniq & existing
-        resolved.empty? ? nil : resolved.join(',')
-      elsif cfg['hosts'].is_a?(String)
-        cfg['hosts']
-      else
-        resolved = Array(cfg['hosts']) & existing
-        resolved.empty? ? nil : resolved.join(',')
-      end
-      next unless hosts_pattern
-
-      <<~PLAY
-        - name : ctlabs.playbooks.setup.#{profile_name}
-          hosts: #{hosts_pattern}
-          tags : setup
-          tasks:
-            - name: ctlabs.playbooks.setup.#{profile_name}.facts
-              include_role:
-                name      : #{cfg['role']}
-                tasks_from: facts.yml
-              vars:
-                ctlabs_role_facts: "{{ (play_setup['#{profile_name}'] | default({}))[inventory_hostname] | default(play_setup['#{profile_name}'] | default({})) }}"
-
-      PLAY
-    end.compact
-
-    path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
-    File.write(path, header + plays.join)
-    @log.write "#{__method__}(): wrote #{path}", "debug"
-  end
-
-  def generate_ctlabs_yml(play_cfg)
-    role_profiles_path = Lab.role_profiles_path
-    profiles = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
-
-    existing  = @nodes.map(&:name)
-    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
-
-    book   = play_cfg['book'] || 'ctlabs.yml'
-    header = <<~HEADER
-      ---
-
-      # ------------------------------------------------------------------------------
-      # File        : ctlabs-ansible/playbooks/#{book}
-      # Description : ctlabs phase 4 - run roles (generated by lab.rb)
-      # ------------------------------------------------------------------------------
-
-      - import_playbook: up.yml
-      - import_playbook: setup.yml
-
-    HEADER
-
-    plays = profiles.flat_map do |profile_name, cfg|
-      next [] unless cfg['role']
-      role_tags = Array(cfg['tags'] || []).map(&:to_s)
-      next [] unless (role_tags & play_tags).any?
-
-      setup_cfg   = (play_cfg['setup'] || {})[profile_name]
-      setup_hosts = setup_cfg && setup_cfg['hosts']
-
-      effective_groups = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
-        setup_hosts
-      elsif cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
-        cfg['hosts']
-      else
-        nil
-      end
-
-      if effective_groups
-        effective_groups.filter_map do |grp|
-          grp_hosts = Array(grp['group']) & existing
-          next if grp_hosts.empty?
-          grp_tags = (Array(grp['tags']).map(&:to_s) + role_tags).uniq
-          <<~PLAY
-            - name : ctlabs.playbooks.ctlabs.#{profile_name}
-              hosts: #{grp_hosts.join(',')}
-              tags : [#{grp_tags.join(', ')}]
-              roles:
-                - roles/#{cfg['role']}
-
-          PLAY
-        end
-      else
-        hosts_pattern = if setup_hosts.is_a?(String)
-          setup_hosts
-        elsif setup_hosts
-          resolved = Array(setup_hosts) & existing
-          resolved.empty? ? nil : resolved.join(',')
-        elsif cfg['hosts'].is_a?(String)
-          cfg['hosts']
-        else
-          resolved = Array(cfg['hosts']) & existing
-          resolved.empty? ? nil : resolved.join(',')
-        end
-        next [] unless hosts_pattern
-        [<<~PLAY]
-          - name : ctlabs.playbooks.ctlabs.#{profile_name}
-            hosts: #{hosts_pattern}
-            tags : [#{role_tags.join(', ')}]
-            roles:
-              - roles/#{cfg['role']}
-
-        PLAY
-      end
-    end.compact
-
-    path = "#{ANSIBLE_DIR}/playbooks/#{book}"
-    File.write(path, header + plays.join)
-    @log.write "#{__method__}(): wrote #{path}", "debug"
-  end
-
-  def run_playbook(play = nil, log_file_path = nil)
-    @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
-
-    # VALIDATION: Lab must be running
-    unless self.class.running? && self.class.current_name == @relative_path
-      raise "Cannot run playbook: Lab '#{@relative_path}' is not running. Start it first with --up"
-    end
-
-    # ACQUIRE PLAYBOOK LOCK (prevents concurrent execution)
-    playbook_lock = nil
-    begin
-      playbook_lock = self.class.acquire_playbook_lock!(@relative_path)
-
-      ctrl = find_node('ansible')
-      raise "No 'ansible' controller node found in topology" if ctrl.nil?
-
-      domain   = (@cfg['domain'] || @domain)
-      play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
-
-      # generate ansible artifacts from lab topology + profiles
-      build_play_setup(play_cfg)
-      generate_setup_yml(play_cfg)
-      generate_ctlabs_yml(play_cfg)
-
-      # Determine playbook command
-      if play.is_a?(String) && !play.strip.empty?
-        play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-      elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
-        play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-      elsif play_cfg['book'].is_a?(String)
-        inv_file  = play_cfg['inv'] || "#{@name}.ini"
-        play_inv  = " -i ./inventories/#{inv_file}"
-        play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-        play_env += " -e @#{PLAY_SETUP_FILE}"
-        play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
-        play_book = " ./playbooks/#{play_cfg['book']}"
-        play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
-        play_cmd  = "ansible-playbook#{play_inv}#{play_book}#{play_tags}#{play_env}"
-      else
-        raise "No playbook specified and no default playbook configured for 'ansible' node"
-      end
-
-      @log.info "Executing playbook: #{play_cmd}"
-
-      # Execute with dual-stream output
-      if log_file_path
-        stream_docker_exec(ctrl.name, play_cmd, log_file_path)
-      else
-        success = system("docker exec #{ctrl.name} sh -c 'cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd}'")
-        unless success
-          @log.info "Playbook execution failed (exit code: #{$?.exitstatus})"
-          raise "Playbook execution failed"
-        end
-      end
-
-      @log.info "Playbook execution completed"
-
-    ensure
-      # ALWAYS release lock (even on failure)
-      self.class.release_playbook_lock!(playbook_lock) if playbook_lock
-    end
-  end
-
-  def run_terraform(target_node_name = nil, log_path = nil, web_v_token = nil, web_v_addr = nil, action = 'apply')
-    @log.write "#{__method__}(): target=#{target_node_name.inspect}", "debug"
-
-    ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
-    raise "No controller node found in topology to run Terraform." unless ctrl
-
-    node_cfg  = @cfg['topology'][0]['nodes'][ctrl.name] || {}
-    tf_cfg    = node_cfg['terraform'] || {}
-
-    workspace = tf_cfg['workspace'].to_s.strip
-    workspace = 'default' if workspace.empty?
-    
-    vars      = tf_cfg['vars'] || []
-    var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
-
-    tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
-    work_dir = "/root/ctlabs-terraform/#{tf_work_dir}"
-    
-    custom_script = tf_cfg['commands'].to_s.strip
-
-    # --- NEW: Smart Execution Router ---
-    if action == 'destroy'
-      # 1. DESTROY ALWAYS WINS (Ignores custom scripts)
-      base_tf_cmd = <<~CMD.gsub("\n", " ").strip
-        cd #{work_dir} && 
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
-        terraform init -upgrade && 
-        terraform destroy -auto-approve #{var_args}
-      CMD
-    elsif !custom_script.empty?
-      # 2. CUSTOM SCRIPT (Only runs if action is apply)
-      base_tf_cmd = <<~CMD.strip
-        cd #{work_dir} && 
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
-        #{custom_script}
-      CMD
-    else
-      # 3. STANDARD APPLY
-      base_tf_cmd = <<~CMD.gsub("\n", " ").strip
-        cd #{work_dir} && 
-        (terraform workspace select #{workspace} || terraform workspace new #{workspace}) && 
-        terraform init -upgrade && 
-        terraform apply -auto-approve #{var_args}
-      CMD
-    end
-
-    exec_env  = ""
-    exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
-    exec_env += "-e VAULT_ADDR='#{web_v_addr}' "   if web_v_addr  && !web_v_addr.empty?
-    exec_env += "-e VAULT_SKIP_VERIFY=true "       if web_v_token &&  web_v_addr
-
-    # --- Fetch GCP credentials in Ruby, dispatched on terraform.auth.method ---
-    begin
-      gcp_env = GcpAuth.env_vars(tf_cfg, { addr: web_v_addr, token: web_v_token })
-      gcp_env.each { |key, value| exec_env += "-e #{key}='#{value}' " }
-    rescue => e
-      error_msg = "\n❌ ERROR: Could not generate GCP credentials: #{e.message}\n👉 Please use the Vault Login button in the UI.\n"
-      File.open(log_path, 'a') { |f| f.puts error_msg } if log_path
-      raise e
-    end
-
-    # No more Python wrappers! Just pure Terraform.
-    tf_command = base_tf_cmd
-
-    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    
-    full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command.gsub("'", "'\\''")}'"
-
-    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}" 
-
-    # 4. Stream the output
-    if log_path
-      File.open(log_path, 'a') do |f|
-        f.puts "\n" + "="*50
-        f.puts "🚀 TERRAFORM EXECUTION STARTED"
-        f.puts "="*50
-        f.puts "Target Node : #{ctrl.name}"
-        f.puts "Workspace   : #{workspace}"
-        f.puts "Variables   : #{vars.empty? ? 'None' : vars.join(', ')}"
-        f.puts "-"*50 + "\n"
-      end
-    end
-
-    IO.popen("#{full_cmd} 2>&1") do |io|
-      File.open(log_path, 'a') do |f|
-        io.each_line do |line|
-          $stdout.print(line) # Mirror to backend CLI
-          $stdout.flush
-          f.puts line
-          f.flush # Force write so the UI picks it up instantly
-        end
-      end if log_path
-    end
-
-    # 5. Check Exit Status and Harvest IPs
-    if $?.success?
-      msg = "\n✅ Terraform execution completed successfully.\n"
-      @log.info msg.strip
-      File.open(log_path, 'a') { |f| f.puts msg } if log_path
-
-      # ONLY harvest IPs if this was an 'apply' action
-      if action == 'apply'
-        begin
-          @log.info "Harvesting provisioned IPs from terraform.tfstate..."
-          
-          # Handle Workspace paths correctly
-          state_file = workspace == 'default' ? "#{work_dir}/terraform.tfstate" : "#{work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
-
-          if File.exist?(state_file)
-            state_data = JSON.parse(File.read(state_file))
-            live_yaml = YAML.load_file(@cfg_file)
-            updates_made = false
-
-            (state_data['resources'] || []).each do |res|
-              # Target GCP Compute Instances
-              if res['type'] == 'google_compute_instance'
-                (res['instances'] || []).each do |inst|
-                  attrs = inst['attributes'] || {}
-                  vm_name = attrs['name']
-                  
-                  next unless vm_name
-
-                  # Extract IPs from GCP network interface schema
-                  nic = attrs['network_interface']&.first || {}
-                  priv_ip = nic['network_ip']
-                  pub_ip  = nic.dig('access_config', 0, 'nat_ip') rescue nil
-
-                  # Find the node in the modern planes schema
-                  vm_topology = live_yaml['topology']&.first || {}
-                  target = nil
-
-                  vm_topology['planes'].each do |_, p_data|
-                    if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
-                      target = p_data['nodes'][vm_name]
-                      break
-                    end
-                  end
-
-                  if target && (priv_ip || pub_ip)
-                    target['nics'] ||= {}
-                    target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
-                    target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
-                    if pub_ip
-                      target['term'] = "ssh://ansible@#{pub_ip}"
-                    end
-                    updates_made = true
-                    
-                    log_msg = "Mapped Terraform IPs for #{vm_name}: eth0=#{pub_ip || 'none'}, eth1=#{priv_ip || 'none'}"
-                    @log.info log_msg
-                    File.open(log_path, 'a') { |f| f.puts "[IP Harvest] #{log_msg}" } if log_path
-                  end
-                end
-              end
-            end
-
-            # Write the updated IPs back to the base lab file
-            if updates_made
-              LabRepository.write_formatted_yaml(@cfg_file, live_yaml, @cfg_file)
-              @log.info "Successfully saved new IPs to lab YAML."
-              File.open(log_path, 'a') { |f| f.puts "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}" } if log_path
-            end
-          else
-            @log.info "No terraform.tfstate found at #{state_file}. Skipping IP harvest."
-          end
-        rescue => e
-          @log.error "Failed to harvest Terraform IPs: #{e.message}"
-          File.open(log_path, 'a') { |f| f.puts "⚠️ IP Harvest failed: #{e.message}" } if log_path
-        end
-      end
-    else
-      msg = "\n⚠️ Terraform execution failed.\n"
-      @log.info msg.strip
-      File.open(log_path, 'a') { |f| f.puts msg } if log_path
-      raise "Terraform process returned a non-zero exit code."
-    end
-  end
-
-  def stream_docker_exec(container_name, play_cmd, log_file_path = nil)
-    inner_command = "cd /root/ctlabs-ansible && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
-    cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
-  
-    # Open log file ONCE before streaming (critical for web UI visibility)
-    log_file = log_file_path ? File.open(log_file_path, 'a') : nil
-  
-    Open3.popen3(*cmd) do |stdin, stdout, stderr, wait_thr|
-      stdin.close
-  
-      begin
-        # Stream stdout → BOTH CLI ($stdout) AND log file
-        Thread.new do
-          while (line = stdout.gets)
-            $stdout.print(line)
-            $stdout.flush
-            log_file&.write(line)
-            log_file&.flush
-          end
-        end
-  
-        # Stream stderr → BOTH CLI ($stderr) AND log file
-        Thread.new do
-          while (err_line = stderr.gets)
-            $stderr.print(err_line)
-            $stderr.flush
-            log_file&.write(err_line)
-            log_file&.flush
-          end
-        end
-  
-        # Wait for command completion
-        wait_thr.value
-  
-      rescue => e
-        error_msg = "Error during playbook streaming: #{e.message}\n"
-        $stderr.print(error_msg)
-        $stderr.flush
-        log_file&.write(error_msg)
-        log_file&.flush
-      ensure
-        # Critical: close log file AFTER all streaming completes
-        log_file&.close
-        exit_status = wait_thr.value.exitstatus
-        summary = "[Playbook exited with status: #{exit_status}]\n"
-        $stdout.print(summary)
-        $stdout.flush
-        File.open(log_file_path, 'a') { |f| f.write(summary) } if log_file_path && exit_status != 0
-      end
-    end
-  end
-
   def down
     begin
       # Validate we own the lock
@@ -1903,19 +1285,6 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       puts "Error saving runtime to base: #{e.message}"
       return false
     end
-  end
-
-  def deep_clone(obj)
-    Marshal.load(Marshal.dump(obj))
-  end
-
-  def deep_merge(base, override)
-    return deep_clone(override) unless base.is_a?(Hash) && override.is_a?(Hash)
-    result = deep_clone(base)
-    override.each do |k, v|
-      result[k] = result[k].is_a?(Hash) && v.is_a?(Hash) ? deep_merge(result[k], v) : deep_clone(v)
-    end
-    result
   end
 
   # Intelligently merges lab overrides on top of global profiles
