@@ -842,11 +842,10 @@ profiles:
       kubeconfig: /etc/kubernetes/admin.conf
 
   # ----------------------------------------------------------------------------
-  # ctlabs_argoapp
-  # ----------------------------------------------------------------------------
-  argoapp_rke201:
-    role: argoapp
+  
+  argoapp_certs:
     rke21:
+      kubeconfig: /etc/rancher/rke2/rke2.yaml
       namespace: argo
       interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
       repositories:

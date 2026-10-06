@@ -405,3 +405,8 @@ profiles:
     role : ctlabs_argoapp
     tags : [argoapp]
     hosts: [k3s1,rke21,k8s1]
+
+  argoapp_certs:
+    role : ctlabs_argoapp
+    tags : [argoapp_certs]
+    hosts: [rke21]
