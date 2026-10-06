@@ -286,6 +286,11 @@ profiles:
     tags : [gitea]
     hosts: [git1, git2]
 
+  chartmuseum:
+    role : ctlabs_chartmuseum
+    tags : [chartmuseum]
+    hosts: [git1, git2]
+
   atlantis:
     role : ctlabs_atlantis
     tags : [atlantis]
@@ -400,8 +405,3 @@ profiles:
     role : ctlabs_argoapp
     tags : [argoapp]
     hosts: [k3s1,rke21,k8s1]
-
-  chartmuseum:
-    role : ctlabs_chartmuseum
-    tags : [chartmuseum]
-    hosts: [repo1,repo2]
