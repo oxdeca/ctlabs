@@ -23,14 +23,31 @@ topology:
             gw   : 192.168.99.1
             nics :
               eth0: 192.168.99.5/24
+            dnat :
+              - [9988, 8200]
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, minikube, smbadc, slapd, xrdp]
+              tags: [up, setup, ca, vault, bind, minikube, smbadc, slapd, xrdp, httpd, guacamole]
               setup:
                 xrdp:
                   hosts: [mkube1]
-            dnat :
-              - [9988, 8200]
+                httpd:
+                  hosts: [gua1]
+                guacamole:
+                  hosts: [gua1]
+                  gua1:
+                    users:
+                    - username: ctlabs
+                      password: secret123!
+                      connections:
+                      - name: mkube1-rdp
+                        protocol: rdp
+                        params:
+                          hostname: mkube1.ctlabs.internal
+                          port: 3389
+                          ignore-cert: true
+                          color-depth: 24
+                          resize-method: display-update
           sw0:
             profile: ovs
             type: switch
@@ -138,6 +155,13 @@ topology:
               eth1: 192.168.30.11/24
             dnat :
               - [8081, 8200]
+          gua1:
+            type: host
+            gw: 192.168.30.1
+            nics:
+              eth1: 192.168.30.17/24
+            dnat:
+              - [8082, 443]
 
     links:
       - [ "ro0:eth1", "natgw:eth1"  ]
@@ -157,3 +181,4 @@ topology:
 
       - [ "sw3:eth2", "mkube1:eth1" ]
       - [ "sw3:eth3", "vdb1:eth1"   ]
+      - [ "sw3:eth4", "gua1:eth1"   ]

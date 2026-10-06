@@ -334,22 +334,22 @@ profiles:
   openclaw:
     role : ctlabs_openclaw
     tags : [openclaw]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [h1,h2]
 
   gemini_cli:
     role : ctlabs_gemini_cli
     tags : [gemini_cli]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   antigravity_cli:
     role : ctlabs_antigravity_cli
     tags : [antigravity_cli]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   claude:
     role : ctlabs_claude
     tags : [claude]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   opencode:
     role : ctlabs_opencode
@@ -359,12 +359,12 @@ profiles:
   picode:
     role : ctlabs_picode
     tags : [picode]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   hermes:
     role : ctlabs_hermes
     tags : [hermes]
-    hosts: [ansible, h1, h2, h3]
+    hosts: [ansible]
 
   wazuh:
     role : ctlabs_wazuh
@@ -400,3 +400,8 @@ profiles:
     role : ctlabs_argoapp
     tags : [argoapp]
     hosts: [k3s1,rke21,k8s1]
+
+  chartmuseum:
+    role : ctlabs_chartmuseum
+    tags : [chartmuseum]
+    hosts: [repo1,repo2]

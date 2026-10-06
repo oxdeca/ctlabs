@@ -840,3 +840,126 @@ profiles:
       kubeconfig: /etc/rancher/k3s/k3s.yaml
     k8s1:
       kubeconfig: /etc/kubernetes/admin.conf
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_argoapp
+  # ----------------------------------------------------------------------------
+  argoapp_rke201:
+    role: argoapp
+    rke21:
+      namespace: argo
+      interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
+      repositories:
+        - name: ctlabs-lab
+          type: git
+          url : https://git1.ctlabs.internal:3000/ctlabs/labs
+          username: ctlabs
+          password: secret123!
+          insecure: true
+      applications:
+        - name: cert-manager
+          source:
+            repoURL: https://charts.jetstack.io
+            chart  : cert-manager
+            targetRevision: v1.21.2
+            helm:
+              valuesObject:
+                crds:
+                  enabled: true
+                  keep   : true
+                startupapicheck:
+                  enabled: false
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+          destination:
+            namespace: cert-manager
+
+        - name: external-secrets
+          source:
+            repoURL: https://charts.external-secrets.io
+            chart  : external-secrets
+            targetRevision: 2.11.0
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+          destination:
+            namespace: external-secrets
+            
+        - name: argo-events
+          source:
+            repoURL: https://argoproj.github.io/argo-helm
+            chart  : argo-events
+            targetRevision: 2.4.27
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+          destination:
+            namespace: argo-events
+            
+        - name: cert-vault-sync
+          source:
+            repoURL: https://git1.ctlabs.internal:3000/ctlabs/labs
+            path: cert-vault-sync
+            targetRevision: main
+            helm:
+              valueFiles:
+                - values.yaml
+                - issuers.yaml
+          destination:
+            namespace: security-tools
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+
+        - name: cert-vault-sync-dev
+          source:
+            repoURL: https://git1.ctlabs.internal:3000/ctlabs/labs
+            path: cert-vault-sync
+            targetRevision: main
+            helm:
+              valueFiles:
+                - values.yaml
+                - certs-dev.yaml
+          destination:
+            namespace: security-tools
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+              
+        - name: cert-vault-sync-uat
+          source:
+            repoURL: https://git1.ctlabs.internal:3000/ctlabs/labs
+            path: cert-vault-sync
+            targetRevision: main
+            helm:
+              valueFiles:
+                - values.yaml
+                - certs-uat.yaml
+          destination:
+            namespace: security-tools
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+              
+        - name: cert-vault-sync-prod
+          source:
+            repoURL: https://git1.ctlabs.internal:3000/ctlabs/labs
+            path: cert-vault-sync
+            targetRevision: main
+            helm:
+              valueFiles:
+                - values.yaml
+                - certs-prod.yaml
+          destination:
+            namespace: security-tools
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true 
