@@ -36,12 +36,11 @@ create_qemu_img() {
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'mknod /dev/null c 1 3 && chmod 0666 /dev/null'
   
-  chroot ${MNTDIR} /bin/sh -c 'useradd -U -s /bin/bash -d /home/ansible -m ansible && echo "ansible ALL=NOPASSWD:ALL" > /etc/sudoers.d/ansible'
+  chroot ${MNTDIR} /bin/sh -c 'useradd -U -s /bin/bash -d /home/ansible -m ansible && echo "ansible ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ansible'
   chroot ${MNTDIR} /bin/sh -c 'sed -ri "s@^(SELINUX)=enforcing@\1=permissive@" /etc/selinux/config'
   chroot ${MNTDIR} /bin/sh -c 'dnf -y remove man-db cloud-init && dnf -y install epel-release epel-next-release'
   chroot ${MNTDIR} /bin/sh -c 'dnf -y install htop lvm2 nfs-utils numactl xterm-resize sshpass nc'
   chroot ${MNTDIR} /bin/sh -c 'dnf -y install vim-enhanced glibc-langpack-en google-noto-color-emoji-fonts'
-  chroot ${MNTDIR} /bin/sh -c 'sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config'
   chroot ${MNTDIR} /bin/sh -c 'ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime'
   chroot ${MNTDIR} /bin/sh -c 'echo 'LANG=en_US.UTF-8' > /etc/locale.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "root:" | chpasswd'

@@ -34,7 +34,7 @@ create_qemu_img() {
   chroot ${MNTDIR} /usr/bin/systemctl disable systemd-networkd.service
   chroot ${MNTDIR} /usr/bin/systemctl mask    systemd-networkd.service
   
-  chroot ${MNTDIR} /bin/sh -c 'useradd -U -s /bin/bash -d /home/ansible -m ansible && echo "ansible ALL=NOPASSWD:ALL" > /etc/sudoers.d/ansible'
+  chroot ${MNTDIR} /bin/sh -c 'useradd -U -s /bin/bash -d /home/ansible -m ansible && echo "ansible ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ansible'
   chroot ${MNTDIR} /bin/sh -c 'rm /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.2" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
@@ -43,7 +43,6 @@ create_qemu_img() {
   chroot ${MNTDIR} /bin/sh -c 'apt -y install openssh-server lvm2 fdisk nfs-kernel-server locales numactl'
   chroot ${MNTDIR} /bin/sh -c 'apt -y install cloud-utils sshpass xterm gnupg fonts-noto-color-emoji htop'
   chroot ${MNTDIR} /bin/sh -c 'mv /bin/resize /usr/local/bin/ && apt -y remove xterm && apt -y clean && apt -y autoclean && apt -y autoremove'
-  chroot ${MNTDIR} /bin/sh -c 'sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config'
   chroot ${MNTDIR} /bin/sh -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen'
   chroot ${MNTDIR} /bin/sh -c 'echo "LANG=en_US.UTF-8" > /etc/default/locale'
 

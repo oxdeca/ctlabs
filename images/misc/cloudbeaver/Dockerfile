@@ -6,8 +6,7 @@ ENV        TERM=linux
 USER       root
 RUN        apt update && apt -y install iproute2 iptables tcpdump vim openssh-server systemd less nginx apache2-utils
 COPY       --chmod=0755 run-server.sh /opt/cloudbeaver/
-RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=NOPASSWD:ALL' > /etc/sudoers.d/ansible
-RUN        echo "root:secret" | chpasswd && sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config
+RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
 RUN        chmod 0755 /opt/cloudbeaver/run-server.sh
 
 COPY       sshd-mgmt.service     /etc/systemd/system/sshd-mgmt.service

@@ -31,8 +31,6 @@ COPY       db2.pam             /etc/pam.d/db2
 RUN        systemctl enable sshd-mgmt.service && systemctl enable db2-setup.service && \
            systemctl disable sshd.service
 
-RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=NOPASSWD:ALL' > /etc/sudoers.d/ansible
-RUN        echo "root:secret" | chpasswd                                            && \
-           sed -ri "s@^(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config
+RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
 
 ENTRYPOINT ["/usr/lib/systemd/systemd"]

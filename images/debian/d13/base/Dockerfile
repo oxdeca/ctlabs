@@ -6,12 +6,11 @@ ENV          TERM=linux
 RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpdump netcat-traditional && \
             apt -y install iptables iputils-ping syslog-ng openssh-server python3-apt curl gpg gawk    && \
             apt -y install fonts-noto-color-emoji sudo locales tmux                                    && \
-            sed -ri "s@^#(PermitRootLogin) .*@\1 yes@" /etc/ssh/sshd_config                            && \
             echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen                                  && \
             echo 'export LANG=en_US.UTF-8' > /etc/profile.d/locale.sh                                  && \
             printf "set paste\n" >> /etc/vim/vimrc
 
-RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=NOPASSWD:ALL' > /etc/sudoers.d/ansible
+RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
 RUN        echo 'if [ -f "/etc/profile" ]; then . /etc/profile; fi' >> ~/.bashrc
 COPY       tmux.conf   /etc/tmux.conf
 COPY       --chmod=0640 bashrc.kali     /etc/profile.d/bashrc-kali.sh
