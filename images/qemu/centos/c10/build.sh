@@ -1,12 +1,12 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/qemu/c10
-IMG_VERS=0.1.1
+IMG_VERS=0.1.2
 
 MNTDIR=/media/ctlabs_c10_qemu
 QIMG_NAME=CentOS-Stream-GenericCloud-10-latest.x86_64.qcow2
 QIMG_URL=https://cloud.centos.org/centos/10-stream/x86_64/images/${QIMG_NAME}
-QIMG_SIZE=20G
+QIMG_SIZE=40G
 
 create_qemu_img() {
   if [ ! -e ${QIMG_NAME} ]; then
