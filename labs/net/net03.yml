@@ -29,7 +29,7 @@ topology:
               - [9988, 8200]
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, frr, openvpn, smbadc, slapd]
+              tags: [up, setup, base, ca, vault, bind, frr, openvpn, smbadc, slapd]
               setup:
                 ca:
                   hosts: all

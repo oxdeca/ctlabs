@@ -9,6 +9,15 @@
 
 profiles:
 
+  # base must stay FIRST: the generator emits plays in file order, so this
+  # makes ctlabs_base run before every other role (its facts play in setup.yml
+  # and the role play in ctlabs.yml). hosts: hosts = run everywhere; the role
+  # self-skips (precheck end_host) on unsupported OS/virtype.
+  base:
+    role : ctlabs_base
+    tags : [base]
+    hosts: hosts
+
   ca:
     role : ctlabs_ca
     tags : [ca]
@@ -62,6 +71,11 @@ profiles:
         tags : [smbadc-master]
       - group: [dc2]
         tags : [smbadc-slave]
+
+  ad:
+    role : ctlabs_ad
+    tags : [ad]
+    hosts: [dc1]
 
   slapd:
     role : ctlabs_slapd

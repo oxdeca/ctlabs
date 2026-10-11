@@ -25,7 +25,7 @@ topology:
               eth0: 192.168.99.5/24
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, opa, jenkins, jupyter]
+              tags: [up, setup, base, ca, vault, bind, opa, jenkins, jupyter]
             dnat:
               - [9988, 8888]
               - [9980, 8080]

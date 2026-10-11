@@ -27,7 +27,7 @@ topology:
               - [9988, 8200]
             play:
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, minikube, smbadc, slapd, xrdp, httpd, guacamole]
+              tags: [up, setup, base, ca, vault, bind, minikube, smbadc, slapd, xrdp, httpd, guacamole]
               setup:
                 xrdp:
                   hosts: [mkube1]

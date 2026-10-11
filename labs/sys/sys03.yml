@@ -26,7 +26,7 @@ topology:
               eth0: 192.168.99.5/24
             play:
               book: ctlabs.yml
-              tags: [up, setup, bind, ca, vault, httpd, guacamole]
+              tags: [up, setup, base, ca, bind, vault, httpd, guacamole]
             dnat :
               - [9988, 8200]              
           sw0:

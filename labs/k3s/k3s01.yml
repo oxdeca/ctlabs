@@ -26,7 +26,7 @@ topology:
               eth0: 192.168.99.5/24
             play: 
               book: ctlabs.yml
-              tags: [up, setup, ca, vault, bind, k3s, helm, argoapp, smbadc, slapd, opa, xrdp]
+              tags: [up, setup, base, ca, vault, bind, k3s, helm, argoapp, smbadc, slapd, opa, xrdp]
             dnat:
               - [9988, 8200]
           sw0:

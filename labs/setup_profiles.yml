@@ -10,6 +10,20 @@
 profiles:
 
   # ----------------------------------------------------------------------------
+  # ctlabs_base   (per-host attached block devices)
+  #
+  # Only needed to declare disks: a host with no entry here resolves to
+  # {"disks": []}, a harmless no-op. Declare a host to have ctlabs_base
+  # format + mount its disks (works on local and GCP VMs alike).
+  #
+  #   Linux   : - {device: /dev/disk/by-id/google-data, path: /srv/data, fstype: xfs, opts: noatime}
+  #   Windows : - {disk_number: 1, drive_letter: D, fstype: NTFS, name: data}
+  # ----------------------------------------------------------------------------
+  base:
+    defaults:
+      disks: []
+
+  # ----------------------------------------------------------------------------
   # ctlabs_vault
   # ----------------------------------------------------------------------------
   vault:
@@ -52,6 +66,17 @@ profiles:
       role  : slave
       domain: "ad.ctlabs.internal"
       master: "dc1.ad.ctlabs.internal"
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_ad   (Windows Active Directory; role resolved per host)
+  #   dc1 -> master (creates the forest);  add dc2: {role: slave, master: ...}
+  #   once a second Windows node exists. Unlisted Windows hosts default to
+  #   `member` (join/leave only).
+  # ----------------------------------------------------------------------------
+  ad:
+    dc1:
+      role  : master
+      domain: ad.ctlabs.internal
 
   # ----------------------------------------------------------------------------
   # ctlabs_slapd
@@ -961,4 +986,4 @@ profiles:
           syncPolicy:
             syncOptions:
               - CreateNamespace=true
-              - ServerSideApply=true 
+              - ServerSideApply=true
