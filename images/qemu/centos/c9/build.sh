@@ -19,6 +19,8 @@ create_qemu_img() {
   mkdir -vp ${MNTDIR}                && sleep 1
   qemu-nbd -c /dev/nbd0 ${QIMG_NAME} && sleep 1
   growpart    /dev/nbd0 4
+  xfs_admin -U generate /dev/nbd0p3
+  xfs_admin -U generate /dev/nbd0p4
   mount       /dev/nbd0p4 ${MNTDIR}
   xfs_growfs  /dev/nbd0p4
 
