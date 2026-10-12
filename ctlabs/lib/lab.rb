@@ -334,6 +334,7 @@ class Lab
           type: node.type   || 'N/A',
           kind: node.kind   || 'N/A',
           provider: node.provider || 'local',
+          plane: node.plane || 'data',
           image: image_ref,
           cpus: 'N/A',
           memory: 'N/A',
@@ -347,6 +348,11 @@ class Lab
     info[:nodes] = nodes
     info[:switches] = lab.nodes.select { |n| n.type == 'switch' }.map(&:name)
     info[:gateways] = lab.nodes.map { |n| n.gw }.compact.reject { |g| g.to_s.strip.empty? }.uniq
+
+    # Wired SNAT gateways (e.g. natgw): a router may uplink to these regardless
+    # of plane. "Wired" = referenced by at least one link in the topology.
+    linked_nodes = info[:links].flat_map { |l| [l[:node_a], l[:node_b]] }.compact.uniq
+    info[:natgws] = lab.nodes.select { |n| n.type == 'gateway' && n.snat && linked_nodes.include?(n.name) }.map(&:name)
 
     # Ansible
     ansible_info = { playbook: 'N/A', inventory: 'N/A', environment: [], tags: [], roles: [] }
@@ -914,6 +920,30 @@ class Lab
     end
   end
 
+  # Determines the "primary" (non-mgmt) data interface for a node config.
+  # Remote/cloud nodes use the overlay tun0, mgmt-plane nodes use eth0.
+  def self.primary_nic_for(node_cfg)
+    provider = node_cfg['provider'].to_s.downcase
+    is_remote = ['rhost', 'external'].include?(node_cfg['type'].to_s) || ['gcp', 'aws', 'azure', 'external'].include?(provider)
+    return 'tun0' if is_remote
+    return 'eth0' if node_cfg['type'] == 'controller' || node_cfg['plane'] == 'mgmt'
+    'eth1'
+  end
+
+  # Allocates the next free port on a switch using a raw YAML topology hash
+  # (used when wiring links while the lab is stopped / not yet loaded).
+  def self.next_free_switch_port(vm, switch_name)
+    sw = Regexp.escape(switch_name.to_s)
+    used = (vm['links'] || []).flat_map do |l|
+      next [] unless l.is_a?(Array)
+      l.map { |ep| ep.to_s =~ /^#{sw}:eth(\d+)$/ ? $1.to_i : nil }
+    end.compact
+
+    port = 1
+    port += 1 while used.include?(port)
+    port
+  end
+
   def get_next_switch_port(switch_name)
     used_ports = @links.map do |l|
       if l[0] =~ /^#{switch_name}:eth(\d+)$/
@@ -928,7 +958,7 @@ class Lab
     next_port
   end
 
-def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, web_v_addr = nil)
+def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, web_v_addr = nil, nic_switches = {})
   @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
     raise "Node '#{node_name}' already exists" if find_node(node_name)
 
@@ -1066,26 +1096,34 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     end
 
     # 4. SMART WIRING (Prevents dual-wiring eth1 in mgmt plane)
-    data_link = nil
-    
+    #    Each interface may target its own switch via nic_switches.
+    nic_switches = {} if nic_switches.nil?
+    data_links   = []
+
     if is_remote
-      # Remote node wiring
-      if target_switch && !target_switch.strip.empty?
-        next_port = get_next_switch_port(target_switch)
-        data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:tun0"]
+      # Remote node wiring (single overlay interface)
+      sw = nic_switches['tun0'].to_s.strip
+      sw = target_switch.to_s.strip if sw.empty?
+      if !sw.empty?
+        next_port = get_next_switch_port(sw)
+        data_link = ["#{sw}:eth#{next_port}", "#{node_name}:tun0"]
         @links << data_link
+        data_links << data_link
       end
     elsif plane == 'mgmt' || type == 'controller'
       # MGMT PLANE: Only one connection needed (eth0 -> target_switch or sw0)
-      actual_switch = (target_switch && !target_switch.strip.empty?) ? target_switch : 'sw0'
+      actual_switch = nic_switches['eth0'].to_s.strip
+      actual_switch = target_switch.to_s.strip if actual_switch.empty?
+      actual_switch = 'sw0' if actual_switch.empty?
       if find_node(actual_switch)
         next_port = get_next_switch_port(actual_switch)
         data_link = ["#{actual_switch}:eth#{next_port}", "#{node_name}:eth0"]
         @links << data_link
         Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
+        data_links << data_link
       end
     else
-      # DATA PLANE: Needs OOB Mgmt (eth0 -> sw0) AND Data (eth1 -> target_switch)
+      # DATA PLANE: Needs OOB Mgmt (eth0 -> sw0) AND Data NICs
       if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
         if find_node('sw0')
           next_sw0 = get_next_switch_port('sw0')
@@ -1094,21 +1132,28 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
           Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
         end
       end
-      
-      if target_switch && !target_switch.strip.empty?
-        if find_node(target_switch)
-          next_port = get_next_switch_port(target_switch)
-          data_link = ["#{target_switch}:eth#{next_port}", "#{node_name}:eth1"]
-          @links << data_link
-          Link.new('nodes' => @nodes, 'links' => data_link, 'log' => @log, 'mgmt' => mgmt)
-        end
+
+      # Wire every data interface (eth1, eth2, ...) to its requested switch
+      all_nics = (node_cfg['nics'] || {}).keys.map(&:to_s)
+      ordered  = (['eth1'] + all_nics).uniq.select { |nic| all_nics.include?(nic) && nic != 'eth0' }
+
+      ordered.each do |nic|
+        sw = nic_switches[nic].to_s.strip
+        sw = target_switch.to_s.strip if nic == 'eth1' && sw.empty?
+        next if sw.empty? || !find_node(sw)
+
+        next_port = get_next_switch_port(sw)
+        link      = ["#{sw}:eth#{next_port}", "#{node_name}:#{nic}"]
+        @links << link
+        Link.new('nodes' => @nodes, 'links' => link, 'log' => @log, 'mgmt' => mgmt)
+        data_links << link
       end
     end
 
     @log.info "[ADHOC NODE] Started node #{node_name}"
     inventory
 
-    [node_cfg, data_link]
+    [node_cfg, data_links]
   end
 
 

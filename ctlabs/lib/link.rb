@@ -1,4 +1,3 @@
-
 # -----------------------------------------------------------------------------
 # File        : ctlabs/lib/link.rb
 # Description : link class
@@ -86,6 +85,31 @@ class Link
  
     set_gateway(@node1, @nic1, @node2, @nic2)
     set_gateway(@node2, @nic2, @node1, @nic1)
+
+    apply_nic_gateway(@node1, @nic1)
+    apply_nic_gateway(@node2, @nic2)
+  end
+
+  #
+  #  add an optional per-NIC gateway (extra default route via that interface)
+  #
+  def apply_nic_gateway(node, nic)
+    return unless node.respond_to?(:nic_gws)
+    gws = node.nic_gws
+    return unless gws.is_a?(Hash)
+
+    gw = gws[nic].to_s.strip
+    return if gw.empty?
+
+    # Extra defaults need a metric so they can coexist with the primary NIC's
+    # unscoped default route (a second unscoped 'default' is rejected with
+    # "File exists"). eth2 -> 200, eth3 -> 300, ... so the primary (metric 0)
+    # stays preferred; a metric route is still usable when it is the only one.
+    idx    = nic[/\d+/].to_i
+    metric = (idx.zero? ? 1 : idx) * 100
+
+    @log.write "#{__method__}(): #{node.name}:#{nic} - adding default via #{gw} metric #{metric}", "debug"
+    %x( ip netns exec #{node.netns} ip route add default via #{gw} dev #{nic} metric #{metric} 2>/dev/null )
   end
 
   #

@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers, :os
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers, :os, :nic_gws, :nic_container
   attr_writer :nics
   attr_accessor :is_running
 
@@ -20,6 +20,8 @@ class Node
     @dns        = args['dns'  ]     || []
     @mgmt       = args['mgmt' ]
     @type       = args['type' ]
+    @nic_gws    = args['nic_gws'] || {}
+    @nic_container = args['nic_container'] || {}
     @plane      = args['plane']     || (args['type'] == 'controller' ? 'mgmt' : 'data')
     @provider   = args['provider']  || 'local'
     @peers      = args['peers']     || args[:peers] || {}
@@ -183,9 +185,24 @@ class Node
     params[:term].to_s.empty?     ? new_cfg.delete('term')     : new_cfg['term']     = params[:term]
 
     if params[:nics] && !params[:nics].strip.empty?
-      new_cfg['nics'] = params[:nics].split("\n").map { |l| l.split('=').map(&:strip) }.to_h.reject { |k,v| k.nil? || v.nil? }
+      parsed = params[:nics].split("\n").map { |l| l.split('=', 2).map(&:strip) }.reject { |k, v| k.nil? || k.empty? || v.nil? }
+      new_cfg['nics'] = parsed.each_with_object({}) { |(k, v), h| h[k] = v.split('@', 2).first.to_s.strip }
     else
       new_cfg.delete('nics')
+    end
+
+    # Optional per-NIC gateway map ({"eth2" => "192.168.20.1", ...}). The
+    # primary NIC's gateway is kept in the top-level 'gw' instead.
+    if params.key?(:nic_gws)
+      gws = self.parse_nic_gws(params)
+      gws.empty? ? new_cfg.delete('nic_gws') : new_cfg['nic_gws'] = gws
+    end
+
+    # Optional per-NIC "keep in container" flags (qemu nodes only), e.g.
+    # {"eth2" => true} for a NIC that must NOT be passed into the guest.
+    if params.key?(:nic_container)
+      cnic = self.parse_nic_container(params)
+      cnic.empty? ? new_cfg.delete('nic_container') : new_cfg['nic_container'] = cnic
     end
 
     if params[:urls_text] && !params[:urls_text].strip.empty?
@@ -223,8 +240,75 @@ class Node
   end
 
   # ---------------------------------------------------------------------------
-  # Helper: Auto-Assign Management IP (Moved from LabHelper)
+  # Helper: Parse the per-NIC switch wiring map ({"eth2" => "sw1", ...})
+  # The UI sends this as a JSON blob so a node can be auto-wired to several
+  # switches, one link per interface, in a single request.
   # ---------------------------------------------------------------------------
+  def self.parse_nic_switches(params)
+    raw = params[:nic_switches]
+    return {} if raw.nil? || raw.to_s.strip.empty?
+
+    require 'json'
+    begin
+      data = JSON.parse(raw)
+    rescue JSON::ParserError
+      return {}
+    end
+    return {} unless data.is_a?(Hash)
+
+    data.each_with_object({}) do |(nic, sw), acc|
+      nic = nic.to_s.strip
+      sw  = sw.to_s.strip
+      acc[nic] = sw unless nic.empty? || sw.empty? || sw == '-- None --'
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper: Parse the per-NIC gateway map ({"eth2" => "192.168.20.1", ...}).
+  # Applied as an extra default route via that interface (primary NIC's
+  # gateway lives in the top-level 'gw').
+  # ---------------------------------------------------------------------------
+  def self.parse_nic_gws(params)
+    raw = params[:nic_gws]
+    return {} if raw.nil? || raw.to_s.strip.empty?
+
+    require 'json'
+    begin
+      data = JSON.parse(raw)
+    rescue JSON::ParserError
+      return {}
+    end
+    return {} unless data.is_a?(Hash)
+
+    data.each_with_object({}) do |(nic, gw), acc|
+      nic = nic.to_s.strip
+      gw  = gw.to_s.strip
+      acc[nic] = gw unless nic.empty? || gw.empty?
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Helper: Parse the per-NIC "keep in container" map ({"eth2" => true, ...}).
+  # Only meaningful for qemu/kvm nodes: those NICs stay at the container level
+  # (e.g. for VNC access to the guest) instead of being passed into the VM.
+  # ---------------------------------------------------------------------------
+  def self.parse_nic_container(params)
+    raw = params[:nic_container]
+    return {} if raw.nil? || raw.to_s.strip.empty?
+
+    require 'json'
+    begin
+      data = JSON.parse(raw)
+    rescue JSON::ParserError
+      return {}
+    end
+    return {} unless data.is_a?(Hash)
+
+    data.each_with_object({}) do |(nic, flag), acc|
+      nic = nic.to_s.strip
+      acc[nic] = true if !nic.empty? && (flag == true || flag.to_s == 'true')
+    end
+  end
   def self.auto_assign_mgmt_ip!(node_cfg, full_yaml)
     target_nic = (node_cfg['provider'] && node_cfg['provider'] != 'local') ? 'tun0' : 'eth0'
     node_cfg['nics'] ||= {}
@@ -443,6 +527,16 @@ class Node
         dns   = @dns.map { |ns| "nameserver #{ns}" }.join("\n")
         image = @image.nil? ? @defaults[@type][@kind]['image'] : @image
         @vols.each { |v| FileUtils.mkdir_p(v.split(':')[0]) }
+
+        # qemu/kvm nodes: tell the image entrypoint which extra NICs must stay
+        # in the container instead of being passed into the guest (e.g. a NIC
+        # kept for VNC access to the qemu process).
+        if @kvm
+          @env.reject! { |e| e.start_with?('QEMU_CONTAINER_NICS=') }
+          container_nics = (@nic_container || {}).select { |_n, keep| keep == true || keep.to_s == 'true' }.keys
+          @env << "QEMU_CONTAINER_NICS=#{container_nics.join(',')}" unless container_nics.empty?
+          env = @env.map { |e| "-e #{e} " }.join
+        end
 
         #
         # Arista Switch

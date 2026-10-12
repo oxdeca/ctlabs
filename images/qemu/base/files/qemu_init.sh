@@ -63,13 +63,22 @@ gen_mac() {
   echo ${premac}$(openssl rand -hex 3 | gawk '{gsub(/.{2}/,"&:")}1' | sed 's@.$@@')
 }
 
+# Resolve the qemu MAC generated for container NIC ethN (ENS<N>_MAC).
+mac_for_nic() {
+  local idx="${1#eth}"
+  local var="ENS${idx}_MAC"
+  echo "${!var}"
+}
+
 create_net_setup_script() {
   local eth0_nic=enp0s1
   local eth0_ip=$( ip -br addr ls eth0 | awk '{print $3}' )
   local eth0_gw=$( ip -br route ls default vrf mgmt | awk '{print $3}' )
   local eth1_nic=enp0s2
   local eth1_ip=$( ip -br addr ls eth1 | awk '{print $3}' )
-  local eth1_gw=$( ip -br route ls default | awk '{print $3}' )
+  # Pin to eth1: once per-NIC gateways add extra 'default' routes (with metrics)
+  # a bare `ip route ls default` would emit several lines and corrupt this value.
+  local eth1_gw=$( ip -br route ls default dev eth1 | awk '{print $3}' | head -n1 )
 cat > /mnt/ctlabs_net_setup.sh << EOF
 #!/bin/bash
 
@@ -113,6 +122,31 @@ fi
 
 echo '$(cat /etc/resolv.conf)' > /etc/resolv.conf
 EOF
+}
+
+# Append guest-side configuration for extra passthrough NICs (eth2, eth3, ...).
+# The primary NICs are handled by create_net_setup_script above; this default
+# (Linux guest) appends equivalent shell lines. The Windows overlay under
+# qemu_init.d/ redefines this to emit PowerShell instead.
+create_extra_net_setup() {
+  for nic in "${passthrough_nics[@]}"; do
+    idx="${nic#eth}"
+    [ "${idx}" -ge 2 ] || continue
+
+    gif="enp0s$((idx + 1))"
+    metric=$((idx * 100))
+    ip=$( ip -br addr ls "${nic}" | awk '{print $3}' )
+    [ -n "${ip}" ] || continue
+    gw=$( ip -br route ls default dev "${nic}" 2>/dev/null | awk '{print $3}' | head -n1 )
+
+    {
+      echo
+      echo "# ${nic} -> ${gif}"
+      echo "ip addr add ${ip} dev ${gif}"
+      echo "ip link set ${gif} mtu 1460 up"
+      [ -n "${gw}" ] && echo "[ -n '${gw}' ] && ip route add default via ${gw} dev ${gif} metric ${metric} 2>/dev/null || true"
+    } >> /mnt/ctlabs_net_setup.sh
+  done
 }
 
 for _ext in /root/qemu_init.d/*.sh; do
@@ -269,7 +303,26 @@ fi
 ENS0_MAC=$(gen_mac)
 ENS1_MAC=$(gen_mac)
 
+# Which container NICs are passed into the guest? eth0 (mgmt) and eth1 (data)
+# are always handed through; extra NICs (eth2, eth3, ...) are too unless they
+# are listed in QEMU_CONTAINER_NICS (comma-separated), which keeps them in the
+# container only (e.g. for VNC). ethN maps to guest ensN, and its MAC is kept
+# in ENS<N>_MAC for the guest net-setup scripts.
+container_only=",${QEMU_CONTAINER_NICS},"
+passthrough_nics=()
+for nicdev in $(ls /sys/class/net 2>/dev/null | grep -E '^eth[0-9]+$' | sort -V); do
+  idx="${nicdev#eth}"
+  if [ "${idx}" -ge 2 ]; then
+    if [[ "${container_only}" == *",${nicdev},"* ]]; then
+      continue
+    fi
+    eval "ENS${idx}_MAC=\$(gen_mac)"
+  fi
+  passthrough_nics+=("${nicdev}")
+done
+
 create_net_setup_script
+create_extra_net_setup
 # -x qemu-base: /mnt/qemu-base is the read-only bind mount of the shared base
 # qcow2 (labs/node_profiles.yml vols); it must never be pulled into this ISO
 # alongside the net-setup files, or a base image >4GiB-1 (seen with Windows)
@@ -281,8 +334,10 @@ tmux new -d -s qemu
 qemu_add_disk 1 "/media/${QEMU_IMG}" "0xa" "3"
 qemu_add_disk 2 "/media/vda.qcow2"   "0xb"
 
-qemu_add_nic ens0 br0 "no"          "$QEMU_CPU_CORES" "$ENS0_MAC"
-qemu_add_nic ens1 br1 "/root/if"    "$QEMU_CPU_CORES" "$ENS1_MAC"
+for nic in "${passthrough_nics[@]}"; do
+  idx="${nic#eth}"
+  qemu_add_nic "ens${idx}" "net${idx}" "/root/if" "$QEMU_CPU_CORES" "$(mac_for_nic "${nic}")"
+done
 qemu_add_iso "/tmp/${HOSTNAME}.iso"
 
 qemu_start

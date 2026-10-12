@@ -184,13 +184,16 @@ class TerminalService
       cmd.push('-u', node_user) if node_user
 
       # The controller opens in the mounted repo workspace (the same path the
-      # playbook runs from), not $HOME. Other nodes keep root's default cwd.
+      # playbook runs from). Every other node runs as root and opens in root's
+      # home (/root) rather than the container's default WORKDIR (/); if that
+      # directory is absent we fall back to the default cwd (no -w).
       work_dir = nil
       if node_type == 'controller'
         workspace = Automation::ANSIBLE_DIR_CTL
         work_dir  = workspace if container_dir_exists?(engine, node_name, workspace)
       end
-      work_dir ||= resolve_home_dir(engine, node_name, node_user) if node_user
+      work_dir ||= resolve_home_dir(engine, node_name, node_user || 'root')
+      work_dir = nil if work_dir && !container_dir_exists?(engine, node_name, work_dir)
       cmd.push('-w', work_dir) if work_dir
       cmd.push('-e', 'TERM=xterm-256color')
 

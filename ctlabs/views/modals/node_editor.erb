@@ -87,7 +87,7 @@
 
           <div class="w3-col m6 w3-margin-bottom std-field" id="div-profile">
             <label>Profile</label>
-            <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="Double-click to select profile..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+            <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="Double-click to select profile..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" oninput="if(window.refreshNicContainerMode) window.refreshNicContainerMode();" onchange="if(window.refreshNicContainerMode) window.refreshNicContainerMode();">
             <datalist id="node-profiles-list"></datalist>
             <script>window.rawProfilesData = <%= (info_hash[:images] || []).to_json %>;</script>
           </div>
@@ -97,31 +97,43 @@
             <input type="text" id="edit-eth0" placeholder="e.g. 34.138.103.53/32" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
           </div>
 
-          <div class="w3-col m6 w3-margin-bottom std-field" id="div-eth1">
-            <label id="lbl-eth1">IP (eth1)</label>
-            <input type="text" id="edit-eth1" placeholder="e.g. 192.168.45.3/24" class="w3-input w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-          </div>
+          <div class="w3-col m12 w3-margin-bottom std-field" id="interfaces-section">
+            <div style="border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #14b8a6; font-weight: bold;"><i class="fas fa-network-wired"></i> Network Interfaces</span>
+              <button type="button" class="w3-button w3-tiny w3-round w3-blue" onclick="window.addNicRow()" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Interface</button>
+            </div>
 
-          <div class="w3-col m6 w3-margin-bottom std-field" id="div-gw">
-            <label>Gateway (gw)</label>
-            <input type="text" id="edit-gw" list="edit-gw-options" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. 192.168.10.1" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
-            <datalist id="edit-gw-options">
-              <% if defined?(info_hash) && info_hash && info_hash[:gateways] %>
-                <% info_hash[:gateways].each do |g| %><option value="<%= g %>"><% end %>
-              <% end %>
-            </datalist>
-          </div>
+            <div style="display: flex; gap: 6px; margin-top: 8px; color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em;">
+              <div style="flex: 0 0 110px;">Interface</div>
+              <div style="flex: 1 1 auto;">IP Address</div>
+              <div style="flex: 1 1 auto;">Gateway (optional)</div>
+              <div style="flex: 0 0 150px;">Link</div>
+              <div style="flex: 0 0 120px;" class="nic-container-col" id="nic-container-col-header" title="qemu nodes: pass-through sends the NIC into the guest; container keeps it at the container level">Mode</div>
+              <div style="flex: 0 0 28px;"></div>
+            </div>
 
-          <div class="w3-col m6 w3-margin-bottom std-field" id="div-switch">
-            <label>Connect to Switch</label>
-            <select id="edit-switch" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateGatewayForSwitch) window.updateGatewayForSwitch(this.value)">
-              <option value="" selected>-- None (Mgmt Only) --</option>
-              <option value="sw1">sw1</option>
-              <option value="sw2">sw2</option>
-              <option value="sw3">sw3</option>
-              <option value="sw4">sw4</option>
-              <option value="sw5">sw5</option>
-            </select>
+            <div class="nic-row primary-row" style="display: flex; gap: 6px; margin-top: 6px; align-items: center;">
+              <div style="flex: 0 0 110px; color: #e2e8f0; font-weight: bold;">
+                <span id="primary-nic-name">eth1</span>
+                <span style="background: #14b8a6; color: #0f172a; border-radius: 4px; padding: 1px 6px; font-size: 0.68em; margin-left: 4px; vertical-align: middle;">primary</span>
+              </div>
+              <input type="text" id="edit-primary-ip" placeholder="e.g. 192.168.45.3/24" class="w3-input w3-small w3-round w3-hover-text-light-green" style="flex: 1 1 auto; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              <input type="text" id="edit-gw" list="edit-gw-options" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round w3-hover-text-light-green" style="flex: 1 1 auto; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
+              <datalist id="edit-gw-options">
+                <% if defined?(info_hash) && info_hash && info_hash[:gateways] %>
+                  <% info_hash[:gateways].each do |g| %><option value="<%= g %>"><% end %>
+                <% end %>
+              </datalist>
+              <select id="edit-switch" class="w3-select w3-small w3-round w3-hover-text-light-green" style="flex: 0 0 150px; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateGatewayForSwitch) window.updateGatewayForSwitch(this.value)">
+                <option value="">-- None --</option>
+              </select>
+              <div style="flex: 0 0 120px;" class="nic-container-col"></div>
+              <div style="flex: 0 0 28px;"></div>
+            </div>
+
+            <div id="extra-nics-rows"></div>
+
+            <div class="w3-text-gray" style="font-size: 0.75em; margin-top: 6px;">Each interface needs an IP and is auto-wired to the selected switch or router (same plane). The primary NIC's gateway becomes the node default route; other gateways are applied as routes via their interface. For qemu images, <em>Mode</em> chooses whether each extra NIC is <em>pass-through</em> (sent into the guest) or <em>container</em> (kept at the container level, e.g. for VNC).</div>
           </div>
 
           <div class="w3-col m12 w3-margin-bottom vpn-field" style="display: none; border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px;">
@@ -169,11 +181,6 @@
 
       <div id="AdvancedEdit" class="editor-tab" style="display:none; max-height: 60vh; overflow-y: auto; overflow-x: hidden;">
         <div class="w3-row-padding" style="margin: 0 -8px;">
-          <div class="w3-col m12 w3-margin-bottom">
-            <label>Additional NICs (nics)</label>
-            <textarea id="edit-nics" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="tun0=10.8.15.2&#10;eth3=10.0.1.1/24" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
-          </div>
-
           <div class="w3-col m12 w3-margin-bottom">
             <label>Volumes (vols)</label>
             <textarea id="edit-vols" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="/host/path:/container/path:Z,rw" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>

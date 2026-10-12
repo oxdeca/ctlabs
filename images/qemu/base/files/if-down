@@ -1,21 +1,26 @@
 #!/bin/bash
 
-down() {
-  local br=$1
-  local nic=$2
-  local ip=$( cat /tmp/$nic.ip )
-  local gw=$( cat /tmp/$nic.gw )
-  local vrf=
+# Tear down the bridges created by if-up and return the NICs to the container.
 
-  if [ "$nic" == "eth0" ]; then
+for ipfile in /tmp/eth*.ip; do
+  [ -e "${ipfile}" ] || continue
+
+  nic=$( basename "${ipfile}" .ip )       # eth0, eth1, ...
+  idx="${nic#eth}"
+  br="net${idx}"
+
+  ip=$( cat "/tmp/${nic}.ip" 2>/dev/null )
+  gw=$( cat "/tmp/${nic}.gw" 2>/dev/null )
+
+  vrf=""
+  if [ "${nic}" == "eth0" ]; then
     vrf="vrf mgmt"
-    ip link set eth0 master mgmt
+    ip link set eth0 master mgmt 2>/dev/null || true
   fi
 
-  ip link del $br
-  ip addr add ${ip} dev $nic
-  ip route add default via ${gw} ${vrf}
-}
+  ip link del "${br}" 2>/dev/null || true
+  [ -n "${ip}" ] && ip addr add "${ip}" dev "${nic}" 2>/dev/null
+  [ -n "${gw}" ] && ip route add default via "${gw}" ${vrf} 2>/dev/null
+done
 
-down net0 eth0
-down net1 eth1
+exit 0

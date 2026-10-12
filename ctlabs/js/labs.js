@@ -99,7 +99,7 @@
   // Helper to dynamically read data from the DOM after an AJAX load
   window.getLabData = function(key) {
       const dataDiv = document.getElementById('lab-dynamic-data');
-      const isMap = ['images-map', 'switch-gws'].includes(key);
+      const isMap = ['images-map', 'switch-gws', 'node-planes'].includes(key);
       if (!dataDiv) return isMap ? {} : [];
       try { 
         const val = dataDiv.getAttribute('data-' + key);

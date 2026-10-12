@@ -37,8 +37,18 @@
   </div>
 
   <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="slim-scroll">
-    <table class="w3-table w3-striped w3-small" id="active-nodes-table">
-      <thead><tr style="color: #94a3b8;"><th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th><th>Name</th><th>Profile</th><th>Type</th><th>Provider</th><th>Image</th><th style="text-align:right;">Actions</th></tr></thead>
+    <table class="w3-table w3-striped w3-small" id="active-nodes-table" style="margin: 0; font-size: 13px;">
+      <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
+        <tr style="color: #94a3b8;">
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px; width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Profile</th>
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Provider</th>
+          <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Image</th>
+          <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
+        </tr>
+      </thead>
       <tbody>
         <% (info_hash[:nodes] || []).each do |node| %>
           <%

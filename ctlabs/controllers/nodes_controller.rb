@@ -96,6 +96,24 @@ class NodesController < BaseController
       vm['planes'][target_plane]['nodes'] ||= {}
       vm['planes'][target_plane]['nodes'][node_name] = new_node
 
+      # --- AUTO-WIRE: link every interface that has a target switch ---
+      nic_switches = Node.parse_nic_switches(params)
+      primary_nic  = Lab.primary_nic_for(new_node)
+      nic_switches[primary_nic] ||= params[:switch].strip if params[:switch] && !params[:switch].strip.empty?
+
+      vm['links'] ||= []
+      all_nics = (new_node['nics'] || {}).keys.map(&:to_s)
+      ([primary_nic] + all_nics).uniq.each do |nic|
+        sw = nic_switches[nic].to_s.strip
+        next if sw.empty?
+        next if vm['links'].any? { |l| l.is_a?(Array) && l.include?("#{node_name}:#{nic}") }
+
+        port = Lab.next_free_switch_port(vm, sw)
+        vm['links'] << ["#{sw}:eth#{port}", "#{node_name}:#{nic}"]
+        sw_node, _ = Lab.find_node_in_raw_yaml(vm, sw)
+        sw_node['ports'] = port if sw_node && port > (sw_node['ports'] || 4)
+      end
+
       LabRepository.write_formatted_yaml(lab_path, yaml)
       { success: true, message: "Node '#{node_name}' added to base configuration." }.to_json
     rescue => e
@@ -117,8 +135,12 @@ class NodesController < BaseController
       node_cfg = Node.parse_form_data(params)
       Node.validate_profile!(node_cfg, data)
 
+      nic_switches = Node.parse_nic_switches(params)
+      primary_nic  = Lab.primary_nic_for(node_cfg)
+      nic_switches[primary_nic] ||= params[:switch].strip if params[:switch] && !params[:switch].strip.empty?
+
       lab = Lab.new(cfg: lab_path, relative_path: lab_name)
-      cfg_out, data_link = lab.add_adhoc_node(node_name, node_cfg, params[:switch], session[:vault_token], session[:vault_addr])
+      cfg_out, data_links = lab.add_adhoc_node(node_name, node_cfg, params[:switch], session[:vault_token], session[:vault_addr], nic_switches)
 
       vm = data['topology'][0]
       target_plane = cfg_out['plane'] || 'data'
@@ -128,9 +150,9 @@ class NodesController < BaseController
       vm['planes'][target_plane]['nodes'][node_name] = cfg_out
 
       vm['links'] ||= []
-      if data_link
+      Array(data_links).compact.each do |data_link|
         vm['links'] << data_link
-        sw_name = params[:switch].strip
+        sw_name = data_link[0].split(':eth').first
         sw_port = data_link[0].split(':eth').last.to_i
 
         sw_node, _ = Lab.find_node_in_raw_yaml(vm, sw_name)
@@ -192,6 +214,48 @@ class NodesController < BaseController
       vm['planes'][new_plane]['nodes'] ||= {}
       vm['planes'][new_plane]['nodes'][node_name] = new_cfg
 
+      # --- SYNC NIC -> SWITCH LINKS ---
+      # Only when the form actually supplied the wiring map, so API / raw-YAML
+      # edits never silently drop existing links.
+      links_added   = []
+      links_removed = []
+      if params.key?(:nic_switches)
+        nic_switches = Node.parse_nic_switches(params)
+        primary_nic  = Lab.primary_nic_for(new_cfg)
+        nic_switches[primary_nic] ||= params[:switch].strip if params[:switch] && !params[:switch].strip.empty?
+
+        vm['links'] ||= []
+        all_nics = (new_cfg['nics'] || {}).keys.map(&:to_s)
+
+        ([primary_nic] + all_nics).uniq.each do |nic|
+          sw = nic_switches[nic].to_s.strip
+          next if sw.empty?
+          next if vm['links'].any? { |l| l.is_a?(Array) && l.include?("#{node_name}:#{nic}") }
+
+          port = Lab.next_free_switch_port(vm, sw)
+          new_link = ["#{sw}:eth#{port}", "#{node_name}:#{nic}"]
+          vm['links'] << new_link
+          sw_node, _ = Lab.find_node_in_raw_yaml(vm, sw)
+          sw_node['ports'] = port if sw_node && port > (sw_node['ports'] || 4)
+          links_added << new_link
+        end
+
+        vm['links'].reject! do |l|
+          next false unless l.is_a?(Array)
+          ep_self = l.find { |ep| ep.to_s.start_with?("#{node_name}:") }
+          next false unless ep_self
+
+          nic = ep_self.split(':', 2).last
+          next false if nic == 'eth0'
+          if nic_switches[nic].to_s.strip.empty?
+            links_removed << [ep_self, (l - [ep_self]).first]
+            true
+          else
+            false
+          end
+        end
+      end
+
       LabRepository.write_formatted_yaml(lab_path, full_yaml)
 
       if Lab.running? && Lab.current_name == lab_name
@@ -203,7 +267,13 @@ class NodesController < BaseController
             old_nics = base_data['nics'] || {}
             new_nics = new_cfg['nics'] || {}
 
+            # Create/remove interfaces first (hotplug_link creates the veth pair
+            # and applies the node's IP), then reconcile IPs on surviving NICs.
+            links_removed.each { |ep, other| lab.hotunplug_link(ep, other) if other }
+            links_added.each   { |ep1, ep2| lab.hotplug_link(ep1, ep2) }
+
             new_nics.each do |nic_name, ip|
+              next if links_added.any? { |_e1, e2| e2 == "#{node_name}:#{nic_name}" }
               if old_nics[nic_name] != ip
                 target_node.hotplug_ip(nic_name, ip)
               end

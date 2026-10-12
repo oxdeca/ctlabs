@@ -17,6 +17,8 @@
     <% safe_images_map = (info_hash[:images_map] || {}).to_json %>
     <% routers_list = (info_hash[:nodes] || []).select { |n| n[:type] == 'router' }.map { |n| n[:name] }.to_json %>
     <% switches_list = (info_hash[:switches] || []).to_json %>
+    <% node_planes_map = (info_hash[:nodes] || []).each_with_object({}) { |n, h| h[n[:name]] = n[:plane] || 'data' } %>
+    <% natgws_list = (info_hash[:natgws] || []).to_json %>
     <% switch_gw_map = generate_switch_gw_map(info_hash[:lab_path], info_hash[:links]) %>
 
     <div id="lab-running-state" data-is-running="<%= is_running %>" style="display:none;"></div>
@@ -24,6 +26,8 @@
          data-images-map="<%= Rack::Utils.escape_html(safe_images_map) %>" 
          data-routers="<%= Rack::Utils.escape_html(routers_list) %>"
          data-switches="<%= Rack::Utils.escape_html(switches_list) %>"
+         data-node-planes="<%= Rack::Utils.escape_html(node_planes_map.to_json) %>"
+         data-natgws="<%= Rack::Utils.escape_html(natgws_list) %>"
          data-switch-gws="<%= Rack::Utils.escape_html(switch_gw_map.to_json) %>"
          style="display:none;">
     </div>

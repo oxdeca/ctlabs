@@ -57,12 +57,12 @@
     <% if (info_hash[:links] || []).empty? %>
       <div class="w3-padding"><p style="color: #94a3b8; font-style: italic;">No links defined</p></div>
     <% else %>
-      <table class="w3-table w3-striped w3-small" id="network-links-table" style="margin: 0;">
-        <thead style="position: sticky; top: 0; background-color: #0f172a; z-index: 1;">
+      <table class="w3-table w3-striped w3-small" id="network-links-table" style="margin: 0; font-size: 13px;">
+        <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
           <tr style="color: #94a3b8;">
-            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important;">Endpoint A</th>
-            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important;">Endpoint B</th>
-            <th style="padding: 12px 8px; border-bottom: 1px solid #475569 !important; text-align:right;">Actions</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Endpoint A</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Endpoint B</th>
+            <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
           </tr>
         </thead>
         <tbody>

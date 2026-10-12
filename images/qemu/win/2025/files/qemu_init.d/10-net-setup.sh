@@ -89,3 +89,32 @@ if (Test-Path \$keySrc) {
 }
 EOF
 }
+
+# Extend the guest network setup with any extra passthrough NICs (eth2, ...).
+# Overrides the Linux default in qemu_init.sh (this file is sourced after it).
+create_extra_net_setup() {
+  local nic idx mac mac_win ip
+  for nic in "${passthrough_nics[@]}"; do
+    idx="${nic#eth}"
+    [ "$idx" -ge 2 ] || continue
+
+    mac=$( mac_for_nic "$nic" )
+    [ -n "$mac" ] || continue
+    ip=$( ip -br addr ls "$nic" | awk '{print $3}' )
+    [ -n "$ip" ] || continue
+    mac_win=$( echo "$mac" | tr '[:lower:]' '[:upper:]' | tr ':' '-' )
+
+    cat >> /mnt/ctlabs_net_setup.ps1 << EOF
+
+\$nic${idx} = Get-NetAdapter | Where-Object { \$_.MacAddress -eq "${mac_win}" }
+if (\$nic${idx}) {
+    Rename-NetAdapter -InputObject \$nic${idx} -NewName "${nic}" -ErrorAction SilentlyContinue
+    Remove-NetIPAddress -InterfaceAlias "${nic}" -Confirm:\$false -ErrorAction SilentlyContinue
+    Remove-NetRoute -InterfaceAlias "${nic}" -Confirm:\$false -ErrorAction SilentlyContinue
+    New-NetIPAddress -InterfaceAlias "${nic}" -IPAddress "${ip%/*}" -PrefixLength 24 -ErrorAction SilentlyContinue
+    Set-NetIPInterface -InterfaceAlias "${nic}" -Dhcp Disabled -WeakHostSend Disabled -WeakHostReceive Disabled -Forwarding Disabled -ErrorAction SilentlyContinue
+    netsh interface ipv4 set subinterface "${nic}" mtu=1460 store=persistent
+}
+EOF
+  done
+}
