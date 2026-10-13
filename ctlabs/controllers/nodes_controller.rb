@@ -227,10 +227,20 @@ class NodesController < BaseController
         vm['links'] ||= []
         all_nics = (new_cfg['nics'] || {}).keys.map(&:to_s)
 
-        ([primary_nic] + all_nics).uniq.each do |nic|
+        ([primary_nic] + all_nics + nic_switches.keys).uniq.each do |nic|
           sw = nic_switches[nic].to_s.strip
           next if sw.empty?
-          next if vm['links'].any? { |l| l.is_a?(Array) && l.include?("#{node_name}:#{nic}") }
+
+          self_ep = "#{node_name}:#{nic}"
+          existing = vm['links'].find { |l| l.is_a?(Array) && l.include?(self_ep) }
+          if existing
+            peer = (existing - [self_ep]).first
+            # Already wired to the desired peer — leave it in place.
+            next if peer.to_s.start_with?("#{sw}:")
+            # Peer changed: drop the old link and recreate it below.
+            vm['links'].delete(existing)
+            links_removed << [self_ep, peer]
+          end
 
           port = Lab.next_free_switch_port(vm, sw)
           new_link = ["#{sw}:eth#{port}", "#{node_name}:#{nic}"]

@@ -100,14 +100,14 @@
           <div class="w3-col m12 w3-margin-bottom std-field" id="interfaces-section">
             <div style="border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px; display: flex; justify-content: space-between; align-items: center;">
               <span style="color: #14b8a6; font-weight: bold;"><i class="fas fa-network-wired"></i> Network Interfaces</span>
-              <button type="button" class="w3-button w3-tiny w3-round w3-blue" onclick="window.addNicRow()" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Interface</button>
+              <button type="button" id="add-nic-btn" class="w3-button w3-tiny w3-round w3-blue" onclick="window.addNicRow()" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Interface</button>
             </div>
 
             <div style="display: flex; gap: 6px; margin-top: 8px; color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em;">
               <div style="flex: 0 0 110px;">Interface</div>
               <div style="flex: 1 1 auto;">IP Address</div>
-              <div style="flex: 1 1 auto;">Gateway (optional)</div>
-              <div style="flex: 0 0 150px;">Link</div>
+              <div style="flex: 1 1 auto;" id="gw-col-header">Gateway (optional)</div>
+              <div style="flex: 0 0 150px;" id="link-col-header">Link</div>
               <div style="flex: 0 0 120px;" class="nic-container-col" id="nic-container-col-header" title="qemu nodes: pass-through sends the NIC into the guest; container keeps it at the container level">Mode</div>
               <div style="flex: 0 0 28px;"></div>
             </div>
@@ -115,7 +115,7 @@
             <div class="nic-row primary-row" style="display: flex; gap: 6px; margin-top: 6px; align-items: center;">
               <div style="flex: 0 0 110px; color: #e2e8f0; font-weight: bold;">
                 <span id="primary-nic-name">eth1</span>
-                <span style="background: #14b8a6; color: #0f172a; border-radius: 4px; padding: 1px 6px; font-size: 0.68em; margin-left: 4px; vertical-align: middle;">primary</span>
+                <span id="primary-nic-badge" style="background: #14b8a6; color: #0f172a; border-radius: 4px; padding: 1px 6px; font-size: 0.68em; margin-left: 4px; vertical-align: middle;">primary</span>
               </div>
               <input type="text" id="edit-primary-ip" placeholder="e.g. 192.168.45.3/24" class="w3-input w3-small w3-round w3-hover-text-light-green" style="flex: 1 1 auto; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
               <input type="text" id="edit-gw" list="edit-gw-options" placeholder="e.g. 192.168.10.1" class="w3-input w3-small w3-round w3-hover-text-light-green" style="flex: 1 1 auto; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;">
@@ -133,7 +133,15 @@
 
             <div id="extra-nics-rows"></div>
 
-            <div class="w3-text-gray" style="font-size: 0.75em; margin-top: 6px;">Each interface needs an IP and is auto-wired to the selected switch or router (same plane). The primary NIC's gateway becomes the node default route; other gateways are applied as routes via their interface. For qemu images, <em>Mode</em> chooses whether each extra NIC is <em>pass-through</em> (sent into the guest) or <em>container</em> (kept at the container level, e.g. for VNC).</div>
+            <div id="gateway-links-section" style="display: none; margin-top: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; background-color: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px;">
+                <span style="color: #38bdf8; font-size: 0.82em; font-weight: bold;"><i class="fas fa-route"></i> Router Links (one per plane)</span>
+                <button type="button" class="w3-button w3-tiny w3-round w3-blue" onclick="window.addGatewayRouterRow()" style="padding: 2px 8px;"><i class="fas fa-plus"></i> Add Router</button>
+              </div>
+              <div id="gateway-router-rows" style="margin-top: 6px;"></div>
+            </div>
+
+            <div class="w3-text-gray" id="nic-hint" style="font-size: 0.75em; margin-top: 6px;">Each interface needs an IP and is auto-wired to the selected switch or router (same plane). The primary NIC's gateway becomes the node default route; other gateways are applied as routes via their interface. For qemu images, <em>Mode</em> chooses whether each extra NIC is <em>pass-through</em> (sent into the guest) or <em>container</em> (kept at the container level, e.g. for VNC).</div>
           </div>
 
           <div class="w3-col m12 w3-margin-bottom vpn-field" style="display: none; border-top: 1px dashed #475569; margin-top: 8px; padding-top: 12px;">

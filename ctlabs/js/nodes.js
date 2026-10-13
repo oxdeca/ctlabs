@@ -82,7 +82,38 @@ window.nicSwitchPool = function(ctx) {
     if (ctx.type === 'router') {
         natgws.forEach(n => { if (n !== self && !pool.includes(n)) pool.push(n); });
     }
+
+    // Host-located gateways (natgw) peer only with routers, across planes —
+    // one per plane via the dnat map — so offer every router regardless of plane.
+    if (ctx.type === 'gateway') {
+        return routers.filter(n => n !== self);
+    }
     return pool;
+};
+
+// --- Gateway <-> interface placement ------------------------------------------
+// A node's default gateway (top-level `gw`) belongs on whichever interface's
+// subnet contains it. Routers often have their default route on a non-primary
+// NIC (e.g. ro0: `default via 192.168.15.1` lives on eth1, not the mgmt eth0),
+// so the editor must show the gateway on that NIC instead of the primary one.
+window.ipv4ToInt = function(ip) {
+    const p = String(ip || '').trim().split('.');
+    if (p.length !== 4 || p.some(o => !/^\d+$/.test(o))) return null;
+    return ((((+p[0]) << 24) >>> 0) + ((+p[1]) << 16) + ((+p[2]) << 8) + (+p[3]));
+};
+
+window.nicForGateway = function(gw, nicAddrs) {
+    const g = window.ipv4ToInt(String(gw || '').split('/')[0]);
+    if (g === null) return '';
+    for (const [nic, cidr] of Object.entries(nicAddrs || {})) {
+        const [net, maskStr] = String(cidr).split('/');
+        const mask = parseInt(maskStr, 10);
+        const n = window.ipv4ToInt(net);
+        if (n === null || isNaN(mask)) continue;
+        const m = mask === 0 ? 0 : ((0xFFFFFFFF << (32 - mask)) >>> 0);
+        if (((g & m) >>> 0) === ((n & m) >>> 0)) return nic;
+    }
+    return '';
 };
 
 // Is the given profile a qemu/kvm one? Those are the only nodes where a NIC
@@ -120,8 +151,92 @@ window.populateNicSwitchOptions = function() {
         delete sel.dataset.pending;
     };
 
-    document.querySelectorAll('#extra-nics-rows .nic-switch').forEach(fill);
+    document.querySelectorAll('#extra-nics-rows .nic-switch, #gateway-router-rows .nic-switch').forEach(fill);
     fill(document.getElementById('edit-switch'));
+};
+
+// ---- Host-located gateway (natgw): a single IP + a list of router links -------
+// A gateway has one shared IP and peers with routers across planes (one link per
+// plane). Each link gets an internal NIC name (eth1, eth2, ...); the backend
+// keeps the link's NIC stable across saves so links aren't churned.
+window.addGatewayRouterRow = function(nic, router) {
+    const wrap = document.getElementById('gateway-router-rows');
+    if (!wrap) return;
+
+    if (!nic) {
+        const used = new Set();
+        wrap.querySelectorAll('.gw-router-row').forEach(r => { if (r.dataset.nic) used.add(r.dataset.nic); });
+        let n = 1;
+        while (used.has(`eth${n}`)) n++;
+        nic = `eth${n}`;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'gw-router-row';
+    row.dataset.nic = nic;
+    row.style.cssText = 'display: flex; gap: 6px; align-items: center;';
+
+    const sel = document.createElement('select');
+    sel.className = 'w3-select w3-small w3-round nic-switch';
+    sel.style.cssText = 'flex: 1 1 auto; background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;';
+    sel.innerHTML = '<option value="">-- None --</option>';
+    if (router) sel.dataset.pending = router;
+
+    const rm = document.createElement('button');
+    rm.type = 'button';
+    rm.className = 'w3-button w3-tiny w3-round w3-red';
+    rm.title = 'Remove';
+    rm.style.cssText = 'flex: 0 0 28px; padding: 2px 8px;';
+    rm.innerHTML = '&times;';
+    rm.onclick = () => row.remove();
+
+    const icon = document.createElement('div');
+    icon.style.cssText = 'flex: 0 0 22px; color: #38bdf8; text-align: center;';
+    icon.innerHTML = '<i class="fas fa-route"></i>';
+
+    row.appendChild(icon);
+    row.appendChild(sel);
+    row.appendChild(rm);
+    wrap.appendChild(row);
+    window.populateNicSwitchOptions();
+};
+
+window.clearGatewayRouterRows = function() {
+    const wrap = document.getElementById('gateway-router-rows');
+    if (wrap) wrap.innerHTML = '';
+};
+
+window.collectGatewayRouterRows = function() {
+    const rows = [];
+    document.querySelectorAll('#gateway-router-rows .gw-router-row').forEach(r => {
+        const sel = r.querySelector('.nic-switch');
+        if (sel && sel.value && r.dataset.nic) rows.push({ nic: r.dataset.nic, router: sel.value });
+    });
+    return rows;
+};
+
+// Gateways get the single-IP + router-list layout; everything else keeps the
+// standard NIC table (IP/gateway/uplink per interface).
+window.refreshGatewayEditor = function() {
+    const typeEl = document.getElementById('edit-type');
+    const isGw = (typeEl ? typeEl.value : '') === 'gateway';
+    const std = isGw ? 'none' : '';
+
+    ['gw-col-header', 'link-col-header', 'edit-gw', 'edit-switch',
+     'extra-nics-rows', 'nic-hint', 'primary-nic-badge'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = std;
+    });
+
+    const addNicBtn = document.getElementById('add-nic-btn');
+    if (addNicBtn) addNicBtn.style.display = isGw ? 'none' : '';
+
+    const gsec = document.getElementById('gateway-links-section');
+    if (gsec) gsec.style.display = isGw ? 'block' : 'none';
+
+    // Gateways have no per-interface meaning for the shared IP.
+    const pnm = document.getElementById('primary-nic-name');
+    if (pnm && isGw) pnm.innerText = 'ipv4';
 };
 
 // Append a new additional-interface row to the node editor.
@@ -292,6 +407,9 @@ window.updateDynamicLabels = function() {
     // Consolidated into a single, clean declaration
     const isCloud = ['gcp', 'aws', 'azure', 'external'].includes(provider);
 
+    // Swap the NIC section between the standard table and the gateway layout.
+    if (window.refreshGatewayEditor) window.refreshGatewayEditor();
+
     // Toggle the Terraform Tab visibility
     const tfTabBtn = document.getElementById('tab-btn-terraform');
     if (tfTabBtn) {
@@ -338,6 +456,7 @@ window.updateDynamicLabels = function() {
         });
     }
 
+    if (window.refreshGatewayEditor) window.refreshGatewayEditor();
     if (window.populateNicSwitchOptions) window.populateNicSwitchOptions();
 };
 
@@ -440,7 +559,12 @@ window.editNodeConfig = async function(labName, nodeName) {
             }
 
             const primaryIpEl = document.getElementById('edit-primary-ip');
-            if (primaryIpEl) primaryIpEl.value = cleanNics[primaryName] || '';
+            // Legacy nodes (natgw, switches, ...) keep their address in the
+            // top-level `ipv4` field instead of `nics`. Surface it in the
+            // primary IP field and remember to write it back on save.
+            const ipv4Based = Object.keys(cleanNics).length === 0 && !!nodeObj.ipv4;
+            window.currentEditNodeIpv4 = ipv4Based;
+            if (primaryIpEl) primaryIpEl.value = ipv4Based ? nodeObj.ipv4 : (cleanNics[primaryName] || '');
             document.getElementById('edit-eth0').value = (primaryName !== 'eth0') ? (cleanNics['eth0'] || '') : '';
 
             const extraNics = [];
@@ -449,6 +573,15 @@ window.editNodeConfig = async function(labName, nodeName) {
                 if (name === 'eth0' && primaryName !== 'eth0') continue;
                 extraNics.push({ name, ip });
             }
+
+            // Which interface actually carries the node-level default gateway?
+            // Only relevant when it isn't the primary NIC (e.g. ro0 -> eth1).
+            const nicAddrs = ipv4Based
+                ? { [primaryName]: nodeObj.ipv4 }
+                : Object.assign({ [primaryName]: cleanNics[primaryName] },
+                                Object.fromEntries(extraNics.map(n => [n.name, n.ip])));
+            const gwOwner = nodeObj.gw ? (window.nicForGateway(nodeObj.gw, nicAddrs) || '') : '';
+            window.currentEditNodeGwNic = (gwOwner && gwOwner !== primaryName) ? gwOwner : '';
 
             // Map each interface of this node -> connected switch, from the links table
             const nicSwitchMap = {};
@@ -467,6 +600,10 @@ window.editNodeConfig = async function(labName, nodeName) {
                 });
             } catch (e) { console.error("NIC/switch scrape error:", e); }
 
+            // Remember existing link peerings so legacy (ipv4-only) nodes —
+            // which have no nics rows — don't lose their extra-plane uplinks.
+            window.currentEditNodeLinkSwitches = Object.assign({}, nicSwitchMap);
+
             // Per-NIC gateways (primary gateway is the node-level 'gw')
             const nicGwsMap = (nodeObj.nic_gws && typeof nodeObj.nic_gws === 'object') ? nodeObj.nic_gws : {};
 
@@ -481,9 +618,19 @@ window.editNodeConfig = async function(labName, nodeName) {
             if (window.refreshNicContainerMode) window.refreshNicContainerMode();
             window.clearNicRows();
             extraNics.forEach(n => window.addNicRow(
-                n.name, n.ip, nicSwitchMap[n.name] || '', nicGwsMap[n.name] || '',
+                n.name, n.ip, nicSwitchMap[n.name] || '',
+                (n.name === gwOwner) ? nodeObj.gw : (nicGwsMap[n.name] || ''),
                 !!(nicContainerMap[n.name] === true || nicContainerMap[n.name] === 'true')
             ));
+
+            // Host-located gateway: a single shared IP plus one router link per
+            // plane, keyed by the existing interface names (eth1, eth2, ...).
+            if (window.clearGatewayRouterRows) window.clearGatewayRouterRows();
+            if (nodeType === 'gateway') {
+                Object.keys(nicSwitchMap)
+                    .sort((a, b) => (parseInt(a.replace(/\D/g, ''), 10) || 0) - (parseInt(b.replace(/\D/g, ''), 10) || 0))
+                    .forEach(nic => window.addGatewayRouterRow(nic, nicSwitchMap[nic]));
+            }
             // --------------------------------
 
             let connectedSwitch = '';
@@ -529,7 +676,8 @@ window.editNodeConfig = async function(labName, nodeName) {
                 }
             }
 
-            document.getElementById('edit-gw').value = nodeObj.gw || '';
+            document.getElementById('edit-gw').value =
+                (gwOwner && gwOwner !== primaryName) ? '' : (nodeObj.gw || '');
             if (!nodeObj.gw && connectedSwitch && typeof window.updateGatewayForSwitch === 'function') {
                 try { window.updateGatewayForSwitch(connectedSwitch); } catch(e) {}
             }
@@ -594,6 +742,9 @@ window.editNodeConfig = async function(labName, nodeName) {
 window.openAddNodeModal = function(labPath) {
     window.currentEditLab = labPath;
     window.currentEditNode = null;
+    window.currentEditNodeIpv4 = false;
+    window.currentEditNodeLinkSwitches = {};
+    window.currentEditNodeGwNic = '';
 
     document.getElementById('node-modal-icon').className = 'fas fa-plus-circle';
     document.getElementById('node-modal-title').innerText = 'Add Node';
@@ -606,6 +757,7 @@ window.openAddNodeModal = function(labPath) {
     });
 
     if (window.clearNicRows) window.clearNicRows();
+    if (window.clearGatewayRouterRows) window.clearGatewayRouterRows();
 
     const planeEl = document.getElementById('edit-plane');
     if (planeEl) planeEl.value = 'data';
@@ -680,11 +832,34 @@ window.saveNodeConfig = async function() {
     // link per interface instead of only wiring the primary NIC.
     const nicSwitches = {};
     const mainSwitchEl = document.getElementById('edit-switch');
-    if (mainSwitchEl && mainSwitchEl.value) nicSwitches[primaryNicJs] = mainSwitchEl.value;
-    nicRows.forEach(r => { if (r.sw) nicSwitches[r.name] = r.sw; });
+    if (typeField === 'gateway') {
+        // Gateways keep a single shared IP and one link per router.
+        window.collectGatewayRouterRows().forEach(r => { if (r.router) nicSwitches[r.nic] = r.router; });
+    } else {
+        // Legacy (ipv4-only) nodes have no nics rows, so re-submit their existing
+        // non-primary link peerings to keep them from being torn down on save.
+        if (window.currentEditNodeIpv4 && window.currentEditNodeLinkSwitches) {
+            for (const [nic, sw] of Object.entries(window.currentEditNodeLinkSwitches)) {
+                if (nic !== primaryNicJs && sw) nicSwitches[nic] = sw;
+            }
+        }
+        if (mainSwitchEl && mainSwitchEl.value) nicSwitches[primaryNicJs] = mainSwitchEl.value;
+        nicRows.forEach(r => { if (r.sw) nicSwitches[r.name] = r.sw; });
+    }
 
     // Per-NIC gateway map — the primary NIC's gateway is the node-level 'gw'.
+    // A node-level gateway shown on a non-primary interface (e.g. ro0 -> eth1)
+    // is folded back into the top-level `gw` so the engine keeps applying it as
+    // the metric-0 default route rather than a per-NIC secondary route.
     const nicGws = {};
+    const gwNic = window.currentEditNodeGwNic;
+    if (gwNic && gwNic !== primaryNicJs) {
+        const row = nicRows.find(r => r.name === gwNic);
+        if (row) {
+            gwField = row.gw || '';
+            row.gw = '';
+        }
+    }
     nicRows.forEach(r => { if (r.gw) nicGws[r.name] = r.gw; });
 
     // Per-NIC "keep in container" map (qemu nodes only).
@@ -714,8 +889,15 @@ window.saveNodeConfig = async function() {
 
         // ALWAYS append these safe defaults
         formData.append('profile', document.getElementById('edit-kind').value);
-        formData.append('gw',    gwField);
-        formData.append('nics', finalNics);
+        // Gateways have no default gateway of their own.
+        formData.append('gw', typeField === 'gateway' ? '' : gwField);
+        if (window.currentEditNodeIpv4 || typeField === 'gateway') {
+            // Legacy ipv4-based node: round-trip the top-level `ipv4` field and
+            // don't emit `nics` (the engine reads `ipv4` for gateways/switches).
+            formData.append('ipv4', primaryIp);
+        } else {
+            formData.append('nics', finalNics);
+        }
         formData.append('nic_switches', JSON.stringify(nicSwitches));
         formData.append('nic_gws', JSON.stringify(nicGws));
         formData.append('nic_container', JSON.stringify(nicContainer));

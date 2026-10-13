@@ -191,6 +191,12 @@ class Node
       new_cfg.delete('nics')
     end
 
+    # Legacy single-address nodes (natgw, switches, ...) keep their address in
+    # the top-level 'ipv4' field rather than 'nics'; the editor round-trips it.
+    if params.key?(:ipv4)
+      params[:ipv4].to_s.strip.empty? ? new_cfg.delete('ipv4') : new_cfg['ipv4'] = params[:ipv4].strip
+    end
+
     # Optional per-NIC gateway map ({"eth2" => "192.168.20.1", ...}). The
     # primary NIC's gateway is kept in the top-level 'gw' instead.
     if params.key?(:nic_gws)
