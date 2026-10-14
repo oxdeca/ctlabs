@@ -5,7 +5,7 @@ IMG_VERS=0.4.3
 
 MNTDIR=/media/ctlabs_d13_qemu
 QIMG_NAME=debian-13-nocloud-amd64.qcow2
-QIMG_URL=https://cloud.debian.org/images/cloud/bookworm/latest/${QIMG_NAME}
+QIMG_URL=https://cloud.debian.org/images/cloud/trixie/latest/${QIMG_NAME}
 QIMG_SIZE=40G
 
 create_qemu_img() {
