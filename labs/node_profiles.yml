@@ -81,6 +81,11 @@ profiles:
       user: ansible
       env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
       kvm: true
+    qemu/d13:
+      image: ctlabs/qemu/d13
+      user: ansible
+      env: ['QEMU_MEM=2G', 'QEMU_CPU=4']
+      kvm: true      
     qemu/c9:
       image: ctlabs/qemu/c9
       user: ansible

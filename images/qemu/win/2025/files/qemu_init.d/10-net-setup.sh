@@ -1,7 +1,7 @@
 create_net_setup_script() {
   local eth0_ip=$( ip -br addr ls eth0 | awk '{print $3}' )
   local eth1_ip=$( ip -br addr ls eth1 | awk '{print $3}' )
-  local eth1_gw=$( ip -br route ls default | awk '{print $3}' )
+  local eth1_gw=$( ip -br route ls default | grep -v metric | awk '{print $3}' )
   local dns_servers=($(awk '/^nameserver/{print $2}' /etc/resolv.conf))
 
   local mac0_win=$( echo "${ENS0_MAC}" | tr '[:lower:]' '[:upper:]' | tr ':' '-' )
