@@ -1,14 +1,15 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/cards/controller.erb
-# Description : Persistent controller mgmt-plane card.
+# Description : Persistent controller mgmt-plane cards.
 #
 #               The controller (ctl-ctrl + its ctl-* mgmt plane) is GLOBAL -- it
-#               is deliberately not a lab -- so this card is not fed by
-#               Lab.metadata. It reads Controller directly (already required at
-#               boot, see server.rb). It is rendered on EVERY lab's details page
-#               because every lab depends on the controller. Terminals reuse the
-#               standard window.manageTerminal() path.
+#               is deliberately not a lab -- so these cards are not fed by
+#               Lab.metadata. They read Controller directly (already required at
+#               boot, see server.rb). They are rendered on EVERY lab's details
+#               page because every lab depends on the controller. Terminals
+#               reuse the standard window.manageTerminal() path. Laid out as
+#               stacked cards, mirroring the Automation tab (Ansible/Terraform).
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
@@ -20,31 +21,35 @@
                   else
                     []
                   end
+  exposed_ports = if defined?(Controller) && Controller.respond_to?(:exposed_ports)
+                    (Controller.exposed_ports rescue [])
+                  else
+                    []
+                  end
 %>
 
-<div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-cogs"></i> Controller Plane</span>
     <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : 'w3-red' %>" style="font-size: 12px; padding: 2px 10px;">
       <%= controller_up ? 'Running' : 'Stopped' %>
     </span>
   </div>
-
-  <% if plane_nodes.empty? %>
-    <div class="w3-padding" style="color: #94a3b8; background-color: #1e293b;">
-      <i class="fas fa-info-circle"></i> The persistent controller is not running.
-      Start it with <code style="background-color: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">ctlabs.rb --controller=up</code>.
-    </div>
-  <% else %>
-    <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="slim-scroll">
+  <div class="w3-padding">
+    <% if plane_nodes.empty? %>
+      <p style="color: #94a3b8; font-style: italic; margin: 0;">
+        <i class="fas fa-info-circle"></i> The persistent controller is not running.
+        Start it with <code style="background-color: #1e293b; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">ctlabs.rb --controller=up</code>.
+      </p>
+    <% else %>
       <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
-        <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
+        <thead>
           <tr style="color: #94a3b8;">
-            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px; width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
-            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
-            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
-            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Plane</th>
-            <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
+            <th style="width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Plane</th>
+            <th style="text-align:right;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -86,6 +91,51 @@
           <% end %>
         </tbody>
       </table>
-    </div>
-  <% end %>
+    <% end %>
+  </div>
+</div>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-network-wired w3-text-red"></i> Exposed Services</span>
+    <span style="font-size: 12px; color: #94a3b8;">host DNAT &middot; controller-owned</span>
+  </div>
+  <div class="w3-padding">
+    <% if exposed_ports.empty? %>
+      <p style="color: #94a3b8; font-style: italic; margin: 0;">No ports exposed</p>
+    <% else %>
+      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+        <thead>
+          <tr style="color: #94a3b8;">
+            <th>Service</th>
+            <th>Node</th>
+            <th>Proto</th>
+            <th>Forwarding Rule</th>
+            <th style="text-align:right;">Access</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% exposed_ports.each do |port| %>
+            <tr>
+              <td>
+                <% if port[:service] %>
+                  <i class="fas fa-star" style="color: #f59e0b;"></i> <strong style="color: #fbbf24;"><%= port[:service] %></strong>
+                <% else %>
+                  <span style="color: #64748b;">&mdash;</span>
+                <% end %>
+              </td>
+              <td><strong style="color: #38bdf8;"><%= port[:node] %></strong></td>
+              <td><span class="w3-badge w3-tiny" style="background: #475569;"><%= port[:proto].upcase %></span></td>
+              <td style="white-space: nowrap;"><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code></td>
+              <td style="text-align:right; white-space: nowrap;">
+                <% if port[:url] %>
+                  <a href="<%= port[:url] %>" target="_blank" rel="noopener" class="w3-button w3-tiny w3-round w3-blue" title="Open <%= port[:service] %> in a new tab"><i class="fas fa-external-link-alt"></i> Open</a>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  </div>
 </div>

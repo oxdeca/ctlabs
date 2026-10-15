@@ -100,6 +100,59 @@ class Controller
     nodes
   end
 
+  # Host port-forwards owned by the controller (its own `dnat:` declarations in
+  # TOPOLOGY), for the webgui "Controller" tab. Mirrors the shape of
+  # Lab.metadata's :exposed_ports so the same DNAT styling can be reused. These
+  # forwards are fixed (declared in #topology_yaml), so the UI shows them
+  # read-only. Known services get a friendly label + a browser URL.
+  def self.exposed_ports
+    return [] unless File.file?(TOPOLOGY)
+
+    cfg = begin
+      YAML.load_file(TOPOLOGY)
+    rescue StandardError
+      nil
+    end
+    return [] unless cfg.is_a?(Hash)
+
+    vip = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).strip
+
+    rows = []
+    Array(cfg['topology']).each do |vm|
+      next unless vm.is_a?(Hash)
+      (vm['planes'] || {}).each do |_plane, pcfg|
+        next unless pcfg.is_a?(Hash)
+        (pcfg['nodes'] || {}).each do |name, ncfg|
+          next unless ncfg.is_a?(Hash)
+          dnat = ncfg['dnat']
+          next unless dnat.is_a?(Array)
+          rip = (ncfg['nics'] || {})['eth0']&.split('/')&.first
+          dnat.each do |r|
+            next unless r.is_a?(Array) && r.size >= 2
+            ext   = r[0].to_i
+            int   = r[1].to_i
+            proto = (r[2] || 'tcp').to_s
+            service = case int
+                      when 8200 then 'Vault'
+                      when 53   then 'DNS (dnsmasq)'
+                      end
+            rows << {
+              node:          name,
+              proto:         proto,
+              service:       service,
+              external_port: "#{vip}:#{ext}",
+              internal_port: "#{rip || 'N/A'}:#{int}",
+              raw_ext:       ext,
+              raw_int:       int,
+              url:           service == 'Vault' ? "https://#{vip}:#{ext}/ui" : nil
+            }
+          end
+        end
+      end
+    end
+    rows
+  end
+
   def initialize(log: nil)
     @log = log || LabLog.null
   end
