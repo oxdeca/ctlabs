@@ -56,6 +56,50 @@ class Controller
       .lines.map(&:strip).reject(&:empty?)
   end
 
+  # Describe the controller's own mgmt-plane nodes for the webgui "Controller"
+  # tab. The controller is global (not a lab), so there is no Lab.metadata for
+  # it; the topology file written by #up is the source of truth. Returns [] when
+  # that file does not exist yet (controller never started on this boot).
+  #
+  # Only container-backed nodes are listed: the edge `ctl-natgw` is a HOST
+  # bridge (like a lab's `natgw`), not a container, so it has no terminal and is
+  # filtered out. `running` is per-node so a partially-started plane stays
+  # visible (a stopped/exited container shows red, not hidden).
+  def self.plane_nodes
+    return [] unless File.file?(TOPOLOGY)
+
+    cfg = begin
+      YAML.load_file(TOPOLOGY)
+    rescue StandardError
+      nil
+    end
+    return [] unless cfg.is_a?(Hash)
+
+    containers = plane_containers
+    running = %x( docker ps --format '{{.Names}}' --filter name='^ctl-' 2>/dev/null )
+                .lines.map(&:strip).reject(&:empty?)
+
+    nodes = []
+    Array(cfg['topology']).each do |vm|
+      next unless vm.is_a?(Hash)
+      (vm['planes'] || {}).each do |plane, pcfg|
+        next unless pcfg.is_a?(Hash)
+        (pcfg['nodes'] || {}).each do |name, ncfg|
+          next unless containers.include?(name)
+          ncfg = {} unless ncfg.is_a?(Hash)
+          nodes << {
+            name:    name,
+            type:    ncfg['type'] || 'host',
+            profile: ncfg['profile'],
+            plane:   plane,
+            running: running.include?(name)
+          }
+        end
+      end
+    end
+    nodes
+  end
+
   def initialize(log: nil)
     @log = log || LabLog.null
   end

@@ -66,6 +66,9 @@
           <button class="w3-bar-item w3-button lab-tab-btn w3-round w3-margin-bottom w3-hover-pink" style="text-align: left; color: #cbd5e1;" onclick="openLabTab(event, 'tab-container-images')">
             <i class="fas fa-box" style="width: 20px;"></i> Container Images
           </button>
+          <button class="w3-bar-item w3-button lab-tab-btn w3-round w3-margin-bottom w3-hover-blue-gray" style="text-align: left; color: #cbd5e1;" onclick="openLabTab(event, 'tab-controller')">
+            <i class="fas fa-cogs" style="width: 20px;"></i> Controller
+          </button>
         </div>
       </div>
 
@@ -93,6 +96,10 @@
         
         <div id="tab-container-images" class="lab-tab-content" style="display: none; flex: 1; min-height: 0; flex-direction: column; overflow-y: hidden;">
           <%= erb :'cards/container_images', locals: { info_hash: info_hash } %>
+        </div>
+        
+        <div id="tab-controller" class="lab-tab-content" style="display: none; flex: 1; min-height: 0; flex-direction: column; overflow-y: auto;">
+          <%= erb :'cards/controller' %>
         </div>
         
       </div>

@@ -1,0 +1,91 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/cards/controller.erb
+# Description : Persistent controller mgmt-plane card.
+#
+#               The controller (ctl-ctrl + its ctl-* mgmt plane) is GLOBAL -- it
+#               is deliberately not a lab -- so this card is not fed by
+#               Lab.metadata. It reads Controller directly (already required at
+#               boot, see server.rb). It is rendered on EVERY lab's details page
+#               because every lab depends on the controller. Terminals reuse the
+#               standard window.manageTerminal() path.
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<%
+  controller_up = defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
+  plane_nodes   = if defined?(Controller) && Controller.respond_to?(:plane_nodes)
+                    (Controller.plane_nodes rescue [])
+                  else
+                    []
+                  end
+%>
+
+<div class="w3-card w3-round-large" style="background-color: #0f172a; display: flex; flex-direction: column; flex: 1; min-height: 0; margin: 0; border: none; overflow: hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-cogs"></i> Controller Plane</span>
+    <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : 'w3-red' %>" style="font-size: 12px; padding: 2px 10px;">
+      <%= controller_up ? 'Running' : 'Stopped' %>
+    </span>
+  </div>
+
+  <% if plane_nodes.empty? %>
+    <div class="w3-padding" style="color: #94a3b8; background-color: #1e293b;">
+      <i class="fas fa-info-circle"></i> The persistent controller is not running.
+      Start it with <code style="background-color: #0f172a; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">ctlabs.rb --controller=up</code>.
+    </div>
+  <% else %>
+    <div style="flex: 1; min-height: 0; padding: 0; overflow-y: auto; overflow-x: auto;" class="slim-scroll">
+      <table class="w3-table w3-striped w3-small" style="margin: 0; font-size: 13px;">
+        <thead style="position: sticky; top: 0; z-index: 1; background-color: #1e293b;">
+          <tr style="color: #94a3b8;">
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px; width: 30px; text-align: center;"><i class="fas fa-heartbeat"></i></th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Name</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Type</th>
+            <th style="border-bottom: 1px solid #475569 !important; padding: 12px 8px;">Plane</th>
+            <th style="border-bottom: 1px solid #475569 !important; text-align:right; padding: 12px 8px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% plane_nodes.each do |node| %>
+            <%
+              n_name  = node[:name]
+              n_type  = (node[:type] || 'host').to_s
+              n_plane = node[:plane] || 'mgmt'
+
+              node_icon = case n_type.downcase
+                          when 'controller' then 'fa-cogs'
+                          when 'switch'     then 'fa-exchange-alt'
+                          when 'router'     then 'fa-route'
+                          when 'gateway'    then 'fa-door-open'
+                          when 'firewall'   then 'fa-shield-alt'
+                          when 'host'       then 'fa-laptop'
+                          when 'server'     then 'fa-server'
+                          else 'fa-server'
+                          end
+            %>
+            <tr class="node-row">
+              <td style="text-align: center; vertical-align: middle;">
+                <i class="fas fa-circle" style="font-size: 0.8em; color: <%= node[:running] ? '#10b981' : '#ef4444' %>;"></i>
+              </td>
+              <td style="vertical-align: middle; white-space: nowrap;">
+                <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
+                <strong style="color: #38bdf8;"><%= n_name %></strong>
+              </td>
+              <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= n_type %></span></td>
+              <td style="vertical-align: middle; color: #a855f7;"><%= n_plane %></td>
+              <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
+                <% if node[:running] %>
+                  <button type="button" onclick="window.manageTerminal('<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-green w3-hover-text-light-green" title="Open Web Terminal"><i class="fas fa-terminal fa-lg"></i></button>
+                <% else %>
+                  <button type="button" class="w3-button w3-tiny w3-transparent" style="color: #475569; cursor: not-allowed;" title="Node is not running"><i class="fas fa-terminal fa-lg"></i></button>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>
