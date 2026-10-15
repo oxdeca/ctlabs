@@ -280,6 +280,15 @@ window.loadAnsProfiles = async function() {
       resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
       resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration and files...';
 
+      // Disable while the request is in flight so a second click can't fire a
+      // duplicate save (the two POSTs would race the reload below).
+      const saveBtn = document.getElementById('ans-save-btn');
+      const saveBtnHtml = saveBtn ? saveBtn.innerHTML : null;
+      if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      }
+
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
@@ -302,6 +311,7 @@ window.loadAnsProfiles = async function() {
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
           resultDiv.innerHTML = '❌ ' + err.message; // Will render Sinatra's HTML error directly in the box!
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
       }
   };
   
@@ -693,6 +703,15 @@ window.openTfTab = function(tabId) {
       resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
       resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving files...';
 
+      // Disable while the request is in flight so a second click can't fire a
+      // duplicate save (the two POSTs would race the reload below).
+      const saveBtn = document.getElementById('tf-save-btn');
+      const saveBtnHtml = saveBtn ? saveBtn.innerHTML : null;
+      if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+      }
+
       const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform/edit`, {
@@ -713,6 +732,7 @@ window.openTfTab = function(tabId) {
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
           resultDiv.innerHTML = '❌ ' + err.message;
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
       }
   };
 

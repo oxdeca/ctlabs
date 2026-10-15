@@ -81,13 +81,23 @@ class BaseController < Sinatra::Base
   end
 
   # Custom error handling can be added here
+  # Sinatra invokes a status error handler for EVERY response whose status is in
+  # the range, not only real exceptions. Without this guard, a route that sets
+  # `status 400` and returns its own JSON body (e.g. the DNAT route's rescue) is
+  # silently overwritten by the generic "An error occurred", hiding the actual
+  # cause from the UI. Only substitute a body for genuine exceptions; otherwise
+  # keep whatever the route produced.
   error 400..599 do
-    path = request.path_info
-    if path.start_with?('/labs/') || path.start_with?('/api/')
-      content_type :json
-      { success: false, error: env['sinatra.error']&.message || 'An error occurred' }.to_json
+    if env['sinatra.error']
+      path = request.path_info
+      if path.start_with?('/labs/') || path.start_with?('/api/')
+        content_type :json
+        { success: false, error: env['sinatra.error'].message }.to_json
+      else
+        "An error occurred: #{env['sinatra.error'].message}"
+      end
     else
-      "An error occurred: #{env['sinatra.error']&.message}"
+      response.body.respond_to?(:join) ? response.body.join : response.body.to_s
     end
   end
 end

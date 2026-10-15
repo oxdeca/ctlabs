@@ -128,6 +128,11 @@ class TerminalService
     node_type = nil
     tf_cfg = nil
     node_user = nil
+    # The lab's controller node is a logical name (e.g. "ansible"); when the
+    # lab is attached to the persistent controller there is no such container,
+    # so exec must be routed to the real one (ctl-ctrl). For every other node
+    # this stays equal to node_name.
+    exec_name = node_name
 
     if Lab.running?
       runtime_path = Lab.get_file_path(Lab.current_name)
@@ -138,6 +143,7 @@ class TerminalService
             node_type = node.type
             custom_term = node.term
             profile_user = sanitize_login_user(node.user)
+            exec_name = lab.controller_exec_name if node_type == 'controller'
 
             # `user:` in the profile is ANSIBLE's login (it becomes to root for
             # tasks), not the shell a human wants. Only the controller is logged
@@ -190,10 +196,10 @@ class TerminalService
       work_dir = nil
       if node_type == 'controller'
         workspace = Automation::ANSIBLE_DIR_CTL
-        work_dir  = workspace if container_dir_exists?(engine, node_name, workspace)
+        work_dir  = workspace if container_dir_exists?(engine, exec_name, workspace)
       end
-      work_dir ||= resolve_home_dir(engine, node_name, node_user || 'root')
-      work_dir = nil if work_dir && !container_dir_exists?(engine, node_name, work_dir)
+      work_dir ||= resolve_home_dir(engine, exec_name, node_user || 'root')
+      work_dir = nil if work_dir && !container_dir_exists?(engine, exec_name, work_dir)
       cmd.push('-w', work_dir) if work_dir
       cmd.push('-e', 'TERM=xterm-256color')
 
@@ -205,7 +211,7 @@ class TerminalService
           puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
         end
       end
-      cmd.push(node_name, 'bash')
+      cmd.push(exec_name, 'bash')
     end
     cmd
   end

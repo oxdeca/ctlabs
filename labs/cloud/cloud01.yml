@@ -1,0 +1,151 @@
+---
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/cloud/cloud01.yml
+# Description : Minimal GCP cloud-node lab.
+#               A GCP gateway VM (gcp-gw) joins the lab as a first-class node
+#               via an OpenVPN routed (L3) tunnel to the lab router ro1;
+#               a GCP host VM (cloud1) sits behind it on a tunneled subnet.
+#               Routing is exchanged by FRR/BGP over the tunnel (ASN 65045<->
+#               65001). No L2 extension, no cloud plane.
+# NOTE        : Design-stage. See design-guide.md sec.12. Known blockers:
+#               - Lab#up runs node.run on *all* nodes; remote (provider !=
+#                 local) nodes are only skipped in the adhoc path, not the
+#                 saved-lab path -> gcp-gw/cloud1 would try to run locally.
+#               - openvpn client `remote` needs the gateway public IP, which
+#                 is only known after terraform apply (see ${gcp_gw_ip}).
+# -----------------------------------------------------------------------------
+
+name: cloud01
+desc: GCP cloud node over self-managed OpenVPN tunnel (routed)
+
+topology:
+- hv: cloud01-vm1
+  provider: local
+  dns: [192.168.10.11, 8.8.8.8]
+  planes:
+    mgmt:
+      vrfid : 99
+      dns   : [1.1.1.1, 8.8.8.8]
+      net   : 192.168.99.0/24
+      gw    : 192.168.99.1
+      nodes:
+        ansible:
+          type: controller
+          gw  : 192.168.99.1
+          nics:
+            eth0: 192.168.99.5/24
+          terraform:
+            work_dir: cloud01
+            profile : gcp-wif-default
+          play:
+            book: ctlabs.yml
+            tags: [up, setup, base, frr, openvpn]
+            inv : cloud01.ini
+            setup:
+              # --- tunnel: server lives on the GCP gateway (it owns the
+              #     public IP); the lab router ro1 is the client ---
+              openvpn:
+                hosts: [gcp-gw, ro1]
+                gcp-gw:
+                  type     : server
+                  server_ip: "10.8.15.1"
+                  client_ip: "10.8.15.2"
+                ro1:
+                  type     : client
+                  server_ip: "10.8.15.1"
+                  client_ip: "10.8.15.2"
+                  # ${gcp_gw_ip} = public IP of gcp-gw, harvested after
+                  # terraform apply (see design-guide sec.12, gap "remote IP
+                  # injection"). Placeholder until that wiring exists.
+                  remote   : "${gcp_gw_ip}"
+              # --- BGP over the tunnel ---
+              frr:
+                hosts: [gcp-gw, ro1]
+                daemons:
+                  enabled: [bgpd]
+                  profile: datacenter
+                gcp-gw:
+                  router:
+                    bgp:
+                      local_asn  : 65045
+                      local_ip   : 10.8.15.1
+                      remote_ip  : 10.8.15.2
+                      remote_asn : 65001
+                      nets: [192.168.45.0/24]
+                ro1:
+                  router:
+                    bgp:
+                      local_asn  : 65001
+                      local_ip   : 10.8.15.2
+                      remote_ip  : 10.8.15.1
+                      remote_asn : 65045
+                      # advertise the lab data subnet towards the cloud
+                      nets: [192.168.10.0/24]
+        sw0:
+          profile: ovs
+          type: switch
+          ipv4: 192.168.99.10/24
+          gw  : 192.168.99.1
+        ro0:
+          profile: frr
+          type: router
+          gw  : 192.168.15.1
+          nics:
+            eth0: 192.168.99.1/24
+            eth1: 192.168.15.2/29
+
+    edge:
+      nodes:
+        natgw:
+          type: gateway
+          ipv4: 192.168.15.1/29
+          snat: true
+          dnat:
+            data: ro1:eth1
+            mgmt: ro0:eth1
+
+    transit:
+      nodes:
+        ro1:
+          profile: frr
+          type: router
+          gw  : 192.168.15.1
+          nics:
+            eth1: 192.168.15.3/29
+            eth2: 192.168.10.1/24
+        # Remote gateway, provisioned by terraform. Reached only over the
+        # tunnel; runs the VPN server + FRR.
+        gcp-gw:
+          provider: gcp
+          type    : router
+          profile : frr
+          nics:
+            tun0: 10.8.15.1
+          terraform:
+            work_dir: cloud01
+
+    data:
+      nodes:
+        sw1:
+          profile: ovs
+          type: switch
+        ns1:
+          type: host
+          gw  : 192.168.10.1
+          nics:
+            eth1: 192.168.10.11/24
+        # Remote host, provisioned by terraform, single NIC on the GCP subnet.
+        # The tunneled subnet 192.168.45.0/24 is just another data-plane subnet.
+        cloud1:
+          provider: gcp
+          type    : host
+          nics:
+            eth1: 192.168.45.11/24
+          terraform:
+            work_dir: cloud01
+
+  links:
+  - [ "ro0:eth1", "natgw:eth1" ]
+  - [ "ro1:eth1", "natgw:eth2" ]
+  - [ "ro1:eth2", "sw1:eth1" ]
+  - [ "sw1:eth2", "ns1:eth1" ]

@@ -225,7 +225,7 @@ class Graph
               node_b, int_b = l[1].split(':')
               is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
               
-              if (node_a != 'sw0' && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
+              if (node_a != mgmt_switch_name && node_a != mgmt_router_name && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
                 link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
         <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
@@ -274,7 +274,7 @@ class Graph
               <tr><td port="eth0" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= server_ip %> </font></td></tr>
             </table> >]
           }
-        <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
+        <%- target_node = dnat_target_node -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
@@ -376,7 +376,7 @@ class Graph
               node_b, int_b = l[1].split(':')
               is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
               
-              if (node_a == 'sw0' || node_a == 'ro0') && (!ext_names.include?(node_a) && !ext_names.include?(node_b) || is_vpn)
+              if (node_a == mgmt_switch_name || node_a == mgmt_router_name) && (!ext_names.include?(node_a) && !ext_names.include?(node_b) || is_vpn)
                 link_opts = is_vpn ? ', style="dashed"' : ""
         -%>
         <%=     l[0].gsub(/[.-]/, "_") %>:s -- <%= l[1].gsub(/[.-]/, "_") %>:n [color="<%= @graph.colors[i] %>"<%= link_opts %>]
@@ -425,7 +425,7 @@ class Graph
               <tr><td port="eth0" bgcolor="#1e293b" align="text"><font color="#cbd5e1" point-size="12"> <%= server_ip %> </font></td></tr>
             </table> >]
           }
-        <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
+        <%- target_node = dnat_target_node -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
@@ -523,7 +523,7 @@ class Graph
               node_b, int_b = l[1].split(':')
               is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
               
-              if (node_a != "sw0" && node_a != 'ro0' && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
+              if (node_a != mgmt_switch_name && node_a != mgmt_router_name && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
                 link_opts = is_vpn ? ' [style="dashed", color="#14b8a6", penwidth="2.5"]' : ""
         -%>
           <%= node_a.gsub(/[.-]/, "_") %> -- <%= node_b.gsub(/[.-]/, "_") %><%= link_opts %>
@@ -562,7 +562,7 @@ class Graph
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]
-        <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
+        <%- target_node = dnat_target_node -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
@@ -650,7 +650,7 @@ class Graph
         <%- @links.each do |l|
               node_a, int_a = l[0].split(':')
               node_b, int_b = l[1].split(':')
-              is_mgmt_link = (node_a == 'sw0' || node_a == 'ro0' || node_b == 'sw0' || node_b == 'ro0')
+              is_mgmt_link = ([mgmt_switch_name, mgmt_router_name].include?(node_a) || [mgmt_switch_name, mgmt_router_name].include?(node_b))
               is_vpn = int_a.to_s.start_with?('tun', 'wg') || int_b.to_s.start_with?('tun', 'wg')
 
               if (is_mgmt_link && !ext_names.include?(node_a) && !ext_names.include?(node_b)) || is_vpn
@@ -692,7 +692,7 @@ class Graph
             host_tt = "CTLABS_HOST  [ Hypervisor ]&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;ℹ️ Host VM: " + host_name + "&#10;━━━━━━━━━━━━━━━━━━━━━━━━&#10;🌐 IPv4: " + server_ip
         -%>
         ctlabs_host [color="#ec4899", tooltip="<%= host_tt %>", label=< <table cellborder="0" border="0" cellspacing="0" cellpadding="4"><tr><td><b><font color="#ec4899" point-size="16">🏢 <%= host_name %></font></b></td></tr><tr><td><font color="#cbd5e1" point-size="12"><%= server_ip %></font></td></tr></table> >]
-        <%- target_node = @nodes.find { |n| n.name == 'natgw' } || @nodes.find { |n| n.name == 'sw0' } -%>
+        <%- target_node = dnat_target_node -%>
         <%- if target_node -%>
         ctlabs_host -- <%= target_node.name %> [color="#ec4899", style="dashed", penwidth="2.0"]
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|

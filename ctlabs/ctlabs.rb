@@ -26,6 +26,7 @@ require './lib/link'
 require './lib/graph'
 require './lib/lablog'
 require './lib/gcp_auth'
+require './lib/controller'
 
 
 #
@@ -58,6 +59,12 @@ OptionParser.new do |opts|
   opts.on("-D", "--dnsmasq", "Create a dnsmasq config for the mgmt hosts") do
     options[:dnsmasq] = true
   end
+  opts.on("--gc", "Reconcile host leftovers of dead labs (orphan DNAT chains + veths)") do
+    options[:gc] = true
+  end
+  opts.on("-n", "--dry-run", "With --gc: report leftovers without removing them") do
+    options[:dry_run] = true
+  end
   opts.on("-t", "--print", "Print inspect output") do
     options[:print] = true
   end
@@ -72,6 +79,9 @@ OptionParser.new do |opts|
   end
   opts.on("-s", "--status", "Show status of currently running lab") do
     options[:status] = true
+  end
+  opts.on("--controller=ACTION", "Persistent control plane: up|down|status") do |a|
+    options[:controller] = a
   end
 end.parse!
 
@@ -100,6 +110,27 @@ if options[:status]
     end
   else
     puts "❌ No lab is currently running."
+  end
+  exit 0
+end
+
+# Handle --gc (host reconcile) before any lab lifecycle.
+if options[:gc]
+  Lab.gc($stdout, dry_run: options[:dry_run] ? true : false)
+  exit 0
+end
+
+# Handle --controller (persistent control plane) before any lab lifecycle.
+if options[:controller]
+  require './lib/controller'
+  ctl = Controller.new(log: LabLog.null)
+  case options[:controller].to_s.strip
+  when 'up'     then ctl.up
+  when 'down'   then ctl.down
+  when 'status' then ctl.status
+  else
+    puts "❌ Unknown controller action: #{options[:controller]} (expected up|down|status)"
+    exit 1
   end
   exit 0
 end
@@ -143,9 +174,15 @@ if options[:up]
   puts "Log file: #{log.path}"
 
   l1 = Lab.new(cfg: runtime_path, relative_path: config_path, log: log)
-  l1.visualize
-  l1.inventory
-  l1.up
+  begin
+    l1.visualize
+    l1.inventory
+    l1.up
+  rescue => e
+    log.info "❌ Error: #{e.message}"
+    log.close
+    exit 1
+  end
 
   log.info "✓ Lab started successfully"
   log.close

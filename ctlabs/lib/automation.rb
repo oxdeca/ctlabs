@@ -561,7 +561,7 @@ module Automation
       # tolerates log_file_path == nil - so the old `system("docker exec ...")`
       # fallback was dead code (every caller passes a log path) that only
       # duplicated the command string and diverged in error handling.
-      status = stream_docker_exec(ctrl.name, play_cmd, log_file_path,
+      status = stream_docker_exec(controller_exec_name, play_cmd, log_file_path,
                                   pid_file: log_file_path ? Automation.playbook_run_state_path(@relative_path) : nil)
 
       # Reaching this point does NOT mean the playbook succeeded: it may have
@@ -656,10 +656,14 @@ module Automation
     tf_command = base_tf_cmd
 
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    
-    full_cmd = "#{engine} exec #{exec_env}#{ctrl.name} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 
-    @log.info "Executing Terraform on #{ctrl.name}: #{tf_command}" 
+    # Terraform runs where the controller lives: ctl-ctrl when attached to the
+    # persistent controller, else the target node's own container.
+    exec_ctrl = (ctrl.type.to_s == 'controller' && controller_attached?) ? Controller::NAME : ctrl.name
+
+    full_cmd = "#{engine} exec #{exec_env}#{exec_ctrl} bash -c '#{tf_command.gsub("'", "'\\''")}'"
+
+    @log.info "Executing Terraform on #{exec_ctrl}: #{tf_command}" 
 
     # 4. Stream the output
     if log_path
@@ -667,7 +671,7 @@ module Automation
         f.puts "\n" + "="*50
         f.puts "🚀 TERRAFORM EXECUTION STARTED"
         f.puts "="*50
-        f.puts "Target Node : #{ctrl.name}"
+        f.puts "Target Node : #{exec_ctrl}"
         f.puts "Workspace   : #{workspace}"
         f.puts "Variables   : #{vars.empty? ? 'None' : vars.join(', ')}"
         f.puts "-"*50 + "\n"
@@ -775,7 +779,19 @@ module Automation
   # Returns the child's status as a String: '0', '143', 'terminated by SIG15',
   # or 'unknown' if the status could not be determined.
   def stream_docker_exec(container_name, play_cmd, log_file_path = nil, pid_file: nil)
-    inner_command = "cd #{ANSIBLE_DIR_CTL} && ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
+    # Export the repo dirs the ctlabs-ansible group_vars expect
+    # (inventories/group_vars/all/ctlabs.yml: ctg_ansible_repo_dir et al. resolve
+    # from these env vars). They must be exported, not left to the group_vars
+    # fallback: lookup('env', X) returns '' (not undefined) when unset, so the
+    # `| default(path)` there never applies and the var becomes empty - a role
+    # writing to "{{ ctg_ansible_repo_dir }}/..." (e.g. the ctlabs_vault init
+    # output) then lands in the container's ephemeral "/" and is lost on the next
+    # controller recreate, breaking vault unseal. The mounted paths below are the
+    # same ones ANSIBLE_DIR_CTL/TF_DIR_CTL already assume.
+    repo_env = "CTLABS_ANSIBLE_REPO_DIR=#{ANSIBLE_DIR_CTL} " \
+               "CTLABS_TERRAFORM_REPO_DIR=#{TF_DIR_CTL} " \
+               "CTLABS_TOOLS_REPO_DIR=/srv/ctlabs/ctlabs-tools"
+    inner_command = "cd #{ANSIBLE_DIR_CTL} && #{repo_env} ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
   
     # Open log file ONCE before streaming (critical for web UI visibility)

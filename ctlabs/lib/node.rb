@@ -7,7 +7,7 @@
 require 'fileutils'
 
 class Node
-  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers, :os, :nic_gws, :nic_container
+  attr_reader :name, :fqdn, :kind, :type, :image, :env, :cmd, :caps, :priv, :cid, :nics, :ports, :gw, :ipv4, :dnat, :snat, :vxlan, :netns, :eos, :bonds, :defaults, :via, :mtu, :dns, :mgmt, :devs, :play, :ephemeral, :info, :urls, :term, :terraform, :plane, :provider, :user, :peers, :os, :nic_gws, :nic_container, :persistent
   attr_writer :nics
   attr_accessor :is_running
 
@@ -47,6 +47,10 @@ class Node
     @info       = args[:info  ]     || args['info' ]
     @urls       = args[:urls  ]     || args['urls' ]
     @term       = args[:term  ]     || args['term' ]
+    # persistent: keep the container after it stops (drop --rm). Used by the
+    # decoupled control-plane controller (see lib/controller.rb), which must
+    # survive lab up/down.
+    @persistent = args['persistent'] || args[:persistent] || false
     @is_running = false
 
     # --- NEW: Smart Ansible User Resolution ---
@@ -570,10 +574,19 @@ class Node
 
 
         #%x( docker run -d #{@ephemeral ? "--rm" : ""} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd} 2>/dev/null )
-        run_cmd = "docker run -d --rm --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd}"
-        %x( #{scoped_run(run_cmd)} 2>/dev/null )
+        rm_flag = @persistent ? '' : '--rm'
+        run_cmd = "docker run -d #{rm_flag} --hostname #{@fqdn} --name #{@name} --net none --cgroupns=private #{env} #{kvm} #{devs} #{priv} #{caps} #{vols} #{image} #{@cmd}"
+        # `docker run -d` prints the new container's ID as its last stdout line.
+        # Capture it directly: re-querying by `--filter name=#{@name}` is a
+        # SUBSTRING match, so e.g. name=sw0 also matches ctl-sw0 and yields two
+        # IDs -- which silently corrupts @cid and the netns symlink below.
+        run_out = %x( #{scoped_run(run_cmd)} 2>/dev/null )
         sleep 1
-        @cid     = %x( docker ps --format '{{.ID}}' --filter name=#{@name} ).rstrip
+        @cid     = run_out.to_s.lines.map(&:strip).reject(&:empty?).last.to_s
+        if @cid.empty?
+          esc  = Regexp.escape(@name.to_s)
+          @cid = %x( docker ps --format '{{.ID}}' --filter name='^#{esc}$' ).lines.first.to_s.strip
+        end
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )
         @vmem    = %x( /usr/bin/printf "262144" > /proc/sys/vm/max_map_count )

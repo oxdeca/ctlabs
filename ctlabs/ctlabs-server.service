@@ -10,6 +10,10 @@ RestartSec=5
 User=root
 WorkingDirectory=/root/ctlabs/ctlabs
 ExecStart=/root/ctlabs/ctlabs/server.rb
+# Backstop: Puma force_shutdown_after (server.rb) bounds the graceful stop to
+# ~5s; this caps systemd's wait short of the 90s default so a wedged shutdown
+# can never keep the webui down for a minute-plus.
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target

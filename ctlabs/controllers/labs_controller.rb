@@ -167,7 +167,7 @@ class LabsController < BaseController
           end
         else
           lab_instance = Lab.new(cfg: runtime_path, relative_path: lab_name, log: log)
-          lab_instance.down
+          lab_instance.down(v_token, v_addr)
           log.info "--- Lab #{lab_name} DOWN completed ---"
           FileUtils.rm_f(runtime_path)
         end

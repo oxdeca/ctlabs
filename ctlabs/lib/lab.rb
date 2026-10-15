@@ -12,6 +12,8 @@ require 'socket'
 require 'fileutils'
 require_relative '../services/lab_repository'
 require_relative 'automation'
+require_relative 'gcp_auth'
+require_relative 'cloud'
 
 class Lab
   # Ansible + Terraform live in lib/automation.rb; mixed in here so Lab keeps
@@ -25,6 +27,14 @@ class Lab
 
   LAB_OPERATION_LOCK = '/var/run/ctlabs/lab_operation.lock'
   LOCK_FILE          = '/var/run/ctlabs/running_lab'.freeze
+
+  # Host public ports reserved for the persistent controller / shared services.
+  # DNAT is host iptables on the host public IP, and the controller is always
+  # on; a workload lab whose ext_port lands here would shadow a controller
+  # service. The single-lab lock means at most one workload lab runs at a time,
+  # so lab-vs-lab collisions can't happen -- only lab-vs-controller. Chosen clear
+  # of every ext_port labs use today (8xxx services, 9888/9920/9988, 18788-18799).
+  RESERVED_DNAT_RANGE = (8400..8499).freeze
 
   # node_profiles.yml is node/container profile data, not ansible fact data, so
   # this one stays here - but it shares Automation's box-local override mechanism.
@@ -41,6 +51,10 @@ class Lab
     @relative_path = relative_path || File.basename(cfg)
     @log           = args[:log]    || LabLog.null
     @pubdir        = "/srv/ctlabs-server/public"
+    # standalone: this Lab is the persistent control-plane controller, not a
+    # user lab. It must NOT take the single-lab lock (or no workload lab could
+    # run) and must NOT overwrite the webgui's public config. See Controller.
+    @standalone    = args[:standalone] || false
 
     @log.write "== Lab ==", "debug"
 
@@ -60,8 +74,11 @@ class Lab
       expanded_yaml = raw_yaml.gsub('${ctlabs_host}', @server_ip)
       
       # Write the EXPANDED config to the public dir so the frontend UI gets the real IPs
-      File.open("#{@pubdir}/config.yml", 'w') do |f|
-        f.write(expanded_yaml)
+      # (skipped in standalone/controller mode, which must not clobber a lab's config)
+      unless @standalone
+        File.open("#{@pubdir}/config.yml", 'w') do |f|
+          f.write(expanded_yaml)
+        end
       end
 
       # Process the EXPANDED config into the backend memory
@@ -120,7 +137,7 @@ class Lab
 
   # Returns an array of all available lab names (relative paths)
   def self.all
-    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __dir__)
     Dir.glob(File.join(labs_dir, "**", "*.yml"))
        .reject { |f| File.basename(f) =~ %r{^.*_profiles.yml$} }
        .map { |f| f.sub(labs_dir + '/', '') }
@@ -159,7 +176,7 @@ class Lab
 
   # Safely resolves the lab file path (Runtime vs Base) - Moved from LabHelper
   def self.get_file_path(lab_name)
-    labs_dir     = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    labs_dir     = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __dir__)
     runtime_path = get_runtime_path(lab_name)
     (running? && current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(labs_dir, lab_name)
   end
@@ -173,6 +190,143 @@ class Lab
 
   def self.release_lock!
     File.delete(LOCK_FILE) if File.file?(LOCK_FILE)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Reconcile / GC: reap HOST-scoped leftovers from labs that died without a
+  # clean `down`. Container netns destruction does not reliably cascade to the
+  # host side, so two things leak: the per-lab `<LAB>-DNAT` iptables chain (+
+  # its PREROUTING jumps) and the host veth endpoints `<node><nic>`. A lab's own
+  # `down` reaps its own; this sweeps everything else. It never touches the
+  # running lab or the controller's own chain/interfaces.
+  #
+  # This is deliberately a name/ownership sweep, not state-based: the leftover
+  # resources themselves are the durable record, so a crashed lab is reaped
+  # identically to one that was never started.
+  # ---------------------------------------------------------------------------
+  def self.gc(out = $stdout, dry_run: false)
+    running_rel  = running? ? current_name : nil
+    running_name = nil
+
+    live_ifaces = {}
+    live_chains = ['CTLABS-CONTROLLER-DNAT']
+    if running_rel
+      begin
+        rl = Lab.new(cfg: get_file_path(running_rel), relative_path: running_rel, log: LabLog.null)
+        running_name = rl.name.to_s
+        live_ifaces.merge!(link_endpoint_ifaces(rl.links))
+        live_chains << "#{rl.name.to_s.upcase}-DNAT"
+      rescue => e
+        # FAIL-SAFE: without the running lab's endpoint set we cannot tell a
+        # live interface from a leftover, and another dead lab may reuse the
+        # same `<node><nic>` names. Refuse to touch anything rather than risk
+        # tearing down the live lab.
+        out.puts "  ! could not load running lab #{running_rel}: #{e.message}"
+        out.puts "gc: aborted (running lab not resolvable; refusing to reap)"
+        return { chains: 0, ifaces: 0, zones: 0, aborted: true }
+      end
+    end
+
+    reaped = { chains: 0, ifaces: 0, zones: 0 }
+
+    all.each do |rel|
+      next if rel == running_rel
+      path = get_file_path(rel)
+      cfg  = (YAML.load_file(path) rescue nil)
+      next unless cfg.is_a?(Hash) && cfg['name'] && cfg['topology']
+      name  = cfg['name'].to_s
+      chain = "#{name.upcase}-DNAT"
+
+      if !live_chains.include?(chain) && dnat_chain_exists?(chain)
+        reap_dnat_chain(chain, out, dry_run)
+        reaped[:chains] += 1
+      end
+
+      begin
+        lab = Lab.new(cfg: path, relative_path: rel, log: LabLog.null)
+        link_endpoint_ifaces(lab.links).each_key do |ifn|
+          next if live_ifaces[ifn]
+          next unless host_interface_exists?(ifn)
+          out.puts(dry_run ? "  would delete host iface #{ifn} (#{name})" : "  delete host iface #{ifn} (#{name})")
+          %x( ip link delete #{ifn} 2>/dev/null ) unless dry_run
+          reaped[:ifaces] += 1
+        end
+      rescue => e
+        out.puts "  ! could not load #{rel}: #{e.message}"
+      end
+    end
+
+    reaped[:zones] = reap_stale_dnsmasq_zones(running_name, out, dry_run)
+
+    out.puts "gc: #{reaped[:chains]} orphan DNAT chain(s), #{reaped[:ifaces]} orphan host interface(s), #{reaped[:zones]} stale dnsmasq zone(s)#{dry_run ? ' (dry-run)' : ''}"
+    reaped
+  end
+
+  # Reap stale per-lab dnsmasq zones from the persistent controller. A lab's
+  # zone is "<lab>.conf" (Graph#to_dnsmasq); deploy_dnsmasq installs it on `up`
+  # and remove_lab_dnsmasq drops it on `down`. A crash -- or the old
+  # deploy-on-view bug -- could leave a zone behind, which then resolves reused
+  # node names to a dead lab's addresses (see design-guide.md sec.12.9). Only
+  # the persistent controller leaks these (an in-lab controller dies with its
+  # lab), so we target ctl-ctrl and keep its own files (00-listen.conf + the
+  # controller plane's ctlabs-controller.conf) plus the running lab's zone.
+  # Conservative: never removes a file it cannot positively classify as stale.
+  def self.reap_stale_dnsmasq_zones(running_name, out, dry_run)
+    return 0 unless defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
+
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    keep   = ['00-listen.conf', 'ctlabs-controller.conf']
+    keep  << "#{running_name}.conf" if running_name && !running_name.empty?
+
+    confs = %x( #{engine} exec #{Controller::NAME} ls -1 /etc/dnsmasq.d/ 2>/dev/null )
+              .lines.map(&:strip).reject(&:empty?)
+    stale = confs.select { |f| f.end_with?('.conf') && !keep.include?(f) }
+    return 0 if stale.empty?
+
+    stale.each do |f|
+      out.puts(dry_run ? "  would delete stale dnsmasq zone #{f}" : "  delete stale dnsmasq zone #{f}")
+    end
+    unless dry_run
+      rm = stale.map { |f| "rm -f /etc/dnsmasq.d/#{f}" }.join(' && ')
+      %x( #{engine} exec #{Controller::NAME} sh -c '#{rm} && systemctl restart dnsmasq' 2>/dev/null )
+    end
+    stale.length
+  end
+
+  # Map a lab's `@links` endpoints to the HOST interface names they create
+  # (`<node><nic>`, e.g. "ro1:eth2" -> "ro1eth2").
+  def self.link_endpoint_ifaces(links)
+    ifaces = {}
+    links.each do |ep1, ep2|
+      [ep1, ep2].compact.each do |ep|
+        node_name, nic = ep.to_s.split(':', 2)
+        next if node_name.to_s.empty? || nic.to_s.empty?
+        ifaces["#{node_name}#{nic}"] = true
+      end
+    end
+    ifaces
+  end
+
+  def self.dnat_chain_exists?(chain)
+    system("iptables -tnat -S #{chain} >/dev/null 2>&1")
+  end
+
+  def self.reap_dnat_chain(chain, out, dry_run)
+    out.puts(dry_run ? "  would reap DNAT chain #{chain}" : "  reap DNAT chain #{chain}")
+    return if dry_run
+    %x( iptables -tnat -S PREROUTING 2>/dev/null ).each_line do |l|
+      next unless l.include?("-j #{chain}")
+      %x( iptables -tnat -D #{l.sub(/-A\s+/, '').strip} 2>/dev/null )
+    end
+    %x( iptables -tnat -F #{chain} 2>/dev/null )
+    %x( iptables -tnat -X #{chain} 2>/dev/null )
+  end
+
+  # IFNAMSIZ: host-side veth names are `<node><nic>` and capped at 15 chars; a
+  # longer name was silently truncated at creation, so it can never match here.
+  def self.host_interface_exists?(ifn)
+    return false if ifn.to_s.empty? || ifn.length > 15
+    system("ip link show #{ifn} >/dev/null 2>&1")
   end
 
   # ---------------------------------------------------------------------------
@@ -241,9 +395,111 @@ class Lab
     @nodes.find { |n| n.name == name }
   end
 
+  # ---------------------------------------------------------------------------
+  # Role-based node lookup (replaces hard-coded sw0/ro0/natgw literals).
+  # The mgmt switch/router and the NAT gateway are identified by ROLE, not by
+  # their historical names, so a second lab-shaped topology (e.g. the persistent
+  # controller plane) can use ctl-* names and coexist with a workload lab.
+  # Names remain the fallback for schema-compatibility (see design-guide.md).
+  # ---------------------------------------------------------------------------
+  def mgmt_plane_key
+    planes = @cfg.dig('topology', 0, 'planes') || {}
+    return 'mgmt' if planes.key?('mgmt')
+    ctl = @nodes.find { |n| n.type == 'controller' }
+    ctl ? ctl.plane : 'mgmt'
+  end
+
+  # The mgmt-plane switch (the L2 core the controller/router hang off).
+  def mgmt_switch
+    @nodes.find { |n| n.type == 'switch' && n.plane == mgmt_plane_key } || find_node('sw0')
+  end
+
+  def mgmt_switch_name
+    (sw = mgmt_switch) ? sw.name : 'sw0'
+  end
+
+  # The mgmt-plane router (the first hop toward the NAT gateway).
+  def mgmt_router
+    @nodes.find { |n| n.type == 'router' && n.plane == mgmt_plane_key } || find_node('ro0')
+  end
+
+  def mgmt_router_name
+    (r = mgmt_router) ? r.name : 'ro0'
+  end
+
+  # Anchor for the host / external link in the diagram: the NAT gateway if
+  # present, else the mgmt switch (mirrors the old natgw||sw0 fallback).
+  def dnat_target_node
+    nat_gateway || @nodes.find { |n| n.name == mgmt_switch_name }
+  end
+
+  # The NAT/egress gateway: a gateway node with snat, else the edge gateway,
+  # else the node literally named natgw (schema fallback).
+  def nat_gateway
+    @nodes.find { |n| n.type == 'gateway' && n.snat } ||
+      @nodes.find { |n| n.type == 'gateway' && n.plane == 'edge' } ||
+      find_node('natgw')
+  end
+
+  # Legacy target route (router:nic facing the NAT gateway) used when
+  # natgw.dnat is NOT an explicit plane->route hash. Derived from the links.
+  def mgmt_dnat_target
+    router = mgmt_router
+    gw     = nat_gateway
+    if router && gw
+      @links.each do |a, b|
+        a = a.to_s
+        b = b.to_s
+        if a.start_with?("#{router.name}:") && b.start_with?("#{gw.name}:")
+          return "#{router.name}:#{a.split(':', 2).last}"
+        elsif b.start_with?("#{router.name}:") && a.start_with?("#{gw.name}:")
+          return "#{router.name}:#{b.split(':', 2).last}"
+        end
+      end
+    end
+    router ? "#{router.name}:eth1" : 'ro0:eth1'
+  end
+
+  # ---------------------------------------------------------------------------
+  # Persistent controller attach (design-guide.md sec.12.9)
+  #
+  # When a persistent controller (ctl-ctrl) is running, a workload lab does NOT
+  # start its own controller container. Instead the lab's mgmt-switch link that
+  # would have gone to the in-lab controller is rewired to an extra NIC on
+  # ctl-ctrl, which adopts the lab controller's mgmt IP. Automation then runs
+  # inside ctl-ctrl. No controller running => the lab keeps today's behaviour
+  # (in-lab controller), i.e. degraded mode.
+  # ---------------------------------------------------------------------------
+  def controller_node
+    @nodes.find { |n| n.type.to_s == 'controller' && n.name != Controller::NAME }
+  end
+
+  def container_running?(name)
+    return false if name.to_s.empty?
+    %x( docker inspect -f '{{.State.Running}}' #{name} 2>/dev/null ).strip == 'true'
+  end
+
+  # True when this lab is using the persistent controller rather than its own:
+  # the controller is up and the lab's own controller container is not.
+  def controller_attached?
+    return false if @standalone
+    return false unless defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
+    ctrl = controller_node
+    return false unless ctrl
+    !container_running?(ctrl.name)
+  end
+
+  # Container that owns automation for this lab: ctl-ctrl when attached, else
+  # the lab's own controller node.
+  def controller_exec_name
+    return Controller::NAME if controller_attached?
+    ctrl = find_node('ansible') || controller_node
+    ctrl ? ctrl.name : Controller::NAME
+  end
+
   # Returns detailed metadata about a lab for the UI (Moved from ApplicationHelper)
   def self.metadata(yaml_file_path, adhoc_rules_by_lab = {})
-    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __dir__)
     lock_dir = defined?(::LOCK_DIR) ? ::LOCK_DIR : '/var/run/ctlabs'
 
     lab_name = yaml_file_path.sub(labs_dir + '/', '')
@@ -317,6 +573,16 @@ class Lab
 
     # Let the Node class figure out who is running!
     Node.bulk_update_status(lab.nodes) if is_running
+
+    # When attached to the persistent controller, the lab's own controller
+    # container is deliberately not started, so bulk_update_status marks it
+    # stopped and its terminal would target a container that doesn't exist.
+    # The controller IS running though - as ctl-ctrl - so report it as up and
+    # let the alias in TerminalService route exec to ctl-ctrl.
+    if is_running && lab.controller_attached?
+      ctrl = lab.controller_node
+      ctrl.is_running = true if ctrl
+    end
 
     # Nodes (With Diffing)
     nodes = []
@@ -433,7 +699,7 @@ class Lab
   # Helper to automatically regenerate Topology Maps and Inventories ONLY if needed
   def self.refresh_visuals(lab_name, force: false)
     begin
-      labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __FILE__)
+      labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __dir__)
       actual_path = get_file_path(lab_name)
       base_path = File.join(labs_dir, lab_name)
 
@@ -547,28 +813,33 @@ class Lab
     links    = []
     cnt      = 2
 
+    # The mgmt switch is identified by ROLE, not by the literal name 'sw0'.
+    mgmt_sw      = mgmt_switch_name
+    mgmt_sw_node = mgmt_switch
+
     cfg['nodes'].each do |name, node|
       is_remote = ['rhost', 'external'].include?(node['type']) || ['gcp', 'external', 'aws', 'azure'].include?(node['provider'].to_s.downcase)
       next if is_remote
 
-      if !(node['kind'] == 'mgmt' && node['type'] == 'switch' )
-        case node['type']
-          when 'controller'
-            links << [ "sw0:eth1", "#{name}:eth0" ]
-          when 'switch'
-            switches << name
-          when 'router'
-            router << name
-          when 'host'
-            hosts << name
-        end
+      # The mgmt switch itself is the star of the mgmt plane, never a member
+      # of it. Excluding it by role also fixes the historical sw0 self-link.
+      next if node['type'] == 'switch' && (name == mgmt_sw || node['kind'] == 'mgmt')
+
+      case node['type']
+        when 'controller'
+          links << [ "#{mgmt_sw}:eth1", "#{name}:eth0" ]
+        when 'switch'
+          switches << name
+        when 'router'
+          router << name
+        when 'host'
+          hosts << name
       end
     end
 
-    sw0 = find_node('sw0')
     (switches + router + hosts).each do |n|
-      links << [ "sw0:eth#{cnt}", "#{n}:eth0" ]
-      sw0.nics["eth#{cnt}"] = '' if sw0 && sw0.nics
+      links << [ "#{mgmt_sw}:eth#{cnt}", "#{n}:eth0" ]
+      mgmt_sw_node.nics["eth#{cnt}"] = '' if mgmt_sw_node && mgmt_sw_node.nics
       cnt += 1
     end
     links
@@ -606,7 +877,11 @@ class Lab
     @graph = Graph.new(name: @name, nodes: @nodes, links: @links, binding: binding, log: @log, pubdir: @pubdir)
     @graph.to_ini(@graph.get_inventory, @name)
     @graph.to_data_ini(@graph.get_data_inventory, @name)
-    deploy_dnsmasq(@graph.to_dnsmasq(@graph.get_dnsmasq, @name))
+    # Intentionally does NOT deploy dnsmasq: inventory generation also runs on
+    # non-start paths (Lab.refresh_visuals when a lab is merely *selected* in the
+    # webui, `--ini`), and deploying there leaked a <lab>.conf into the persistent
+    # controller for every lab ever viewed. Deployment happens in `up` (after the
+    # controller is attached), removal in `down`. See design-guide.md sec.12.9.
   end
 
   def dnsmasq
@@ -628,7 +903,10 @@ class Lab
     end
    
     engine  = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    ctr     = controller.name
+    # Attached to the persistent controller: deploy into ctl-ctrl, not the
+    # (absent) in-lab controller. conf file is already named "<lab>.conf" by
+    # Graph#to_dnsmasq, so it stays namespaced per lab.
+    ctr     = controller_attached? ? Controller::NAME : controller.name
     base    = File.basename(conf_path)
     
     @log.write "#{__method__}(): conf=#{conf_path},controller=#{ctr},engine=#{engine}", "debug"
@@ -639,6 +917,28 @@ class Lab
     end
     @log.write "#{__method__}(): ran=#{ran.inspect},exit=#{$?.exitstatus}", "debug"
     $?.success?
+  end
+
+  # Inverse of deploy_dnsmasq: drop this lab's zone from the controller's
+  # /etc/dnsmasq.d and restart dnsmasq, so a stopped lab leaves no host
+  # records behind. Labs reuse node names while IPs are dynamic (see
+  # design-guide.md sec.12.9), so a lingering "<lab>.conf" would resolve the
+  # same name to a different lab's address. Only the lab's own file is
+  # removed (the controller's 00-listen.conf is untouched). `attached` is
+  # captured by the caller because controller_attached? flips during `down`.
+  def remove_lab_dnsmasq(attached)
+    controller = @nodes.find { |n| n.respond_to?(:type) && n.type.to_s == 'controller' }
+    return if controller.nil?
+
+    ctr    = attached ? Controller::NAME : controller.name
+    file   = "/etc/dnsmasq.d/#{@name}.conf"
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    out    = %x( #{engine} exec #{ctr} sh -c 'rm -f #{file} && systemctl restart dnsmasq' 2>&1 )
+    @log.write "#{__method__}(): ctr=#{ctr},file=#{file},out=#{out.strip.inspect}", "debug"
+    $?.success?
+  rescue => e
+    @log.write "#{__method__}(): #{e.message}", "warn"
+    false
   end
 
   def find_node(name)
@@ -681,7 +981,7 @@ class Lab
     chain = "#{@name.upcase}-DNAT"
     vmip  = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).rstrip
     vmips = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).split
-    natgw = find_node('natgw')
+    natgw = nat_gateway
 
     # create new chain if it does not exist
     %x( iptables -tnat -S #{chain} 2> /dev/null )
@@ -726,7 +1026,7 @@ class Lab
             target_route = natgw.dnat[node.plane] || natgw.dnat.values.first
           else
             # Legacy Fallback (so old YAMLs don't break)
-            target_route = node.plane == 'mgmt' ? 'ro0:eth1' : natgw.dnat
+            target_route = node.plane == 'mgmt' ? mgmt_dnat_target : natgw.dnat
           end
         end
 
@@ -770,7 +1070,43 @@ class Lab
   end
 
 
+  # Reject host DNAT port conflicts up front: a port reserved for the
+  # controller, or the same ext_port/proto bound twice within this lab. Called
+  # from `up` before anything is started, so a bad lab.yml fails fast instead of
+  # silently shadowing another rule (iptables DNAT is first-match-wins).
+  def validate_dnat_ports!
+    seen = {}
+    @nodes.each do |node|
+      next unless node.dnat.is_a?(Array)
+      node.dnat.each do |r|
+        ext   = r[0].to_i
+        next if ext <= 0
+        proto = (r[2] || 'tcp').to_s
+        assert_host_port_available!(ext, proto, node.name, seen)
+      end
+    end
+  end
+
+  # Shared by validate_dnat_ports! and add_adhoc_dnat. `seen` (a hash keyed
+  # "port/proto") is optional; when present, intra-lab duplicates are rejected.
+  def assert_host_port_available!(ext_port, proto, owner, seen = nil)
+    ext = ext_port.to_i
+    if !@standalone && RESERVED_DNAT_RANGE.include?(ext)
+      raise "Host port #{ext} is reserved for the controller " \
+            "(#{RESERVED_DNAT_RANGE}); pick another ext_port for '#{owner}'"
+    end
+    if seen
+      key = "#{ext}/#{proto}"
+      if seen[key]
+        raise "Duplicate host DNAT binding #{key}: used by both " \
+              "'#{seen[key]}' and '#{owner}'"
+      end
+      seen[key] = owner
+    end
+  end
+
   def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
+    assert_host_port_available!(ext_port, proto, node_name)
     @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
 
     chain = "#{@name.upcase}-DNAT"
@@ -779,16 +1115,16 @@ class Lab
     node = find_node(node_name)
     raise "Node '#{node_name}' not found" if node.nil?
 
-    natgw = find_node('natgw')
-    raise "No 'natgw' node found (required for DNAT)" if natgw.nil?
-    raise "'natgw' has no 'dnat' attribute" if natgw.dnat.nil?
+    natgw = nat_gateway
+    raise "No NAT gateway node found (required for DNAT)" if natgw.nil?
+    raise "NAT gateway '#{natgw.name}' has no 'dnat' attribute" if natgw.dnat.nil?
 
     # --- THE SMART LOOKUP ---
     target_route = nil
     if natgw.dnat.is_a?(Hash)
       target_route = natgw.dnat[node.plane] || natgw.dnat.values.first
     else
-      target_route = node.plane == 'mgmt' ? 'ro0:eth1' : natgw.dnat
+      target_route = node.plane == 'mgmt' ? mgmt_dnat_target : natgw.dnat
     end
 
     parts = target_route.to_s.split(':')
@@ -828,8 +1164,15 @@ class Lab
         raise "Failed rule 1: #{$?.exitstatus}" unless system(rule1_add)
       end
 
-      router_netns = %x( docker ps --format '{{.ID}}' --filter name=#{router.name} ).rstrip
-      
+      # The lab names netns by the FULL container id (Node#add_netns), and the
+      # declared-rule path uses `router.netns` (lab.rb#add_dnat). A short
+      # `docker ps` id does NOT resolve (`ip netns exec <short>` -> "No such file
+      # or directory"), so rule 2 failed silently and the whole add reported only
+      # a masked "An error occurred". Resolve it exactly like add_dnat does.
+      router.resolve_runtime! if router.respond_to?(:resolve_runtime!)
+      router_netns = router.netns.to_s
+      raise "Could not resolve network namespace for router '#{router.name}'" if router_netns.empty?
+
       rule2_check = "ip netns exec #{router_netns} iptables -t nat -C PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
       rule2_add   = "ip netns exec #{router_netns} iptables -t nat -I PREROUTING -p #{proto} -d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
 
@@ -842,6 +1185,81 @@ class Lab
     @log.info "[ADHOC DNAT] #{vmip}:#{ext_port} ➡ #{via}:#{ext_port} ➡ #{target_ip}:#{int_port}"
 
     return { node: node.name, type: node.type, proto: proto, external_port: "#{vmip}:#{ext_port}", internal_port: "#{target_ip}:#{int_port}", adhoc: true }
+  end
+
+  # Removes the host + router iptables rules that add_adhoc_dnat installed for a
+  # single rule. Mirrors add_adhoc_dnat's chain/router/via/target derivation so a
+  # WebUI delete actually stops forwarding the port -- previously the delete
+  # route only edited the YAML and left the rules live until the lab was torn
+  # down (see del_dnat, which flushes the whole chain but only runs on `down`).
+  # Best-effort and idempotent: a rule that isn't present is not an error (the
+  # chain may already have been flushed by a lab restart).
+  def del_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
+    @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
+
+    chain    = "#{@name.upcase}-DNAT"
+    vmip     = %x(ip route get 1.1.1.1 2>/dev/null | awk 'NR==1{print $7}').strip
+    ext_port = ext_port.to_i
+    int_port = int_port.to_i
+    proto    = (proto || 'tcp').to_s.downcase
+    return { removed: false, reason: 'no host address' } if vmip.empty?
+
+    node = find_node(node_name)
+    return { removed: false, reason: "node '#{node_name}' not found" } if node.nil?
+
+    # Derive the same via/target_ip pair add_adhoc_dnat used (best effort: a
+    # missing natgw/router only means we cannot reach the router-side rule).
+    target_ip = node.nics['eth1']&.split('/')&.first ||
+                node.nics['eth0']&.split('/')&.first ||
+                node.nics['tun0']&.split('/')&.first ||
+                node.nics['wg0']&.split('/')&.first
+
+    via    = nil
+    router = nil
+    natgw  = nat_gateway
+    if natgw && natgw.dnat
+      target_route = natgw.dnat.is_a?(Hash) ? (natgw.dnat[node.plane] || natgw.dnat.values.first)
+                                            : (node.plane == 'mgmt' ? mgmt_dnat_target : natgw.dnat)
+      rname, nic = target_route.to_s.split(':')
+      router = find_node(rname)
+      via    = router.nics[nic].split('/')[0] if router && router.nics.key?(nic)
+    end
+
+    removed = false
+
+    # Host chain: delete every rule matching this proto/ext_port regardless of
+    # destination form (add_adhoc_dnat installs EITHER the optimized form
+    # `via:int_port` OR the 2-step form `via:ext_port`). Enumerating the chain
+    # avoids guessing, and needs no `via` resolution.
+    %x( iptables -t nat -S #{chain} 2>/dev/null ).each_line do |l|
+      next unless l.start_with?("-A #{chain} ")
+      next unless l =~ /-p #{Regexp.escape(proto)}(\s|$)/
+      next unless l =~ /--dport #{ext_port}(\s|$)/
+      next unless l.include?("-j DNAT")
+      spec = l.sub(/^-A\s+#{Regexp.escape(chain)}\s+/, '').strip
+      cmd  = "iptables -t nat -D #{chain} #{spec}"
+      if system("#{cmd} 2>/dev/null")
+        removed = true
+        @log.write "#{__method__}(): removed host rule: #{cmd}", "debug"
+      end
+    end
+
+    # Router-side rule (2-step form only): PREROUTING -> target_ip:int_port.
+    if router && via && target_ip && target_ip != via
+      router.resolve_runtime! if router.respond_to?(:resolve_runtime!)
+      netns = router.netns.to_s
+      unless netns.empty?
+        cmd = "ip netns exec #{netns} iptables -t nat -D PREROUTING -p #{proto} " \
+              "-d #{via} --dport #{ext_port} -j DNAT --to-destination #{target_ip}:#{int_port}"
+        if system("#{cmd} 2>/dev/null")
+          removed = true
+          @log.write "#{__method__}(): removed router rule: #{cmd}", "debug"
+        end
+      end
+    end
+
+    @log.info "[ADHOC DNAT DEL] #{vmip}:#{ext_port} #{proto} removed=#{removed}"
+    { removed: removed }
   end
 
   # Generates a dedicated SSH key pair for the lab and distributes it
@@ -870,6 +1288,10 @@ class Lab
     # Skip remote hosts since we don't have local docker exec access to them
     return if ['rhost', 'external', 'gateway'].include?(node.type)
 
+    # When attached to the persistent controller there is no in-lab controller
+    # container; install the key into ctl-ctrl instead.
+    target = (node.type.to_s == 'controller' && controller_attached?) ? Controller::NAME : node.name
+
     begin
       # Login user for this node. The public key must land in THAT user's home
       # (node_profiles.yml sets `user: ansible` for everything that has the
@@ -878,9 +1300,9 @@ class Lab
       home       = login_user == 'root' ? '/root' : "/home/#{login_user}"
 
       # Ensure .ssh directory exists
-      system("docker exec #{node.name} mkdir -p #{home}/.ssh")
-      system("docker exec #{node.name} chmod 700 #{home}/.ssh")
-      system("docker exec #{node.name} chown #{login_user}:#{login_user} #{home}/.ssh") unless login_user == 'root'
+      system("docker exec #{target} mkdir -p #{home}/.ssh")
+      system("docker exec #{target} chmod 700 #{home}/.ssh")
+      system("docker exec #{target} chown #{login_user}:#{login_user} #{home}/.ssh") unless login_user == 'root'
 
       # The controller gets the PRIVATE key so it can SSH into other nodes/GCP.
       # It goes into root's home AND the profile login user's home: the web
@@ -895,25 +1317,25 @@ class Lab
         key_homes << home unless login_user == 'root'
 
         key_homes.each do |key_home|
-          next unless system("docker exec #{node.name} mkdir -p #{key_home}/.ssh")
+          next unless system("docker exec #{target} mkdir -p #{key_home}/.ssh")
 
-          system("docker cp #{priv_key} #{node.name}:#{key_home}/.ssh/id_ed25519")
-          system("docker cp #{pub_key_path} #{node.name}:#{key_home}/.ssh/id_ed25519.pub")
-          system("docker exec #{node.name} chmod 700 #{key_home}/.ssh")
-          system("docker exec #{node.name} chmod 600 #{key_home}/.ssh/id_ed25519")
-          system("docker exec #{node.name} chmod 644 #{key_home}/.ssh/id_ed25519.pub")
+          system("docker cp #{priv_key} #{target}:#{key_home}/.ssh/id_ed25519")
+          system("docker cp #{pub_key_path} #{target}:#{key_home}/.ssh/id_ed25519.pub")
+          system("docker exec #{target} chmod 700 #{key_home}/.ssh")
+          system("docker exec #{target} chmod 600 #{key_home}/.ssh/id_ed25519")
+          system("docker exec #{target} chmod 644 #{key_home}/.ssh/id_ed25519.pub")
           # docker cp preserves the host file's root ownership, and ssh refuses a
           # private key the caller does not own.
-          system("docker exec #{node.name} chown -R #{login_user}:#{login_user} #{key_home}/.ssh") unless key_home == '/root'
+          system("docker exec #{target} chown -R #{login_user}:#{login_user} #{key_home}/.ssh") unless key_home == '/root'
         end
       end
 
       # ALL nodes get the PUBLIC key in their login user's authorized_keys
-      system("docker exec #{node.name} sh -c \"echo '#{pub_key}' >> #{home}/.ssh/authorized_keys\"")
+      system("docker exec #{target} sh -c \"echo '#{pub_key}' >> #{home}/.ssh/authorized_keys\"")
       unless login_user == 'root'
-        system("docker exec #{node.name} chown #{login_user}:#{login_user} #{home}/.ssh/authorized_keys")
+        system("docker exec #{target} chown #{login_user}:#{login_user} #{home}/.ssh/authorized_keys")
       end
-      system("docker exec #{node.name} chmod 600 #{home}/.ssh/authorized_keys")
+      system("docker exec #{target} chmod 600 #{home}/.ssh/authorized_keys")
 
     rescue => e
       @log.write("Failed to inject SSH keys to #{node.name}: #{e.message}", "error")
@@ -965,7 +1387,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     # 1. Fetch live container namespace IDs for existing nodes
     @nodes.each do |n|
       if n.netns.nil?
-        cid = %x( docker ps --format '{{.ID}}' --filter name=#{n.name} ).strip
+        cid = %x( docker ps --format '{{.ID}}' --filter name='^#{n.name}$' ).strip
         n.instance_variable_set(:@netns, cid) unless cid.empty?
       end
     end
@@ -1020,7 +1442,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     if is_remote && node_cfg['terraform'] && !node_cfg['terraform'].empty?
       @log.info "Queueing auto-provisioning for Node #{node_name} via Terraform in the background..."
 
-      ctrl = find_node('ansible')
+      ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
       if ctrl
         ctrl_name = ctrl.name
         tf_dir = node_cfg['terraform']['work_dir'] || '.'
@@ -1111,10 +1533,10 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         data_links << data_link
       end
     elsif plane == 'mgmt' || type == 'controller'
-      # MGMT PLANE: Only one connection needed (eth0 -> target_switch or sw0)
+      # MGMT PLANE: Only one connection needed (eth0 -> target_switch or mgmt switch)
       actual_switch = nic_switches['eth0'].to_s.strip
       actual_switch = target_switch.to_s.strip if actual_switch.empty?
-      actual_switch = 'sw0' if actual_switch.empty?
+      actual_switch = mgmt_switch_name if actual_switch.empty?
       if find_node(actual_switch)
         next_port = get_next_switch_port(actual_switch)
         data_link = ["#{actual_switch}:eth#{next_port}", "#{node_name}:eth0"]
@@ -1123,11 +1545,12 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         data_links << data_link
       end
     else
-      # DATA PLANE: Needs OOB Mgmt (eth0 -> sw0) AND Data NICs
+      # DATA PLANE: Needs OOB Mgmt (eth0 -> mgmt switch) AND Data NICs
       if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
-        if find_node('sw0')
-          next_sw0 = get_next_switch_port('sw0')
-          mgmt_link = ["sw0:eth#{next_sw0}", "#{node_name}:eth0"]
+        msw = mgmt_switch_name
+        if find_node(msw)
+          next_sw0 = get_next_switch_port(msw)
+          mgmt_link = ["#{msw}:eth#{next_sw0}", "#{node_name}:eth0"]
           @links << mgmt_link
           Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
         end
@@ -1173,16 +1596,28 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   end
 
   def up(web_v_token = nil, web_v_addr = nil)
-    self.class.acquire_lock!(@relative_path)
+    validate_dnat_ports!
+    self.class.acquire_lock!(@relative_path) unless @standalone
   
     @log.info "Starting Lab: #{@relative_path}"
+    attached = controller_attached?
     synchronize_lab_operation do
       @log.info "Starting Nodes:"
-      @nodes.each { |node| node.run }
+      @nodes.each do |node|
+        # Attached to the persistent controller: don't start an in-lab
+        # controller container; its mgmt NIC is wired onto ctl-ctrl below.
+        if attached && node.type.to_s == 'controller'
+          @log.info "Attached to persistent controller (#{Controller::NAME}); skipping in-lab '#{node.name}'"
+          next
+        end
+        node.run
+      end
   
       @log.info "Starting Links:"
+      swap_controller_link! if attached
       @links.each do |l|
-        Link.new('nodes' => @nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt)
+        nodes = (@oob_proxy && l.include?(@oob_endpoint)) ? @nodes + [@oob_proxy] : @nodes
+        Link.new('nodes' => nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt)
       end
   
       @log.info "DNAT:"
@@ -1220,6 +1655,11 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     @log.info "Generating fresh Ansible inventory..."
     inventory
 
+    # Deploy this lab's dnsmasq zone into the (attached) controller now that the
+    # lab is actually starting. `down` removes it. Doing it here (not in
+    # `inventory`) keeps the zone tied to lab lifetime, not to lab *viewing*.
+    deploy_dnsmasq(@graph.to_dnsmasq(@graph.get_dnsmasq, @name))
+
     # Copy lab-specific flashcards if they exist
     lab_flashcards    = File.join(File.dirname(@cfg_file), 'flashcards.json')
     public_flashcards = '/srv/ctlabs-server/public/flashcards.json'
@@ -1230,27 +1670,52 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     end
   end
 
-  def down
+  def down(web_v_token = nil, web_v_addr = nil)
     begin
-      # Validate we own the lock
-      if self.class.running? && self.class.current_name != @relative_path
-        raise "Cannot stop '#{@relative_path}': currently running lab is '#{self.class.current_name}'"
+      # Validate we own the lock (skipped in standalone/controller mode)
+      unless @standalone
+        if self.class.running? && self.class.current_name != @relative_path
+          raise "Cannot stop '#{@relative_path}': currently running lab is '#{self.class.current_name}'"
+        end
       end
   
       @log.info "Stopping Lab: #{@relative_path}"
-  
+
+      # Remove this lab's dnsmasq zone while the controller container is still
+      # up (before detach/stop): labs reuse node names but get dynamic IPs, so
+      # a stale <lab>.conf would resolve a name to another lab's address.
+      attached = controller_attached?
+      remove_lab_dnsmasq(attached)
+
+      # Detach from the persistent controller BEFORE stopping nodes (the OOB
+      # NIC lives on ctl-ctrl, which outlives the lab).
+      detach_controller! if attached
+
       synchronize_lab_operation do
         @log.info "Stopping Nodes:"
-        @nodes.each { |node| node.stop }
-  
+        @nodes.each do |node|
+          # No in-lab controller container exists while attached; ctl-ctrl
+          # outlives the lab and must not be stopped.
+          next if attached && node.type.to_s == 'controller'
+          node.stop
+        end
+
+        @log.info "Cleaning up link interfaces..."
+        cleanup_link_interfaces
+
         @log.info "Removing DNAT rules..."
         del_dnat
       end
 
+      # Tear down any cloud (GCP) resources this lab created, by label. Best
+      # effort: needs a Vault session to mint a GCP token, and never blocks or
+      # fails the local teardown (see teardown_cloud!).
+      teardown_cloud!(web_v_token, web_v_addr)
+
       # Clear any unsaved AdHoc cache!
       FileUtils.rm_f("/var/run/ctlabs/#{@relative_path.gsub('/', '_')}.adhoc")
     ensure
-      self.class.release_lock!
+      self.class.release_lock! unless @standalone
     end
   end
 
@@ -1262,6 +1727,142 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     timestamp = Time.now.to_i
     safe_name = @relative_path.gsub(/\//, '_').gsub(/[^a-zA-Z0-9_.\-]/, '')
     "/var/log/ctlabs/ctlabs_#{timestamp}_#{safe_name}_#{action}.log"
+  end
+
+  # Delete the cloud (GCP) resources this lab created, by label (see Cloud).
+  # Best-effort: it never blocks or fails the local teardown, and it is skipped
+  # entirely when the lab has no GCP auth configured. A GCP token is minted via
+  # GcpAuth, which needs a Vault session: the webgui passes its session token,
+  # and CLI users can supply VAULT_TOKEN/VAULT_ADDR in the environment.
+  #
+  # !!! UNVERIFIED !!! - the delete-by-label REST calls are untested (no GCP
+  # creds available at implementation time).
+  def teardown_cloud!(web_v_token = nil, web_v_addr = nil)
+    ctrl = find_node('ansible') || @nodes.find { |n| n.type.to_s == 'controller' }
+    return unless ctrl
+    tf_cfg = (@cfg['topology'][0]['nodes'][ctrl.name] || {})['terraform']
+    return unless tf_cfg.is_a?(Hash) && !tf_cfg.empty?
+    return unless (GcpAuth.resolve_auth_cfg(tf_cfg) rescue nil)  # no GCP auth on this lab
+
+    token = web_v_token.to_s
+    addr  = web_v_addr.to_s
+    if token.empty? && ENV['VAULT_TOKEN'] && !ENV['VAULT_TOKEN'].empty?
+      token = ENV['VAULT_TOKEN']
+      addr  = ENV['VAULT_ADDR'].to_s
+    end
+    if token.empty?
+      @log.write("[cloud] skipping GCP teardown for #{@name}: no Vault token available", "warn")
+      return
+    end
+
+    auth_cfg = GcpAuth.resolve_auth_cfg(tf_cfg) || {}
+    project  = auth_cfg['project'].to_s.strip
+    project  = tf_cfg['project'].to_s.strip if project.empty?
+    if project.empty?
+      @log.write("[cloud] skipping GCP teardown for #{@name}: no project configured", "warn")
+      return
+    end
+
+    begin
+      access = GcpAuth.fetch_token(tf_cfg, { addr: addr, token: token })
+      Cloud.new(project: project, token: access, log: @log).teardown!(@name)
+    rescue => e
+      @log.write("[cloud] GCP teardown failed for #{@name}: #{e.message}", "error")
+    end
+  end
+
+  # Node#stop tears down the container/netns side of each node, but host-side
+  # veth endpoints can linger: gateway peers, and any veth whose move into the
+  # container netns failed. A lingering `<node><nic>` name makes the next `up`
+  # fail at `ip link add ... peer ...` ("File exists"), silently leaving the
+  # lab unwired. Delete every link endpoint on the host idempotently.
+  def cleanup_link_interfaces
+    @links.each do |ep1, ep2|
+      [ep1, ep2].compact.each do |ep|
+        node_name, nic = ep.to_s.split(':', 2)
+        next if node_name.to_s.empty? || nic.to_s.empty?
+        %x( ip link delete #{node_name}#{nic} 2>/dev/null )
+      end
+    end
+  end
+
+  # Rewire the lab controller's mgmt-switch link onto ctl-ctrl. The lab's own
+  # controller node stays in @nodes (inventory/exec resolution keep working off
+  # it) but is not started; ctl-ctrl takes over its mgmt NIC and IP. A synthetic
+  # proxy node (bypassing @nodes, so it never reaches inventory) supplies Link
+  # with ctl-ctrl's netns + address so the existing veth/OVS wiring is reused
+  # verbatim.
+  def swap_controller_link!
+    ctrl = controller_node
+    return if ctrl.nil?
+
+    cid = Controller.container_id
+    return if cid.to_s.empty?
+
+    mgmt_ip = (ctrl.nics || {}).values.first
+    old_ep  = "#{ctrl.name}:eth0"
+    @oob_endpoint = "#{Controller::NAME}:eth1"
+
+    @links.each do |l|
+      l.each_index { |i| l[i] = @oob_endpoint if l[i].to_s == old_ep }
+    end
+
+    proxy = Node.new(
+      'name'     => Controller::NAME,
+      'type'     => 'controller',
+      'profile'  => 'linux',
+      'plane'    => 'mgmt',
+      'nics'     => { 'eth1' => mgmt_ip },
+      'gw'       => nil,
+      'mtu'      => 1460,
+      'defaults' => @defaults,
+      'log'      => @log
+    )
+    proxy.instance_variable_set(:@netns, cid)
+    @oob_proxy = proxy
+
+    @log.info "[ATTACH] #{ctrl.name} -> #{Controller::NAME}:eth1 (#{mgmt_ip})"
+
+    configure_controller_dns!(ctrl)
+  end
+
+  # Mirror Node#run's controller branch for the persistent controller. When the
+  # controller is attached to a lab, its resolver must cover the lab's mgmt
+  # hostnames (resolved by the lab's generated dnsmasq zone, which is deployed
+  # into ctl-ctrl -- hence 127.0.0.1) AND the lab's external resolvers (the
+  # mgmt-plane dns). The controller's own resolver is saved once and restored
+  # on detach so a lab's dns never outlives it.
+  #
+  # Without this, a lab whose mgmt plane has its own resolvers (or when the
+  # controller's baseline lacks an external server) leaves `docker exec
+  # ctl-ctrl` unable to resolve anything -- and the playbook/terraform runs
+  # that the controller owns fail.
+  def configure_controller_dns!(ctrl)
+    return if ctrl.nil?
+    addrs = (ctrl.dns || []).map(&:to_s).reject(&:empty?)
+    return if addrs.empty?
+
+    domain = "mgmt.#{@domain} #{@domain}"
+    dns    = "nameserver 127.0.0.1\n" + addrs.map { |ns| "nameserver #{ns}" }.join("\n")
+
+    %x( docker exec #{Controller::NAME} sh -c 'test -f /etc/resolv.conf.ctlabs.bak || cp /etc/resolv.conf /etc/resolv.conf.ctlabs.bak' )
+    %x( docker exec #{Controller::NAME} sh -c '/usr/bin/printf "domain #{domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
+    @log.info "[ATTACH] #{Controller::NAME} resolvers: 127.0.0.1, #{addrs.join(', ')}"
+  end
+
+  # Remove the OOB NIC from ctl-ctrl on lab down. The switch-side endpoint dies
+  # with its (stopped) container netns, but the ctl-ctrl side lives on (the
+  # controller is persistent), so it MUST be deleted explicitly here.
+  def detach_controller!
+    return unless controller_attached?
+    cid = Controller.container_id
+    return if cid.to_s.empty?
+    @log.info "[DETACH] removing OOB NIC from #{Controller::NAME}"
+    %x( ip netns exec #{cid} ip link delete eth1 2>/dev/null )
+    %x( ip link delete ctl-ctroleth1 2>/dev/null )
+    # Restore the controller's own resolver (saved on attach) so the lab's dns
+    # does not leak past its lifecycle.
+    %x( docker exec #{Controller::NAME} sh -c 'test -f /etc/resolv.conf.ctlabs.bak && cp /etc/resolv.conf.ctlabs.bak /etc/resolv.conf' )
   end
 
   def synchronize_lab_operation

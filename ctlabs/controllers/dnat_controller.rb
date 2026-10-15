@@ -35,6 +35,15 @@ class DnatController < BaseController
     lab_name = params[:splat].first
     lab_path = Lab.get_file_path(lab_name)
     begin
+      # Tear down the live iptables rules first: this route used to only edit
+      # the YAML, so a deleted rule kept forwarding the port until the lab was
+      # stopped. Only meaningful for the running lab (the only one with rules
+      # installed); a no-op otherwise.
+      if Lab.current_name == lab_name
+        lab = Lab.new(cfg: lab_path)
+        lab.del_adhoc_dnat(params[:node], params[:ext].to_i, params[:int].to_i, (params[:proto] || 'tcp').downcase)
+      end
+
       yaml = YAML.load_file(lab_path)
       node = params[:node]
       node_cfg, _ = Lab.find_node_in_raw_yaml(yaml['topology'][0], node)
