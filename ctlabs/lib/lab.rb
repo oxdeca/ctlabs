@@ -1105,6 +1105,67 @@ class Lab
     end
   end
 
+  # Container node types that actually start a local container (see Node#run).
+  # `gateway` nodes are host bridges and pull no image, so they're excluded.
+  CONTAINER_NODE_TYPES = %w[host router switch controller].freeze
+
+  # Normalized list of image tags present in the local engine(s). Mirrors the
+  # normalization used by the Container Images / Node Profiles cards (strip
+  # registry prefixes so `localhost/ctlabs/x`, `docker.io/ctlabs/x` -> `ctlabs/x`).
+  def self.local_images
+    imgs  = `podman images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    imgs += `docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null`.split("\n").map(&:strip)
+    imgs.map! do |img|
+      img.sub(%r{^localhost/}, '').sub(%r{^docker\.io/library/}, '').sub(%r{^docker\.io/}, '').sub(%r{^quay\.io/}, '')
+    end
+    imgs.reject! { |img| img.empty? || img.include?('<none>') }
+    imgs.uniq
+  end
+
+  # Normalize a single image reference the same way as self.local_images.
+  def self.normalize_image(image)
+    norm = image.to_s.sub(%r{^localhost/}, '').sub(%r{^docker\.io/library/}, '').sub(%r{^docker\.io/}, '').sub(%r{^quay\.io/}, '')
+    norm = "#{norm}:latest" unless norm.include?(':') || norm.include?('@')
+    norm
+  end
+
+  # Pre-flight: every local node that will start a container must have its
+  # profile image present in the local registry. Fails fast with an actionable
+  # list instead of a mid-`up` `docker run` failure. Called from `up` before the
+  # lock is taken. Remote (cloud/rhost) nodes are provisioned elsewhere and are
+  # skipped, as is the in-lab controller when attached to the persistent plane.
+  # Only `ctlabs/...` (locally built) images are enforced: public images are
+  # pulled on demand by the engine and must not be treated as missing.
+  def validate_profiles_ready!
+    available = self.class.local_images
+    missing   = []
+
+    @nodes.each do |node|
+      next unless CONTAINER_NODE_TYPES.include?(node.type.to_s)
+      next if node.remote?
+      next if node.type.to_s == 'controller' && controller_attached?
+
+      image = node.image
+      if image.nil? || image.to_s.strip.empty?
+        defs  = (@defaults[node.type] || {})[node.kind] || {}
+        image = defs['image']
+      end
+      next if image.nil? || image.to_s.strip.empty?
+
+      norm = self.class.normalize_image(image)
+      next unless norm.start_with?('ctlabs/')
+      next if available.include?(norm)
+
+      missing << "  - #{node.name} (#{node.type}/#{node.kind}) -> #{image}"
+    end
+
+    return true if missing.empty?
+
+    raise "Container profile image(s) not ready:\n#{missing.join("\n")}\n\n" \
+          "Build or import the missing image(s) from the Container Images tab " \
+          "before starting this lab."
+  end
+
   def add_adhoc_dnat(node_name, ext_port, int_port, proto = 'tcp')
     assert_host_port_available!(ext_port, proto, node_name)
     @log.write "#{__method__}(): node=#{node_name}, #{ext_port}->#{int_port}/#{proto}", "debug"
@@ -1597,6 +1658,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
   def up(web_v_token = nil, web_v_addr = nil)
     validate_dnat_ports!
+    validate_profiles_ready!
     self.class.acquire_lock!(@relative_path) unless @standalone
   
     @log.info "Starting Lab: #{@relative_path}"

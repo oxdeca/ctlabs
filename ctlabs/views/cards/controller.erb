@@ -78,7 +78,7 @@
                 <i class="fas <%= node_icon %>" style="color: #94a3b8; width: 16px; text-align: center; margin-right: 6px;"></i>
                 <strong style="color: #38bdf8;"><%= n_name %></strong>
               </td>
-              <td style="vertical-align: middle;"><span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= n_type %></span></td>
+              <td style="vertical-align: middle;"><%= node_type_badge(n_type) %></td>
               <td style="vertical-align: middle; color: #a855f7;"><%= n_plane %></td>
               <td style="text-align:right; white-space: nowrap; vertical-align: middle;">
                 <% if node[:running] %>
@@ -125,7 +125,7 @@
                 <% end %>
               </td>
               <td><strong style="color: #38bdf8;"><%= port[:node] %></strong></td>
-              <td><span class="w3-badge w3-tiny" style="background: #475569;"><%= port[:proto].upcase %></span></td>
+              <td><%= proto_badge(port[:proto]) %></td>
               <td style="white-space: nowrap;"><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code></td>
               <td style="text-align:right; white-space: nowrap;">
                 <% if port[:url] %>

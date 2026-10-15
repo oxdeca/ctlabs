@@ -44,6 +44,42 @@ module ApplicationHelper
     html 
   end
 
+  # Accent colors for the pill "tag" badges below, keyed by node type.
+  NODE_TYPE_COLORS = {
+    'controller' => '#a78bfa',
+    'switch'     => '#22d3ee',
+    'router'     => '#fb923c',
+    'host'       => '#34d399',
+    'gateway'    => '#f472b6',
+    'server'     => '#60a5fa',
+    'firewall'   => '#f87171',
+    'rhost'      => '#94a3b8',
+    'external'   => '#94a3b8',
+  }.freeze
+
+  # A small pill "tag" matching the Ansible-tag styling in the Automation card
+  # (views/cards/automation.erb): dark slate fill, colored text + matching
+  # border. Use this instead of the low-contrast `w3-badge` grey chips.
+  def tag_badge(text, color: '#34d399')
+    return '' if text.nil? || text.to_s.strip.empty?
+
+    "<span style=\"display: inline-block; background-color: #1e293b; " \
+      "color: #{color}; border: 1px solid #{color}; padding: 1px 8px; " \
+      "border-radius: 10px; font-weight: 600; margin: 0 4px 2px 0; " \
+      "white-space: nowrap;\">#{ERB::Util.h(text)}</span>"
+  end
+
+  def node_type_badge(type)
+    return '' if type.nil?
+
+    tag_badge(type, color: NODE_TYPE_COLORS[type.to_s] || '#cbd5e1')
+  end
+
+  def proto_badge(proto)
+    p = proto.to_s.upcase
+    tag_badge(p, color: p == 'UDP' ? '#fbbf24' : '#60a5fa')
+  end
+
   def all_labs
     Lab.all
   end

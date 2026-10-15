@@ -107,10 +107,10 @@
                 <% if img[:imported] %>
                   <span class="w3-badge w3-tiny w3-round w3-deep-purple">imported</span>
                 <% else %>
-                  <span class="w3-badge w3-tiny w3-round" style="background-color: #475569;"><%= img[:category] %></span>
+                  <%= tag_badge(img[:category], color: '#60a5fa') %>
                 <% end %>
               </td>
-              <td style="vertical-align: middle;"><%= img[:os] == '-' ? '-' : "<span class='w3-badge w3-tiny w3-round' style='background-color: #64748b;'>#{img[:os]}</span>" %></td>
+              <td style="vertical-align: middle;"><%= img[:os] == '-' ? '-' : tag_badge(img[:os], color: '#a78bfa') %></td>
               
               <td style="vertical-align: middle;">
                 <span style="color:#f59e0b; font-size:0.85em; font-weight: bold;"><%= img[:version] %></span>
@@ -143,4 +143,3 @@
     <% end %>
   </div>
 </div>
-
