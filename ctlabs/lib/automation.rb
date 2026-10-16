@@ -515,8 +515,9 @@ module Automation
   def run_playbook(play = nil, log_file_path = nil)
     @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
 
-    # VALIDATION: Lab must be running
-    unless self.class.running? && self.class.current_name == @relative_path
+    # VALIDATION: Lab must be running. The persistent controller is its own
+    # standalone "lab" (no global lab lock), so skip the lock check there.
+    unless @standalone || (self.class.running? && self.class.current_name == @relative_path)
       raise "Cannot run playbook: Lab '#{@relative_path}' is not running. Start it first with --up"
     end
 
@@ -525,7 +526,10 @@ module Automation
     begin
       playbook_lock = Automation.acquire_playbook_lock!(@relative_path)
 
-      ctrl = find_node('ansible')
+      # A workload lab runs on its in-lab `ansible` node; the standalone
+      # controller topology (ctl-ctrl) has no `ansible` node, so fall back to
+      # the controller node itself.
+      ctrl = find_node('ansible') || @nodes.find { |n| n.type.to_s == 'controller' }
       raise "No 'ansible' controller node found in topology" if ctrl.nil?
 
       domain   = (@cfg['domain'] || @domain)
@@ -597,8 +601,14 @@ module Automation
     ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
     raise "No controller node found in topology to run Terraform." unless ctrl
 
-    node_cfg  = @cfg['topology'][0]['nodes'][ctrl.name] || {}
-    tf_cfg    = node_cfg['terraform'] || {}
+    # The node's own parsed config covers both schemas (top-level `nodes` for a
+    # lab, `planes.<p>.nodes` for the standalone controller); fall back to the
+    # raw top-level lookup for older lab YAMLs.
+    tf_cfg = ctrl.respond_to?(:terraform) && ctrl.terraform.is_a?(Hash) ? ctrl.terraform : {}
+    if tf_cfg.empty?
+      node_cfg = ((@cfg['topology'][0]['nodes'] || {})[ctrl.name]) || {}
+      tf_cfg   = node_cfg['terraform'] || {}
+    end
 
     workspace = tf_cfg['workspace'].to_s.strip
     workspace = 'default' if workspace.empty?

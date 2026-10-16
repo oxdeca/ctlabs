@@ -56,6 +56,7 @@ require_relative 'controllers/terminal_controller'
 require_relative 'controllers/logs_controller'
 require_relative 'controllers/dnat_controller'
 require_relative 'controllers/links_controller'
+require_relative 'controllers/controller_controller'
 
 # --- Sinatra Settings (Classic for root app) ---
 disable :logging
@@ -99,6 +100,7 @@ use MainController
 use TerminalController
 use LogsController
 use DnatController
+use ControllerController
 
 # ------------------------------------------------------------------------------
 # SHUTDOWN REAPER

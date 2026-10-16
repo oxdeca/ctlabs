@@ -3,7 +3,33 @@
  File        : ctlabs/public/js/automation.js
  License     : MIT License
  -----------------------------------------------------------------------------
-*/
+ */
+
+// ----------------------------------------------------------------------------
+// --- EDITOR SCOPE (lab vs control-plane) ---
+// The Ansible/Terraform editor modals are shared between a lab and the global
+// control plane. `window.automationBase` is null for lab scope (default) and
+// '/controller' when a control-plane editor is open; every fetch uses ansScope()
+// so the SAME modal/JS drives both. Lab-scoped calls that receive an explicit
+// labName (Run/Stop/Destroy) pass it through so they still target the right lab
+// even when no editor is open.
+// ----------------------------------------------------------------------------
+window.automationBase = null;
+
+// Scope precedence:
+//   1. explicit labName  -> /labs/<lab>  (lab Run/Stop/Destroy buttons)
+//   2. automationBase    -> '/controller' (control-plane editor / runs)
+//   3. currentEditLab    -> /labs/<lab>  (open editor fetches)
+window.ansScope = function(labName) {
+  if (labName) {
+    const lab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+    return '/labs/' + lab;
+  }
+  if (window.automationBase) return window.automationBase;
+  const lab = (window.currentEditLab || '')
+    .replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+  return '/labs/' + lab;
+};
 
 // ----------------------------------------------------------------------------
 // --- ANSIBLE ---
@@ -44,7 +70,7 @@ window.openAnsTab = function(tabId) {
   window.openAnsibleFileBrowser = async function() {
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/ansible/tree?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/ansible/tree?t=${Date.now()}`);
           if (res.ok) {
               const files = await res.json();
               const datalist = document.getElementById('ans-files-datalist');
@@ -73,7 +99,7 @@ window.openAnsTab = function(tabId) {
       const resultDiv = document.getElementById('ansible-editor-result');
       try {
           const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/ansible/file?path=${encodeURIComponent(filepath)}`);
+          const res = await fetch(`${window.ansScope()}/ansible/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
           const data = await res.json();
@@ -168,7 +194,7 @@ window.loadAnsProfiles = async function() {
       const resultDiv = document.getElementById('ansible-editor-result');
       try {
           const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/ansible/profiles?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/ansible/profiles?t=${Date.now()}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
           const data = await res.json();
@@ -183,7 +209,8 @@ window.loadAnsProfiles = async function() {
       }
   };
 
-  window.openAnsibleEditor = async function(labName) {
+  window.openAnsibleEditor = async function(labName, base) {
+    window.automationBase = base || null;
     window.currentEditLab = labName;
     // --- READ MEMORY FIRST! ---
     const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
@@ -193,7 +220,7 @@ window.loadAnsProfiles = async function() {
     document.querySelector('.ans-tablink').click();
     try {
         const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-        const res = await fetch(`/labs/${safeLab}/ansible/config?t=${Date.now()}`);
+        const res = await fetch(`${window.ansScope()}/ansible/config?t=${Date.now()}`);
         if (!res.ok) throw new Error("Could not fetch ansible node configuration");
         
         const data = await res.json();
@@ -291,7 +318,7 @@ window.loadAnsProfiles = async function() {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
+          const res = await fetch(`${window.ansScope()}/ansible/edit`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
@@ -349,7 +376,7 @@ window.loadAnsProfiles = async function() {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/ansible/file/delete`, {
+          const res = await fetch(`${window.ansScope()}/ansible/file/delete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ filepath: filepath }).toString()
@@ -374,10 +401,13 @@ window.loadAnsProfiles = async function() {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
       btn.classList.replace('w3-green', 'w3-grey');
 
-      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/playbook`, { method: 'POST' });
-          if (res.ok) window.location.href = '/logs/current';
+          const res = await fetch(`${window.ansScope(labName)}/playbook`, { method: 'POST' });
+          if (res.ok) {
+              const data = await res.json().catch(() => ({}));
+              window.location.href = data.log_url || '/logs/current';
+          }
           else {
               const data = await res.json();
               alert("Error: " + (data.error || 'Failed to start playbook'));
@@ -397,11 +427,11 @@ window.loadAnsProfiles = async function() {
 window.stopAnsiblePlaybook = async function(event, labName) {
       const btn = event.currentTarget;
 
-      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           btn.disabled = true;
           btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
-          const res = await fetch(`/labs/${safeLab}/playbook/stop`, { method: 'POST' });
+          const res = await fetch(`${window.ansScope(labName)}/playbook/stop`, { method: 'POST' });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(data.message || data.error || 'Stop failed');
           window.location.reload();
@@ -523,7 +553,7 @@ window.openTfTab = function(tabId) {
       const resultDiv = document.getElementById('terraform-editor-result');
       try {
           const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/terraform/profiles?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/terraform/profiles?t=${Date.now()}`);
           if (!res.ok) throw new Error((await res.json()).error);
 
           const data = await res.json();
@@ -535,7 +565,8 @@ window.openTfTab = function(tabId) {
       }
   };
 
-  window.openTerraformEditor = async function(labName) {
+  window.openTerraformEditor = async function(labName, base) {
+      window.automationBase = base || null;
       window.currentEditLab = labName;
       // --- READ MEMORY FIRST! Before any clicks overwrite it! ---
       const savedActiveTab = localStorage.getItem('tf_active_tab_' + window.currentEditLab);
@@ -547,7 +578,7 @@ window.openTfTab = function(tabId) {
 
       try {
           const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/terraform/config?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/terraform/config?t=${Date.now()}`);
           if (!res.ok) throw new Error("Could not fetch terraform node configuration");
           
           const data = await res.json();
@@ -623,7 +654,7 @@ window.openTfTab = function(tabId) {
 
       try {
           const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/terraform/files?work_dir=${encodeURIComponent(workDir)}`);
+          const res = await fetch(`${window.ansScope()}/terraform/files?work_dir=${encodeURIComponent(workDir)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           const data = await res.json();
 
@@ -714,7 +745,7 @@ window.openTfTab = function(tabId) {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/terraform/edit`, {
+          const res = await fetch(`${window.ansScope()}/terraform/edit`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString()
@@ -765,7 +796,7 @@ window.openTfTab = function(tabId) {
       const resultDiv = document.getElementById('terraform-editor-result');
       try {
           const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/terraform/file?path=${encodeURIComponent(filepath)}`);
+          const res = await fetch(`${window.ansScope()}/terraform/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
           const data = await res.json();
@@ -788,7 +819,7 @@ window.openTfTab = function(tabId) {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/terraform/file/delete`, {
+          const res = await fetch(`${window.ansScope()}/terraform/file/delete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ filepath: filepath }).toString()
@@ -814,11 +845,14 @@ window.openTfTab = function(tabId) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Destroying...';
       btn.classList.replace('w3-red', 'w3-grey');
 
-      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           // We will pass an explicit 'action=destroy' flag to the backend
-          const res = await fetch(`/labs/${safeLab}/terraform?action=destroy`, { method: 'POST' });
-          if (res.ok) window.location.href = '/logs/current';
+          const res = await fetch(`${window.ansScope(labName)}/terraform?action=destroy`, { method: 'POST' });
+          if (res.ok) {
+              const data = await res.json().catch(() => ({}));
+              window.location.href = data.log_url || '/logs/current';
+          }
           else {
               const data = await res.json();
               alert("Error: " + (data.error || 'Failed to start Terraform Destroy'));
@@ -840,10 +874,13 @@ window.openTfTab = function(tabId) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
       btn.classList.replace('w3-green', 'w3-grey');
 
-      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/terraform`, { method: 'POST' });
-          if (res.ok) window.location.href = '/logs/current';
+          const res = await fetch(`${window.ansScope(labName)}/terraform`, { method: 'POST' });
+          if (res.ok) {
+              const data = await res.json().catch(() => ({}));
+              window.location.href = data.log_url || '/logs/current';
+          }
           else {
               const data = await res.json();
               alert("Error: " + (data.error || 'Failed to start Terraform'));
@@ -866,7 +903,7 @@ window.openTfTab = function(tabId) {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
-          const res = await fetch(`/labs/${safeLab}/terraform/tree?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/terraform/tree?t=${Date.now()}`);
           if (res.ok) {
               const files = await res.json();
 
@@ -926,3 +963,38 @@ window.openTfTab = function(tabId) {
       }
   };
   
+// ----------------------------------------------------------------------------
+// --- CONTROL-PLANE WRAPPERS ---
+// The control-plane cards live on the lab details page but must hit the
+// global /controller/* endpoints instead of /labs/<lab>/*. They set
+// automationBase for the editor scope, then reuse the shared lab runners with
+// an empty labName (ansScope treats an explicit labName as an absolute lab
+// target, so an empty string falls through to automationBase).
+// ----------------------------------------------------------------------------
+window.openControllerAnsibleEditor = function() {
+    window.openAnsibleEditor('controller', '/controller');
+};
+
+window.openControllerTerraformEditor = function() {
+    window.openTerraformEditor('controller', '/controller');
+};
+
+window.runControllerAnsible = function(event) {
+    window.automationBase = '/controller';
+    return window.runAnsiblePlaybook(event, '');
+};
+
+window.stopControllerAnsible = function(event) {
+    window.automationBase = '/controller';
+    return window.stopAnsiblePlaybook(event, '');
+};
+
+window.runControllerTerraform = function(event) {
+    window.automationBase = '/controller';
+    return window.runTerraform(event, '');
+};
+
+window.destroyControllerTerraform = function(event) {
+    window.automationBase = '/controller';
+    return window.destroyTerraform(event, '');
+};

@@ -18,8 +18,7 @@
       document.getElementById('unified-file-browser-modal').style.display = 'block';
 
       try {
-          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`/labs/${safeLab}/${mode}/tree?t=${Date.now()}`);
+          const res = await fetch(`${window.ansScope()}/${mode}/tree?t=${Date.now()}`);
           if (res.ok) {
               const files = await res.json();
               listDiv.innerHTML = '';
@@ -75,3 +74,4 @@
           window.fetchTerraformFile(path);
       }
   };
+  

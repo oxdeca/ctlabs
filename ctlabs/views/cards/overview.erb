@@ -26,7 +26,7 @@
               <td><strong><%= port[:node] %></strong></td>
               <td><%= proto_badge(port[:proto]) %></td>
               <td><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code><% if port[:adhoc] %> <span style="color:#f59e0b; font-size:0.75em; font-weight: bold;">(adhoc)</span><% end %></td>
-              <td style="text-align:right; white-space: nowrap;"><button type="button" onclick="window.deleteDnat('<%= info_hash[:lab_path] %>', '<%= port[:node] %>', '<%= port[:raw_ext] %>', '<%= port[:raw_int] %>', '<%= port[:proto] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button></td>
+              <td style="text-align:right; white-space: nowrap;"><% if port[:url] %><a href="<%= port[:url] %>" target="_blank" rel="noopener" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 6px;" title="Open https://<%= port[:external_port] %> in a new tab"><i class="fas fa-external-link-alt"></i></a> <% end %><button type="button" onclick="window.deleteDnat('<%= info_hash[:lab_path] %>', '<%= port[:node] %>', '<%= port[:raw_ext] %>', '<%= port[:raw_int] %>', '<%= port[:proto] %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-coral" style="padding: 2px 6px;"><i class="fas fa-trash fa-lg"></i></button></td>
             </tr>
           <% end %>
         </tbody>

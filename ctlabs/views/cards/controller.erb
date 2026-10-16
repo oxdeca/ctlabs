@@ -26,11 +26,19 @@
                   else
                     []
                   end
+
+  ctrl_play = (defined?(Controller) && Controller.respond_to?(:controller_play) ? (Controller.controller_play rescue {}) : {}) || {}
+  ctrl_tf   = (defined?(Controller) && Controller.respond_to?(:controller_terraform) ? (Controller.controller_terraform rescue {}) : {}) || {}
+  ctrl_pb_running = (defined?(Automation) ? (Automation.playbook_running?('controller/topology.yml') rescue false) : false)
+  ctrl_tf_workdir  = ctrl_tf['work_dir'].to_s
+  ctrl_tf_ws       = ctrl_tf['workspace'].to_s
+  ctrl_tf_vars     = ctrl_tf['vars'] || []
+  ctrl_tf_commands = ctrl_tf['commands'].to_s
 %>
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-cogs"></i> Controller Plane</span>
+    <span><i class="fas fa-cogs"></i> Control-Plane</span>
     <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : 'w3-red' %>" style="font-size: 12px; padding: 2px 10px;">
       <%= controller_up ? 'Running' : 'Stopped' %>
     </span>
@@ -86,12 +94,44 @@
                 <% else %>
                   <button type="button" class="w3-button w3-tiny w3-transparent" style="color: #475569; cursor: not-allowed;" title="Node is not running"><i class="fas fa-terminal fa-lg"></i></button>
                 <% end %>
+                <% if node[:removable] %>
+                  <button type="button" onclick="window.deleteControllerNode('<%= n_name %>')" class="w3-button w3-tiny w3-transparent w3-text-red w3-hover-text-light-red" title="Remove control-plane node"><i class="fas fa-trash-alt fa-lg"></i></button>
+                <% else %>
+                  <button type="button" class="w3-button w3-tiny w3-transparent" style="color: #475569; cursor: not-allowed;" title="Built-in control-plane node"><i class="fas fa-lock fa-lg"></i></button>
+                <% end %>
               </td>
             </tr>
           <% end %>
         </tbody>
       </table>
     <% end %>
+
+    <form onsubmit="return window.controllerAddNode(event)" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #1e293b; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;">
+      <div>
+        <label style="display:block;">Name</label>
+        <input type="text" name="name" class="w3-input w3-round w3-small" placeholder="ctl-helpers" pattern="[a-z0-9][a-z0-9-]*" required style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
+      <div>
+        <label style="display:block;">Type</label>
+        <select name="type" class="w3-select w3-round w3-small" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+          <option value="host">host</option>
+          <option value="server">server</option>
+          <option value="router">router</option>
+          <option value="switch">switch</option>
+          <option value="firewall">firewall</option>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;">Kind <span style="color:#475569;">(optional)</span></label>
+        <input type="text" name="kind" class="w3-input w3-round w3-small" placeholder="debian" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
+      <div>
+        <label style="display:block;">IPv4 <span style="color:#475569;">(optional)</span></label>
+        <input type="text" name="ipv4" class="w3-input w3-round w3-small" placeholder="192.168.98.20/24" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
+      <button type="submit" class="w3-button w3-round w3-green w3-small" style="font-weight: 600;"><i class="fas fa-plus"></i> Add Node</button>
+      <span style="color: #64748b; font-size: 12px; align-self: center;"><i class="fas fa-info-circle"></i> Applied on next controller start</span>
+    </form>
   </div>
 </div>
 
@@ -131,11 +171,104 @@
                 <% if port[:url] %>
                   <a href="<%= port[:url] %>" target="_blank" rel="noopener" class="w3-button w3-tiny w3-round w3-blue" title="Open <%= port[:service] %> in a new tab"><i class="fas fa-external-link-alt"></i> Open</a>
                 <% end %>
+                <% if port[:removable] %>
+                  <button type="button" onclick="window.deleteControllerService('<%= port[:node] %>', <%= port[:raw_ext] %>, <%= port[:raw_int] %>, '<%= port[:proto] %>')" class="w3-button w3-tiny w3-round w3-red" title="Remove this port forward"><i class="fas fa-trash-alt"></i></button>
+                <% else %>
+                  <span class="w3-button w3-tiny w3-transparent" style="color: #475569; cursor: not-allowed;" title="Built-in service"><i class="fas fa-lock"></i></span>
+                <% end %>
               </td>
             </tr>
           <% end %>
         </tbody>
       </table>
     <% end %>
+
+    <form onsubmit="return window.controllerAddService(event)" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #1e293b; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;">
+      <div>
+        <label style="display:block;">Node</label>
+        <select name="node" class="w3-select w3-round w3-small" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+          <% plane_nodes.each do |node| %>
+            <option value="<%= node[:name] %>"><%= node[:name] %></option>
+          <% end %>
+        </select>
+      </div>
+      <div>
+        <label style="display:block;">Host Port <span style="color:#475569;">(8400-8499)</span></label>
+        <input type="number" name="external_port" min="8400" max="8499" class="w3-input w3-round w3-small" required style="width: 110px; background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
+      <div>
+        <label style="display:block;">Node Port</label>
+        <input type="number" name="internal_port" min="1" max="65535" class="w3-input w3-round w3-small" required style="width: 100px; background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
+      <div>
+        <label style="display:block;">Proto</label>
+        <select name="protocol" class="w3-select w3-round w3-small" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+          <option value="tcp">tcp</option>
+          <option value="udp">udp</option>
+        </select>
+      </div>
+      <button type="submit" class="w3-button w3-round w3-green w3-small" style="font-weight: 600;"><i class="fas fa-plus"></i> Expose</button>
+      <span style="color: #64748b; font-size: 12px; align-self: center;"><i class="fas fa-info-circle"></i> Applied live when the controller is running</span>
+    </form>
+  </div>
+</div>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-code-branch"></i> Controller Ansible</span>
+    <div>
+      <button type="button" onclick="window.openControllerAnsibleEditor()" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      <% if controller_up && ctrl_play['book'] %>
+        <button type="button" onclick="window.runControllerAnsible(event)" class="w3-button w3-round <%= ctrl_pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 3px 10px; font-size: 13px; font-weight: 600;" <%= ctrl_pb_running ? 'disabled' : '' %>>
+          <i class="fas <%= ctrl_pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= ctrl_pb_running ? 'Running...' : 'Run Playbook' %>
+        </button>
+        <% if ctrl_pb_running %>
+          <button type="button" onclick="window.stopControllerAnsible(event)" class="w3-button w3-round w3-red" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-left: 4px;" title="Send SIGTERM to the running playbook">
+            <i class="fas fa-stop"></i> Stop
+          </button>
+        <% end %>
+      <% elsif !controller_up %>
+        <span style="color: #64748b; font-size: 12px;"><i class="fas fa-info-circle"></i> Start the controller to run</span>
+      <% else %>
+        <span style="color: #64748b; font-size: 12px;"><i class="fas fa-info-circle"></i> No playbook configured</span>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small">
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Playbook:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= ctrl_play['book'] && !ctrl_play['book'].to_s.empty? ? ctrl_play['book'] : 'N/A' %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Inventory:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= ctrl_play['custom_inv'] && !ctrl_play['custom_inv'].to_s.empty? ? ctrl_play['custom_inv'] : (ctrl_play['inv'] && !ctrl_play['inv'].to_s.empty? ? ctrl_play['inv'] : 'default') %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Environment:</td><td><% (ctrl_play['env'] || []).each do |e| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div><% end %><% if (ctrl_play['env'] || []).empty? %><span style="color: #64748b; font-style: italic;">None</span><% end %></td></tr>
+      <tr><td style="color: #94a3b8;">Tags:</td><td><% if (ctrl_play['tags'] || []).empty? %><span style="color: #64748b; font-style: italic;">None</span><% else %><% (ctrl_play['tags'] || []).each do |t| %><span style="display: inline-block; background-color: #1e293b; color: #34d399; border: 1px solid #10b981; padding: 1px 8px; border-radius: 10px; font-weight: 600; margin: 0 4px 2px 0;"><%= t %></span><% end %><% end %></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span><i class="fas fa-cubes"></i> Controller Terraform</span>
+    <div>
+      <button type="button" onclick="window.openControllerTerraformEditor()" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
+      <% if controller_up && !ctrl_tf_workdir.empty? %>
+        <button type="button" onclick="window.destroyControllerTerraform(event)" class="w3-button w3-round w3-red w3-hover-dark-red" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;" title="Destroy Terraform Resources">
+          <i class="fas fa-trash-alt"></i> Destroy
+        </button>
+        <button type="button" onclick="window.runControllerTerraform(event)" class="w3-button w3-round w3-green" style="padding: 3px 10px; font-size: 13px; font-weight: 600;">
+          <i class="fas fa-play"></i> Run Terraform
+        </button>
+      <% elsif !controller_up %>
+        <span style="color: #64748b; font-size: 12px;"><i class="fas fa-info-circle"></i> Start the controller to run</span>
+      <% else %>
+        <span style="color: #64748b; font-size: 12px;"><i class="fas fa-info-circle"></i> No working directory configured</span>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small">
+    <table class="w3-table">
+      <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= ctrl_tf_workdir.empty? ? '(root)' : ctrl_tf_workdir %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= ctrl_tf_ws.empty? ? 'default' : ctrl_tf_ws %></code></td></tr>
+      <tr><td style="color: #94a3b8;">Execution:</td><td><% if ctrl_tf_commands.strip.empty? %><span style="color: #64748b; font-style: italic;">Standard (init &amp; apply)</span><% else %><span class="w3-badge w3-tiny w3-round w3-blue" style="margin-right: 4px;"><i class="fas fa-terminal"></i> Custom Script Active</span><% end %></td></tr>
+      <tr><td style="color: #94a3b8;">Variables:</td><td><% if ctrl_tf_vars.empty? %><span style="color: #64748b; font-style: italic;">None</span><% else %><% ctrl_tf_vars.each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %><% end %></td></tr>
+    </table>
   </div>
 </div>

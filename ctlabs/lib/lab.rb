@@ -698,6 +698,9 @@ class Lab
               proto: p[2] || 'tcp',
               external_port: "#{vip}:#{p[0]}",
               internal_port: "#{rip || 'N/A'}:#{p[1]}",
+              # Same rule the topology map uses for its "Web Interface" link
+              # (see graph.rb). HTTP(S) is the common case for an exposed service.
+              url: vip.to_s.empty? ? nil : "https://#{vip}:#{p[0]}",
               adhoc: is_adhoc_dnat,
               raw_ext: p[0],   
               raw_int: p[1]    
