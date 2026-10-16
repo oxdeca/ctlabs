@@ -506,20 +506,21 @@ class Lab
     %x( docker inspect -f '{{.State.Running}}' #{name} 2>/dev/null ).strip == 'true'
   end
 
-  # True when this lab is using the persistent controller rather than its own:
-  # the controller is up and the lab's own controller container is not.
-  def controller_attached?
+  # True when the persistent controller (ctl-ctrl) is up. ctl-ctrl is a
+  # separate, persistent node on its own ctl plane: the lab ALWAYS runs its own
+  # in-lab controller (the `controller` node, e.g. `ansible`), and ctl-ctrl is
+  # additionally wired onto the lab's mgmt plane as an extra OOB host (its own
+  # reserved mgmt IP) so the server can drive cloud/terraform/host ops from it
+  # and exchange data with the lab controller over the management network.
+  def persistent_controller_up?
     return false if @standalone
-    return false unless defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
-    ctrl = controller_node
-    return false unless ctrl
-    !container_running?(ctrl.name)
+    defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
   end
 
-  # Container that owns automation for this lab: ctl-ctrl when attached, else
-  # the lab's own controller node.
+  # Container that owns lab automation: always the lab's own in-lab controller
+  # node (created and destroyed with the lab). ctl-ctrl never runs the lab
+  # playbook.
   def controller_exec_name
-    return Controller::NAME if controller_attached?
     ctrl = find_node('ansible') || controller_node
     ctrl ? ctrl.name : Controller::NAME
   end
@@ -600,16 +601,6 @@ class Lab
 
     # Let the Node class figure out who is running!
     Node.bulk_update_status(lab.nodes) if is_running
-
-    # When attached to the persistent controller, the lab's own controller
-    # container is deliberately not started, so bulk_update_status marks it
-    # stopped and its terminal would target a container that doesn't exist.
-    # The controller IS running though - as ctl-ctrl - so report it as up and
-    # let the alias in TerminalService route exec to ctl-ctrl.
-    if is_running && lab.controller_attached?
-      ctrl = lab.controller_node
-      ctrl.is_running = true if ctrl
-    end
 
     # Nodes (With Diffing)
     nodes = []
@@ -930,18 +921,20 @@ class Lab
     end
    
     engine  = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-    # Attached to the persistent controller: deploy into ctl-ctrl, not the
-    # (absent) in-lab controller. conf file is already named "<lab>.conf" by
+    # The lab's dnsmasq zone lives in the lab's own in-lab controller (it is
+    # created and destroyed with the lab). conf file is named "<lab>.conf" by
     # Graph#to_dnsmasq, so it stays namespaced per lab.
-    ctr     = controller_attached? ? Controller::NAME : controller.name
+    ctr     = controller.name
     base    = File.basename(conf_path)
     
     @log.write "#{__method__}(): conf=#{conf_path},controller=#{ctr},engine=#{engine}", "debug"
     
-    ran = %x( #{engine} cp "#{conf_path}" #{ctr}:/etc/dnsmasq.d/#{base} 2>&1 )
-    if $?.success?
-      %x( #{engine} exec #{ctr} systemctl restart dnsmasq 2>&1 )
-    end
+     ran = %x( #{engine} cp "#{conf_path}" #{ctr}:/etc/dnsmasq.d/#{base} 2>&1 )
+     if $?.success?
+       # Ensure the lab controller's dnsmasq also listens on its mgmt interface
+       # (eth0) so ctl-ctrl (wired onto mgmt) can query it at 99.5 if needed.
+       %x( #{engine} exec #{ctr} sh -c '/usr/bin/printf "interface=eth0\n" > /etc/dnsmasq.d/00-listen.conf 2>/dev/null; systemctl restart dnsmasq' 2>&1 )
+     end
     @log.write "#{__method__}(): ran=#{ran.inspect},exit=#{$?.exitstatus}", "debug"
     $?.success?
   end
@@ -951,13 +944,13 @@ class Lab
   # records behind. Labs reuse node names while IPs are dynamic (see
   # design-guide.md sec.12.9), so a lingering "<lab>.conf" would resolve the
   # same name to a different lab's address. Only the lab's own file is
-  # removed (the controller's 00-listen.conf is untouched). `attached` is
-  # captured by the caller because controller_attached? flips during `down`.
-  def remove_lab_dnsmasq(attached)
+  # removed (the controller's 00-listen.conf is untouched). Runs before the
+  # in-lab controller is stopped in `down`.
+  def remove_lab_dnsmasq
     controller = @nodes.find { |n| n.respond_to?(:type) && n.type.to_s == 'controller' }
     return if controller.nil?
 
-    ctr    = attached ? Controller::NAME : controller.name
+    ctr    = controller.name
     file   = "/etc/dnsmasq.d/#{@name}.conf"
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     out    = %x( #{engine} exec #{ctr} sh -c 'rm -f #{file} && systemctl restart dnsmasq' 2>&1 )
@@ -1170,7 +1163,6 @@ class Lab
     @nodes.each do |node|
       next unless CONTAINER_NODE_TYPES.include?(node.type.to_s)
       next if node.remote?
-      next if node.type.to_s == 'controller' && controller_attached?
 
       image = node.image
       if image.nil? || image.to_s.strip.empty?
@@ -1376,10 +1368,17 @@ class Lab
     # Skip remote hosts since we don't have local docker exec access to them
     return if ['rhost', 'external', 'gateway'].include?(node.type)
 
-    # When attached to the persistent controller there is no in-lab controller
-    # container; install the key into ctl-ctrl instead.
-    target = (node.type.to_s == 'controller' && controller_attached?) ? Controller::NAME : node.name
+    # The lab's own controller gets the key (it runs the playbook / SSHes to
+    # nodes). When the persistent controller is up it ALSO gets the key, so the
+    # server can run ansible/ssh against the lab from ctl-ctrl over the mgmt
+    # plane (its own use case: cloud/terraform/host ops + data exchange).
+    targets = [node.name]
+    targets << Controller::NAME if node.type.to_s == 'controller' && persistent_controller_up?
 
+    targets.each { |target| inject_ssh_key_into(target, node, priv_key, pub_key_path, pub_key) }
+  end
+
+  def inject_ssh_key_into(target, node, priv_key, pub_key_path, pub_key)
     begin
       # Login user for this node. The public key must land in THAT user's home
       # (node_profiles.yml sets `user: ansible` for everything that has the
@@ -1426,7 +1425,7 @@ class Lab
       system("docker exec #{target} chmod 600 #{home}/.ssh/authorized_keys")
 
     rescue => e
-      @log.write("Failed to inject SSH keys to #{node.name}: #{e.message}", "error")
+      @log.write("Failed to inject SSH keys to #{node.name} (target #{target}): #{e.message}", "error")
     end
   end
 
@@ -1689,26 +1688,23 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     self.class.acquire_lock!(@relative_path) unless @standalone
   
     @log.info "Starting Lab: #{@relative_path}"
-    attached = controller_attached?
+    attached = persistent_controller_up?
     synchronize_lab_operation do
       @log.info "Starting Nodes:"
-      @nodes.each do |node|
-        # Attached to the persistent controller: don't start an in-lab
-        # controller container; its mgmt NIC is wired onto ctl-ctrl below.
-        if attached && node.type.to_s == 'controller'
-          @log.info "Attached to persistent controller (#{Controller::NAME}); skipping in-lab '#{node.name}'"
-          next
-        end
-        node.run
-      end
-  
+      # The lab ALWAYS runs its own in-lab controller (it is created and
+      # destroyed with the lab); ctl-ctrl is a separate persistent node.
+      @nodes.each(&:run)
+
       @log.info "Starting Links:"
-      swap_controller_link! if attached
+      # When the persistent controller is up, additionally wire it onto the
+      # lab's mgmt plane as an extra OOB host (its own reserved mgmt IP) --
+      # WITHOUT taking over the lab's controller node.
+      attach_controller_oob! if attached
       @links.each do |l|
         nodes = (@oob_proxy && l.include?(@oob_endpoint)) ? @nodes + [@oob_proxy] : @nodes
         Link.new('nodes' => nodes, 'links' => l, 'log' => @log, 'mgmt' => @mgmt)
       end
-  
+
       @log.info "DNAT:"
       add_dnat
     end
@@ -1770,24 +1766,19 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   
       @log.info "Stopping Lab: #{@relative_path}"
 
-      # Remove this lab's dnsmasq zone while the controller container is still
-      # up (before detach/stop): labs reuse node names but get dynamic IPs, so
-      # a stale <lab>.conf would resolve a name to another lab's address.
-      attached = controller_attached?
-      remove_lab_dnsmasq(attached)
+      # Remove this lab's dnsmasq zone while the in-lab controller is still up
+      # (before the node loop stops it): labs reuse node names but get dynamic
+      # IPs, so a stale <lab>.conf would resolve a name to another lab's address.
+      attached = persistent_controller_up?
+      remove_lab_dnsmasq
 
-      # Detach from the persistent controller BEFORE stopping nodes (the OOB
-      # NIC lives on ctl-ctrl, which outlives the lab).
-      detach_controller! if attached
+      # Remove ctl-ctrl's OOB NIC BEFORE stopping nodes (the NIC lives on
+      # ctl-ctrl, which outlives the lab).
+      detach_controller_oob! if attached
 
       synchronize_lab_operation do
         @log.info "Stopping Nodes:"
-        @nodes.each do |node|
-          # No in-lab controller container exists while attached; ctl-ctrl
-          # outlives the lab and must not be stopped.
-          next if attached && node.type.to_s == 'controller'
-          node.stop
-        end
+        @nodes.each(&:stop)
 
         @log.info "Cleaning up link interfaces..."
         cleanup_link_interfaces
@@ -1875,33 +1866,42 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     end
   end
 
-  # Rewire the lab controller's mgmt-switch link onto ctl-ctrl. The lab's own
-  # controller node stays in @nodes (inventory/exec resolution keep working off
-  # it) but is not started; ctl-ctrl takes over its mgmt NIC and IP. A synthetic
-  # proxy node (bypassing @nodes, so it never reaches inventory) supplies Link
-  # with ctl-ctrl's netns + address so the existing veth/OVS wiring is reused
-  # verbatim.
-  def swap_controller_link!
-    ctrl = controller_node
-    return if ctrl.nil?
-
+  # Wire the persistent controller (ctl-ctrl) onto the lab's mgmt plane as an
+  # extra host, WITHOUT taking over the lab's controller node. The lab keeps
+  # its own in-lab controller at its assigned mgmt IP (e.g. 192.168.99.5);
+  # ctl-ctrl joins the same mgmt switch on its own reserved address (the last
+  # usable host of the mgmt subnet) so the server can run cloud/terraform/host
+  # ops from it and exchange persistent data with the lab controller over the
+  # management network.
+  #
+  # A synthetic proxy node (bypassing @nodes, so it never reaches inventory)
+  # supplies Link with ctl-ctrl's netns + address so the existing veth/OVS
+  # wiring is reused verbatim. The OOB link is appended to @links and the proxy
+  # is injected only for that link in the `up` link loop.
+  def attach_controller_oob!
     cid = Controller.container_id
     return if cid.to_s.empty?
 
-    mgmt_ip = (ctrl.nics || {}).values.first
-    old_ep  = "#{ctrl.name}:eth0"
-    @oob_endpoint = "#{Controller::NAME}:eth1"
+    sw = mgmt_switch_name
+    return unless find_node(sw)
 
-    @links.each do |l|
-      l.each_index { |i| l[i] = @oob_endpoint if l[i].to_s == old_ep }
-    end
+    oob_ip = controller_oob_mgmt_ip
+    return if oob_ip.nil?
+
+    nic           = 'eth1'
+    # Idempotency: if a previous run left the OOB NIC on ctl-ctrl (e.g. a
+    # crashed lab that never detached), clear it before re-wiring.
+    %x( ip netns exec #{cid} ip link delete #{nic} 2>/dev/null )
+    port          = get_next_switch_port(sw)
+    @oob_endpoint = "#{Controller::NAME}:#{nic}"
+    @links << [ "#{sw}:eth#{port}", @oob_endpoint ]
 
     proxy = Node.new(
       'name'     => Controller::NAME,
       'type'     => 'controller',
       'profile'  => 'linux',
       'plane'    => 'mgmt',
-      'nics'     => { 'eth1' => mgmt_ip },
+      'nics'     => { nic => oob_ip },
       'gw'       => nil,
       'mtu'      => 1460,
       'defaults' => @defaults,
@@ -1910,45 +1910,56 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
     proxy.instance_variable_set(:@netns, cid)
     @oob_proxy = proxy
 
-    @log.info "[ATTACH] #{ctrl.name} -> #{Controller::NAME}:eth1 (#{mgmt_ip})"
+    @log.info "[ATTACH] #{Controller::NAME}:#{nic} (#{oob_ip}) on #{sw}:eth#{port}; lab controller '#{controller_node&.name}' stays in-lab"
 
-    configure_controller_dns!(ctrl)
+    configure_controller_dns!
   end
 
-  # Mirror Node#run's controller branch for the persistent controller. When the
-  # controller is attached to a lab, its resolver must cover the lab's mgmt
-  # hostnames (resolved by the lab's generated dnsmasq zone, which is deployed
-  # into ctl-ctrl -- hence 127.0.0.1) AND the lab's external resolvers (the
-  # mgmt-plane dns). The controller's own resolver is saved once and restored
-  # on detach so a lab's dns never outlives it.
-  #
-  # Without this, a lab whose mgmt plane has its own resolvers (or when the
-  # controller's baseline lacks an external server) leaves `docker exec
-  # ctl-ctrl` unable to resolve anything -- and the playbook/terraform runs
-  # that the controller owns fail.
-  def configure_controller_dns!(ctrl)
-    return if ctrl.nil?
-    addrs = (ctrl.dns || []).map(&:to_s).reject(&:empty?)
-    return if addrs.empty?
+  # Reserved mgmt address for the persistent controller's OOB NIC: the last
+  # usable host of the lab's mgmt subnet. Kept off the sequential allocator
+  # (auto_assign_mgmt_ip! starts at .20) so it never collides with a lab node.
+  def controller_oob_mgmt_ip
+    net = (@mgmt || {})['net'].to_s
+    net = '192.168.99.0/24' if net.empty?
+    require 'ipaddr'
+    subnet = IPAddr.new(net)
+    last   = subnet.to_range.last.to_i - 1
+    "#{IPAddr.new(last, subnet.family)}/#{subnet.prefix}"
+  rescue StandardError
+    nil
+  end
+
+  # While a lab runs, point ctl-ctrl's resolver at the lab controller's own
+  # dnsmasq (on the lab mgmt plane) so `docker exec ctl-ctrl` can resolve the
+  # lab's mgmt hostnames for data exchange / server-driven ops, plus the lab's
+  # external resolvers. ctl-ctrl's own resolver is saved once and restored on
+  # detach so a lab's dns never outlives it.
+  def configure_controller_dns!
+    ctrl   = controller_node
+    ctl_ip = ((ctrl&.nics || {})['eth0'] || '').to_s.split('/')[0]
+    return if ctl_ip.empty?
+
+    addrs = ((ctrl&.dns || []) + ((@mgmt || {})['dns'] || []))
+            .map(&:to_s).reject(&:empty?).uniq
 
     domain = "mgmt.#{@domain} #{@domain}"
-    dns    = "nameserver 127.0.0.1\n" + addrs.map { |ns| "nameserver #{ns}" }.join("\n")
+    dns    = "nameserver #{ctl_ip}\n" + addrs.map { |ns| "nameserver #{ns}" }.join("\n")
 
     %x( docker exec #{Controller::NAME} sh -c 'test -f /etc/resolv.conf.ctlabs.bak || cp /etc/resolv.conf /etc/resolv.conf.ctlabs.bak' )
     %x( docker exec #{Controller::NAME} sh -c '/usr/bin/printf "domain #{domain}\n#{dns}\noptions timeout:1 attempts:1\n" > /etc/resolv.conf' )
-    @log.info "[ATTACH] #{Controller::NAME} resolvers: 127.0.0.1, #{addrs.join(', ')}"
+    @log.info "[ATTACH] #{Controller::NAME} resolvers: #{ctl_ip}, #{addrs.join(', ')}"
   end
 
   # Remove the OOB NIC from ctl-ctrl on lab down. The switch-side endpoint dies
   # with its (stopped) container netns, but the ctl-ctrl side lives on (the
   # controller is persistent), so it MUST be deleted explicitly here.
-  def detach_controller!
-    return unless controller_attached?
+  def detach_controller_oob!
+    return unless persistent_controller_up?
     cid = Controller.container_id
     return if cid.to_s.empty?
     @log.info "[DETACH] removing OOB NIC from #{Controller::NAME}"
     %x( ip netns exec #{cid} ip link delete eth1 2>/dev/null )
-    %x( ip link delete ctl-ctroleth1 2>/dev/null )
+    %x( ip link delete ctl-ctrleth1 2>/dev/null )
     # Restore the controller's own resolver (saved on attach) so the lab's dns
     # does not leak past its lifecycle.
     %x( docker exec #{Controller::NAME} sh -c 'test -f /etc/resolv.conf.ctlabs.bak && cp /etc/resolv.conf.ctlabs.bak /etc/resolv.conf' )

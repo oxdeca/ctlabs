@@ -657,9 +657,10 @@ module Automation
 
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
 
-    # Terraform runs where the controller lives: ctl-ctrl when attached to the
-    # persistent controller, else the target node's own container.
-    exec_ctrl = (ctrl.type.to_s == 'controller' && controller_attached?) ? Controller::NAME : ctrl.name
+    # Cloud/terraform runs on the persistent controller (ctl-ctrl) when it is
+    # up -- it holds the persistent terraform state/workspace and reaches the
+    # cloud without a lab. Otherwise it runs on the lab's own in-lab controller.
+    exec_ctrl = (ctrl.type.to_s == 'controller' && persistent_controller_up?) ? Controller::NAME : ctrl.name
 
     full_cmd = "#{engine} exec #{exec_env}#{exec_ctrl} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 
