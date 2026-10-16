@@ -56,7 +56,7 @@
         <label style="font-size: 0.85em; color: #94a3b8;"><b>Select Lab:</b></label><br>
         <select name="lab_name" id="lab-selector" class="w3-select w3-medium w3-round select-scroll w3-hover-text-light-green" style="min-width: 200px; padding: 6px;" required <%= 'disabled' if running %>>
           <% @labs.each do |lab| %>
-            <option value="<%= lab %>" <%= 'selected' if lab == @selected_lab %>><%= lab %></option>
+            <option value="<%= lab %>" <%= 'selected' if lab == @selected_lab %>><%= lab_display_name(lab) %></option>
           <% end %>
         </select>
       </div>
@@ -127,7 +127,7 @@
   <% if running %>
     <div class="w3-panel w3-orange w3-margin-top w3-round" style="padding:12px;">
       <strong>⚠️ A lab is already running:</strong>
-      <code><%= get_running_lab || 'unknown' %></code>
+      <code><%= get_running_lab ? lab_display_name(get_running_lab) : 'unknown' %></code>
       <br>Please stop it before starting another.
 
       <div style="margin-top: 10px;">
@@ -192,7 +192,7 @@
     btn.innerHTML = '<i class="fas fa-check"></i> Save Lab';
     btn.disabled = false;
 
-    document.getElementById('unified-save-name').value = currentLab;
+    document.getElementById('unified-save-name').value = currentLab.replace(/\.ya?ml$/i, '');
     document.getElementById('unified-save-modal').style.display = 'block';
   };
 
@@ -213,7 +213,7 @@
 
       // --- 1. OVERWRITE ITSELF ---
       if (normalizedCurrent === targetName) {
-        const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+        const safeLab = currentLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
         const res = await fetch(`/labs/${safeLab}/save`, { method: 'POST' });
         const data = await res.json();
 
@@ -234,7 +234,7 @@
       }
 
       // --- 2. CLONE TO NEW LAB (Save As) ---
-      const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = currentLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       const formData = new URLSearchParams({ new_lab_name: targetName });
       
       // Inject the force flag if the user confirmed the popup
@@ -312,7 +312,7 @@
         window.cmEditors['lab-yaml-editor-textarea'].setSize(null, "65vh");
     }
 
-    const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+    const safeLab = currentLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
     try {
         const res = await fetch(`/labs/${safeLab}/raw?t=${Date.now()}`);
         if (!res.ok) throw new Error("Failed to load lab YAML");
@@ -333,7 +333,7 @@
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-    const safeLab = currentLab.split('/').map(encodeURIComponent).join('/');
+    const safeLab = currentLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
     try {
         const res = await fetch(`/labs/${safeLab}/raw`, {
             method: 'POST',

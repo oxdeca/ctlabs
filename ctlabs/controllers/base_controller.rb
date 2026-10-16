@@ -52,6 +52,31 @@ class BaseController < Sinatra::Base
     set     :views,              File.expand_path('../views', __dir__)
   end
 
+  # --- Extensionless Lab URLs ---
+  # Routes are defined as /labs/<dir>/<file>.yml/<endpoint>. Accept the
+  # extensionless form (/labs/<dir>/<file>/<endpoint>) too, for consistency with
+  # the CLI and the WebUI's lab labels, by rewriting the request path to the
+  # canonical form before route matching happens. Sinatra runs `before` filters
+  # before `route!` (see dispatch! in sinatra/base.rb), so this affects which
+  # route matches. Defined on BaseController, so every controller inherits it,
+  # and the rewritten env propagates across the `use`d controllers.
+  #
+  # Keyword routes under /labs (e.g. /labs, /labs/new, /labs/execute,
+  # /labs/download) have fewer than four path segments and are left untouched.
+  before do
+    path = request.path_info
+    if path.start_with?('/labs/')
+      segs = path.split('/', -1) # keep a trailing empty segment
+      if segs.length >= 4 && !segs[3].end_with?('.yml')
+        resolved = Lab.resolve_name("#{segs[2]}/#{segs[3]}")
+        if resolved.end_with?('.yml')
+          segs[3] = resolved.split('/', 2).last
+          env['PATH_INFO'] = segs.join('/')
+        end
+      end
+    end
+  end
+
   # --- Middleware (Basic Auth) ---
   use Rack::Auth::Basic, 'Restricted Area' do |user, pass|
     # Default credentials

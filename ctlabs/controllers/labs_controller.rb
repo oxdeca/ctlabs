@@ -28,7 +28,7 @@ class LabsController < BaseController
 
   # --- Download Lab Config ---
   get '/labs/download' do
-    lab_name = params[:lab]
+    lab_name = Lab.resolve_name(params[:lab])
     path = Lab.get_file_path(lab_name)
 
     if File.file?(path)
@@ -117,7 +117,7 @@ class LabsController < BaseController
     halt 400, "Invalid action" unless %w[up up_playbook down].include?(action)
 
     if action != 'down'
-      lab_name = params[:lab_name]
+      lab_name = Lab.resolve_name(params[:lab_name])
       halt 400, "Invalid lab" unless lab_name && Lab.all.include?(lab_name)
       if Lab.running?
         halt 400, "A lab is already running: #{Lab.current_name}. Stop it first."
@@ -188,7 +188,7 @@ class LabsController < BaseController
 
   # --- Lab Action (Legacy start/stop via CLI) ---
   post '/labs/action' do
-    lab_name = params[:lab_name]
+    lab_name = Lab.resolve_name(params[:lab_name])
     action   = params[:action]
 
     unless lab_name && Lab.all.include?(lab_name)

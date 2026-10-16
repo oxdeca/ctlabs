@@ -181,6 +181,33 @@ class Lab
     (running? && current_name == lab_name && File.file?(runtime_path)) ? runtime_path : File.join(labs_dir, lab_name)
   end
 
+  # Resolve a user-supplied lab name to its canonical relative path (with the
+  # `.yml` suffix). Accepts:
+  #   'net/net01'      -> 'net/net01.yml'   (relative path, no extension)
+  #   'net/net01.yml'  -> 'net/net01.yml'   (already canonical)
+  #   'net01'          -> 'net/net01.yml'   (unique basename fallback)
+  # Returns the input unchanged when nothing matches, so callers still surface a
+  # "not found" error for exactly what the user typed.
+  def self.resolve_name(name)
+    name = name.to_s
+    return name if name.empty?
+
+    labs_dir = defined?(::LABS_DIR) ? ::LABS_DIR : File.expand_path('../../labs', __dir__)
+    with_yml = name.end_with?('.yml') ? name : "#{name}.yml"
+
+    return with_yml if File.file?(File.join(labs_dir, with_yml))
+    return name if name.end_with?('.yml') # canonical but missing -> let caller report it
+
+    matches = all.select { |l| File.basename(l) == with_yml }
+    matches.size == 1 ? matches.first : name
+  end
+
+  # Human-facing lab name: drop the trailing `.yml` (e.g. 'net/net01.yml' ->
+  # 'net/net01'). Display-only — never feed this back into path lookups.
+  def self.display_name(name)
+    name.to_s.sub(/\.yml\z/, '')
+  end
+
   def self.acquire_lock!(name)
     raise ArgumentError, "Lab name must be relative path like 'dir/lab.yml'" unless name =~ %r{^[^/]+/[^/]+\.yml$}
     raise "A lab is already running: #{current_name}" if running?

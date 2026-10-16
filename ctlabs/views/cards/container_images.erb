@@ -105,7 +105,7 @@
               </td>
               <td style="vertical-align: middle;">
                 <% if img[:imported] %>
-                  <span class="w3-badge w3-tiny w3-round w3-deep-purple">imported</span>
+                  <%= tag_badge('imported', color: '#c084fc') %>
                 <% else %>
                   <%= tag_badge(img[:category], color: '#60a5fa') %>
                 <% end %>

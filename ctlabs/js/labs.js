@@ -42,7 +42,7 @@
       if (resultDiv) resultDiv.style.display = 'none';
 
       try {
-          const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+          const safeLab = labPath.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/meta`);
           if (!res.ok) throw new Error("Failed to load lab data from backend.");
           const data = await res.json();
@@ -67,7 +67,7 @@
       const form = e.target;
       const formData = new FormData(form);
       const labPath = formData.get('lab_path');
-      const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labPath.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       
       const btn = form.querySelector('button[type="submit"]');
       const origText = btn.innerHTML;
@@ -116,7 +116,7 @@
   window.submitAdhocDnat = async function(e) {
       e.preventDefault();
       const formData = new FormData(e.target);
-      const safeLab = formData.get('lab_name').split('/').map(encodeURIComponent).join('/');
+      const safeLab = formData.get('lab_name').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       const resultDiv = document.getElementById('adhoc-dnat-result');
 
       try {
@@ -140,7 +140,7 @@
   // --- DELETE ROUTINES ---
   window.deleteItem = async function(labName, endpointPath) {
       if (!confirm("Are you sure you want to delete this item?")) return;
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/${endpointPath}/delete`, { method: 'POST' });
           if (res.ok) setTimeout(() => location.reload(), 300);
@@ -150,7 +150,7 @@
 
   window.deleteDnat = async function(labName, node, ext, int, proto) {
       if (!confirm("Delete this port forwarding rule?")) return;
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/dnat/delete`, {
               method: 'POST',
@@ -164,7 +164,7 @@
 
   window.deleteLink = async function(labName, ep1, ep2) {
       if (!confirm("Delete this link?")) return;
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/link/delete`, {
               method: 'POST',
@@ -195,7 +195,7 @@
       }
 
       try {
-          const safeLab = labPath.split('/').map(encodeURIComponent).join('/');
+          const safeLab = labPath.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           
           // Send the save command to the backend
           const res = await fetch(`/labs/${safeLab}/save`, { method: 'POST' });
@@ -236,7 +236,7 @@
       const labSelector = document.getElementById('lab-selector');
       if (!labSelector || !labSelector.value) return;
 
-      const safeLab = labSelector.value.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labSelector.value.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       const btn = form.querySelector('button[type="submit"]');
       const originalBtnHTML = btn.innerHTML;
       btn.disabled = true; 
@@ -276,7 +276,7 @@
       infoSection.innerHTML = '<div class="w3-panel w3-flat-midnight-blue w3-round"><p><i class="fas fa-spinner fa-spin"></i> Loading lab info...</p></div>';
 
       // We always pass ?init=true now, because every fetch is an intentional user action!
-      fetch(`/labs/${encodeURIComponent(selectedLab)}/info_card?init=true`)
+      fetch(`/labs/${selectedLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/')}/info_card?init=true`)
         .then(response => {
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return response.text(); 

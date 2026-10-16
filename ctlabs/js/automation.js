@@ -42,7 +42,7 @@ window.openAnsTab = function(tabId) {
 
   // INNER FILE BROWSER LOGIC
   window.openAnsibleFileBrowser = async function() {
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/ansible/tree?t=${Date.now()}`);
           if (res.ok) {
@@ -72,7 +72,7 @@ window.openAnsTab = function(tabId) {
   window.fetchAnsibleFile = async function(filepath) {
       const resultDiv = document.getElementById('ansible-editor-result');
       try {
-          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/ansible/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
@@ -167,7 +167,7 @@ window.openAnsTab = function(tabId) {
 window.loadAnsProfiles = async function() {
       const resultDiv = document.getElementById('ansible-editor-result');
       try {
-          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/ansible/profiles?t=${Date.now()}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
@@ -192,7 +192,7 @@ window.loadAnsProfiles = async function() {
     if (resultDiv) resultDiv.style.display = 'none';
     document.querySelector('.ans-tablink').click();
     try {
-        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+        const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
         const res = await fetch(`/labs/${safeLab}/ansible/config?t=${Date.now()}`);
         if (!res.ok) throw new Error("Could not fetch ansible node configuration");
         
@@ -289,7 +289,7 @@ window.loadAnsProfiles = async function() {
           saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
       }
 
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/ansible/edit`, {
               method: 'POST',
@@ -347,7 +347,7 @@ window.loadAnsProfiles = async function() {
 
       if (!confirm(`WARNING: Are you sure you want to permanently delete '${filepath}' from disk?`)) return;
 
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/ansible/file/delete`, {
               method: 'POST',
@@ -374,7 +374,7 @@ window.loadAnsProfiles = async function() {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
       btn.classList.replace('w3-green', 'w3-grey');
 
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/playbook`, { method: 'POST' });
           if (res.ok) window.location.href = '/logs/current';
@@ -397,7 +397,7 @@ window.loadAnsProfiles = async function() {
 window.stopAnsiblePlaybook = async function(event, labName) {
       const btn = event.currentTarget;
 
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           btn.disabled = true;
           btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
@@ -522,7 +522,7 @@ window.openTfTab = function(tabId) {
   window.loadTfAuthProfiles = async function() {
       const resultDiv = document.getElementById('terraform-editor-result');
       try {
-          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/profiles?t=${Date.now()}`);
           if (!res.ok) throw new Error((await res.json()).error);
 
@@ -546,7 +546,7 @@ window.openTfTab = function(tabId) {
       document.querySelector('.tf-tablink').click();
 
       try {
-          const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+          const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/config?t=${Date.now()}`);
           if (!res.ok) throw new Error("Could not fetch terraform node configuration");
           
@@ -622,7 +622,7 @@ window.openTfTab = function(tabId) {
       resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering and loading files...';
 
       try {
-          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/files?work_dir=${encodeURIComponent(workDir)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           const data = await res.json();
@@ -712,7 +712,7 @@ window.openTfTab = function(tabId) {
           saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
       }
 
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform/edit`, {
               method: 'POST',
@@ -764,7 +764,7 @@ window.openTfTab = function(tabId) {
   window.fetchTerraformFile = async function(filepath) {
       const resultDiv = document.getElementById('terraform-editor-result');
       try {
-          const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
           const res = await fetch(`/labs/${safeLab}/terraform/file?path=${encodeURIComponent(filepath)}`);
           if (!res.ok) throw new Error((await res.json()).error);
           
@@ -786,7 +786,7 @@ window.openTfTab = function(tabId) {
 
       if (!confirm(`WARNING: Are you sure you want to permanently delete '${filepath}' from disk?`)) return;
 
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform/file/delete`, {
               method: 'POST',
@@ -814,7 +814,7 @@ window.openTfTab = function(tabId) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Destroying...';
       btn.classList.replace('w3-red', 'w3-grey');
 
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           // We will pass an explicit 'action=destroy' flag to the backend
           const res = await fetch(`/labs/${safeLab}/terraform?action=destroy`, { method: 'POST' });
@@ -840,7 +840,7 @@ window.openTfTab = function(tabId) {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
       btn.classList.replace('w3-green', 'w3-grey');
 
-      const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+      const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform`, { method: 'POST' });
           if (res.ok) window.location.href = '/logs/current';
@@ -864,7 +864,7 @@ window.openTfTab = function(tabId) {
       // 1. Save which input field requested the browser
       window.currentTfDirTarget = targetInputId;
 
-      const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
           const res = await fetch(`/labs/${safeLab}/terraform/tree?t=${Date.now()}`);
           if (res.ok) {
@@ -925,3 +925,4 @@ window.openTfTab = function(tabId) {
           window.loadTerraformFiles();
       }
   };
+  

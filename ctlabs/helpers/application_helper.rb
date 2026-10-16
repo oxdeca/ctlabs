@@ -84,6 +84,12 @@ module ApplicationHelper
     Lab.all
   end
 
+  # Lab name for display: drops the trailing `.yml` (e.g. 'net/net01.yml' ->
+  # 'net/net01'). Display-only; never use the result for path lookups.
+  def lab_display_name(name)
+    Lab.display_name(name)
+  end
+
   def running_lab?
     Lab.running?
   end

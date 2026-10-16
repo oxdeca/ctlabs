@@ -14,7 +14,7 @@ class LogsController < BaseController
       
       basename = File.basename(@log_file, '.log')
       parts = basename.split('_')
-      @lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown'
+      @lab_name = (lab_name_from_log_token(parts[2..-2].join('_')) rescue 'Unknown')
       @action = parts.last == 'up' ? 'up' : 'down'
       
       erb :live_log

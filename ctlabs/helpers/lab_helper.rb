@@ -98,6 +98,18 @@ module LabHelper
   # ---------------------------------------------------------------------------
   # 
   # ---------------------------------------------------------------------------
+  # Rebuild a human lab name from a log filename's sanitized lab token.
+  # Logs store the lab as `dir_name.yml` ('/' -> '_'), so 'net_net01.yml'
+  # resolves back to 'net/net01' when that lab still exists; otherwise the token
+  # is returned without its `.yml` extension. Display-only.
+  def lab_name_from_log_token(token)
+    token = token.to_s.sub(/\.yml\z/, '')
+    return token if token.empty?
+
+    match = Lab.all.find { |l| Lab.display_name(l).tr('/', '_') == token }
+    match ? Lab.display_name(match) : token
+  end
+
   def fetch_latest_log_info
     latest_log_path = Dir.glob(File.join(LOG_DIR, "*.log")).max_by { |f| File.mtime(f) }
     return nil unless latest_log_path
@@ -107,7 +119,7 @@ module LabHelper
     action_name     = "action"
 
     if match = latest_log_file.match(/^ctlabs_\d+_(.+)_([a-zA-Z]+)\.log$/)
-      lab_name    = match[1]
+      lab_name    = lab_name_from_log_token(match[1])
       action_name = match[2]
     end
 
@@ -128,7 +140,7 @@ module LabHelper
     else
       parts = basename.split('_')
       timestamp = parts[1].to_i rescue 0
-      lab_name = parts[2..-2].join('_').gsub(/\.yml$/, '.yml') rescue 'Unknown Lab'
+      lab_name = lab_name_from_log_token(parts[2..-2].join('_')) rescue 'Unknown Lab'
       action = case parts.last
                when 'up' then 'Start'
                when 'down' then 'Stop'

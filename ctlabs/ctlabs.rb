@@ -92,7 +92,7 @@ LOG_DIR         = '/var/log/ctlabs'
 if options[:status]
   if Lab.running?
     running_lab = Lab.current_name
-    puts "✅ Lab is running: #{running_lab}"
+    puts "✅ Lab is running: #{Lab.display_name(running_lab)}"
     
     # Optional: show full path
     labs_dir = File.expand_path('../labs', __dir__)
@@ -154,7 +154,7 @@ if options[:up]
     exit 1
   end
 
-  config_path = options[:config]
+  config_path = Lab.resolve_name(options[:config])
   labs_dir = File.expand_path('../labs', __dir__)
   full_path = File.join(labs_dir, config_path)
 
@@ -274,7 +274,7 @@ if options[:graph] || options[:ini] || options[:dnsmasq] || options[:print]
   # Initialize l1 if it wasn't already initialized by up/down/play
   unless defined?(l1) && l1
     if options[:config]
-      l1 = Lab.find(options[:config])
+      l1 = Lab.find(Lab.resolve_name(options[:config]))
       unless l1
         puts "❌ Error: Lab not found: #{options[:config]}"
         exit 1
@@ -299,7 +299,7 @@ if options[:list]
     puts "No labs found in #{LABS_DIR}"
   else
     puts "Available labs:"
-    labs.each { |lab| puts "  #{lab}" }
+    labs.each { |lab| puts "  #{Lab.display_name(lab)}" }
   end
   exit 0
 end

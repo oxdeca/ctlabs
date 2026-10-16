@@ -42,7 +42,7 @@ window.editLinkConfig = function(labName, nodeA, intA, nodeB, intB, oldEp1, oldE
 };
 
 window.saveLinkConfig = async function() {
-    const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+    const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
     const formData = new URLSearchParams({
         old_ep1: document.getElementById('edit-link-old-ep1').value,
         old_ep2: document.getElementById('edit-link-old-ep2').value,

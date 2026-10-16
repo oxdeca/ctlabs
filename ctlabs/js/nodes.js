@@ -489,7 +489,7 @@ window.editNodeConfig = async function(labName, nodeName) {
     document.getElementById('node-editor-result').style.display = 'none';
 
     try {
-        const safeLab = labName.split('/').map(encodeURIComponent).join('/');
+        const safeLab = labName.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
         const res = await fetch(`/labs/${safeLab}/node/${encodeURIComponent(nodeName)}?t=${Date.now()}`);
         if (!res.ok) throw new Error("HTTP Status " + res.status);
         const data = await res.json();
@@ -933,7 +933,7 @@ window.saveNodeConfig = async function() {
         formData.append('devs', document.getElementById('edit-devs').value);
     }
 
-    const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+    const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
 
     try {
         if (isAdding) {
@@ -1030,7 +1030,7 @@ window.checkRemoteHosts = async function() {
         const rawLab = el.getAttribute('data-lab');
         if (!rawLab) continue;
 
-        const safeLab = rawLab.split('/').map(encodeURIComponent).join('/');
+        const safeLab = rawLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
         const node = encodeURIComponent(el.getAttribute('data-node'));
 
         // Instantly remove the spin class so we don't check it twice next loop

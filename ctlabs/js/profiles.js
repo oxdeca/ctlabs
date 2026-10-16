@@ -70,7 +70,7 @@ window.saveImageConfig = async function() {
     resDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; padding: 8px;';
     resDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving profile...';
 
-    const safeLab = window.currentEditLab.split('/').map(encodeURIComponent).join('/');
+    const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
     try {
         const res = await fetch(`/labs/${safeLab}/image/edit`, {
             method: 'POST',
