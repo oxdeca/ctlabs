@@ -20,10 +20,13 @@
   <div style="flex: 1; min-height: 0; overflow-y: auto;">
     <div class="w3-bar w3-round-large w3-margin-bottom" style="background-color: #1e293b; border: 1px solid #334155;">
       <button class="w3-bar-item w3-button tablink w3-blue w3-round-large" onclick="openInvTab(event, 'MgmtInv')" style="font-weight: 600;">
-        <i class="fas fa-network-wired"></i> Management Network
+        <i class="fas fa-network-wired w3-text-green"></i> Management Network
       </button>
       <button class="w3-bar-item w3-button tablink w3-round-large" onclick="openInvTab(event, 'DataInv')" style="font-weight: 600;">
-        <i class="fas fa-project-diagram"></i> Data Network
+        <i class="fas fa-project-diagram w3-text-orange"></i> Data Network
+      </button>
+      <button class="w3-bar-item w3-button tablink w3-round-large" onclick="openInvTab(event, 'ControllerInv')" style="font-weight: 600;">
+        <i class="fas fa-cogs w3-text-purple"></i> Controller Network
       </button>
     </div>
 
@@ -47,6 +50,16 @@
       </div>
     </div>
 
+    <div id="ControllerInv" class="w3-container inv-tab w3-margin-bottom" style="display:none; padding: 0;">
+      <div class="w3-panel w3-round-large" style="background-color: rgba(168, 85, 247, 0.1); border: 1px solid #a855f7; margin-top: 0;">
+        <h4 style="color: #a855f7; margin-top: 10px;"><i class="fas fa-info-circle"></i> Controller Network (ctl-* out-of-band)</h4>
+        <p style="color: #e2e8f0; font-size: 0.9em;">This inventory targets the persistent control plane (ctl-ctrl, ctl-sw0, ctl-ro0) over its isolated out-of-band network.</p>
+      </div>
+      <div class="w3-card-4 w3-round-large" style="border: 1px solid #475569; overflow: hidden; background-color: #0f172a;">
+        <textarea id="controller-inv-viewer"><%= ERB::Util.h(inv_contents[:controller]) %></textarea>
+      </div>
+    </div>
+
     <script>
       document.addEventListener('DOMContentLoaded', () => {
           if (typeof window.initCodeEditor === 'function') {
@@ -66,13 +79,22 @@
                   dataViewer.getWrapperElement().style.height = "auto";
               }
 
-              // 3. Fix the "Hidden Tab" CodeMirror Glitch
+              // 3. Initialize Controller Inventory Editor
+              const controllerViewer = window.initCodeEditor('controller-inv-viewer', 'properties');
+              if (controllerViewer) {
+                  controllerViewer.setOption('readOnly', true);
+                  controllerViewer.getWrapperElement().style.minHeight = "auto";
+                  controllerViewer.getWrapperElement().style.height = "auto";
+              }
+
+              // 4. Fix the "Hidden Tab" CodeMirror Glitch
               // When the user clicks a tab, wait 50ms for it to become visible, then tell the editor to redraw
               document.querySelectorAll('.tablink').forEach(btn => {
                   btn.addEventListener('click', (e) => {
                       setTimeout(() => {
                           if (window.cmEditors['mgmt-inv-viewer']) window.cmEditors['mgmt-inv-viewer'].refresh();
                           if (window.cmEditors['data-inv-viewer']) window.cmEditors['data-inv-viewer'].refresh();
+                          if (window.cmEditors['controller-inv-viewer']) window.cmEditors['controller-inv-viewer'].refresh();
                       }, 50);
                   });
               });

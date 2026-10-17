@@ -786,13 +786,18 @@ class Graph
     }
   end
 
-  def to_data_ini(data, name)
-    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
+  # `shared` is the basename used for the single, last-writer-wins copy kept in
+  # @pubdir (the "current" inventory shown in the webui). Labs use the default
+  # `inventory` / `inventory_data`; the standalone controller plane uses
+  # `inventory_controller` / `inventory_controller_data` so it never clobbers
+  # the lab inventory that the Management/Data tabs read.
+  def to_data_ini(data, name, shared = 'inventory_data')
+    @log.write "#{__method__}(): data=#{data},name=#{name},shared=#{shared}", "debug"
 
     File.open("../../ctlabs-ansible/inventories/#{name}_data.ini", "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
-    File.open("#{@pubdir}/inventory_data.ini", "w") do |f|
+    File.open("#{@pubdir}/#{shared}.ini", "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
   end
@@ -851,13 +856,14 @@ host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
     %x( dot -Tsvg #{@dotfile} -o #{@pubdir}/#{name}.svg )
   end
 
-  def to_ini(data, name)
-    @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
+  # See to_data_ini for the `shared` basename contract.
+  def to_ini(data, name, shared = 'inventory')
+    @log.write "#{__method__}(): data=#{data},name=#{name},shared=#{shared}", "debug"
 
     File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
-    File.open("#{@pubdir}/inventory.ini", "w") do |f|
+    File.open("#{@pubdir}/#{shared}.ini", "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
   end

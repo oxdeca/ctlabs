@@ -89,9 +89,16 @@ module LabHelper
       end
     end
 
+    # The controller plane is not a lab, so its inventory is always at the fixed
+    # public dir (Controller::PUBDIR) regardless of which lab is running. It is
+    # written by the controller's standalone Lab#inventory to its own basename
+    # (inventory_controller.ini) so it never clobbers the lab inventory above.
+    controller_path = (Controller.inventory_file rescue File.join('public', 'inventory_controller.ini'))
+
     {
       mgmt: File.file?(mgmt_path) ? File.read(mgmt_path) : "Management inventory not generated.\nRun './ctlabs.rb -i' to generate.",
-      data: File.file?(data_path) ? File.read(data_path) : "Data inventory not generated.\nRun './ctlabs.rb -i' to generate."
+      data: File.file?(data_path) ? File.read(data_path) : "Data inventory not generated.\nRun './ctlabs.rb -i' to generate.",
+      controller: File.file?(controller_path) ? File.read(controller_path) : "Controller inventory not generated.\nRestart the controller (ctlabs.rb --controller=up) to generate."
     }
   end
 

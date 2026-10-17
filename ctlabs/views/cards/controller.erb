@@ -36,9 +36,16 @@
   ctrl_tf_commands = ctrl_tf['commands'].to_s
 %>
 
+<%# The tab-controller container is a column flexbox (openLabTab forces
+    display:flex). Each card below has overflow:hidden, which collapses a flex
+    item's automatic min-height to 0 -- so when the browser window is short the
+    cards shrink, overlap and clip their bottoms. Wrapping them in a single
+    flex-shrink:0 block keeps them at natural height and lets the tab scroll. %>
+<div style="flex-shrink: 0;">
+
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-cogs"></i> Control-Plane</span>
+    <span><i class="fas fa-cogs w3-text-purple"></i> Control-Plane</span>
     <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : 'w3-red' %>" style="font-size: 12px; padding: 2px 10px;">
       <%= controller_up ? 'Running' : 'Stopped' %>
     </span>
@@ -169,10 +176,10 @@
               <td style="white-space: nowrap;"><code style="color: #10b981;"><%= port[:external_port] %></code> <i class="fas fa-arrow-right" style="color: #64748b; font-size: 0.8em; margin: 0 4px;"></i> <code style="color: #38bdf8;"><%= port[:internal_port] %></code></td>
               <td style="text-align:right; white-space: nowrap;">
                 <% if port[:url] %>
-                  <a href="<%= port[:url] %>" target="_blank" rel="noopener" class="w3-button w3-tiny w3-round w3-blue" title="Open <%= port[:service] %> in a new tab"><i class="fas fa-external-link-alt"></i> Open</a>
+                  <a href="<%= port[:url] %>" target="_blank" rel="noopener" class="w3-button w3-tiny w3-round w3-blue" style="padding: 2px 6px;" title="Open <%= port[:service] %> in a new tab"><i class="fas fa-external-link-alt"></i></a>
                 <% end %>
                 <% if port[:removable] %>
-                  <button type="button" onclick="window.deleteControllerService('<%= port[:node] %>', <%= port[:raw_ext] %>, <%= port[:raw_int] %>, '<%= port[:proto] %>')" class="w3-button w3-tiny w3-round w3-red" title="Remove this port forward"><i class="fas fa-trash-alt"></i></button>
+                  <button type="button" onclick="window.deleteControllerService('<%= port[:node] %>', <%= port[:raw_ext] %>, <%= port[:raw_int] %>, '<%= port[:proto] %>')" class="w3-button w3-small w3-transparent w3-text-red w3-hover-text-light-coral" title="Remove this port forward" style="padding: 4px 10px;"><i class="fas fa-trash fa-lg"></i></button>
                 <% else %>
                   <span class="w3-button w3-tiny w3-transparent" style="color: #475569; cursor: not-allowed;" title="Built-in service"><i class="fas fa-lock"></i></span>
                 <% end %>
@@ -184,6 +191,10 @@
     <% end %>
 
     <form onsubmit="return window.controllerAddService(event)" style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #1e293b; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end;">
+      <div>
+        <label style="display:block;">Name <span style="color:#475569;">(optional)</span></label>
+        <input type="text" name="name" placeholder="e.g. Vault UI" maxlength="60" class="w3-input w3-round w3-small" style="width: 150px; background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
+      </div>
       <div>
         <label style="display:block;">Node</label>
         <select name="node" class="w3-select w3-round w3-small" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #334155; padding: 5px 8px;">
@@ -215,7 +226,7 @@
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-code-branch"></i> Controller Ansible</span>
+    <span><i class="fas fa-code-branch w3-text-blue"></i> Controller Ansible</span>
     <div>
       <button type="button" onclick="window.openControllerAnsibleEditor()" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       <% if controller_up && ctrl_play['book'] %>
@@ -246,7 +257,7 @@
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-cubes"></i> Controller Terraform</span>
+    <span><i class="fas fa-cubes w3-text-purple"></i> Controller Terraform</span>
     <div>
       <button type="button" onclick="window.openControllerTerraformEditor()" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       <% if controller_up && !ctrl_tf_workdir.empty? %>
@@ -272,3 +283,5 @@
     </table>
   </div>
 </div>
+
+</div><%# /flex-shrink wrapper %>

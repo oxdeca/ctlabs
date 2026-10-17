@@ -44,6 +44,19 @@ class Controller
   # locked; only entries stored here are user-removable.
   OVERLAYS = File.join(DATA_DIR, 'overrides.yml')
 
+  # Public web dir the controller's Lab writes its generated topology images and
+  # inventory into. This is Lab's default @pubdir (lib/lab.rb). The controller's
+  # inventory goes to a dedicated basename here (inventory_controller.ini) so it
+  # never clobbers the lab inventory the webui Management/Data tabs read -- the
+  # controller plane shares @pubdir with labs, so a shared basename would be
+  # last-writer-wins. See lib/lab.rb#inventory and views/inventory.erb.
+  PUBDIR = '/srv/ctlabs-server/public'
+
+  # File the webui "Controller Network" inventory tab reads.
+  def self.inventory_file
+    File.join(PUBDIR, 'inventory_controller.ini')
+  end
+
   # Node types that actually start a container on the control plane, i.e. have a
   # terminal and can own services. `gateway` (ctl-natgw) is a host bridge.
   PLANE_CONTAINER_TYPES = %w[host router switch controller].freeze
@@ -126,6 +139,15 @@ class Controller
     vip = %x( ip route get 1.1.1.1 | head -n1 | awk '{print $7}' ).strip
     base = base_service_keys
 
+    # User-assigned names for overlay services, keyed "node/ext/proto".
+    saved_names = {}
+    (overlays['services'] || {}).each do |nname, rules|
+      Array(rules).each do |r|
+        next unless r.is_a?(Hash) && r['name'].to_s.strip != ''
+        saved_names["#{nname}/#{dnat_rule(r)[0]}/#{dnat_rule(r)[2]}"] = r['name'].to_s.strip
+      end
+    end
+
     rows = []
     Array(cfg['topology']).each do |vm|
       next unless vm.is_a?(Hash)
@@ -141,10 +163,11 @@ class Controller
             ext   = r[0].to_i
             int   = r[1].to_i
             proto = (r[2] || 'tcp').to_s
-            service = case int
-                      when 8200 then 'Vault'
-                      when 53   then 'DNS (dnsmasq)'
-                      end
+            service = saved_names["#{name}/#{ext}/#{proto}"]
+            service ||= case int
+                        when 8200 then 'Vault'
+                        when 53   then 'DNS (dnsmasq)'
+                        end
             rows << {
               node:          name,
               proto:         proto,
@@ -261,7 +284,7 @@ class Controller
 
   # Add an exposed service to a control-plane node. Enforces the reserved host
   # port range (the controller owns 8400-8499) + uniqueness.
-  def self.add_service(node_name, ext, int, proto = 'tcp')
+  def self.add_service(node_name, ext, int, proto = 'tcp', name = nil)
     ext   = ext.to_i
     int   = int.to_i
     proto = proto.to_s.downcase
@@ -278,12 +301,16 @@ class Controller
     existing = Array(node['dnat']).map { |r| dnat_rule(r) }
     raise "Port #{ext}/#{proto} is already exposed" if existing.any? { |r| r[0] == ext && r[2] == proto }
 
+    entry = { 'ext' => ext, 'int' => int, 'proto' => proto }
+    label = name.to_s.strip
+    entry['name'] = label unless label.empty?
+
     ov = overlays
     ov['services'] ||= {}
     ov['services'][node_name] ||= []
-    ov['services'][node_name] << { 'ext' => ext, 'int' => int, 'proto' => proto }
+    ov['services'][node_name] << entry
     save_overlays(ov)
-    { node: node_name, ext: ext, int: int, proto: proto }
+    { node: node_name, ext: ext, int: int, proto: proto, name: (label.empty? ? nil : label) }
   end
 
   # Remove an OVERLAY service. A base (built-in) service is not stored in the

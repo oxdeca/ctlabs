@@ -52,7 +52,7 @@ class ControllerController < BaseController
   post '/controller/services' do
     content_type :json
     begin
-      svc = Controller.add_service(params[:node], params[:external_port], params[:internal_port], (params[:protocol] || 'tcp'))
+      svc = Controller.add_service(params[:node], params[:external_port], params[:internal_port], (params[:protocol] || 'tcp'), params[:name])
       applied = live_apply_services
       { success: true, service: svc,
         message: applied ? "Service #{svc[:node]}:#{svc[:ext]} -> #{svc[:int]}/#{svc[:proto]} added."

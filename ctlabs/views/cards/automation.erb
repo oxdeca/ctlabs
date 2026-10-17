@@ -14,7 +14,7 @@
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-code-branch"></i> Ansible</span>
+    <span><i class="fas fa-code-branch w3-text-blue"></i> Ansible</span>
     <div>
       <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
@@ -42,7 +42,7 @@
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-cubes"></i> Terraform</span>
+    <span><i class="fas fa-cubes w3-text-purple"></i> Terraform</span>
     <div>
       <button type="button" onclick="window.openTerraformEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       
