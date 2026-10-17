@@ -167,6 +167,19 @@ class TerminalService
       end
     end
 
+    # If we still don't have tf_cfg and we're execing into the controller plane (ctl-ctrl),
+    # pull terraform config from the Controller's effective topology/overlay.
+    if !tf_cfg && defined?(Controller)
+      cname = Controller::NAME rescue 'ctl-ctrl'
+      if exec_name == cname
+        begin
+          ctf = Controller.controller_terraform
+          tf_cfg = ctf if ctf.is_a?(Hash) && !ctf.empty?
+        rescue
+        end
+      end
+    end
+
     if custom_term && custom_term.start_with?('ssh://')
       require 'uri'
       uri = URI.parse(custom_term)
@@ -203,7 +216,14 @@ class TerminalService
       cmd.push('-w', work_dir) if work_dir
       cmd.push('-e', 'TERM=xterm-256color')
 
-      if session[:vault_token] && session[:vault_addr] && node_type == 'controller'
+      # Inject GCP creds when opening a terminal in a controller container: the
+      # lab's in-lab controller node (ansible/controller), or the persistent
+      # control-plane controller (ctl-ctrl) whose terraform config lives in the
+      # Controller overlay.
+      is_controller_container = (node_type == 'controller') ||
+                                (defined?(Controller) && exec_name == (Controller::NAME rescue 'ctl-ctrl'))
+
+      if session[:vault_token] && session[:vault_addr] && is_controller_container && tf_cfg
         begin
           gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] })
           gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
