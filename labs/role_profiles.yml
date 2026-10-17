@@ -36,7 +36,7 @@ profiles:
   vault:
     role : ctlabs_vault
     tags : [vault]
-    hosts: [ansible, vdb1, vdb2]
+    hosts: [ansible]
 
   rundeck:
     role : ctlabs_rundeck
@@ -263,6 +263,11 @@ profiles:
         tags : [rke2-control]
       - group: [rke24]
         tags : [rke2-worker]
+
+  vault_certs:
+    role: ctlabs_vault
+    tags: [vault]
+    hosts: [vdb1]
 
   containerd:
     role : ctlabs_containerd

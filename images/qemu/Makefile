@@ -15,6 +15,9 @@ win25_dtop_img: base_img
 c9_img: base_img
 	cd centos/c9 && sh ./build.sh
 	
+d13_img: base_img
+	cd debian/d13 && sh ./build.sh
+
 d12_img: base_img
 	cd debian/d12 && sh ./build.sh
 
