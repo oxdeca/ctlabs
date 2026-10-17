@@ -56,6 +56,9 @@ module Automation
   TF_DIR_CTL         = '/srv/ctlabs/ctlabs-terraform'.freeze
   PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
   PLAY_SETUP_FILE_CTL= "#{ANSIBLE_DIR_CTL}/.play_setup.json"
+  ROLE_PROFILES_CTL  = '/root/ctlabs/labs/role_profiles_ctl.yml'
+  SETUP_PROFILES_CTL = '/root/ctlabs/labs/setup_profiles_ctl.yml'
+  PLAYBOOK_FILE_CTL  = "#{ANSIBLE_DIR_CTL}/playbooks/ctlabs-ctl.yml"
   PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
 
   # ---------------------------------------------------------------------------
@@ -279,12 +282,19 @@ module Automation
   end
 
   def build_play_setup(play_cfg)
-    setup_profiles_path = Automation.setup_profiles_path
-    role_profiles_path  = Automation.role_profiles_path
-    setup_profiles = File.file?(setup_profiles_path) ?
-      (YAML.load_file(setup_profiles_path)['profiles'] || {}) : {}
-    role_profiles  = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
+    if @standalone
+      sp_path = '/root/ctlabs/labs/setup_profiles_ctl.yml'
+      rp_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
+      out_file = Automation.PLAY_SETUP_FILE_CTL
+    else
+      sp_path = Automation.setup_profiles_path
+      rp_path = Automation.role_profiles_path
+      out_file = Automation.PLAY_SETUP_FILE
+    end
+    setup_profiles = File.file?(sp_path) ?
+      (YAML.load_file(sp_path)['profiles'] || {}) : {}
+    role_profiles  = File.file?(rp_path) ?
+      (YAML.load_file(rp_path)['profiles'] || {}) : {}
 
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
     result    = {}
@@ -342,13 +352,19 @@ module Automation
       end
     end
 
-    File.write(PLAY_SETUP_FILE, JSON.pretty_generate({ 'play_setup' => result }))
-    @log.write "#{__method__}(): wrote #{PLAY_SETUP_FILE}", "debug"
+    File.write(out_file, JSON.pretty_generate({ 'play_setup' => result }))
+    @log.write "#{__method__}(): wrote #{out_file}", "debug"
     result
   end
 
   def generate_setup_yml(play_cfg)
-    role_profiles_path = Automation.role_profiles_path
+    if @standalone
+      role_profiles_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
+      out_path = "#{ANSIBLE_DIR_CTL}/playbooks/setup.yml"
+    else
+      role_profiles_path = Automation.role_profiles_path
+      out_path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
+    end
     profiles  = File.file?(role_profiles_path) ?
       (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
@@ -426,20 +442,25 @@ module Automation
       PLAY
     end.compact
 
-    path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
-    File.write(path, header + plays.join)
-    @log.write "#{__method__}(): wrote #{path}", "debug"
+    File.write(out_path, header + plays.join)
+    @log.write "#{__method__}(): wrote #{out_path}", "debug"
   end
 
   def generate_ctlabs_yml(play_cfg)
-    role_profiles_path = Automation.role_profiles_path
+    if @standalone
+      role_profiles_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
+      out_dir = "#{ANSIBLE_DIR_CTL}/playbooks"
+    else
+      role_profiles_path = Automation.role_profiles_path
+      out_dir = "#{ANSIBLE_DIR}/playbooks"
+    end
     profiles = File.file?(role_profiles_path) ?
       (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
 
-    book   = play_cfg['book'] || 'ctlabs.yml'
+    book   = play_cfg['book'] || (@standalone ? 'ctlabs-ctl.yml' : 'ctlabs.yml')
     header = <<~HEADER
       ---
 
@@ -507,7 +528,7 @@ module Automation
       end
     end.compact
 
-    path = "#{ANSIBLE_DIR}/playbooks/#{book}"
+    path = "#{out_dir}/#{book}"
     File.write(path, header + plays.join)
     @log.write "#{__method__}(): wrote #{path}", "debug"
   end
@@ -546,12 +567,18 @@ module Automation
       elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
         play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
       elsif play_cfg['book'].is_a?(String)
-        inv_file  = play_cfg['inv'] || "#{@name}.ini"
+        if @standalone
+          inv_file = play_cfg['inv'] || 'inventory_controller.ini'
+          play_book_path = "./playbooks/#{play_cfg['book'] || 'ctlabs-ctl.yml'}"
+        else
+          inv_file  = play_cfg['inv'] || "#{@name}.ini"
+          play_book_path = " ./playbooks/#{play_cfg['book']}"
+        end
         play_inv  = " -i ./inventories/#{inv_file}"
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
         play_env += " -e @#{PLAY_SETUP_FILE_CTL}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
-        play_book = " ./playbooks/#{play_cfg['book']}"
+        play_book = " #{play_book_path}"
         play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
         play_cmd  = "ansible-playbook -b#{play_inv}#{play_book}#{play_tags}#{play_env}"
       else

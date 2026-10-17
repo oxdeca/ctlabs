@@ -47,9 +47,11 @@ class AutomationService
   # picks up an override dropped in after boot) ---
   def self.profile_files
     {
-      'role_profiles.yml'      => Automation.role_profiles_path,
-      'setup_profiles.yml'     => Automation.setup_profiles_path,
-      'terraform_profiles.yml' => Automation.terraform_profiles_path
+      'role_profiles.yml'       => Automation.role_profiles_path,
+      'setup_profiles.yml'      => Automation.setup_profiles_path,
+      'terraform_profiles.yml'  => Automation.terraform_profiles_path,
+      'role_profiles_ctl.yml'   => '/root/ctlabs/labs/role_profiles_ctl.yml',
+      'setup_profiles_ctl.yml'  => '/root/ctlabs/labs/setup_profiles_ctl.yml'
     }
   end
 
