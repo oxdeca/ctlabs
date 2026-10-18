@@ -46,15 +46,15 @@ class Controller
 
   # Public web dir the controller's Lab writes its generated topology images and
   # inventory into. This is Lab's default @pubdir (lib/lab.rb). The controller's
-  # inventory goes to a dedicated basename here (inventory_controller.ini) so it
-  # never clobbers the lab inventory the webui Management/Data tabs read -- the
+  # inventory goes to a dedicated basename here (controller.ini) so it never
+  # clobbers the lab inventory the webui Management/Data tabs read -- the
   # controller plane shares @pubdir with labs, so a shared basename would be
   # last-writer-wins. See lib/lab.rb#inventory and views/inventory.erb.
   PUBDIR = '/srv/ctlabs-server/public'
 
   # File the webui "Controller Network" inventory tab reads.
   def self.inventory_file
-    File.join(PUBDIR, 'inventory_controller.ini')
+    File.join(PUBDIR, 'controller.ini')
   end
 
   # Node types that actually start a container on the control plane, i.e. have a

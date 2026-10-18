@@ -324,7 +324,7 @@ class ControllerController < BaseController
       tf_cfg.delete('vault')
 
       tf_auth_profiles = params[:tf_auth_profiles]
-      AutomationService.write_profile_files('terraform_profiles.yml' => tf_auth_profiles) if tf_auth_profiles && !tf_auth_profiles.to_s.strip.empty?
+      AutomationService.write_profile_files('terraform_profiles_ctl.yml' => tf_auth_profiles) if tf_auth_profiles && !tf_auth_profiles.to_s.strip.empty?
 
       Controller.update_controller_terraform(tf_cfg)
 

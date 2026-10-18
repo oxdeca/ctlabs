@@ -901,9 +901,16 @@ class Lab
     # actually selected/running (the webui Management/Data tabs read it). Give it
     # its own basename so the controller inventory lives in its own file instead
     # of clobbering the lab one. See to_ini/to_data_ini and views/inventory.erb.
-    inv_shared = @standalone ? 'inventory_controller' : 'inventory'
-    @graph.to_ini(@graph.get_inventory, @name, inv_shared)
-    @graph.to_data_ini(@graph.get_data_inventory, @name, "#{inv_shared}_data")
+    if @standalone
+      # Node name is ctlabs-controller (20 chars, near veth IFNAMSIZ limit) but
+      # the inventory file must be controller.ini so Ansible's -i resolves.
+      @graph.to_ini(@graph.get_inventory, 'controller', 'controller')
+      @graph.to_data_ini(@graph.get_data_inventory, 'controller', 'controller_data')
+    else
+      inv_shared = 'inventory'
+      @graph.to_ini(@graph.get_inventory, @name, inv_shared)
+      @graph.to_data_ini(@graph.get_data_inventory, @name, "#{inv_shared}_data")
+    end
     # Intentionally does NOT deploy dnsmasq: inventory generation also runs on
     # non-start paths (Lab.refresh_visuals when a lab is merely *selected* in the
     # webui, `--ini`), and deploying there leaked a <lab>.conf into the persistent

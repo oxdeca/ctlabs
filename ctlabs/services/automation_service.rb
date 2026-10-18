@@ -41,17 +41,20 @@ class AutomationService
     File.delete(full_path) if File.exist?(full_path)
   end
 
-  # --- Global role/setup profile files (live under /root/ctlabs/labs/, or
-  # /root/.ctlabs/labs/ when box-locally overridden - resolved fresh on every
-  # call via Lab.*_profiles_path, not cached, so a long-lived webgui process
-  # picks up an override dropped in after boot) ---
+  # --- Global role/setup/terraform profile files. The lab instance reads
+  # automation/lab/, the control-plane controller automation/ctl/ (both in-repo
+  # under /root/ctlabs/ctlabs/, or /root/.ctlabs/automation/<scope>/ when
+  # box-locally overridden - resolved fresh on every call via the Automation
+  # path helpers, not cached, so a long-lived webgui process picks up an
+  # override dropped in after boot) ---
   def self.profile_files
     {
-      'role_profiles.yml'       => Automation.role_profiles_path,
-      'setup_profiles.yml'      => Automation.setup_profiles_path,
-      'terraform_profiles.yml'  => Automation.terraform_profiles_path,
-      'role_profiles_ctl.yml'   => '/root/ctlabs/labs/role_profiles_ctl.yml',
-      'setup_profiles_ctl.yml'  => '/root/ctlabs/labs/setup_profiles_ctl.yml'
+      'role_profiles.yml'          => Automation.role_profiles_path,
+      'setup_profiles.yml'         => Automation.setup_profiles_path,
+      'terraform_profiles.yml'     => Automation.terraform_profiles_path,
+      'role_profiles_ctl.yml'      => Automation.role_profiles_ctl_path,
+      'setup_profiles_ctl.yml'     => Automation.setup_profiles_ctl_path,
+      'terraform_profiles_ctl.yml' => Automation.terraform_profiles_ctl_path
     }
   end
 

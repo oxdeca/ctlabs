@@ -5,6 +5,17 @@
 # -----------------------------------------------------------------------------
 -->
 
+<%
+  # See ansible_editor.erb - the modal serves both the lab and the controller,
+  # so both terraform_profiles.yml variants are rendered as data-* attributes.
+  terraform_file_label = lambda do |path|
+    label = path.dup
+    label << ' (box-local override active)' if path.start_with?('/root/.ctlabs/')
+    label << (File.file?(path) ? ' (exists)' : ' (MISSING)')
+    label
+  end
+%>
+
 <style>
   .file-list-item { cursor: pointer; padding: 6px 12px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
   .file-list-item:hover { background-color: #334155; }
@@ -118,7 +129,7 @@
 
       <div id="TfAuthProfiles" class="tf-tab" style="display:none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Global file: <code><%= Automation.terraform_profiles_path %></code><% if Automation.terraform_profiles_path.start_with?('/root/.ctlabs/') %> (box-local override active)<% end %> — reusable named GCP auth configs, selected per-lab via Auth Method &rarr; Named Profile. Applied on next terraform run / terminal open.
+          <i class="fas fa-info-circle"></i> Global file: <code data-lab-label="<%= terraform_file_label.call(Automation.terraform_profiles_path) %>" data-ctl-label="<%= terraform_file_label.call(Automation.terraform_profiles_ctl_path) %>"><%= terraform_file_label.call(Automation.terraform_profiles_path) %></code> — reusable named GCP auth configs, selected per-lab via Auth Method &rarr; Named Profile. Applied on next terraform run / terminal open.
         </div>
         <textarea id="editor-TfAuthProfiles"></textarea>
       </div>

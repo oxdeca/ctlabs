@@ -219,13 +219,15 @@ class TerminalService
       # Inject GCP creds when opening a terminal in a controller container: the
       # lab's in-lab controller node (ansible/controller), or the persistent
       # control-plane controller (ctl-ctrl) whose terraform config lives in the
-      # Controller overlay.
-      is_controller_container = (node_type == 'controller') ||
-                                (defined?(Controller) && exec_name == (Controller::NAME rescue 'ctl-ctrl'))
+      # Controller overlay. The scope selects which terraform_profiles.yml the
+      # named `terraform.profile` is resolved against (automation/lab vs ctl).
+      is_ctl_controller = defined?(Controller) && exec_name == (Controller::NAME rescue 'ctl-ctrl')
+      is_controller_container = (node_type == 'controller') || is_ctl_controller
 
       if session[:vault_token] && session[:vault_addr] && is_controller_container && tf_cfg
         begin
-          gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] })
+          gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
+                                     scope: is_ctl_controller ? 'ctl' : 'lab')
           gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
         rescue => e
           puts "[Terminal GCP Auto-Fetch Error] #{e.message}"

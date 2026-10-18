@@ -789,8 +789,8 @@ class Graph
   # `shared` is the basename used for the single, last-writer-wins copy kept in
   # @pubdir (the "current" inventory shown in the webui). Labs use the default
   # `inventory` / `inventory_data`; the standalone controller plane uses
-  # `inventory_controller` / `inventory_controller_data` so it never clobbers
-  # the lab inventory that the Management/Data tabs read.
+  # `controller` / `controller_data` so it never clobbers the lab inventory that
+  # the Management/Data tabs read.
   def to_data_ini(data, name, shared = 'inventory_data')
     @log.write "#{__method__}(): data=#{data},name=#{name},shared=#{shared}", "debug"
 

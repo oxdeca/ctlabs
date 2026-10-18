@@ -31,6 +31,17 @@ window.ansScope = function(labName) {
   return '/labs/' + lab;
 };
 
+// Point an editor info-bar's <code> at the correct profile file for the current
+// context. The modal is server-rendered with both variants in data-lab-label /
+// data-ctl-label (see views/modals/*_editor.erb), so the label stays accurate
+// even when a box-local override is active.
+window.setProfileFileLabel = function(containerSelector, isController) {
+  const code = document.querySelector(containerSelector + ' code');
+  if (!code) return;
+  const label = isController ? code.dataset.ctlLabel : code.dataset.labLabel;
+  if (label) code.textContent = label;
+};
+
 // ----------------------------------------------------------------------------
 // --- ANSIBLE ---
 // ----------------------------------------------------------------------------
@@ -201,8 +212,15 @@ window.loadAnsProfiles = async function() {
           
           const roleProf  = window.initCodeEditor('editor-AnsRoleProfiles',  'yaml');
           const setupProf = window.initCodeEditor('editor-AnsSetupProfiles', 'yaml');
-          if (data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
-          if (data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
+          if (window.automationBase === '/controller') {
+            if (data['role_profiles_ctl.yml'])   roleProf.setValue(data['role_profiles_ctl.yml']);
+            if (data['setup_profiles_ctl.yml'])  setupProf.setValue(data['setup_profiles_ctl.yml']);
+            if (!data['role_profiles_ctl.yml'] && data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
+            if (!data['setup_profiles_ctl.yml'] && data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
+          } else {
+            if (data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
+            if (data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
+          }
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
           resultDiv.innerHTML = '❌ ' + err.message;
@@ -212,6 +230,11 @@ window.loadAnsProfiles = async function() {
   window.openAnsibleEditor = async function(labName, base) {
     window.automationBase = base || null;
     window.currentEditLab = labName;
+    // Update labels for controller vs lab context. The modal renders both the
+    // lab (automation/lab/) and controller (automation/ctl/) file paths into
+    // data-lab-label / data-ctl-label; pick the one matching this context.
+    window.setProfileFileLabel('#AnsSetupProfiles', window.automationBase === '/controller');
+    window.setProfileFileLabel('#AnsRoleProfiles',  window.automationBase === '/controller');
     // --- READ MEMORY FIRST! ---
     const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
 
@@ -228,7 +251,15 @@ window.loadAnsProfiles = async function() {
         if (typeof play === 'string') play = { book: play };
         
         const book = play.book || 'main.yml';
-        const defaultInv = play.inv || window.currentEditLab.split('/').pop().replace('.yml', '.ini');
+        let defaultInv = play.inv;
+        if (!defaultInv) {
+            // Controller scope passes 'controller' (no .yml), labs pass e.g.
+            // 'labs/net01.yml'. Always normalize to a .ini inventory filename.
+            defaultInv = window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini');
+        }
+        if (defaultInv && !defaultInv.includes('/') && !defaultInv.endsWith('.ini')) {
+            defaultInv += '.ini';
+        }
         const customInv = play.custom_inv || '';
         document.getElementById('edit-ansible-book').value = book;
         document.getElementById('edit-ansible-inv').value = defaultInv;
@@ -558,7 +589,12 @@ window.openTfTab = function(tabId) {
 
           const data = await res.json();
           const authProf = window.initCodeEditor('editor-TfAuthProfiles', 'yaml');
-          if (data['terraform_profiles.yml']) authProf.setValue(data['terraform_profiles.yml']);
+          if (window.automationBase === '/controller') {
+            if (data['terraform_profiles_ctl.yml']) authProf.setValue(data['terraform_profiles_ctl.yml']);
+            else if (data['terraform_profiles.yml']) authProf.setValue(data['terraform_profiles.yml']);
+          } else {
+            if (data['terraform_profiles.yml']) authProf.setValue(data['terraform_profiles.yml']);
+          }
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px;';
           resultDiv.innerHTML = '❌ ' + err.message;
@@ -568,6 +604,8 @@ window.openTfTab = function(tabId) {
   window.openTerraformEditor = async function(labName, base) {
       window.automationBase = base || null;
       window.currentEditLab = labName;
+      // See openAnsibleEditor - swap between the lab and controller file paths.
+      window.setProfileFileLabel('#TfAuthProfiles', window.automationBase === '/controller');
       // --- READ MEMORY FIRST! Before any clicks overwrite it! ---
       const savedActiveTab = localStorage.getItem('tf_active_tab_' + window.currentEditLab);
 

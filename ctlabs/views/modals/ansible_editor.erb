@@ -5,6 +5,20 @@
 # -----------------------------------------------------------------------------
 -->
 
+<%
+  # Human-readable label for one automation profile file, e.g.
+  #   /root/.ctlabs/automation/lab/role_profiles.yml (box-local override active)
+  # The modal is shared by the lab editor and the controller editor, so both the
+  # lab (automation/lab/) and controller (automation/ctl/) variants are rendered
+  # into data-* attributes; js/automation.js picks one based on the context.
+  automation_file_label = lambda do |path|
+    label = path.dup
+    label << ' (box-local override active)' if path.start_with?('/root/.ctlabs/')
+    label << (File.file?(path) ? ' (exists)' : ' (MISSING)')
+    label
+  end
+%>
+
 <style>
   .file-list-item { cursor: pointer; padding: 6px 12px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 8px; transition: background 0.2s; }
   .file-list-item:hover { background-color: #334155; }
@@ -74,14 +88,14 @@
 
       <div id="AnsSetupProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Controller file: <code>/root/ctlabs/labs/setup_profiles_ctl.yml</code><% if File.file?('/root/ctlabs/labs/setup_profiles_ctl.yml') %> (exists)<% else %> <strong style="color:#ef4444">MISSING</strong> — save via Editor to create<% end %> — controller-specific default fact config. Separate from lab profiles.
+          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.setup_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.setup_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.setup_profiles_path) %></code> — default fact config. Separate from lab profiles.
         </div>
         <textarea id="editor-AnsSetupProfiles"></textarea>
       </div>
 
       <div id="AnsRoleProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Controller file: <code>/root/ctlabs/labs/role_profiles_ctl.yml</code><% if File.file?('/root/ctlabs/labs/role_profiles_ctl.yml') %> (exists)<% else %> <strong style="color:#ef4444">MISSING</strong> — save via Editor to create<% end %> — controller-specific role mappings. Separate from lab profiles.
+          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.role_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.role_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.role_profiles_path) %></code> — role mappings. Separate from lab profiles.
         </div>
         <textarea id="editor-AnsRoleProfiles"></textarea>
       </div>

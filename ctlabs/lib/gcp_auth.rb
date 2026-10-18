@@ -30,17 +30,19 @@ class GcpAuth
   # tf_cfg    : the node's `terraform` config hash (reads tf_cfg['auth'], with
   #             a fallback to the legacy tf_cfg['vault'] shape).
   # vault_ctx : { addr:, token: } - the caller's already-authenticated Vault session.
+  # scope     : 'lab' (default) or 'ctl' - which automation profile set
+  #             terraform.profile names resolve against.
   #
   # Returns the env vars to inject into the container, or {} when this node
   # has no GCP auth configured at all.
-  def self.env_vars(tf_cfg, vault_ctx)
-    token = fetch_token(tf_cfg, vault_ctx)
+  def self.env_vars(tf_cfg, vault_ctx, scope: 'lab')
+    token = fetch_token(tf_cfg, vault_ctx, scope: scope)
     return {} unless token
     { 'GOOGLE_OAUTH_ACCESS_TOKEN' => token, 'CLOUDSDK_AUTH_ACCESS_TOKEN' => token }
   end
 
-  def self.fetch_token(tf_cfg, vault_ctx)
-    auth_cfg = resolve_auth_cfg(tf_cfg)
+  def self.fetch_token(tf_cfg, vault_ctx, scope: 'lab')
+    auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
     return nil unless auth_cfg
 
     vault_ctx ||= {}
@@ -55,11 +57,11 @@ class GcpAuth
   end
 
   # Normalizes the inline `terraform.auth` block, a named `terraform.profile`
-  # (looked up in the global labs/terraform_profiles.yml, all-or-nothing - a
+  # (looked up in automation/<scope>/terraform_profiles.yml, all-or-nothing - a
   # profile is never merged with inline auth), and the legacy `terraform.vault`
   # block into one { 'method' => ..., ... } hash (or nil if GCP auth isn't
   # configured for this node).
-  def self.resolve_auth_cfg(tf_cfg)
+  def self.resolve_auth_cfg(tf_cfg, scope: 'lab')
     tf_cfg = tf_cfg || {}
 
     auth = tf_cfg['auth']
@@ -71,8 +73,8 @@ class GcpAuth
 
     profile_name = tf_cfg['profile'].to_s.strip
     unless profile_name.empty?
-      profile = load_terraform_profile(profile_name)
-      raise "Terraform auth profile '#{profile_name}' not found in #{Automation.terraform_profiles_path}" unless profile
+      profile = load_terraform_profile(profile_name, scope: scope)
+      raise "Terraform auth profile '#{profile_name}' not found" unless profile
       method = profile['method'].to_s.strip
       return nil if method.empty?
       return profile.merge('method' => method)
@@ -83,8 +85,8 @@ class GcpAuth
     legacy_vault.merge('method' => 'vault')
   end
 
-  def self.load_terraform_profile(name)
-    path = Automation.terraform_profiles_path
+  def self.load_terraform_profile(name, scope: 'lab')
+    path = Automation.automation_profiles_path(scope, 'terraform_profiles.yml')
     return nil unless File.file?(path)
     profiles = YAML.load_file(path)['profiles'] || {}
     profiles[name]

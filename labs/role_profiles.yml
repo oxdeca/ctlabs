@@ -63,14 +63,15 @@ profiles:
     tags : [bind]
     hosts: [ns1, ns2]
 
-  smbadc:
+  smbadc-master:
     role : ctlabs_smbadc
-    tags : [smbadc]
-    hosts:
-      - group: [dc1]
-        tags : [smbadc-master]
-      - group: [dc2]
-        tags : [smbadc-slave]
+    tags : [smbadc, smbadc-master]
+    hosts: [dc1]
+    
+  smbadc-slave:
+    role : ctlabs_smbadc
+    tags : [smbadc, smbadc-slave]
+    hosts: [dc2]
 
   ad:
     role : ctlabs_ad
@@ -242,31 +243,39 @@ profiles:
     tags : [kind]
     hosts: [kind1]
 
-  k3s:
+  k3s-server:
     role : ctlabs_k3s
-    tags : [k3s]
-    hosts: 
-      - group: [k3s1]
-        tags : [k3s-server]
-      - group: [k3s2, k3s3]
-        tags : [k3s-control]
-      - group: [k3s4]
-        tags : [k3s-worker]
+    tags : [k3s, k3s-server]
+    hosts: [k3s1]
 
-  rke2:
+  k3s-control:
+    role : ctlabs_k3s
+    tags : [k3s, k3s-control]
+    hosts: [k3s2, k3s3]
+
+  k3s-worker:
+    role : ctlabs_k3s
+    tags : [k3s, k3s-worker]
+    hosts: [k3s4]
+
+  rke2-server:
     role : ctlabs_rke2
-    tags : [rke2]
-    hosts: 
-      - group: [rke21]
-        tags : [rke2-server]
-      - group: [rke22, rke23]
-        tags : [rke2-control]
-      - group: [rke24]
-        tags : [rke2-worker]
+    tags : [rke2, rke2-server]
+    hosts: [rke21]
 
-  vault_certs:
-    role: ctlabs_vault
-    tags: [vault]
+  rke2-control:
+    role : ctlabs_rke2
+    tags : [rke2, rke2-control]
+    hosts: [rke22, rke23]
+    
+  rke2-worker:
+    role : ctlabs_rke2
+    tags : [rke2, rke2-worker]
+    hosts: [rke24]
+
+  vault-certs:
+    role : ctlabs_vault
+    tags : [vault, vault-certs]
     hosts: [vdb1]
 
   containerd:
@@ -274,16 +283,20 @@ profiles:
     tags : [containerd]
     hosts: [k8s1, k8s2, k8s3, k8s4]
 
-  k8s:
+  k8s-server:
     role : ctlabs_k8s
-    tags : [k8s]
-    hosts:
-      - group: [k8s1]
-        tags : [k8s-master]
-      - group: [k8s2, k8s3]
-        tags : [k8s-control]
-      - group: [k8s4]
-        tags : [k8s-worker]
+    tags : [k8s, k8s-server]
+    hosts: [k8s1]
+    
+  k8s-control:
+    role : ctlabs_k8s
+    tags : [k8s, k8s-control]
+    hosts: [k8s2, k8s3]
+
+  k8s-worker:
+    role : ctlabs_k8s
+    tags : [k8s, k8s-worker]
+    hosts: [k8s4]
 
   helm:
     role : ctlabs_helm
@@ -425,7 +438,7 @@ profiles:
     tags : [argoapp]
     hosts: [k3s1,rke21,k8s1]
 
-  argoapp_certs:
+  argoapp-certs:
     role : ctlabs_argoapp
-    tags : [argoapp_certs]
+    tags : [argoapp-certs]
     hosts: [rke21]

@@ -34,14 +34,33 @@ module Automation
   # ~/.ctlabs-server/auth override (base_controller.rb) - a frozen constant would
   # only re-check at the next process start (CLI runs are fine either way since
   # each invocation is a fresh process, but the puma server is not).
+  #
+  # Only node_profiles.yml still lives in the repo's labs/ dir; the automation
+  # profiles (setup/role/terraform) moved to automation/<scope>/ - see below.
   def self.profile_override_path(basename)
     override = "/root/.ctlabs/labs/#{basename}"
     File.exist?(override) ? override : "/root/ctlabs/labs/#{basename}"
   end
 
-  def self.setup_profiles_path;     profile_override_path('setup_profiles.yml');     end
-  def self.role_profiles_path;      profile_override_path('role_profiles.yml');      end
-  def self.terraform_profiles_path; profile_override_path('terraform_profiles.yml'); end
+  # Automation profile files, split by instance so the lab and the persistent
+  # control-plane controller never share (or clobber) each other's config:
+  #   automation/lab/  - the lab instance (Lab automation)
+  #   automation/ctl/  - the controller instance (standalone ctl-ctrl)
+  # Box-local overrides live under /root/.ctlabs/automation/<scope>/<file> and
+  # shadow the repo default entirely.
+  AUTOMATION_DIR = '/root/ctlabs/ctlabs/automation'.freeze
+
+  def self.automation_profiles_path(scope, basename)
+    override = "/root/.ctlabs/automation/#{scope}/#{basename}"
+    File.exist?(override) ? override : "#{AUTOMATION_DIR}/#{scope}/#{basename}"
+  end
+
+  def self.setup_profiles_path;         automation_profiles_path('lab', 'setup_profiles.yml');     end
+  def self.role_profiles_path;          automation_profiles_path('lab', 'role_profiles.yml');      end
+  def self.terraform_profiles_path;     automation_profiles_path('lab', 'terraform_profiles.yml'); end
+  def self.setup_profiles_ctl_path;     automation_profiles_path('ctl', 'setup_profiles.yml');     end
+  def self.role_profiles_ctl_path;      automation_profiles_path('ctl', 'role_profiles.yml');      end
+  def self.terraform_profiles_ctl_path; automation_profiles_path('ctl', 'terraform_profiles.yml'); end
 
   # The repos live under the host's /root, but /root is mode 0750 root:root in
   # the controller image, so the `ansible` user cannot traverse into it. The
@@ -54,10 +73,16 @@ module Automation
   ANSIBLE_DIR_CTL    = '/srv/ctlabs/ctlabs-ansible'.freeze
   TF_DIR             = '/root/ctlabs-terraform'.freeze
   TF_DIR_CTL         = '/srv/ctlabs/ctlabs-terraform'.freeze
-  PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/.play_setup.json"
-  PLAY_SETUP_FILE_CTL= "#{ANSIBLE_DIR_CTL}/.play_setup.json"
-  ROLE_PROFILES_CTL  = '/root/ctlabs/labs/role_profiles_ctl.yml'
-  SETUP_PROFILES_CTL = '/root/ctlabs/labs/setup_profiles_ctl.yml'
+  # Host-side write paths (this process runs on the host; Ruby File.write must
+  # use these). The controller container bind-mounts the same repo at
+  # ANSIBLE_DIR_CTL, so its artifacts need SEPARATE FILENAMES (not just a
+  # different mount path) to avoid lab/controller clobbering each other.
+  PLAY_SETUP_FILE    = "#{ANSIBLE_DIR}/playbooks/.play_setup_lab.json"
+  PLAY_SETUP_FILE_CTL= "#{ANSIBLE_DIR}/playbooks/.play_setup_ctl.json"
+  # In-container read paths: the playbook command executes inside the
+  # controller container, so `-e @...` must use the mounted (_CTL) form.
+  PLAY_SETUP_FILE_INNER     = "#{ANSIBLE_DIR_CTL}/playbooks/.play_setup_lab.json"
+  PLAY_SETUP_FILE_CTL_INNER = "#{ANSIBLE_DIR_CTL}/playbooks/.play_setup_ctl.json"
   PLAYBOOK_FILE_CTL  = "#{ANSIBLE_DIR_CTL}/playbooks/ctlabs-ctl.yml"
   PLAYBOOK_LOCK_DIR  = '/var/run/ctlabs/playbook_locks'.freeze
 
@@ -283,13 +308,13 @@ module Automation
 
   def build_play_setup(play_cfg)
     if @standalone
-      sp_path = '/root/ctlabs/labs/setup_profiles_ctl.yml'
-      rp_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
-      out_file = Automation.PLAY_SETUP_FILE_CTL
+      sp_path = Automation.setup_profiles_ctl_path
+      rp_path = Automation.role_profiles_ctl_path
+      out_file = Automation::PLAY_SETUP_FILE_CTL
     else
       sp_path = Automation.setup_profiles_path
       rp_path = Automation.role_profiles_path
-      out_file = Automation.PLAY_SETUP_FILE
+      out_file = Automation::PLAY_SETUP_FILE
     end
     setup_profiles = File.file?(sp_path) ?
       (YAML.load_file(sp_path)['profiles'] || {}) : {}
@@ -314,7 +339,7 @@ module Automation
     # matching by profile name == role profile name in role_profiles.yml
     role_profiles.each do |profile_name, rp_cfg|
       next if result.key?(profile_name)
-      role_tags = Array(rp_cfg['tags'] || []).map(&:to_s)
+      role_tags = (Array(rp_cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next unless (role_tags & play_tags).any?
       next unless setup_profiles.key?(profile_name)
       base = Marshal.load(Marshal.dump(setup_profiles[profile_name]))
@@ -359,8 +384,8 @@ module Automation
 
   def generate_setup_yml(play_cfg)
     if @standalone
-      role_profiles_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
-      out_path = "#{ANSIBLE_DIR_CTL}/playbooks/setup.yml"
+      role_profiles_path = Automation.role_profiles_ctl_path
+      out_path = "#{ANSIBLE_DIR}/playbooks/setup_ctl.yml"
     else
       role_profiles_path = Automation.role_profiles_path
       out_path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
@@ -402,22 +427,15 @@ module Automation
       next unless cfg['role']
       next unless File.file?("#{ANSIBLE_DIR}/roles/#{cfg['role']}/tasks/facts.yml")
 
-      role_tags = Array(cfg['tags'] || []).map(&:to_s)
+      role_tags = (Array(cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next unless (role_tags & play_tags).any?
 
       role_setup  = setup_cfg[profile_name]
       setup_hosts = role_setup && role_setup['hosts']
-      grouped     = cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
-      hosts_pattern = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
-        resolved = setup_hosts.flat_map { |g| Array(g['group']) }.uniq & existing
-        resolved.empty? ? nil : resolved.join(',')
-      elsif setup_hosts.is_a?(String)
+      hosts_pattern = if setup_hosts.is_a?(String)
         setup_hosts
       elsif setup_hosts
         resolved = Array(setup_hosts) & existing
-        resolved.empty? ? nil : resolved.join(',')
-      elsif grouped
-        resolved = cfg['hosts'].flat_map { |g| Array(g['group']) }.uniq & existing
         resolved.empty? ? nil : resolved.join(',')
       elsif cfg['hosts'].is_a?(String)
         cfg['hosts']
@@ -448,19 +466,19 @@ module Automation
 
   def generate_ctlabs_yml(play_cfg)
     if @standalone
-      role_profiles_path = '/root/ctlabs/labs/role_profiles_ctl.yml'
-      out_dir = "#{ANSIBLE_DIR_CTL}/playbooks"
+      role_profiles_path = Automation.role_profiles_ctl_path
     else
       role_profiles_path = Automation.role_profiles_path
-      out_dir = "#{ANSIBLE_DIR}/playbooks"
     end
+    out_dir = "#{ANSIBLE_DIR}/playbooks"
     profiles = File.file?(role_profiles_path) ?
       (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
 
-    book   = play_cfg['book'] || (@standalone ? 'ctlabs-ctl.yml' : 'ctlabs.yml')
+    book       = play_cfg['book'] || (@standalone ? 'ctlabs-ctl.yml' : 'ctlabs.yml')
+    setup_book = @standalone ? 'setup_ctl.yml' : 'setup.yml'
     header = <<~HEADER
       ---
 
@@ -470,62 +488,38 @@ module Automation
       # ------------------------------------------------------------------------------
 
       - import_playbook: up.yml
-      - import_playbook: setup.yml
+      - import_playbook: #{setup_book}
 
     HEADER
 
     plays = profiles.flat_map do |profile_name, cfg|
       next [] unless cfg['role']
-      role_tags = Array(cfg['tags'] || []).map(&:to_s)
+      role_tags = (Array(cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next [] unless (role_tags & play_tags).any?
 
       setup_cfg   = (play_cfg['setup'] || {})[profile_name]
       setup_hosts = setup_cfg && setup_cfg['hosts']
 
-      effective_groups = if setup_hosts.is_a?(Array) && setup_hosts.first.is_a?(Hash)
+      hosts_pattern = if setup_hosts.is_a?(String)
         setup_hosts
-      elsif cfg['hosts'].is_a?(Array) && cfg['hosts'].first.is_a?(Hash)
+      elsif setup_hosts
+        resolved = Array(setup_hosts) & existing
+        resolved.empty? ? nil : resolved.join(',')
+      elsif cfg['hosts'].is_a?(String)
         cfg['hosts']
       else
-        nil
+        resolved = Array(cfg['hosts']) & existing
+        resolved.empty? ? nil : resolved.join(',')
       end
+      next [] unless hosts_pattern
+      [<<~PLAY]
+        - name : ctlabs.playbooks.ctlabs.#{profile_name}
+          hosts: #{hosts_pattern}
+          tags : [#{role_tags.join(', ')}]
+          roles:
+            - roles/#{cfg['role']}
 
-      if effective_groups
-        effective_groups.filter_map do |grp|
-          grp_hosts = Array(grp['group']) & existing
-          next if grp_hosts.empty?
-          grp_tags = (Array(grp['tags']).map(&:to_s) + role_tags).uniq
-          <<~PLAY
-            - name : ctlabs.playbooks.ctlabs.#{profile_name}
-              hosts: #{grp_hosts.join(',')}
-              tags : [#{grp_tags.join(', ')}]
-              roles:
-                - roles/#{cfg['role']}
-
-          PLAY
-        end
-      else
-        hosts_pattern = if setup_hosts.is_a?(String)
-          setup_hosts
-        elsif setup_hosts
-          resolved = Array(setup_hosts) & existing
-          resolved.empty? ? nil : resolved.join(',')
-        elsif cfg['hosts'].is_a?(String)
-          cfg['hosts']
-        else
-          resolved = Array(cfg['hosts']) & existing
-          resolved.empty? ? nil : resolved.join(',')
-        end
-        next [] unless hosts_pattern
-        [<<~PLAY]
-          - name : ctlabs.playbooks.ctlabs.#{profile_name}
-            hosts: #{hosts_pattern}
-            tags : [#{role_tags.join(', ')}]
-            roles:
-              - roles/#{cfg['role']}
-
-        PLAY
-      end
+      PLAY
     end.compact
 
     path = "#{out_dir}/#{book}"
@@ -568,15 +562,17 @@ module Automation
         play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
       elsif play_cfg['book'].is_a?(String)
         if @standalone
-          inv_file = play_cfg['inv'] || 'inventory_controller.ini'
+          inv_file = play_cfg['inv'] || 'controller.ini'
           play_book_path = "./playbooks/#{play_cfg['book'] || 'ctlabs-ctl.yml'}"
         else
           inv_file  = play_cfg['inv'] || "#{@name}.ini"
           play_book_path = " ./playbooks/#{play_cfg['book']}"
         end
+        # Always use a .ini inventory filename so -i ./inventories/<inv> resolves.
+        inv_file += '.ini' if inv_file && !inv_file.include?('/') && !inv_file.end_with?('.ini')
         play_inv  = " -i ./inventories/#{inv_file}"
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
-        play_env += " -e @#{PLAY_SETUP_FILE_CTL}"
+        play_env += " -e @#{@standalone ? PLAY_SETUP_FILE_CTL_INNER : PLAY_SETUP_FILE_INNER}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_book = " #{play_book_path}"
         play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
@@ -681,7 +677,8 @@ module Automation
 
     # --- Fetch GCP credentials in Ruby, dispatched on terraform.auth.method ---
     begin
-      gcp_env = GcpAuth.env_vars(tf_cfg, { addr: web_v_addr, token: web_v_token })
+      gcp_env = GcpAuth.env_vars(tf_cfg, { addr: web_v_addr, token: web_v_token },
+                                 scope: (@standalone ? 'ctl' : 'lab'))
       gcp_env.each { |key, value| exec_env += "-e #{key}='#{value}' " }
     rescue => e
       error_msg = "\n❌ ERROR: Could not generate GCP credentials: #{e.message}\n👉 Please use the Vault Login button in the UI.\n"
