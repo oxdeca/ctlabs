@@ -22,7 +22,9 @@ profiles:
   ca:
     role : ctlabs_ca
     tags : [ca]
-    hosts: all
+    # controller.ini group (ctl-ctrl only) — ctl-ro0/ctl-sw0 have no SSH keys,
+    # so `all` would make Gathering Facts fail UNREACHABLE on them.
+    hosts: controller
 
   semaphore_ui:
     role : ctlabs_semaphore_ui
@@ -37,7 +39,7 @@ profiles:
   vault:
     role : ctlabs_vault
     tags : [vault]
-    hosts: [ansible]
+    hosts: [ctl-ctrl]
 
   rundeck:
     role : ctlabs_rundeck
