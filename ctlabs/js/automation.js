@@ -257,8 +257,11 @@ window.loadAnsProfiles = async function() {
             // 'labs/net01.yml'. Always normalize to a .ini inventory filename.
             defaultInv = window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini');
         }
-        if (defaultInv && !defaultInv.includes('/') && !defaultInv.endsWith('.ini')) {
-            defaultInv += '.ini';
+        if (defaultInv && !defaultInv.includes('/')) {
+            if (window.automationBase === '/controller' && !defaultInv.startsWith('controller')) {
+                defaultInv = 'controller';
+            }
+            if (!defaultInv.endsWith('.ini')) defaultInv += '.ini';
         }
         const customInv = play.custom_inv || '';
         document.getElementById('edit-ansible-book').value = book;
