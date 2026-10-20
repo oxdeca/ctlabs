@@ -56,10 +56,10 @@ module Automation
   end
 
   def self.setup_profiles_path;         automation_profiles_path('lab', 'setup_profiles.yml');     end
-  def self.role_profiles_path;          automation_profiles_path('lab', 'role_profiles.yml');      end
+  def self.play_profiles_path;          automation_profiles_path('lab', 'play_profiles.yml');      end
   def self.terraform_profiles_path;     automation_profiles_path('lab', 'terraform_profiles.yml'); end
   def self.setup_profiles_ctl_path;     automation_profiles_path('ctl', 'setup_profiles.yml');     end
-  def self.role_profiles_ctl_path;      automation_profiles_path('ctl', 'role_profiles.yml');      end
+  def self.play_profiles_ctl_path;      automation_profiles_path('ctl', 'play_profiles.yml');      end
   def self.terraform_profiles_ctl_path; automation_profiles_path('ctl', 'terraform_profiles.yml'); end
 
   # The repos live under the host's /root, but /root is mode 0750 root:root in
@@ -309,20 +309,21 @@ module Automation
   def build_play_setup(play_cfg)
     if @standalone
       sp_path = Automation.setup_profiles_ctl_path
-      rp_path = Automation.role_profiles_ctl_path
+      pp_path = Automation.play_profiles_ctl_path
       out_file = Automation::PLAY_SETUP_FILE_CTL
     else
       sp_path = Automation.setup_profiles_path
-      rp_path = Automation.role_profiles_path
+      pp_path = Automation.play_profiles_path
       out_file = Automation::PLAY_SETUP_FILE
     end
     setup_profiles = File.file?(sp_path) ?
       (YAML.load_file(sp_path)['profiles'] || {}) : {}
-    role_profiles  = File.file?(rp_path) ?
-      (YAML.load_file(rp_path)['profiles'] || {}) : {}
+    play_profiles  = File.file?(pp_path) ?
+      (YAML.load_file(pp_path)['profiles'] || {}) : {}
 
-    play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
-    result    = {}
+    play_tags     = Array(play_cfg['tags'] || []).map(&:to_s)
+    result        = {}
+    activated_by  = {}
 
     # process explicit play.setup entries (profile + per-host overrides)
     (play_cfg['setup'] || {}).each do |role, cfg|
@@ -335,23 +336,60 @@ module Automation
       result[role] = deep_merge(base, cfg.reject { |k, _| k == 'profile' })
     end
 
-    # for roles in play.tags but not play.setup, load setup_profile defaults
-    # matching by profile name == role profile name in role_profiles.yml
-    role_profiles.each do |profile_name, rp_cfg|
+    # for roles in play.tags but not play.setup, load setup_profile defaults.
+    # Activation and fact selection are two separate lookups:
+    #   1. ACTIVATION: any of the play profile's tags (its own name is appended
+    #      last) present in play.tags — this is how one shared alias tag like
+    #      `rke2` activates rke2-server AND rke2-control AND rke2-worker.
+    #   2. FACTS: first tag that is BOTH in play.tags AND a setup_profiles key
+    #      (explicit tags win — e.g. lab tag `rke2` -> setup_profile `rke2`),
+    #      else the play profile's OWN NAME if setup_profiles has it
+    #      (rke2-server -> setup_profile rke2-server). So with only per-role
+    #      setup profiles, play.tags `[rke2]` is enough: the shared tag runs
+    #      the profiles, each one loads the facts named after itself.
+    play_profiles.each do |profile_name, profile_cfg|
       next if result.key?(profile_name)
-      role_tags = (Array(rp_cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
+      role_tags = (Array(profile_cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next unless (role_tags & play_tags).any?
-      next unless setup_profiles.key?(profile_name)
-      base = Marshal.load(Marshal.dump(setup_profiles[profile_name]))
+      sp_key = role_tags.find { |t| play_tags.include?(t) && setup_profiles.key?(t) }
+      sp_key ||= profile_name.to_s if setup_profiles.key?(profile_name.to_s)
+      next unless sp_key
+      base = Marshal.load(Marshal.dump(setup_profiles[sp_key]))
       base.delete('role')
       result[profile_name] = base
+      activated_by[profile_name] = sp_key
+    end
+
+    # Facts are authoritative: one fact file per host+role. If the play tags
+    # activate multiple profiles writing facts for the same host+role, the
+    # last facts play in play_profiles.yml order wins — warn so an overlap is
+    # never silently order-dependent. A profile writes facts for its own
+    # `hosts:` entries only (baked setup data may carry sibling hosts), and
+    # only for roles that ship tasks/facts.yml.
+    node_names = @nodes.map(&:name).to_set
+    writers = Hash.new { |h, k| h[k] = [] }
+    result.each_key do |profile_name|
+      profile_cfg = play_profiles[profile_name]
+      next unless profile_cfg && profile_cfg['role']
+      role = profile_cfg['role'].to_s
+      next if role.empty?
+      next unless File.file?("#{ANSIBLE_DIR}/roles/#{role}/tasks/facts.yml")
+      Array(profile_cfg['hosts']).uniq.each do |host|
+        next unless node_names.include?(host)
+        writers[[host, role]] << "#{profile_name} [setup: #{activated_by[profile_name]}]"
+      end
+    end
+    writers.each do |(host, role), from|
+      next unless from.size > 1
+      @log.write "#{__method__}(): FACTS CLASH: #{host} (#{role}) gets facts from " \
+                 "#{from.join(', ')} — last one in play_profiles.yml order wins; " \
+                 "activate one profile per host+role via play.tags", "warn"
     end
 
     # Bake `defaults:` into each per-host entry so that
     # play_setup[role][hostname] always contains the full config.
     # Per-host keys are node names; role-wide defaults live under `defaults:`.
     # Per-host `profile:` overrides the base profile for that host.
-    node_names = @nodes.map(&:name).to_set
     result.transform_values! do |role_cfg|
       role_defaults = role_cfg['defaults'] || {}
       per_hosts     = role_cfg.select { |k, _| node_names.include?(k) }
@@ -418,14 +456,14 @@ module Automation
 
   def generate_setup_yml(play_cfg)
     if @standalone
-      role_profiles_path = Automation.role_profiles_ctl_path
+      play_profiles_path = Automation.play_profiles_ctl_path
       out_path = "#{ANSIBLE_DIR}/playbooks/setup_ctl.yml"
     else
-      role_profiles_path = Automation.role_profiles_path
+      play_profiles_path = Automation.play_profiles_path
       out_path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
     end
-    profiles  = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
+    profiles  = File.file?(play_profiles_path) ?
+      (YAML.load_file(play_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
@@ -500,10 +538,10 @@ module Automation
   TPL
 
   def generate_ctlabs_yml(play_cfg)
-    role_profiles_path = @standalone ? Automation.role_profiles_ctl_path : Automation.role_profiles_path
+    play_profiles_path = @standalone ? Automation.play_profiles_ctl_path : Automation.play_profiles_path
     out_dir = "#{ANSIBLE_DIR}/playbooks"
-    profiles = File.file?(role_profiles_path) ?
-      (YAML.load_file(role_profiles_path)['profiles'] || {}) : {}
+    profiles = File.file?(play_profiles_path) ?
+      (YAML.load_file(play_profiles_path)['profiles'] || {}) : {}
 
     existing  = @nodes.map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
@@ -964,11 +1002,24 @@ module Automation
     Marshal.load(Marshal.dump(obj))
   end
 
+  # Hash merge where lists UNITE instead of replace: base (defaults) items
+  # first, then override (per-host) additions, deduplicated. A per-host
+  # entry therefore ADDS to a defaults list, never silently overrides it —
+  # change a default for everyone in the defaults; repeating a default item
+  # per-host is deduplicated, not doubled. (YAML anchors can't do this: the
+  # `<<` merge key works on maps only, and list anchors would still require
+  # enumerating the shared items per host.)
   def deep_merge(base, override)
     return deep_clone(override) unless base.is_a?(Hash) && override.is_a?(Hash)
     result = deep_clone(base)
     override.each do |k, v|
-      result[k] = result[k].is_a?(Hash) && v.is_a?(Hash) ? deep_merge(result[k], v) : deep_clone(v)
+      if result[k].is_a?(Hash) && v.is_a?(Hash)
+        result[k] = deep_merge(result[k], v)
+      elsif result[k].is_a?(Array) && v.is_a?(Array)
+        result[k] = (result[k] + v).uniq
+      else
+        result[k] = deep_clone(v)
+      end
     end
     result
   end

@@ -15,6 +15,9 @@ profiles:
   vault:
     defaults:
       install_type: server
+
+  vault-certs-renewal:
+    install_type: server
     vdb1:
       bootstrap:
         engines:
@@ -94,94 +97,6 @@ profiles:
               bound_subject: system:serviceaccount:security-tools:cert-vault-sync-prod
               token_policies: [cert-vault-sync-prod]
               token_ttl: 3600
-    vdb2:
-      bootstrap:
-        engines:
-          - path: secrets/dev
-            type: kv
-            options:
-              version: "2"
-          - path: secrets/uat
-            type: kv
-            options:
-              version: "2"
-          - path: secrets/prod
-            type: kv
-            options:
-              version: "2"              
-        auth:
-          - path: userpass
-            type: userpass
-            description: "User/Pass Authentication"
-          - path: kubernetes
-            type: kubernetes
-            description: "Kubernetes ServiceAccount Authentication"
-        policies:
-          - name: ctlabs
-            source: template
-            template: ctlabs.hcl.j2
-          - name: cert-vault-sync-dev
-            source: inline
-            policy: |
-              path "secrets/dev/data/*" {
-                capabilities = ["create", "read", "update"]
-              }
-              path "secrets/dev/metadata/*" {
-                capabilities = ["create", "read", "update", "list"]
-              }
-          - name: cert-vault-sync-uat
-            source: inline
-            policy: |
-              path "secrets/uat/data/*" {
-                capabilities = ["create", "read", "update"]
-              }
-              path "secrets/uat/metadata/*" {
-                capabilities = ["create", "read", "update", "list"]
-              }
-          - name: cert-vault-sync-prod
-            source: inline
-            policy: |
-              path "secrets/prod/data/*" {
-                capabilities = ["create", "read", "update"]
-              }
-              path "secrets/prod/metadata/*" {
-                capabilities = ["create", "read", "update", "list"]
-              }
-        users:
-          - username: ctlabs
-            password: secret123!
-            policies: [default, ctlabs]
-        kubernetes:
-          - mount: kubernetes
-            host: https://rke21.ctlabs.internal:6443
-            ca_cert: |
-              -----BEGIN CERTIFICATE-----
-              MIIBeTCCAR+gAwIBAgIBADAKBggqhkjOPQQDAjAkMSIwIAYDVQQDDBlya2UyLXNl
-              cnZlci1jYUAxNzkxMzE0ODM4MB4XDTI2MTAwNjE5MjcxOFoXDTM2MTAwMzE5Mjcx
-              OFowJDEiMCAGA1UEAwwZcmtlMi1zZXJ2ZXItY2FAMTc5MTMxNDgzODBZMBMGByqG
-              SM49AgEGCCqGSM49AwEHA0IABA2QziIMjOibcrOduhPKaUwEh1Gq0UbJ/twJxfcK
-              mQaHwJCWIh5tkTbfQBxWKhwA3PGydUBffg/2o8/LFsMQV+qjQjBAMA4GA1UdDwEB
-              /wQEAwICpDAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQaB2DSN4JqsNPTQNhp
-              6eWxB7bebDAKBggqhkjOPQQDAgNIADBFAiByLvwodTCpgJsYfvGQC5TEjcZJYcMV
-              +ZkFg+yW0pTcGgIhANPfWCB2O40kyEk7U3IO58EbB1rVQVGJCLiKFJaMV67F
-              -----END CERTIFICATE-----
-            token_reviewer_jwt: "eyJhbGciOiJSUzI1NiIsImtpZCI6IjdtYjRTN3U1bnVCMVVGb3FpRFlLcVRuWG52by1USWs5TU90VDFRWVVaQlUifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJzZWN1cml0eS10b29scyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJjZXJ0LXZhdWx0LXN5bmMtdmF1bHQtcmV2aWV3ZXItdG9rZW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiY2VydC12YXVsdC1zeW5jLXZhdWx0LXJldmlld2VyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiNDZmY2YzYTEtMjU0ZS00Zjc3LWJjMDMtMTEzYTIwNTcxODM2Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OnNlY3VyaXR5LXRvb2xzOmNlcnQtdmF1bHQtc3luYy12YXVsdC1yZXZpZXdlciJ9.L8aO7Rn0VUIjWaSptzKFVzYr83aNCC_1KCrHkOEZudsT8SnGQikFEya8jf2PQr7JeUH40iEi1kriENvsRZ_NbNeZFqd5LDis55c_rKe-0L6VpWgv178mx0EbE-K9tLR3VQDd7DeXyosJ16P4RX9GGYDmlJ8YaXOqwe9EclOWUfTxYMMiefdPhYj0IYEgLIwU8i1wiV5q4H17IH5dW7YF2sJrUOKkYTH3WEvS_Xo2t5qstoFC6C7TYs9kFfc5OVQeOG-T82OPbDjtULYYAuwI-Rjm7pLvJaHr-Bg7zX2GtRqeoLJnfES3IWZzO9Xqhtcn2E53J2rglZHaYrHe84CXCg"
-            roles:
-              - name: cert-vault-sync-dev
-                bound_service_account_names: [cert-vault-sync-dev]
-                bound_service_account_namespaces: [security-tools]
-                token_policies: [cert-vault-sync-dev]
-                token_ttl: 1h
-              - name: cert-vault-sync-uat
-                bound_service_account_names: [cert-vault-sync-uat]
-                bound_service_account_namespaces: [security-tools]
-                token_policies: [cert-vault-sync-uat]
-                token_ttl: 1h
-              - name: cert-vault-sync-prod
-                bound_service_account_names: [cert-vault-sync-prod]
-                bound_service_account_namespaces: [security-tools]
-                token_policies: [cert-vault-sync-prod]
-                token_ttl: 1h
 
   # ----------------------------------------------------------------------------
   # ctlabs_bind
@@ -419,18 +334,17 @@ profiles:
   # ----------------------------------------------------------------------------
   # ctlabs_rke2
   # ----------------------------------------------------------------------------
-  rke2:
+  rke2-server:
     rke21:
       role: server
-      cni: cilium
       servicelb:
         enabled: true
       ingress:
         enabled : false
-        type    : nginx
       gateway_api:
         enabled : true
         provider: traefik
+  rke2-control:
     rke22:
       role: control
       server_node: rke21
@@ -447,6 +361,7 @@ profiles:
         enabled : false
       gateway_api:
         enabled : false
+  rke2-worker:
     rke24:
       role: worker
       server_node: rke21
@@ -455,6 +370,43 @@ profiles:
         enabled : false
       gateway_api:
         enabled : false
+
+  # ----------------------------------------------------------------------------
+  # ctlabs_rke2 - cilium variant (rke21). Complete config for that host, keyed
+  # to match the rke2-cilium role_profile name (play_setup is matched by
+  # role-profile name). Must stay a FULL config: it replaces the fact file
+  # wholesale on every setup run (one role -> one fact file per host).
+  # ----------------------------------------------------------------------------
+  rke2-cilium-server:
+    rke21:
+      role: server
+      cni: cilium
+      gateway_api:
+        enabled : true
+        provider: cilium
+      servicelb:
+        enabled: false
+      ingress:
+        enabled: false
+      cilium:
+        kube_proxy_replacement: true
+        operators_replicas: 1
+        lb:
+          ip_pool:
+            cidrs: [192.168.30.41/32]
+        l2:
+          interface: [enp0s2]
+
+  rke2-cilium-control:
+    rke22:
+      role: control
+    rke23:
+      role: control
+
+
+  rke2-cilium-worker:
+    rke24:
+      role: worker
 
   # ----------------------------------------------------------------------------
   # ctlabs_k8s
@@ -966,47 +918,14 @@ profiles:
   # ----------------------------------------------------------------------------
   # ctlabs_argoapp
   # ----------------------------------------------------------------------------
-  argoapp:
-    defaults:
-      namespace: argo
-      interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
-      applications:
-        - name: cert-manager
-          source:
-            repoURL: https://charts.jetstack.io
-            chart  : cert-manager
-            targetRevision: v1.21.2
-            helm:
-              valuesObject:
-                crds:
-                  enabled: true
-                  keep   : true
-                startupapicheck:
-                  enabled: false
-          syncPolicy:
-            syncOptions:
-              - CreateNamespace=true
-              - ServerSideApply=true
-          destination:
-            namespace: cert-manager
-
-        - name: external-secrets
-          source:
-            repoURL: https://charts.external-secrets.io
-            chart  : external-secrets
-            targetRevision: 2.11.0
-          syncPolicy:
-            syncOptions:
-              - CreateNamespace=true
-              - ServerSideApply=true
-          destination:
-            namespace: external-secrets
+  argoapps:
     k3s1:
       kubeconfig: /etc/rancher/k3s/k3s.yaml
     k8s1:
       kubeconfig: /etc/kubernetes/admin.conf
     rke21:
       kubeconfig: /etc/rancher/rke2/rke2.yaml
+    defaults:
       namespace: argo
       interpreter: /usr/sbin/ip vrf exec default /usr/bin/python3
       repositories:
@@ -1047,7 +966,19 @@ profiles:
               - ServerSideApply=true
           destination:
             namespace: external-secrets
-            
+
+        - name: headlamp-gwapi
+          source:
+            repoURL: https://github.com/oxdeca/ctlabs-helm
+            targetRevision: dev
+            path: headlamp-gwapi
+          syncPolicy:
+            syncOptions:
+              - CreateNamespace=true
+              - ServerSideApply=true
+          destination:
+            namespace: kube-system
+
         - name: argo-events
           source:
             repoURL: https://argoproj.github.io/argo-helm

@@ -64,7 +64,7 @@ window.openAnsTab = function(tabId) {
   if (activeTab) activeTab.style.display = "block";
 
   const deleteBtn = document.getElementById('ans-delete-file-btn');
-  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings' || tabId === 'AnsRoleProfiles' || tabId === 'AnsSetupProfiles' || tabId === 'AnsPlaySetup') ? 'none' : 'inline-block';
+  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings' || tabId === 'AnsPlayProfiles' || tabId === 'AnsSetupProfiles' || tabId === 'AnsPlaySetup') ? 'none' : 'inline-block';
 
   const taId = 'editor-' + tabId;
   if (window.cmEditors[taId]) {
@@ -210,15 +210,15 @@ window.loadAnsProfiles = async function() {
           
           const data = await res.json();
           
-          const roleProf  = window.initCodeEditor('editor-AnsRoleProfiles',  'yaml');
+          const playProf  = window.initCodeEditor('editor-AnsPlayProfiles',  'yaml');
           const setupProf = window.initCodeEditor('editor-AnsSetupProfiles', 'yaml');
           if (window.automationBase === '/controller') {
-            if (data['role_profiles_ctl.yml'])   roleProf.setValue(data['role_profiles_ctl.yml']);
+            if (data['play_profiles_ctl.yml'])   playProf.setValue(data['play_profiles_ctl.yml']);
             if (data['setup_profiles_ctl.yml'])  setupProf.setValue(data['setup_profiles_ctl.yml']);
-            if (!data['role_profiles_ctl.yml'] && data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
+            if (!data['play_profiles_ctl.yml'] && data['play_profiles.yml'])   playProf.setValue(data['play_profiles.yml']);
             if (!data['setup_profiles_ctl.yml'] && data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
           } else {
-            if (data['role_profiles.yml'])   roleProf.setValue(data['role_profiles.yml']);
+            if (data['play_profiles.yml'])   playProf.setValue(data['play_profiles.yml']);
             if (data['setup_profiles.yml'])  setupProf.setValue(data['setup_profiles.yml']);
           }
       } catch (err) {
@@ -234,7 +234,7 @@ window.loadAnsProfiles = async function() {
     // lab (automation/lab/) and controller (automation/ctl/) file paths into
     // data-lab-label / data-ctl-label; pick the one matching this context.
     window.setProfileFileLabel('#AnsSetupProfiles', window.automationBase === '/controller');
-    window.setProfileFileLabel('#AnsRoleProfiles',  window.automationBase === '/controller');
+    window.setProfileFileLabel('#AnsPlayProfiles',  window.automationBase === '/controller');
     // --- READ MEMORY FIRST! ---
     const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
 
@@ -322,7 +322,7 @@ window.loadAnsProfiles = async function() {
           filesData[filepath] = window.cmEditors[taId].getValue();
       });
 
-      const roleProf  = window.cmEditors['editor-AnsRoleProfiles']  ? window.cmEditors['editor-AnsRoleProfiles'].getValue()  : '';
+      const playProf  = window.cmEditors['editor-AnsPlayProfiles']  ? window.cmEditors['editor-AnsPlayProfiles'].getValue()  : '';
       const setupProf = window.cmEditors['editor-AnsSetupProfiles'] ? window.cmEditors['editor-AnsSetupProfiles'].getValue() : '';
       const playSetup = window.cmEditors['editor-AnsPlaySetup']     ? window.cmEditors['editor-AnsPlaySetup'].getValue()     : '';
 
@@ -334,7 +334,7 @@ window.loadAnsProfiles = async function() {
           env: document.getElementById('edit-ansible-env').value,
           setup: playSetup,
           ans_files: JSON.stringify(filesData),
-          role_profiles: roleProf,
+          play_profiles: playProf,
           setup_profiles: setupProf
       });
 

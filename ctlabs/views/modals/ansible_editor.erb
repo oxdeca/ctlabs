@@ -7,7 +7,7 @@
 
 <%
   # Human-readable label for one automation profile file, e.g.
-  #   /root/.ctlabs/automation/lab/role_profiles.yml (box-local override active)
+  #   /root/.ctlabs/automation/lab/play_profiles.yml (box-local override active)
   # The modal is shared by the lab editor and the controller editor, so both the
   # lab (automation/lab/) and controller (automation/ctl/) variants are rendered
   # into data-* attributes; js/automation.js picks one based on the context.
@@ -42,7 +42,7 @@
       <button class="w3-bar-item w3-button ans-tablink w3-text-blue" data-target-tab="AnsSettings" onclick="window.openAnsTab('AnsSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h w3-text-blue"></i> Settings</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlaySetup" onclick="window.openAnsTab('AnsPlaySetup')" style="flex-shrink: 0;"><i class="fas fa-layer-group w3-text-teal"></i> Play Setup</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsSetupProfiles" onclick="window.openAnsTab('AnsSetupProfiles')" style="flex-shrink: 0;"><i class="fas fa-server w3-text-orange"></i> Setup Profiles</button>
-      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsRoleProfiles" onclick="window.openAnsTab('AnsRoleProfiles')" style="flex-shrink: 0;"><i class="fas fa-tags w3-text-pink"></i> Role Profiles</button>
+      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlayProfiles" onclick="window.openAnsTab('AnsPlayProfiles')" style="flex-shrink: 0;"><i class="fas fa-tags w3-text-pink"></i> Play Profiles</button>
       <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('ansible')" title="Browse Workspace"><i class="fas fa-plus"></i></button>
     </div>
 
@@ -93,11 +93,11 @@
         <textarea id="editor-AnsSetupProfiles"></textarea>
       </div>
 
-      <div id="AnsRoleProfiles" class="ans-tab" style="display: none;">
+      <div id="AnsPlayProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.role_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.role_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.role_profiles_path) %></code> — role mappings. Separate from lab profiles.
+          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.play_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.play_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.play_profiles_path) %></code> — play mappings. Separate from lab profiles.
         </div>
-        <textarea id="editor-AnsRoleProfiles"></textarea>
+        <textarea id="editor-AnsPlayProfiles"></textarea>
       </div>
 
       <div id="ansible-editor-result" class="w3-panel w3-round" style="display:none; font-size: 1em; padding: 8px; margin-top: 15px;"></div>

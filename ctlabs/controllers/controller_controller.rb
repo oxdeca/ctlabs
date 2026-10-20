@@ -184,7 +184,7 @@ class ControllerController < BaseController
       AutomationService.write_ansible_files(ans_files)
 
       profile_files = {}
-      profile_files['role_profiles_ctl.yml']  = params[:role_profiles]  if params[:role_profiles]  && !params[:role_profiles].to_s.strip.empty?
+      profile_files['play_profiles_ctl.yml']  = params[:play_profiles]  if params[:play_profiles]  && !params[:play_profiles].to_s.strip.empty?
       profile_files['setup_profiles_ctl.yml'] = params[:setup_profiles] if params[:setup_profiles] && !params[:setup_profiles].to_s.strip.empty?
       AutomationService.write_profile_files(profile_files) unless profile_files.empty?
 

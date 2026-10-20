@@ -71,11 +71,11 @@ class AutomationController < BaseController
   post '/labs/*/ansible/profiles' do
     content_type :json
     begin
-      params[:role_profiles]  = params[:role_profiles].read if params[:role_profiles].respond_to?(:read)
+      params[:play_profiles]  = params[:play_profiles].read if params[:play_profiles].respond_to?(:read)
       params[:setup_profiles] = params[:setup_profiles].read if params[:setup_profiles].respond_to?(:read)
 
       files = {
-        'role_profiles.yml'  => params[:role_profiles],
+        'play_profiles.yml'  => params[:play_profiles],
         'setup_profiles.yml' => params[:setup_profiles]
       }.select { |_, content| !content.nil? }
 
@@ -143,7 +143,7 @@ class AutomationController < BaseController
       AutomationService.write_ansible_files(ans_files)
 
       profile_files = {}
-      profile_files['role_profiles.yml']  = params[:role_profiles]  if params[:role_profiles]  && !params[:role_profiles].to_s.strip.empty?
+      profile_files['play_profiles.yml']  = params[:play_profiles]  if params[:play_profiles]  && !params[:play_profiles].to_s.strip.empty?
       profile_files['setup_profiles.yml'] = params[:setup_profiles] if params[:setup_profiles] && !params[:setup_profiles].to_s.strip.empty?
       AutomationService.write_profile_files(profile_files) unless profile_files.empty?
 

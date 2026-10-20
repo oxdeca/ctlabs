@@ -1,0 +1,23 @@
+---
+
+# ------------------------------------------------------------------------------
+# File        : ctlabs/automation/ctl/play_profiles.yml
+# Description : maps play profile names to ansible roles, activation tags and
+#               canonical host lists. lib/automation.rb generates main.yml.
+#               hosts are filtered against nodes that actually exist in the lab.
+#               It also defines the execution order. 
+# ------------------------------------------------------------------------------
+
+profiles:
+  ca:
+    role : ctlabs_ca
+    hosts: controller
+
+  openbao:
+    role : ctlabs_openbao
+    hosts: [ctl-ctrl]
+
+  vault:
+    role : ctlabs_vault
+    tags : [vault]
+    hosts: [ctl-ctrl]

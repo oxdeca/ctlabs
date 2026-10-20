@@ -49,10 +49,10 @@ class AutomationService
   # override dropped in after boot) ---
   def self.profile_files
     {
-      'role_profiles.yml'          => Automation.role_profiles_path,
+      'play_profiles.yml'          => Automation.play_profiles_path,
       'setup_profiles.yml'         => Automation.setup_profiles_path,
       'terraform_profiles.yml'     => Automation.terraform_profiles_path,
-      'role_profiles_ctl.yml'      => Automation.role_profiles_ctl_path,
+      'play_profiles_ctl.yml'      => Automation.play_profiles_ctl_path,
       'setup_profiles_ctl.yml'     => Automation.setup_profiles_ctl_path,
       'terraform_profiles_ctl.yml' => Automation.terraform_profiles_ctl_path
     }
@@ -68,7 +68,7 @@ class AutomationService
       next unless paths.key?(filepath)
       next if content.nil?
       begin
-        YAML.safe_load(content)
+        YAML.safe_load(content, aliases: true)
       rescue => e
         raise "Invalid YAML in #{filepath}: #{e.message}"
       end
