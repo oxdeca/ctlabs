@@ -16,7 +16,7 @@ profiles:
     defaults:
       install_type: server
 
-  vault-certs-renewal:
+  vault-certs:
     install_type: server
     vdb1:
       bootstrap:
