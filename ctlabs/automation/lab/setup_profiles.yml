@@ -403,7 +403,6 @@ profiles:
     rke23:
       role: control
 
-
   rke2-cilium-worker:
     rke24:
       role: worker

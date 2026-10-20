@@ -217,17 +217,32 @@ profiles:
 
   rke2-server:
     role : ctlabs_rke2
-    tags : [rke2, rke2-cilium-server, rke2-cilium]
+    tags : [rke2]
     hosts: [rke21]
 
   rke2-control:
     role : ctlabs_rke2
-    tags : [rke2, rke2-cilium-control, rke2-cilium]
+    tags : [rke2]
     hosts: [rke22, rke23]
     
   rke2-worker:
     role : ctlabs_rke2
-    tags : [rke2, rke2-cilium-worker, rke2-cilium]
+    tags : [rke2]
+    hosts: [rke24]
+
+  rke2-cilium-server:
+    role : ctlabs_rke2
+    tags : [rke2-cilium]
+    hosts: [rke21]
+
+  rke2-cilium-control:
+    role : ctlabs_rke2
+    tags : [rke2-cilium]
+    hosts: [rke22, rke23]
+    
+  rke2-cilium-worker:
+    role : ctlabs_rke2
+    tags : [rke2-cilium]
     hosts: [rke24]
 
   vault-certs:
