@@ -7,12 +7,16 @@
 #               a GCP host VM (cloud1) sits behind it on a tunneled subnet.
 #               Routing is exchanged by FRR/BGP over the tunnel (ASN 65045<->
 #               65001). No L2 extension, no cloud plane.
-# NOTE        : Design-stage. See design-guide.md sec.12. Known blockers:
+# NOTE        : Design-stage, SUPERSEDED by cloud02.yml (which uses the
+#               configurable ${node:...} endpoint form — see design-guide §12
+#               and docs/ctlabs.docs.ansible.lab-automation.md §7). Kept as the
+#               original sketch. Known blockers:
 #               - Lab#up runs node.run on *all* nodes; remote (provider !=
 #                 local) nodes are only skipped in the adhoc path, not the
 #                 saved-lab path -> gcp-gw/cloud1 would try to run locally.
 #               - openvpn client `remote` needs the gateway public IP, which
-#                 is only known after terraform apply (see ${gcp_gw_ip}).
+#                 is only known after terraform apply -> use
+#                 "${node:gcp-gw:nics.eth0}" instead of a bare name.
 # -----------------------------------------------------------------------------
 
 name: cloud01
@@ -54,9 +58,10 @@ topology:
                   type     : client
                   server_ip: "10.8.15.1"
                   client_ip: "10.8.15.2"
-                  # ${gcp_gw_ip} = public IP of gcp-gw, harvested after
-                  # terraform apply (see design-guide sec.12, gap "remote IP
-                  # injection"). Placeholder until that wiring exists.
+                  # Was a bare ${gcp_gw_ip} (never resolved). The configurable
+                  # form resolves from the gateway's harvested public IP:
+                  #   remote : "${node:gcp-gw:nics.eth0}"
+                  # Left as-is here so cloud02.yml is the worked example.
                   remote   : "${gcp_gw_ip}"
               # --- BGP over the tunnel ---
               frr:

@@ -383,7 +383,7 @@ profiles:
       cni: cilium
       gateway_api:
         enabled : true
-        provider: cilium
+        provider: traefik
       servicelb:
         enabled: false
       ingress:
@@ -1053,3 +1053,27 @@ profiles:
             syncOptions:
               - CreateNamespace=true
               - ServerSideApply=true 
+
+#        - name: gatekeeper
+#          source:
+#            repoURL: https://open-policy-agent.github.io/gatekeeper/charts
+#            chart: gatekeeper
+#            targetRevision: 3.23.1
+#          destination:
+#            namespace: gatekeeper-system
+#          syncPolicy:
+#            syncOptions:
+#              - CreateNamespace=true
+#              - ServerSideApply=true
+
+#        - name: kyverno
+#          source:
+#            repoURL: https://kyverno.github.io/kyverno/
+#            chart: kyverno
+#            targetRevision: 3.9.1
+#          destination:
+#            namespace: kyverno
+#          syncPolicy:
+#            syncOptions:
+#              - CreateNamespace=true
+#              - ServerSideApply=true

@@ -288,7 +288,47 @@ Each host's resolution order is: **named host profile → shared role config (fr
 
 ---
 
-## 7. Local Facts
+## 7. Lab YAML — `${...}` placeholder expansion
+
+Lab YAML values may reference other parts of the same file. Expansion happens in `lib/lab.rb` (`Lab.expand_placeholders`) on the raw text at load time, *before* the config is parsed into nodes.
+
+| Placeholder                        | Resolves to                                          |
+|------------------------------------|------------------------------------------------------|
+| `${ctlabs_host}`                   | The lab server's public IP (legacy form)             |
+| `${node:<name>}`                   | A node's address                                     |
+| `${node:<name>:<attr>}`            | One attribute of a node (dotted paths allowed)       |
+| `${node:<name>:<attr>:<idx>}`      | Index into a list-valued attribute (default `0`)     |
+
+Attribute lookup, in order:
+
+1. `nics.<attr>` — e.g. `${node:gcp-gw:nics.eth0}` → `35.200.10.7` (`nics.eth0.ip` style sub-keys work)
+2. a top-level key — e.g. `${node:natgw:ipv4}` → `192.168.15.1`
+3. `terraform.<attr>` — e.g. `${node:gcp-gw:terraform.work_dir}` → `cloud02`
+
+With no `<attr>`, "a node's address" means the most useful single value: `nics.eth0`, else `nics.eth1`, else `nics.tun0`, else `nics.wg0`, else top-level `ipv4`, else `gw`. CIDR suffixes are always stripped — an endpoint never wants a prefix length.
+
+### Why: configurable tunnel endpoints
+
+A cloud gateway's public IP is not known until Terraform applies. The IP harvest (`Automation#run_terraform`) writes `nics.eth0 = <public>/32` back into the lab YAML; a placeholder is how that value reaches a *different* node's config:
+
+```yaml
+openvpn:
+  ro1:
+    type  : client
+    remote: "${node:gcp-gw:nics.eth0}"   # -> the gateway's public IP
+```
+
+Either endpoint can be moved by editing one line — point `remote:` at another node/attribute, or swap which side is `server`. Nothing in Ruby hard-codes "the gateway is the server"; that lives entirely in `play.setup`.
+
+### Failure behaviour
+
+Unknown or unresolvable placeholders are left **verbatim** and logged as a warning — never silently blanked. A tunnel with a literal `${node:...}` in its `remote` fails visibly, whereas an empty `remote` is much harder to diagnose.
+
+YAML comments are never expanded and never warn (prose documenting a placeholder is left alone).
+
+---
+
+## 8. Local Facts
 
 Facts are written to `/etc/ansible/facts.d/<role>.fact` on each host and are accessible in playbooks as `ctg_facts.<role>.*`.
 
@@ -310,7 +350,7 @@ A role without `tasks/facts.yml` is silently skipped in `setup.yml` generation.
 
 ---
 
-## 8. Secrets
+## 9. Secrets
 
 API keys and passwords must **never** appear in lab YAML or profile files. Always use environment variable lookups in `facts.json.j2`:
 
@@ -320,7 +360,7 @@ API keys and passwords must **never** appear in lab YAML or profile files. Alway
 
 ---
 
-## 9. Generated Playbook Structure
+## 10. Generated Playbook Structure
 
 ### setup.yml (phase 3)
 
@@ -400,7 +440,7 @@ Generated `ctlabs.yml`:
 
 ---
 
-## 10. Adding a New Role
+## 11. Adding a New Role
 
 1. Create the Ansible role under `ctlabs-ansible/roles/ctlabs_<name>/`
 2. Add `tasks/facts.yml` and `templates/facts.json.j2` if the role needs local facts

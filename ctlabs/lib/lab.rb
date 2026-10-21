@@ -70,8 +70,12 @@ class Lab
       raw_yaml = File.read(cfg)
       
       # DYNAMIC VARIABLE EXPANSION
-      # Replaces ${ctlabs_host} with the actual IP address
-      expanded_yaml = raw_yaml.gsub('${ctlabs_host}', @server_ip)
+      # ${ctlabs_host} -> this lab server's public IP, and ${node:...} ->
+      # attributes of another node in THIS file (see Lab.expand_placeholders).
+      # The latter is what lets a tunnel endpoint stay configurable: the cloud
+      # gateway's public IP is written back into the lab YAML by the terraform
+      # IP harvest, and ro1's `remote:` picks it up from here on the next load.
+      expanded_yaml = self.class.expand_placeholders(raw_yaml, @server_ip, @log)
       
       # Write the EXPANDED config to the public dir so the frontend UI gets the real IPs
       # (skipped in standalone/controller mode, which must not clobber a lab's config)
@@ -370,6 +374,125 @@ class Lab
       end
     end
     [nil, nil]
+  end
+
+  # ---------------------------------------------------------------------------
+  # Placeholder expansion — ${...}
+  #
+  # Runs on the RAW yaml text, before the config is parsed, because the values
+  # it substitutes (a cloud gateway's public IP) are themselves only present in
+  # the raw file — the IP harvest in Automation#run_terraform writes nics/term
+  # back to the lab YAML, and this expansion is what makes those harvested
+  # values reach a *different* node's config (e.g. ro1's openvpn `remote:`,
+  # which needs gcp-gw's public IP — see design-guide.md sec.12).
+  #
+  # Grammar (deliberately tiny, no nested/expressions):
+  #
+  #   ${ctlabs_host}                host public IP of the lab server (legacy)
+  #   ${node:<name>}                <name>'s address (see resolution order below)
+  #   ${node:<name>:<attr>}         one attribute of <name>
+  #   ${node:<name>:<attr>[:<idx>]} index into a list attribute (default 0)
+  #
+  # Attribute lookup walks the SAME shapes the rest of the code does, so nothing
+  # new has to be learned:
+  #
+  #   1. `nics.<attr>`            e.g. ${node:gcp-gw:nics.eth0}      -> 35.1.2.3
+  #                               dotted sub-keys work: nics.eth0.ip
+  #   2. top-level key            e.g. ${node:natgw:ipv4}            -> 192.168.15.1
+  #   3. `terraform.<attr>`       e.g. ${node:gcp-gw:terraform.work_dir}
+  #
+  # IP semantics: a value like `192.168.15.1/29` or `35.1.2.3/32` yields the
+  # ADDRESS ONLY (CIDR stripped) — endpoints never want the prefix length. Use
+  # the `<attr>[:<idx>]` form on a list-valued attribute when several addresses
+  # share a key.
+  #
+  # Unknown placeholders are left VERBATIM (loud in the generated YAML, and the
+  # role fails visibly) rather than silently emptied — a tunnel with a blank
+  # `remote` is much harder to diagnose than one with a literal `${...}` in it.
+  # ---------------------------------------------------------------------------
+  PLACEHOLDER_RE = /\$\{([^}]*)\}/.freeze
+
+  def self.expand_placeholders(raw_yaml, server_ip, log = nil)
+    return raw_yaml if raw_yaml.nil?
+
+    # Parse once, up front, from the raw (still-unexpanded) text. Placeholders
+    # are only ever in the lab file itself, never in the values we read back
+    # out of it, so no recursion or re-expansion pass is needed.
+    cfg = begin
+      YAML.safe_load(raw_yaml, aliases: true)
+    rescue Psych::Exception => e
+      log&.write "expand_placeholders(): YAML parse failed (#{e.message}); no expansion", 'warn'
+      nil
+    end
+
+    # Expand line by line so YAML COMMENTS are left completely alone: a comment
+    # documenting a placeholder (cloud01.yml explains ${gcp_gw_ip} in prose) must
+    # neither be rewritten nor warn. A `#` inside a quoted scalar (e.g. a
+    # password) is not a comment, but a placeholder there is a configuration
+    # mistake anyway — verbatim is the safe outcome either way.
+    raw_yaml.lines.map do |line|
+      if line.lstrip.start_with?('#')
+        line
+      else
+        line.gsub(PLACEHOLDER_RE) do
+          # `Regexp.last_match` is clobbered by ANY nested regex op (the `match`
+          # below, in particular), so capture everything we need from THIS match
+          # first — the full token text included, for the verbatim fallbacks.
+          whole = Regexp.last_match(0)
+          token = Regexp.last_match(1).strip
+
+          if token == 'ctlabs_host'
+            server_ip
+          elsif (m = token.match(/\Anode:([^:\s]+)(?::([^:\s]+))?(?::(\d+))?\z/))
+            name, attr, idx = m[1], m[2], (m[3] || '0').to_i
+            resolved = cfg && self.resolve_node_attr(cfg, name, attr, idx)
+            if resolved.nil?
+              log&.write "expand_placeholders(): ${#{token}} -> unresolved " \
+                         "(node=#{name} attr=#{attr || '(address)'}); left verbatim", 'warn'
+              whole
+            else
+              resolved
+            end
+          else
+            log&.write "expand_placeholders(): unknown placeholder ${#{token}}; left verbatim", 'warn'
+            whole
+          end
+        end
+      end
+    end.join
+  end
+
+  # Resolves one `${node:...}` reference against a RAW lab config hash (the
+  # `topology` shape, planes included — works before and after `find_vm`'s
+  # in-memory flattening, since find_node_in_raw_yaml handles both).
+  # `attr` nil => "the node's address", i.e. the most useful single value:
+  # nics.eth0, else nics.eth1, else nics.tun0, else top-level ipv4, else gw.
+  def self.resolve_node_attr(cfg, node_name, attr = nil, idx = 0)
+    vm = (cfg['topology'] || [])[0]
+    return nil unless vm
+
+    node_cfg, = find_node_in_raw_yaml(vm, node_name)
+    return nil unless node_cfg
+
+    # Dotted path (`nics.eth0`, `terraform.work_dir`) walked segment by segment.
+    value =
+      if attr.nil?
+        %w[eth0 eth1 tun0 wg0].map { |n| node_cfg.dig('nics', n) }
+                              .compact.first ||
+          node_cfg['ipv4'] || node_cfg['gw']
+      else
+        segments = attr.split('.')
+        segments.reduce(node_cfg) do |acc, key|
+          break nil unless acc.is_a?(Hash)
+          acc[key]
+        end
+      end
+
+    value = Array(value)[idx] if value.is_a?(Array)
+    return nil if value.nil?
+
+    # Strip CIDR — an endpoint address is never written with a prefix length.
+    value.to_s.split('/').first.to_s.strip
   end
 
   def find_vm(name)

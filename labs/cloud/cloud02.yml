@@ -1,0 +1,200 @@
+---
+# -----------------------------------------------------------------------------
+# File        : ctlabs/labs/cloud/cloud02.yml
+# Description : GCP subnet as a lab LAN, over a configurable VPN tunnel.
+#
+#               This is the "working" successor to cloud01.yml. Same shape —
+#               a GCP gateway VM joins the lab over a routed (L3) tunnel, a
+#               cloud host sits behind it on a GCP subnet that is just another
+#               data-plane subnet — but the TUNNEL ENDPOINTS ARE CONFIGURED,
+#               not hard-coded.
+#
+#               ENDPOINT MECHANISM (lib/lab.rb: Lab.expand_placeholders)
+#               ------------------------------------------------------------
+#               Any lab YAML value may be written as a ${...} reference that is
+#               expanded at load time, from THIS file:
+#
+#                 ${ctlabs_host}                  lab server's public IP
+#                 ${node:<name>}                  a node's address
+#                 ${node:<name>:<attr>}           one attribute, dotted paths OK
+#                 ${node:<name>:<attr>:<idx>}     index into a list attribute
+#
+#               So the tunnel's client-side `remote:` is simply
+#
+#                 remote: "${node:gcp-gw:nics.eth0}"
+#
+#               and it needs no special-case wiring: the terraform IP harvest
+#               (Automation#run_terraform) writes `nics.eth0 = <public>/32` back
+#               into this file after `apply`, and the next load resolves the
+#               reference to the real address. Before the harvest the reference
+#               stays VERBATIM and warns, so a missing endpoint is loud rather
+#               than a silently empty `remote`.
+#
+#               Because it is a plain reference, either end can be moved by
+#               editing one line — point `remote:` at a different node/attr, or
+#               swap which side is `server`. Nothing in Ruby encodes "the
+#               gateway is the server"; that lives entirely in `play.setup` below.
+#
+#               ROUTING
+#               -------
+#               BGP over the tunnel (FRR both ends). NB: BGP only teaches the
+#               LAB the cloud prefixes. The reverse direction needs static VPC
+#               routes emitted by terraform (`next_hop_instance` = gateway VM) —
+#               see design-guide.md sec.12.2. Without those, cloud->lab is
+#               one-way and looks like "ping works, replies don't".
+#
+# NOTE        : Design-stage, mirrors cloud01. Known blockers (design-guide
+#               sec.12.3): the router image needs the `openvpn` package on
+#               tun0-capable nodes; the OpenVPN role's cross-host static-key
+#               distribution is not site-to-site ready (single key, two hosts,
+#               two plays); and openvpn/wireguard role work is owned by the
+#               ANSIBLE agent (see agents/ansible/messages/ctlabs.md).
+# -----------------------------------------------------------------------------
+
+name: cloud02
+desc: GCP subnet as a lab LAN over a configurable VPN tunnel
+
+topology:
+- hv: cloud02-vm1
+  provider: local
+  dns: [192.168.10.11, 8.8.8.8]
+  planes:
+    mgmt:
+      vrfid : 99
+      dns   : [1.1.1.1, 8.8.8.8]
+      net   : 192.168.99.0/24
+      gw    : 192.168.99.1
+      nodes:
+        ansible:
+          type: controller
+          gw  : 192.168.99.1
+          nics:
+            eth0: 192.168.99.5/24
+          terraform:
+            work_dir: cloud02
+            profile : gcp-wif-default
+          play:
+            book: ctlabs.yml
+            tags: [up, setup, base, frr, openvpn]
+            inv : cloud02.ini
+            setup:
+              # --- tunnel ---------------------------------------------------
+              # Ends are configured HERE. `hosts:` names both ends; per-host
+              # blocks say which is server/client and what addresses the p2p
+              # link uses. The server owns the public IP, so its `remote`
+              # would only be meaningful in a server-to-server setup.
+              openvpn:
+                hosts: [gcp-gw, ro1]
+                gcp-gw:
+                  type     : server
+                  server_ip: "10.8.15.1"
+                  client_ip: "10.8.15.2"
+                ro1:
+                  type     : client
+                  server_ip: "10.8.15.1"
+                  client_ip: "10.8.15.2"
+                  # THE configurable endpoint: resolved from the gateway's
+                  # harvested public address. Swap the node/attr to move ends.
+                  remote   : "${node:gcp-gw:nics.eth0}"
+              # --- BGP over the tunnel --------------------------------------
+              # The p2p addresses double as BGP neighbor addresses (no extra
+              # interface needed): 10.8.15.1 <-> 10.8.15.2.
+              frr:
+                hosts: [gcp-gw, ro1]
+                daemons:
+                  enabled: [bgpd]
+                  profile: datacenter
+                gcp-gw:
+                  router:
+                    bgp:
+                      local_asn  : 65045
+                      local_ip   : 10.8.15.1
+                      remote_ip  : 10.8.15.2
+                      remote_asn : 65001
+                      # advertise the cloud subnet INTO the lab
+                      nets: [192.168.45.0/24]
+                ro1:
+                  router:
+                    bgp:
+                      local_asn  : 65001
+                      local_ip   : 10.8.15.2
+                      remote_ip  : 10.8.15.1
+                      remote_asn : 65045
+                      # advertise the lab data subnet towards the cloud
+                      nets: [192.168.10.0/24]
+        sw0:
+          profile: ovs
+          type: switch
+          ipv4: 192.168.99.10/24
+          gw  : 192.168.99.1
+        ro0:
+          profile: frr
+          type: router
+          gw  : 192.168.15.1
+          nics:
+            eth0: 192.168.99.1/24
+            eth1: 192.168.15.2/29
+
+    edge:
+      nodes:
+        natgw:
+          type: gateway
+          ipv4: 192.168.15.1/29
+          snat: true
+          dnat:
+            data: ro1:eth1
+            mgmt: ro0:eth1
+
+    transit:
+      nodes:
+        # The lab-side tunnel endpoint. Gains tun0 (see nics below) and the
+        # FRR/BGP config above. No new node type is introduced for the tunnel:
+        # the VPN is configured by the Ansible role, not by ctlabs.
+        ro1:
+          profile: frr
+          type: router
+          gw  : 192.168.15.1
+          nics:
+            eth1: 192.168.15.3/29
+            eth2: 192.168.10.1/24
+            # lab-side tunnel address (the client end of the p2p /30)
+            tun0: 10.8.15.2
+        # Remote gateway, provisioned by terraform. Reached over its public
+        # IP for the first play, then over the tunnel.
+        gcp-gw:
+          provider: gcp
+          type    : router
+          profile : frr
+          nics:
+            # cloud-side tunnel address (server end). eth0/eth1 are written
+            # back by the terraform IP harvest, not declared here.
+            tun0: 10.8.15.1
+          terraform:
+            work_dir: cloud02
+
+    data:
+      nodes:
+        sw1:
+          profile: ovs
+          type: switch
+        ns1:
+          type: host
+          gw  : 192.168.10.1
+          nics:
+            eth1: 192.168.10.11/24
+        # Remote host, provisioned by terraform. Single NIC on the GCP subnet.
+        # 192.168.45.0/24 is just another data-plane subnet, reached by routed
+        # L3 over the tunnel — NOT an L2 extension of the lab.
+        cloud1:
+          provider: gcp
+          type    : host
+          nics:
+            eth1: 192.168.45.11/24
+          terraform:
+            work_dir: cloud02
+
+  links:
+  - [ "ro0:eth1", "natgw:eth1" ]
+  - [ "ro1:eth1", "natgw:eth2" ]
+  - [ "ro1:eth2", "sw1:eth1" ]
+  - [ "sw1:eth2", "ns1:eth1" ]
