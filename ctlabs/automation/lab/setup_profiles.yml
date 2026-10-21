@@ -947,48 +947,48 @@ profiles:
                   keep   : true
                 startupapicheck:
                   enabled: false
+          destination:
+            namespace: cert-manager
           syncPolicy:
             syncOptions:
               - CreateNamespace=true
               - ServerSideApply=true
-          destination:
-            namespace: cert-manager
 
         - name: external-secrets
           source:
             repoURL: https://charts.external-secrets.io
             chart  : external-secrets
             targetRevision: 2.11.0
+          destination:
+            namespace: external-secrets
           syncPolicy:
             syncOptions:
               - CreateNamespace=true
               - ServerSideApply=true
-          destination:
-            namespace: external-secrets
 
         - name: headlamp-gwapi
           source:
             repoURL: https://github.com/oxdeca/ctlabs-helm
             targetRevision: dev
             path: headlamp-gwapi
+          destination:
+            namespace: kube-system
           syncPolicy:
             syncOptions:
               - CreateNamespace=true
               - ServerSideApply=true
-          destination:
-            namespace: kube-system
 
         - name: argo-events
           source:
             repoURL: https://argoproj.github.io/argo-helm
             chart  : argo-events
             targetRevision: 2.4.27
+          destination:
+            namespace: argo-events
           syncPolicy:
             syncOptions:
               - CreateNamespace=true
               - ServerSideApply=true
-          destination:
-            namespace: argo-events
             
         - name: cert-vault-sync
           source:
