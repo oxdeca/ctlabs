@@ -1569,11 +1569,24 @@ class Lab
   end
 
   # Determines the "primary" (non-mgmt) data interface for a node config.
-  # Remote/cloud nodes use the overlay tun0, mgmt-plane nodes use eth0.
+  # Remote/cloud nodes use the overlay tunnel NIC; mgmt-plane nodes use eth0.
   def self.primary_nic_for(node_cfg)
     provider = node_cfg['provider'].to_s.downcase
     is_remote = ['rhost', 'external'].include?(node_cfg['type'].to_s) || ['gcp', 'aws', 'azure', 'external'].include?(provider)
-    return 'tun0' if is_remote
+    if is_remote
+      # The tunnel interface is whatever the lab actually declares: OpenVPN
+      # uses tun0, WireGuard uses wg0. Honour a declared one, otherwise a
+      # WireGuard cloud gateway is treated as tun0 and the editor auto-wires a
+      # NIC that never exists. tun0 is checked first to keep every existing
+      # (OpenVPN) lab byte-identical; tun0 remains the fallback when a remote
+      # node declares neither (historical behaviour).
+      nics = node_cfg['nics']
+      if nics.is_a?(Hash)
+        return 'tun0' unless nics['tun0'].to_s.strip.empty?
+        return 'wg0'  unless nics['wg0'].to_s.strip.empty?
+      end
+      return 'tun0'
+    end
     return 'eth0' if node_cfg['type'] == 'controller' || node_cfg['plane'] == 'mgmt'
     'eth1'
   end

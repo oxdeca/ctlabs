@@ -9,6 +9,8 @@ require 'json'
 require 'timeout'
 require 'securerandom'
 
+require_relative 'recording_service'
+
 class TerminalService
   @@sessions = {}
   @@mutex = Mutex.new
@@ -246,6 +248,75 @@ class TerminalService
     session_info = nil
     closed       = false
 
+    # --- Recording (asciicast v2) -------------------------------------------
+    # A recording is opt-in per browser tab. The PTY thread records output as
+    # it is forwarded, the message handler records resizes, and the file is
+    # finalized on stop or when the socket closes. Input is deliberately NOT
+    # recorded: the PTY echoes what the user types anyway, and skipping input
+    # keeps echo-off secrets (passwords) out of the cast.
+    rec_io      = nil
+    rec_id      = nil
+    rec_started = nil
+    rec_mutex   = Mutex.new
+    cur_cols    = (initial_cols || 120).to_i
+    cur_rows    = (initial_rows || 40).to_i
+
+    rec_event = lambda do |kind, data|
+      begin
+        rec_mutex.synchronize do
+          if rec_io && !rec_io.closed?
+            t = Process.clock_gettime(Process::CLOCK_MONOTONIC) - rec_started.to_f
+            rec_io.write(JSON.generate([t.round(6), kind, data]) + "\n")
+            rec_io.flush
+          end
+        end
+      rescue StandardError => e
+        puts "[Recording Write Error] #{e.class}: #{e.message}"
+      end
+    end
+
+    rec_start = lambda do |cols, rows|
+      rec_mutex.synchronize do
+        next if rec_io
+        id, io = RecordingService.open(node: node_name, cols: cols, rows: rows)
+        rec_io      = io
+        rec_id      = id
+        rec_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
+      rec_id
+    end
+
+    rec_stop = lambda do
+      id       = nil
+      duration = 0.0
+      rec_mutex.synchronize do
+        id = rec_id
+        if rec_io
+          duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - rec_started.to_f
+          rec_io.flush rescue nil
+          rec_io.close rescue nil
+        end
+        rec_io      = nil
+        rec_id      = nil
+        rec_started = nil
+      end
+      [id, duration]
+    end
+
+    # Control frames are prefixed with NUL so they can share the terminal's
+    # websocket without ever being mistaken for terminal output. The client
+    # strips the prefix and handles the JSON; anything that fails to parse is
+    # written to the terminal as normal data.
+    rec_control = lambda do |payload|
+      driver.text("\x00" + JSON.generate(payload)) rescue nil
+    end
+
+    # Write to both the recording and the screen (used for our own notices).
+    emit = lambda do |text|
+      rec_event.call('o', text)
+      driver.text(text) rescue nil
+    end
+
     driver.on(:open) do |_|
       begin
         available, info = register_if_available(node_name)
@@ -276,6 +347,7 @@ class TerminalService
               # have complete UTF-8; otherwise keep buffering.
               utf8 = utf8_buf.dup.force_encoding('UTF-8')
               if utf8.valid_encoding?
+                rec_event.call('o', utf8)
                 driver.text(utf8)
                 utf8_buf.clear
               else
@@ -283,6 +355,7 @@ class TerminalService
                 # an incomplete multibyte sequence is still pending.
                 scrubbed = utf8.scrub('?')
                 if scrubbed != utf8
+                  rec_event.call('o', scrubbed)
                   driver.text(scrubbed)
                   utf8_buf.clear
                 end
@@ -292,8 +365,11 @@ class TerminalService
               retry
             rescue EOFError, Errno::EIO, Errno::ECONNRESET, IOError
               remainder = utf8_buf.force_encoding('UTF-8')
-              driver.text(remainder.scrub('?')) if remainder.bytesize > 0
-              driver.text("\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n") rescue nil
+              if remainder.bytesize > 0
+                rec_event.call('o', remainder.scrub('?'))
+                driver.text(remainder.scrub('?'))
+              end
+              emit.call("\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n")
               break
             rescue StandardError => e
               puts "[PTY Error] #{e.message}"
@@ -310,17 +386,55 @@ class TerminalService
     end
 
     driver.on(:message) do |event|
-      if pty_write
+      payload = begin
+        JSON.parse(event.data)
+      rescue JSON::ParserError
+        pty_write&.write(event.data)
+        next
+      end
+      next unless payload.is_a?(Hash)
+
+      case payload['type']
+      when 'input'
+        pty_write&.write(payload['data'])
+
+      when 'resize'
+        cols = payload['cols'].to_i
+        rows = payload['rows'].to_i
+        if pty_write
+          winsize = [rows, cols, 0, 0].pack('SSSS')
+          pty_write.ioctl(0x5414, winsize) rescue nil
+        end
+        cur_cols = cols if cols.positive?
+        cur_rows = rows if rows.positive?
+        rec_event.call('r', "#{cur_cols}x#{cur_rows}")
+
+      when 'record_start'
         begin
-          payload = JSON.parse(event.data)
-          if payload['type'] == 'input'
-            pty_write.write(payload['data'])
-          elsif payload['type'] == 'resize'
-            winsize = [payload['rows'].to_i, payload['cols'].to_i, 0, 0].pack('SSSS')
-            pty_write.ioctl(0x5414, winsize) rescue nil
+          cols = payload['cols'].to_i.positive? ? payload['cols'].to_i : cur_cols
+          rows = payload['rows'].to_i.positive? ? payload['rows'].to_i : cur_rows
+          id   = rec_start.call(cols, rows)
+          if id
+            emit.call("\r\n\x1b[31m● REC\x1b[0m #{id}\r\n")
+            rec_control.call({ type: 'record', state: 'started', id: id, node: node_name })
+          else
+            # Already recording (e.g. a second click raced the first): report
+            # the active id so the button converges on the real state.
+            active = rec_mutex.synchronize { rec_id }
+            rec_control.call({ type: 'record', state: 'started', id: active, node: node_name })
           end
-        rescue JSON::ParserError
-          pty_write.write(event.data)
+        rescue StandardError => e
+          puts "[Recording Start Error] #{e.class}: #{e.message}"
+          rec_control.call({ type: 'record', state: 'error', message: e.message })
+        end
+
+      when 'record_stop'
+        id, duration = rec_stop.call
+        if id
+          emit.call("\r\n\x1b[32m■ Saved\x1b[0m #{id} (#{format('%.1fs', duration)}) — open Walkthrough to replay\r\n")
+          rec_control.call({ type: 'record', state: 'stopped', id: id, duration: duration.round(3) })
+        else
+          rec_control.call({ type: 'record', state: 'stopped', id: nil })
         end
       end
     end
@@ -329,6 +443,9 @@ class TerminalService
       next if closed
       closed = true
       begin
+        # Finalize any in-flight recording before the PTY is torn down so the
+        # cast is complete and closed even if the tab is simply closed.
+        rec_stop.call
         unregister_session(node_name, session_info) if session_info && session_info[:id]
         pty_thread&.kill
         pty_write&.close rescue nil

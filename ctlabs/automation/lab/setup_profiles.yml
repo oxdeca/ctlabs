@@ -263,6 +263,27 @@ profiles:
       remote   : "192.168.16.2"
 
   # ----------------------------------------------------------------------------
+  # ctlabs_wireguard  (alternative to openvpn — same tunnel shape, wg0 not tun0)
+  # ----------------------------------------------------------------------------
+  # `dev` defaults to wg0 in the role but is stated here so the interface name
+  # is visible at the lab level (FRR neighbours are configured against it).
+  # `table: off` keeps wg-quick from touching the host routing table — the
+  # tunnel must NOT become a default route; subnets are exchanged by BGP.
+  wireguard:
+    defaults:
+      dev  : wg0
+      table: "off"
+    ro1:
+      type     : server
+      server_ip: "10.8.16.1"
+      client_ip: "10.8.16.2"
+    ro2:
+      type     : client
+      server_ip: "10.8.16.1"
+      client_ip: "10.8.16.2"
+      remote   : "192.168.16.2"
+
+  # ----------------------------------------------------------------------------
   # ctlabs_frr
   # ----------------------------------------------------------------------------
   frr:

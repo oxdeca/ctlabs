@@ -46,6 +46,16 @@ profiles:
     role : ctlabs_openvpn
     hosts: [ro1, ro2]
 
+  # Alternative tunnel technology to openvpn (one tunnel = one of the two, not
+  # both). Same fact shape / same tun0-style purpose, different daemon:
+  # wg0 + wg-quick instead of tun0 + openvpn@. A lab selects this instead of
+  # `openvpn` in play.tags. `hosts` here is the pre-cloud default pair; a lab
+  # that runs the tunnel to a cloud gateway overrides it per-lab via
+  # play.setup.<profile>.hosts (see labs/cloud/cloud02.yml).
+  wireguard:
+    role : ctlabs_wireguard
+    hosts: [ro1, ro2]
+
   frr:
     role : ctlabs_frr
     hosts: [ro1, ro2, ro3, ro4, isp1]
