@@ -90,6 +90,7 @@ GEMS=(
   'rackup'
   'faye-websocket'
   'puma'
+  'zip'
 )
 
 CTIMGS=(
