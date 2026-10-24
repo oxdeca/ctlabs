@@ -197,4 +197,140 @@ class RecordingService
     end
     format('%.1f %s', value, units[unit])
   end
+
+
+  # Updates the title in the JSON header of the .cast file
+  def self.update_meta(id, title:)
+    path = path_for(id)
+    return false unless path
+
+    lines = File.readlines(path)
+    return false if lines.empty?
+
+    header = begin
+      JSON.parse(lines[0])
+    rescue StandardError
+      nil
+    end
+    return false unless header.is_a?(Hash)
+
+    header['title'] = title.to_s
+    lines[0] = JSON.generate(header) + "\n"
+
+    File.write(path, lines.join)
+    true
+  rescue StandardError
+    false
+  end
+
+  # Saves the drag-and-drop custom order array to an index file
+  def self.reorder!(ordered_ids)
+    ensure_dir
+    order_file = File.join(DIR, '_order.json')
+    File.write(order_file, JSON.generate(ordered_ids))
+    true
+  rescue StandardError
+    false
+  end
+
+  # Lists recordings ordered by saved drag-and-drop sequence, falling back to newest first
+  def self.list
+    ensure_dir
+    files = Dir.glob(File.join(DIR, "*#{EXT}"))
+    recs = files.filter_map { |path| meta(path) }
+
+    order_file = File.join(DIR, '_order.json')
+    if File.file?(order_file)
+      begin
+        ordered_ids = JSON.parse(File.read(order_file))
+        if ordered_ids.is_a?(Array)
+          recs.sort_by! do |r|
+            idx = ordered_ids.index(r[:id])
+            idx ? idx : 999999
+          end
+        end
+      rescue StandardError
+        recs.sort_by! { |m| [m[:created_at], m[:id]] }.reverse!
+      end
+    else
+      recs.sort_by! { |m| [m[:created_at], m[:id]] }.reverse!
+    end
+
+    recs
+  end
+
+
+  # --- Walkthrough Collections Management ---
+
+  def self.walkthroughs_file
+    File.join(ensure_dir, '_walkthroughs.json')
+  end
+
+  def self.load_walkthroughs
+    file = walkthroughs_file
+    if File.file?(file)
+      begin
+        data = JSON.parse(File.read(file))
+        return data if data.is_a?(Hash)
+      rescue StandardError
+        # Fall through to default
+      end
+    end
+
+    # Default fallback walkthrough if none exist
+    {
+      'default' => {
+        'name' => 'Default Walkthrough',
+        'recording_ids' => Dir.glob(File.join(DIR, "*#{EXT}")).map { |f| File.basename(f, EXT) }
+      }
+    }
+  end
+
+  def self.save_walkthroughs(walkthroughs)
+    ensure_dir
+    File.write(walkthroughs_file, JSON.pretty_generate(walkthroughs))
+  end
+
+  def self.create_walkthrough(name)
+    wks = load_walkthroughs
+    slug = name.to_s.strip.downcase.gsub(/[^a-z0-9_-]+/, '_')
+    slug = "walkthrough_#{SecureRandom.hex(3)}" if slug.empty?
+    
+    unless wks.key?(slug)
+      wks[slug] = { 'name' => name.to_s.strip, 'recording_ids' => [] }
+      save_walkthroughs(wks)
+    end
+    slug
+  end
+
+  def self.list_for_walkthrough(slug = 'default')
+    wks = load_walkthroughs
+    wk = wks[slug] || wks['default'] || { 'recording_ids' => [] }
+    allowed_ids = wk['recording_ids'] || []
+
+    all_recs = Dir.glob(File.join(DIR, "*#{EXT}")).filter_map { |path| meta(path) }
+    recs_map = all_recs.map { |r| [r[:id], r] }.to_h
+    all_ids = recs_map.keys
+
+    # Automatically add any newly recorded files that aren't in this walkthrough yet
+    new_ids = all_ids - allowed_ids
+    if !new_ids.empty?
+      wk['recording_ids'] = allowed_ids + new_ids
+      save_walkthroughs(wks)
+      allowed_ids = wk['recording_ids']
+    end
+
+    if slug == 'default' && allowed_ids.empty?
+      all_recs
+    else
+      allowed_ids.filter_map { |id| recs_map[id] }
+    end
+  end
+
+  def self.update_walkthrough_order(slug, ordered_ids)
+    wks = load_walkthroughs
+    slug = 'default' unless wks.key?(slug)
+    wks[slug]['recording_ids'] = ordered_ids
+    save_walkthroughs(wks)
+  end
 end

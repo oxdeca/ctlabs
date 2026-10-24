@@ -1,54 +1,224 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/demo.erb
-# Description : walkthrough view
+# Description : walkthrough view with drag-and-drop ordering and custom titles
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
 
-    <div class="w3-panel w3-green">
-      <h2>📹 Walkthrough </h2>
+    <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
+      <h2><i class="fas fa-video"></i> Walkthrough</h2>
     </div>
-    <!-- Constrain total height to viewport, similar to live_log -->
-    <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;"> <!-- Adjust calc value if needed -->
-      <!-- Main card/container for the demo player -->
-      <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; padding: 8px;"> <!-- Added padding -->
-        <!-- Container specifically for the Asciinema player -->
-        <div id="demo-container" style="flex: 1; display: flex; align-items: stretch; justify-content: center; overflow: hidden;"> <!-- New container div -->
-          <div id="demo" style="flex: 1; height: 100%; width: 100%;"> <!-- Target div for Asciinema, fills its container -->
-            <!-- Asciinema player will be injected here -->
+
+    <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;">
+      <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: row; min-height: 0; overflow: hidden; border: 1px solid #334155;">
+        <!-- Sidebar: recorded sessions -->
+        <aside style="width: 340px; min-width: 280px; max-width: 400px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
+            <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Walkthrough Steps</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <a href="/recordings/download-all" title="Download all recordings as ZIP" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
+                <i class="fas file-archive fas fa-file-archive"></i> Zip
+              </a>
+              <div style="color: #94a3b8; font-size: 0.85em;"><%= (@recordings || []).size %></div>
+            </div>
           </div>
-        </div>
+          <div id="recs-list" style="flex: 1; min-height: 0; overflow-y: auto;">
+            <% 
+              recs = (@recordings || []).sort_by { |r| [r[:step].to_i > 0 ? r[:step].to_i : 999, r[:created_at] || Time.now] }
+            %>
+            <% if recs.empty? %>
+              <div style="padding: 18px 14px; color: #94a3b8; font-size: 0.9em; line-height: 1.5;">
+                <div style="margin-bottom: 8px;"><i class="fas fa-info-circle"></i> No recordings yet</div>
+                <div>Open a terminal, click <strong>REC</strong> to capture a step, and it will appear here.</div>
+              </div>
+            <% else %>
+              <% recs.each_with_index do |r, idx| %>
+                <% display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title] %>
+                <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
+                  <button class="rec-item" 
+                          data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
+                          data-id="<%= ERB::Util.html_escape(r[:id]) %>"
+                          data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
+                          data-step="<%= r[:step] || (idx + 1) %>"
+                          style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;" 
+                          onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" 
+                          onmouseout="this.style.backgroundColor='transparent'">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
+                        <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
+                      </div>
+                      <div style="color: #94a3b8; font-size: 0.8em; white-space: nowrap;"><%= RecordingService.duration_label(r[:duration]) %></div>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.8em;">
+                      <div><i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i> <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(r[:node]) %></div>
+                      <div><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></div>
+                    </div>
+                  </button>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </aside>
+
+        <!-- Player -->
+        <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #000;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid #334155; background: #1e293b; flex-wrap: wrap; gap: 8px;">
+            <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-play-circle w3-text-green"></i> <span>Select a recording</span>
+            </div>
+
+            <!-- Metadata Editor & Actions -->
+            <div id="rec-actions" style="display: none; align-items: center; gap: 12px;">
+              <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
+                <input type="text" name="title" id="edit-title" placeholder="Walkthrough title..." title="Custom title" style="width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;" />
+                <button type="submit" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85em;"><i class="fas fa-save"></i> Save</button>
+              </form>
+
+              <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #475569; color: #f8fafc; padding: 4px 10px;"><i class="fas fa-download"></i></a>
+              <form id="rec-delete" method="post" action="#" style="margin: 0;" onsubmit="return confirm('Delete this recording? This cannot be undone.')">
+                <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px;"><i class="fas fa-trash-alt"></i></button>
+              </form>
+            </div>
+          </div>
+          <div id="demo-container" style="flex: 1; min-height: 0; overflow: hidden; display: flex;">
+            <div id="demo" style="flex: 1; height: 100%; width: 100%;"></div>
+          </div>
+        </main>
       </div>
     </div>
 
-    <script src="/asciinema-player.min.js"></script>
+    <script src="/js/asciinema-player.min.js"></script>
     <script>
-      // Wait for the DOM to be fully loaded before initializing the player
-      document.addEventListener('DOMContentLoaded', function() {
-        // Get the target div
+      (function() {
         const demoDiv = document.getElementById('demo');
+        const titleEl = document.getElementById('rec-title');
+        const actionsEl = document.getElementById('rec-actions');
+        const downloadEl = document.getElementById('rec-download');
+        const deleteForm = document.getElementById('rec-delete');
+        const metaForm = document.getElementById('meta-form');
+        const editTitle = document.getElementById('edit-title');
+        const recsList = document.getElementById('recs-list');
+        let player = null;
+        let activeId = null;
 
-        // Create the player, targeting the 'demo' div
-        // Pass configuration options to influence sizing
-        AsciinemaPlayer.create('/demo.cast', demoDiv, {
-          // --- Player Sizing Options ---
-          cols: null, // Let the player determine based on container/recording width
-          rows: null, // Let the player determine based on container/recording height
-          // fit: "width", // Alternative: fit only width, height adapts
-          // fit: "height", // Alternative: fit only height, width adapts (might distort)
-          fit: "both", // Default behavior might be similar, but explicit 'both' can sometimes help
-          // autoFit: true, // Check Asciinema docs - this might be the key option if supported
-          // --- Other Common Options ---
-          // autoplay: true, // Start playing automatically
-          // loop: false,    // Loop the playback
-          // startAt: 0,     // Start time in seconds
-          // poster: "npt:0", // Poster frame (e.g., at start)
-          // fontSize: "small", // Font size ("small", "normal", "big")
-          // theme: "dracula", // Color theme
-          // terminalFontFamily: "Monaco, Courier New", // Custom font
-          // terminalLineHeight: 1.3, // Line height multiplier
-          // terminalPadding: "4px", // Padding around terminal content
+        function play(src, label, id, step, title) {
+          if (!src) return;
+          activeId = id;
+          if (player && typeof player.dispose === 'function') {
+            try { player.dispose(); } catch (e) {}
+          }
+          demoDiv.innerHTML = '';
+          titleEl.querySelector('span').textContent = (step ? '#' + step + ': ' : '') + (title || label);
+          actionsEl.style.display = 'flex';
+          downloadEl.href = src + '?download=1';
+          deleteForm.action = src + '/delete';
+          metaForm.action = src + '/meta';
+          
+          editTitle.value = title || '';
+
+          if (typeof AsciinemaPlayer !== 'undefined' && typeof AsciinemaPlayer.create === 'function') {
+            player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: false });
+          } else {
+            titleEl.querySelector('span').textContent = 'Asciinema player not loaded';
+          }
+        }
+
+        // Click handlers for selecting items
+        document.querySelectorAll('.rec-item').forEach((btn, idx) => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.rec-item').forEach(b => b.style.backgroundColor = 'transparent');
+            btn.style.backgroundColor = 'rgba(56, 189, 248, 0.12)';
+            const src = btn.getAttribute('data-src');
+            const id = btn.getAttribute('data-id');
+            const step = btn.getAttribute('data-step');
+            const title = btn.getAttribute('data-title');
+            const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
+            play(src, node, id, step, title);
+          });
+          if (idx === 0) btn.click();
         });
-      });
+
+        // --- Drag and Drop Reordering Logic ---
+        let draggedItem = null;
+
+        recsList.addEventListener('dragstart', (e) => {
+          draggedItem = e.target.closest('.rec-item-wrapper');
+          if (draggedItem) {
+            draggedItem.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+          }
+        });
+
+        recsList.addEventListener('dragend', (e) => {
+          if (draggedItem) {
+            draggedItem.style.opacity = '1';
+            draggedItem = null;
+          }
+          document.querySelectorAll('.rec-item-wrapper').forEach(w => w.style.borderTop = '1px solid #334155');
+        });
+
+        recsList.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          const targetWrapper = e.target.closest('.rec-item-wrapper');
+          if (targetWrapper && targetWrapper !== draggedItem) {
+            const rect = targetWrapper.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            if (e.clientY < midpoint) {
+              targetWrapper.style.borderTop = '2px solid #38bdf8';
+            } else {
+              targetWrapper.style.borderTop = '1px solid #334155';
+            }
+          }
+        });
+
+        recsList.addEventListener('dragleave', (e) => {
+          const targetWrapper = e.target.closest('.rec-item-wrapper');
+          if (targetWrapper) {
+            targetWrapper.style.borderTop = '1px solid #334155';
+          }
+        });
+
+        recsList.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const targetWrapper = e.target.closest('.rec-item-wrapper');
+          if (targetWrapper && draggedItem && targetWrapper !== draggedItem) {
+            const rect = targetWrapper.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            
+            if (e.clientY < midpoint) {
+              recsList.insertBefore(draggedItem, targetWrapper);
+            } else {
+              recsList.insertBefore(draggedItem, targetWrapper.nextSibling);
+            }
+
+            updateOrderAndSync();
+          }
+          document.querySelectorAll('.rec-item-wrapper').forEach(w => w.style.borderTop = '1px solid #334155');
+        });
+
+        function updateOrderAndSync() {
+          const wrappers = document.querySelectorAll('.rec-item-wrapper');
+          const orderedIds = [];
+
+          wrappers.forEach((wrapper, index) => {
+            const newStep = index + 1;
+            const btn = wrapper.querySelector('.rec-item');
+            const stepSpan = wrapper.querySelector('.step-num');
+            
+            btn.setAttribute('data-step', newStep);
+            stepSpan.textContent = '#' + newStep;
+            orderedIds.push(btn.getAttribute('data-id'));
+          });
+
+          // Posts the new ordered ID sequence to your backend handler
+          fetch('/recordings/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderedIds })
+          }).catch(err => console.error('Failed to sync recording order', err));
+        }
+      })();
     </script>

@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body, html {
-      margin:      0; padding: 0; height: 100%;
+      margin:     0; padding: 0; height: 100%;
       background:  #0f172a; color: #f8fafc;
       font-family: sans-serif; overflow: hidden;
       display:     flex; flex-direction: column;
@@ -48,17 +48,28 @@
   
   <div id="header">
     <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
-    <span id="status" class="status"><i class="fas fa-circle"></i> Connecting...</span>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="rec-toggle" title="Record terminal output as ASCII (asciicast)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-circle" style="color: #ef4444;"></i> 
+        <span id="rec-label">REC</span>
+        <span id="rec-timer" style="font-variant-numeric: tabular-nums; display: none; margin-left: 2px;">00:00</span>
+      </button>
+      <span id="status" class="status"><i class="fas fa-circle"></i> Connecting...</span>
+    </div>
   </div>
   <div id="terminal-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-serialize@0.10.0/lib/xterm-addon-serialize.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const container = document.getElementById('terminal-container');
       const headerEl = document.getElementById('header');
       const nodeName = document.body.dataset.nodeName;
+      const recBtn = document.getElementById('rec-toggle');
+      const recLabel = document.getElementById('rec-label');
+      const recTimer = document.getElementById('rec-timer');
 
       const initialCols = 120;
       const initialRows = 40;
@@ -79,6 +90,10 @@
 
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
+
+      const serializeAddon = new SerializeAddon.SerializeAddon();
+      term.loadAddon(serializeAddon);
+
       term.open(container);
 
       const cellSize = () => {
@@ -88,25 +103,10 @@
         return null;
       };
 
-      // Browser chrome (title bar + borders) so resizeTo() can target the exact
-      // INNER size that matches the cell grid.
       const chromeW = window.outerWidth - window.innerWidth;
       const chromeH = window.outerHeight - window.innerHeight;
-      // xterm renders its own overlay scrollbar; fit() subtracts scrollBarWidth
-      // from the available width, so the window must reserve it to end up with
-      // the full intended column count.
       const scrollBarWidth = term._core && term._core.viewport ? term._core.viewport.scrollBarWidth : 0;
 
-      // fit() floors rows/cols, so the usable height always ends on a partial
-      // cell and the last text row floats above a variable band of background
-      // (the "sometimes there's an extra row" the user sees).
-      //
-      // Fix: resize the popup window ONCE to the exact inner size that holds
-      // the full 120x40 grid, then fit once more to adopt it. resizeTo is only
-      // ever called here — the resize listener below re-fits but never resizes
-//      the window, so a resizeTo -> fit -> resizeTo feedback loop
-      //      (which also shrank the window column-by-column via the scrollbar offset)
-      //      is impossible.
       const pinToGrid = () => {
         const cell = cellSize();
         if (!cell || !window.resizeTo) return;
@@ -125,22 +125,162 @@
         const ws = new WebSocket(wsUrl);
         const statusEl = document.getElementById('status');
 
+        // Client-side recording (asciicast v2)
+        let recording = false;
+        let recStartTime = 0;
+        let recLines = [];
+        let recCols = term.cols;
+        let recRows = term.rows;
+        let timerInterval = null;
+        let idleTimeout = null;
+
+        const IDLE_TIMEOUT_MS = 120 * 1000;
+
+        function recNow() {
+          return (performance.now() - recStartTime) / 1000.0;
+        }
+
+        function formatTime(seconds) {
+          const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+          const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+          return `${m}:${s}`;
+        }
+
+        const stopRecording = () => {
+          if (!recording) return;
+          recording = false;
+
+          if (timerInterval) clearInterval(timerInterval);
+          if (idleTimeout) clearTimeout(idleTimeout);
+
+          recBtn.style.borderColor = '#475569';
+          recBtn.style.backgroundColor = 'transparent';
+          recLabel.textContent = 'REC';
+          recBtn.firstElementChild.className = 'fas fa-circle';
+          if (recTimer) recTimer.style.display = 'none';
+
+          const cast = recLines.join('\n') + '\n';
+          const blob = new Blob([cast], { type: 'application/x-asciicast' });
+          const form = new FormData();
+          const fname = 'term_' + nodeName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.cast';
+          form.append('file', blob, fname);
+          form.append('node', nodeName);
+          fetch('/recordings/upload', { method: 'POST', body: form, credentials: 'same-origin' })
+            .catch(() => {});
+        };
+
+        const resetIdleTimer = () => {
+          if (!recording) return;
+          if (idleTimeout) clearTimeout(idleTimeout);
+          idleTimeout = setTimeout(() => {
+            stopRecording();
+          }, IDLE_TIMEOUT_MS);
+        };
+
+        if (recBtn) {
+          recBtn.addEventListener('click', () => {
+            if (recBtn.disabled) return;
+            if (!recording) {
+              recStartTime = performance.now();
+              recCols = term.cols;
+              recRows = term.rows;
+              recLines = [];
+              recLines.push(JSON.stringify({
+                version: 2,
+                width: recCols,
+                height: recRows,
+                timestamp: Math.floor(Date.now() / 1000),
+                title: nodeName + ' - ' + new Date().toISOString(),
+                env: { TERM: 'xterm-256color', SHELL: '/bin/bash' },
+                theme: {
+                  fg: '#ffffff',
+                  bg: '#300a24',
+                  palette: '#2e3436:#cc0000:#4e9a06:#c4a000:#3465a4:#75507b:#06989a:#d3d3d3:#555753:#ef2929:#8ae234:#fce94f:#729fcf:#ad7fa8:#34e2e2:#eeeeec'
+                }
+              }));
+
+              const screenSnapshot = serializeAddon.serialize();
+              if (screenSnapshot) {
+                recLines.push(JSON.stringify([recNow(), 'o', screenSnapshot]));
+              }
+
+              recording = true;
+              recBtn.style.borderColor = '#ef4444';
+              recBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.18)';
+              recLabel.textContent = 'STOP';
+              recBtn.firstElementChild.className = 'fas fa-square';
+              if (recTimer) {
+                recTimer.textContent = '00:00';
+                recTimer.style.display = 'inline';
+              }
+
+              timerInterval = setInterval(() => {
+                const elapsed = (performance.now() - recStartTime) / 1000.0;
+                if (recTimer) recTimer.textContent = formatTime(elapsed);
+              }, 1000);
+
+              resetIdleTimer();
+            } else {
+              stopRecording();
+            }
+          });
+        }
+
+        term.onResize(size => {
+          if (recording) {
+            recLines.push(JSON.stringify([recNow(), 'r', size.cols + 'x' + size.rows]));
+            recCols = size.cols;
+            recRows = size.rows;
+            resetIdleTimer();
+          }
+        });
+
         ws.onopen = () => {
           statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
           term.focus();
-          // Re-confirm size after onopen; PTY was already spawned at correct size
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
         };
 
-        ws.onmessage = (event) => term.write(event.data);
+        const origWrite = term.write.bind(term);
+        term.write = function(data) {
+          if (recording) {
+            resetIdleTimer();
+            if (typeof data === 'string') {
+              recLines.push(JSON.stringify([recNow(), 'o', data]));
+            } else if (data instanceof Uint8Array) {
+              try {
+                const s = new TextDecoder().decode(data);
+                recLines.push(JSON.stringify([recNow(), 'o', s]));
+              } catch(e) {}
+            }
+          }
+          return origWrite(data);
+        };
+
+        ws.onmessage = (event) => {
+          term.write(event.data);
+        };
 
         ws.onclose = () => {
           statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
           statusEl.classList.add('disconnected');
           term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+
+          // Stop active recording and save if open, then disable the rec button
+          if (recording) {
+            stopRecording();
+          }
+          if (recBtn) {
+            recBtn.disabled = true;
+            recBtn.style.opacity = '0.5';
+            recBtn.style.cursor = 'not-allowed';
+            recBtn.style.borderColor = '#475569';
+            recBtn.style.backgroundColor = 'transparent';
+          }
         };
 
         term.onData(data => {
+          if (recording) resetIdleTimer();
           if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'input', data: data }));
         });
 
@@ -148,26 +288,17 @@
           if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
         });
 
-        // Re-fit if the user drags the window or changes zoom. Fit-only:
-        // never resizeTo here, so synthetically sized windows can't feed back
-        // into a resize loop or shrink cascade.
         window.addEventListener('resize', () => fitAddon.fit());
       };
 
       const start = () => {
-        // Pin the popup to the full 120x40 grid exactly once.
         pinToGrid();
-        // Second pass after the window resize settles, so the WS opens with
-        // the exact post-pin cols/rows.
         requestAnimationFrame(() => {
           fitAddon.fit();
           openSocket();
         });
       };
 
-      // Don't measure the grid until the font is actually loaded, or the
-      // cell size (and thus the snapped window) could be computed from a
-      // fallback font and shift everything once Courier New arrives.
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(start).catch(() => start());
       } else {

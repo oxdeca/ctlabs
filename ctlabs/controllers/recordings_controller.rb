@@ -4,12 +4,51 @@
 # License     : MIT License
 # -----------------------------------------------------------------------------
 
+require 'zip'
+require 'tempfile'
+
 class RecordingsController < BaseController
   # The Walkthrough page lives at /demo (MainController); these routes only
   # deal with the cast files themselves.
 
   get '/recordings' do
     redirect '/demo'
+  end
+
+  post '/recordings/upload' do
+    content_type :json
+    f = params[:file]
+    halt 400, { ok: false }.to_json unless f && f[:tempfile]
+    node = params[:node].to_s
+    id = RecordingService.new_id(node.empty? ? 'terminal' : node)
+    path = File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}")
+    FileUtils.mkdir_p(File.dirname(path))
+    FileUtils.cp(f[:tempfile].path, path)
+    { ok: true, id: id }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/recordings/download-all' do
+    RecordingService.ensure_dir
+    files = Dir.glob(File.join(RecordingService::DIR, "*#{RecordingService::EXT}"))
+    halt 404, 'No recordings found to download' if files.empty?
+
+    # Write directly to a safe path in DIR to prevent premature Tempfile unlinking issues
+    zip_filename = "ctlabs_walkthrough_#{Time.now.strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_path = File.join(RecordingService::DIR, zip_filename)
+
+    Zip::File.open(zip_path, create: true) do |zipfile|
+      files.each do |file|
+        zipfile.add(File.basename(file), file)
+      end
+    end
+
+    send_file zip_path,
+              type: 'application/zip',
+              disposition: 'attachment',
+              filename: zip_filename
   end
 
   get '/recordings/:id' do
@@ -22,12 +61,19 @@ class RecordingsController < BaseController
                 type:        'application/x-asciicast',
                 disposition: 'attachment'
     else
-      # Inline so the player can fetch() it; kept out of public/ so basic auth
-      # applies and the id can never resolve outside the recordings directory.
       send_file path,
                 type:        'application/x-asciicast; charset=utf-8',
                 disposition: 'inline'
     end
+  end
+
+  post '/recordings/:id/meta' do
+    halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
+    
+    title = params[:title].to_s.strip
+    RecordingService.update_meta(params[:id], title: title) if RecordingService.respond_to?(:update_meta)
+
+    redirect '/demo'
   end
 
   post '/recordings/:id/delete' do
@@ -37,5 +83,35 @@ class RecordingsController < BaseController
     halt 404, 'Recording not found' unless deleted
 
     redirect '/demo'
+  end
+
+  post '/recordings/reorder' do
+    content_type :json
+    body = request.body.read
+    halt 400, { ok: false, error: 'Empty request body' }.to_json if body.empty?
+
+    data = JSON.parse(body)
+    ordered_ids = data['order']
+    walkthrough_slug = data['walkthrough'] || 'default'
+    
+    halt 400, { ok: false, error: 'Invalid order data' }.to_json unless ordered_ids.is_a?(Array)
+
+    if RecordingService.respond_to?(:update_walkthrough_order)
+      RecordingService.update_walkthrough_order(walkthrough_slug, ordered_ids)
+    elsif RecordingService.respond_to?(:reorder!)
+      RecordingService.reorder!(ordered_ids)
+    end
+
+    { ok: true }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/walkthroughs/create' do
+    name = params[:name].to_s.strip
+    name = "New Walkthrough" if name.empty?
+    slug = RecordingService.create_walkthrough(name)
+    redirect "/demo?walkthrough=#{slug}"
   end
 end

@@ -52,7 +52,15 @@ class MainController < BaseController
     erb :config
   end
 
+#  get '/demo' do
+#    @recordings = RecordingService.list
+#    erb :demo
+#  end
+
   get '/demo' do
+    @active_walkthrough = params[:walkthrough] || 'default'
+    @walkthroughs = RecordingService.load_walkthroughs
+    @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
     erb :demo
   end
 
