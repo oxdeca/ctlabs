@@ -25,10 +25,45 @@
       border-bottom: 1px solid #334155;
       display:       flex; justify-content: space-between; align-items: center;
       flex-shrink:   0; font-size: 0.85em;
+      position:      relative;
     }
     .status { color: #10b981; font-size: 0.85em; }
     .status.disconnected { color: #ef4444; }
     
+    /* Settings Popover Menu */
+    #settings-menu {
+      display: none;
+      position: absolute;
+      top: 36px;
+      right: 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      z-index: 1000;
+      font-size: 0.9em;
+      width: 220px;
+    }
+    .setting-group {
+      margin-bottom: 10px;
+    }
+    .setting-group label {
+      display: block;
+      margin-bottom: 4px;
+      color: #94a3b8;
+      font-size: 0.85em;
+    }
+    .setting-group select {
+      width: 100%;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
     /* --- UNIFIED SLIM SCROLLBARS --- */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #0f172a; }
@@ -48,7 +83,40 @@
   
   <div id="header">
     <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
-    <div style="display: flex; align-items: center; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px; position: relative;">
+      
+      <!-- Settings Gear Button -->
+      <button id="settings-btn" title="Recording Settings" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center;">
+        <i class="fas fa-cog"></i>
+      </button>
+
+      <!-- Settings Dropdown Menu -->
+      <div id="settings-menu">
+        <div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+          <span>Recording Settings</span>
+          <span id="settings-close" style="cursor: pointer; color: #94a3b8; font-size: 1.1em;">&times;</span>
+        </div>
+        <div class="setting-group">
+          <label for="max-len-select">Max Length:</label>
+          <select id="max-len-select">
+            <option value="60">1 Minute</option>
+            <option value="300" selected>5 Minutes</option>
+            <option value="600">10 Minutes</option>
+            <option value="1800">30 Minutes</option>
+            <option value="0">Unlimited</option>
+          </select>
+        </div>
+        <div class="setting-group" style="margin-bottom: 0;">
+          <label for="idle-timeout-select">Idle Timeout:</label>
+          <select id="idle-timeout-select">
+            <option value="60">1 Minute</option>
+            <option value="120" selected>2 Minutes</option>
+            <option value="300">5 Minutes</option>
+            <option value="0">Disabled</option>
+          </select>
+        </div>
+      </div>
+
       <button id="rec-toggle" title="Record terminal output as ASCII (asciicast)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
         <i class="fas fa-circle" style="color: #ef4444;"></i> 
         <span id="rec-label">REC</span>
@@ -70,8 +138,30 @@
       const recBtn = document.getElementById('rec-toggle');
       const recLabel = document.getElementById('rec-label');
       const recTimer = document.getElementById('rec-timer');
+      
+      const settingsBtn = document.getElementById('settings-btn');
+      const settingsMenu = document.getElementById('settings-menu');
+      const settingsClose = document.getElementById('settings-close');
+      const maxLenSelect = document.getElementById('max-len-select');
+      const idleTimeoutSelect = document.getElementById('idle-timeout-select');
 
-      const initialCols = 120;
+      // Toggle settings popover menu
+      settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+      });
+
+      settingsClose.addEventListener('click', () => {
+        settingsMenu.style.display = 'none';
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+          settingsMenu.style.display = 'none';
+        }
+      });
+
+      const initialCols = 125;
       const initialRows = 40;
 
       const term = new Terminal({
@@ -121,7 +211,7 @@
       const openSocket = () => {
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         const wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
-                      `?cols=${term.cols}&rows=${term.rows}`;
+                    `?cols=${term.cols}&rows=${term.rows}`;
         const ws = new WebSocket(wsUrl);
         const statusEl = document.getElementById('status');
 
@@ -133,8 +223,7 @@
         let recRows = term.rows;
         let timerInterval = null;
         let idleTimeout = null;
-
-        const IDLE_TIMEOUT_MS = 120 * 1000;
+        let maxRecordingTimeout = null;
 
         function recNow() {
           return (performance.now() - recStartTime) / 1000.0;
@@ -152,6 +241,7 @@
 
           if (timerInterval) clearInterval(timerInterval);
           if (idleTimeout) clearTimeout(idleTimeout);
+          if (maxRecordingTimeout) clearTimeout(maxRecordingTimeout);
 
           recBtn.style.borderColor = '#475569';
           recBtn.style.backgroundColor = 'transparent';
@@ -171,10 +261,13 @@
 
         const resetIdleTimer = () => {
           if (!recording) return;
+          const idleSecs = parseInt(idleTimeoutSelect.value, 10);
+          if (idleSecs <= 0) return; // Disabled
+
           if (idleTimeout) clearTimeout(idleTimeout);
           idleTimeout = setTimeout(() => {
             stopRecording();
-          }, IDLE_TIMEOUT_MS);
+          }, idleSecs * 1000);
         };
 
         if (recBtn) {
@@ -218,6 +311,14 @@
                 const elapsed = (performance.now() - recStartTime) / 1000.0;
                 if (recTimer) recTimer.textContent = formatTime(elapsed);
               }, 1000);
+
+              // Max length timeout check
+              const maxSecs = parseInt(maxLenSelect.value, 10);
+              if (maxSecs > 0) {
+                maxRecordingTimeout = setTimeout(() => {
+                  stopRecording();
+                }, maxSecs * 1000);
+              }
 
               resetIdleTimer();
             } else {
@@ -266,7 +367,6 @@
           statusEl.classList.add('disconnected');
           term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
 
-          // Stop active recording and save if open, then disable the rec button
           if (recording) {
             stopRecording();
           }
