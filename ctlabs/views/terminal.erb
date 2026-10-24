@@ -145,6 +145,25 @@
       const maxLenSelect = document.getElementById('max-len-select');
       const idleTimeoutSelect = document.getElementById('idle-timeout-select');
 
+      // --- Load saved preferences from localStorage ---
+      if (localStorage.getItem('ctlabs_max_len')) {
+        maxLenSelect.value = localStorage.getItem('ctlabs_max_len');
+      }
+      if (localStorage.getItem('ctlabs_idle_timeout')) {
+        localStorage.getItem('ctlabs_idle_timeout'); // fallback check
+        const savedIdle = localStorage.getItem('ctlabs_idle_timeout');
+        if (savedIdle !== null) idleTimeoutSelect.value = savedIdle;
+      }
+
+      // --- Save preferences on change ---
+      maxLenSelect.addEventListener('change', () => {
+        localStorage.setItem('ctlabs_max_len', maxLenSelect.value);
+      });
+
+      idleTimeoutSelect.addEventListener('change', () => {
+        localStorage.setItem('ctlabs_idle_timeout', idleTimeoutSelect.value);
+      });
+
       // Toggle settings popover menu
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
