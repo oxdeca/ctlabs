@@ -11,7 +11,8 @@ RUN         apt update && apt -y install attr acl vim less systemd iproute2 tcpd
             printf "set paste\n" >> /etc/vim/vimrc
 
 RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
-RUN        echo 'if [ -f "/etc/profile" ]; then . /etc/profile; fi' >> ~/.bashrc
+RUN        echo 'if [ -f "/etc/profile" ]; then . /etc/profile; fi' >> ~/.bashrc && \
+           printf "UserKnownHostsFile /dev/null\nStrictHostKeyChecking no" >> /etc/ssh/ssh_config
 COPY       tmux.conf   /etc/tmux.conf
 COPY       --chmod=0640 bashrc.kali     /etc/profile.d/bashrc-kali.sh
 COPY       --chmod=0755 ctlabs-exec     /usr/bin/ctlabs-exec 

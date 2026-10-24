@@ -12,7 +12,7 @@ RUN        ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime           
 
 RUN        systemctl mask systemd-logind systemd-sysusers systemd-tmpfiles-setup dev-hugepages.mount systemd-tmpfiles-clean 
 RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
-RUN        cp /etc/skel/.bash* /root/
+RUN        cp /etc/skel/.bash* /root/ && printf "UserKnownHostsFile /dev/null\nStrictHostKeyChecking no" >> /etc/ssh/ssh_config
 
 COPY       tmux.conf   /etc/tmux.conf
 COPY       bashrc.kali /etc/profile.d/ctlabs-bashrc.sh

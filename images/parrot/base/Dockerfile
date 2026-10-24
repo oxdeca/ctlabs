@@ -7,13 +7,15 @@ COPY       parrot.list /etc/apt/sources.list.d/parrot.list
 RUN        apt update && apt -y full-upgrade && apt -y install attr acl less systemd iproute2 tcpdump git curl && \
            apt -y install iptables openssh-server python3 htop iputils-ping pipx netcat-traditional gnupg nmap && \
            apt -y install sudo locales fonts-noto-color-emoji dnsutils lsof python3-apt bsdmainutils           && \
-           echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen        && \
-           echo 'export LANG=en_US.UTF-8' > /etc/profile.d/locale.sh        && \
+           echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen                                           && \
+           echo 'export LANG=en_US.UTF-8' > /etc/profile.d/locale.sh                                           && \
+           printf "UserKnownHostsFile /dev/null\nStrictHostKeyChecking no" >> /etc/ssh/ssh_config              && \
            printf "set paste\n" >> /etc/vim/vimrc
 
 RUN        useradd -U -s /bin/bash -d /home/ansible -m ansible && echo 'ansible ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/ansible
 RUN        systemctl enable ssh && systemctl mask systemd-logind dev-hugepages.mount
 COPY       bashrc.kali /etc/bashrc.kali
+COPY       tmux.conf   /etc/tmux.conf
 COPY       --chmod=0755 ctlabs-exec /usr/bin/ctlabs-exec 
 COPY       ssh.service /etc/systemd/system/ssh.service
 RUN        systemctl enable ssh.service
