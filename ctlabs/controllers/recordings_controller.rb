@@ -51,6 +51,40 @@ class RecordingsController < BaseController
               filename: zip_filename
   end
 
+  post '/recordings/import' do
+    content_type :json
+    f = params[:file]
+    halt 400, { ok: false, error: 'No file uploaded' }.to_json unless f && f[:tempfile]
+
+    filename = f[:filename].to_s.downcase
+    RecordingService.ensure_dir
+
+    if filename.end_with?('.zip')
+      Zip::File.open(f[:tempfile].path) do |zipfile|
+        zipfile.each do |entry|
+          next unless entry.name.end_with?(RecordingService::EXT)
+          dest_path = File.join(RecordingService::DIR, File.basename(entry.name))
+          
+          # Ensure target directory exists and write stream directly
+          FileUtils.mkdir_p(File.dirname(dest_path))
+          File.write(dest_path, entry.get_input_stream.read)
+        end
+      end
+    elsif filename.end_with?(RecordingService::EXT)
+      id = RecordingService.new_id('imported')
+      dest_path = File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}")
+      FileUtils.mkdir_p(File.dirname(dest_path))
+      FileUtils.cp(f[:tempfile].path, dest_path)
+    else
+      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip or .cast file.' }.to_json
+    end
+
+    { ok: true }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   get '/recordings/:id' do
     path = RecordingService.path_for(params[:id])
     halt 404, 'Recording not found' unless path
@@ -67,11 +101,24 @@ class RecordingsController < BaseController
     end
   end
 
+#  post '/recordings/:id/meta' do
+#    halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
+#    
+#    title = params[:title].to_s.strip
+#    RecordingService.update_meta(params[:id], title: title) if RecordingService.respond_to?(:update_meta)
+#
+#    redirect '/demo'
+#  end
+
   post '/recordings/:id/meta' do
     halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
-    
+
     title = params[:title].to_s.strip
-    RecordingService.update_meta(params[:id], title: title) if RecordingService.respond_to?(:update_meta)
+    
+    # Ensure update_meta only updates the title field and never touches the node identifier
+    if RecordingService.respond_to?(:update_meta)
+      RecordingService.update_meta(params[:id], title: title)
+    end
 
     redirect '/demo'
   end

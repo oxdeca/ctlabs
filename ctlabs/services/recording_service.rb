@@ -118,7 +118,7 @@ class RecordingService
     {
       id:         id,
       path:       path,
-      node:       header.dig('ctlabs', 'node') || header['title'] || node_from_id(id),
+      node:       header.dig('ctlabs', 'node') || node_from_id(id),
       title:      header['title'].to_s,
       cols:       header['width'],
       rows:       header['height'],

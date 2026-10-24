@@ -16,13 +16,21 @@
         <aside style="width: 340px; min-width: 280px; max-width: 400px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b;">
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
             <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Walkthrough Steps</div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <a href="/recordings/download-all" title="Download all recordings as ZIP" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
-                <i class="fas file-archive fas fa-file-archive"></i> Zip
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <!-- Import Button & Hidden File Input -->
+              <button id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
+                <i class="fas fa-upload"></i> Import
+              </button>
+              <input type="file" id="import-file-input" accept=".zip,.cast" style="display: none;" />
+
+              <!-- Zip Download Button -->
+              <a href="/recordings/download-all" target="_self" title="Download all recordings as ZIP" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
+                <i class="fas fa-file-archive"></i> Zip
               </a>
-              <div style="color: #94a3b8; font-size: 0.85em;"><%= (@recordings || []).size %></div>
+              <div style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
             </div>
-          </div>
+          </div> 
+
           <div id="recs-list" style="flex: 1; min-height: 0; overflow-y: auto;">
             <% 
               recs = (@recordings || []).sort_by { |r| [r[:step].to_i > 0 ? r[:step].to_i : 999, r[:created_at] || Time.now] }
@@ -34,16 +42,22 @@
               </div>
             <% else %>
               <% recs.each_with_index do |r, idx| %>
-                <% display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title] %>
+                <% 
+                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title] 
+                  fpath = File.join(RecordingService::DIR, "#{r[:id]}#{RecordingService::EXT}")
+                  fsize = File.exist?(fpath) ? File.size(fpath) : 0
+                  size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
+                  node_str = r[:node].to_s.split(' - ').first.strip
+                %>
                 <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
-                          data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
-                          data-id="<%= ERB::Util.html_escape(r[:id]) %>"
-                          data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
-                          data-step="<%= r[:step] || (idx + 1) %>"
-                          style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;" 
-                          onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" 
-                          onmouseout="this.style.backgroundColor='transparent'">
+                        data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
+                        data-id="<%= ERB::Util.html_escape(r[:id]) %>"
+                        data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
+                        data-step="<%= r[:step] || (idx + 1) %>"
+                        style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;" 
+                        onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" 
+                        onmouseout="this.style.backgroundColor='transparent'">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
@@ -52,14 +66,18 @@
                       <div style="color: #94a3b8; font-size: 0.8em; white-space: nowrap;"><%= RecordingService.duration_label(r[:duration]) %></div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.8em;">
-                      <div><i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i> <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(r[:node]) %></div>
-                      <div><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></div>
+                      <div><i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i> <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %></div>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></span>
+                        <span style="background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.75em;"><%= size_str %></span>
+                      </div>
                     </div>
                   </button>
                 </div>
               <% end %>
             <% end %>
           </div>
+
         </aside>
 
         <!-- Player -->
@@ -100,8 +118,43 @@
         const metaForm = document.getElementById('meta-form');
         const editTitle = document.getElementById('edit-title');
         const recsList = document.getElementById('recs-list');
+        const importBtn = document.getElementById('import-btn');
+        const importFileInput = document.getElementById('import-file-input');
+
         let player = null;
         let activeId = null;
+
+        // --- Import Walkthrough Handler ---
+        if (importBtn && importFileInput) {
+          importBtn.addEventListener('click', () => {
+            importFileInput.click();
+          });
+
+          importFileInput.addEventListener('change', () => {
+            if (!importFileInput.files || importFileInput.files.length === 0) return;
+            const file = importFileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/recordings/import', {
+              method: 'POST',
+              body: formData,
+              credentials: 'same-origin'
+            })
+            .then(res => res.json())
+            .then(data => {
+              if (data.ok) {
+                window.location.reload();
+              } else {
+                alert('Import failed: ' + (data.error || 'Unknown error'));
+              }
+            })
+            .catch(err => {
+              console.error('Import error:', err);
+              alert('Failed to upload import file.');
+            });
+          });
+        }
 
         function play(src, label, id, step, title) {
           if (!src) return;
