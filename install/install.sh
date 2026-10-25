@@ -90,7 +90,11 @@ GEMS=(
   'rackup'
   'faye-websocket'
   'puma'
-  'zip'
+  # recordings_controller.rb uses Zip::File -> the `rubyzip` gem. The legacy
+  # `zip` gem (rubyzip2) is a DIFFERENT library: it defines top-level
+  # `ZipFile`, not `Zip::File`, so requiring it gets as far as the first
+  # zip call and dies with "uninitialized constant Zip::File".
+  'rubyzip'
 )
 
 CTIMGS=(

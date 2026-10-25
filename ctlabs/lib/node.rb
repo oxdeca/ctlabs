@@ -584,8 +584,11 @@ class Node
         sleep 1
         @cid     = run_out.to_s.lines.map(&:strip).reject(&:empty?).last.to_s
         if @cid.empty?
-          esc  = Regexp.escape(@name.to_s)
-          @cid = %x( docker ps --format '{{.ID}}' --filter name='^#{esc}$' ).lines.first.to_s.strip
+          # `docker ps` prints the SHORT ID, but add_netns names the
+          # /var/run/netns symlink after @cid -- a short id there makes every
+          # later `ip netns exec` fail ("Cannot open network namespace").
+          # Resolve the FULL id by exact container name instead.
+          @cid = %x( docker inspect -f '{{.Id}}' #{@name} 2>/dev/null ).strip
         end
         @cpid    = %x( docker inspect -f '{{.State.Pid}}' #{@cid} ).rstrip
         @inotify = %x( /usr/bin/printf "256" > /proc/sys/fs/inotify/max_user_instances )

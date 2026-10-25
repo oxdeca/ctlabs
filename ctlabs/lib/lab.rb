@@ -1623,13 +1623,14 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
   @log.write "#{__method__}(): node=#{node_name}, cfg=#{node_cfg}, switch=#{target_switch}", "debug"
     raise "Node '#{node_name}' already exists" if find_node(node_name)
 
-    # 1. Fetch live container namespace IDs for existing nodes
-    @nodes.each do |n|
-      if n.netns.nil?
-        cid = %x( docker ps --format '{{.ID}}' --filter name='^#{n.name}$' ).strip
-        n.instance_variable_set(:@netns, cid) unless cid.empty?
-      end
-    end
+    # 1. Resolve live namespace IDs for existing nodes. Use the canonical
+    #    resolver: `docker ps` returns the SHORT container ID while the
+    #    /var/run/netns symlink is named by the FULL ID, so the old inline
+    #    lookup left every existing node with a netns name that `ip netns`
+    #    could not open -- the switch-side veth endpoints were then never
+    #    moved out of the host netns and the adhoc node came up with no
+    #    carrier (delete/recreate-the-link is what masked it).
+    @nodes.each { |n| n.resolve_runtime! if n.respond_to?(:resolve_runtime!) }
 
     type = node_cfg['type'] || 'host'
     kind = node_cfg['kind'] || node_cfg['profile'] || 'linux'
