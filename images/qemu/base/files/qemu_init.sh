@@ -160,6 +160,12 @@ qemu_base_cmd() {
   local qemu_numa=""
   local qemu_vnc=""
   local qemu_machine_extra=",graphics=off"
+  local qemu_uefi=""
+
+  if [ "${QEMU_UEFI}" == "true" ]; then
+    [ -f /tmp/OVMF_VARS.fd ] || cp /usr/share/OVMF/OVMF_VARS.fd /tmp/OVMF_VARS.fd
+    qemu_uefi="-drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd -drive if=pflash,format=raw,file=/tmp/OVMF_VARS.fd"
+  fi
 
   if [ "$QEMU_VGA" != "none" ]; then
     qemu_vga="-vga $QEMU_VGA"
@@ -211,7 +217,7 @@ qemu_base_cmd() {
     "-smp sockets=${QEMU_CPU_SOCKETS},dies=1,cores=${QEMU_CPU_CORES},threads=${QEMU_CPU_THREADS}"
     "-cpu host,hv_relaxed,hv_spinlocks=0x1fff,hv_vapic,hv_time,kvm=on,l3-cache=on,migratable=no"
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm ${qemu_numa}"
-    "${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet"
+    "${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet ${qemu_uefi}"
     "-global ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=1"
     "-device virtio-balloon-pci,free-page-reporting=on,id=ballon0,bus=pcie.0,addr=0x5"
   )

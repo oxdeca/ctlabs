@@ -1,8 +1,9 @@
 #!/bin/bash
 
 IMG_NAME=ctlabs/qemu/d13
-IMG_VERS=0.4.4
+IMG_VERS=0.4.5
 
+BASE_IMAGES_DIR=${BASE_IMAGES_DIR:-/media/ctlabs-images/qemu}
 MNTDIR=/media/ctlabs_d13_qemu
 QIMG_NAME=debian-13-nocloud-amd64.qcow2
 QIMG_URL=https://cloud.debian.org/images/cloud/trixie/latest/${QIMG_NAME}
@@ -38,12 +39,14 @@ create_qemu_img() {
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.1" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'mknod /dev/null c 1 3 && chmod 0666 /dev/null'
+  chroot ${MNTDIR} /bin/sh -c 'ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y remove man-db'
   chroot ${MNTDIR} /bin/sh -c 'apt -y install openssh-server lvm2 fdisk nfs-kernel-server locales numactl'
   chroot ${MNTDIR} /bin/sh -c 'apt -y install cloud-utils sshpass xterm gnupg fonts-noto-color-emoji htop'
   chroot ${MNTDIR} /bin/sh -c 'mv /bin/resize /usr/local/bin/ && apt -y remove xterm && apt -y clean && apt -y autoclean && apt -y autoremove'
   chroot ${MNTDIR} /bin/sh -c 'echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen && locale-gen'
   chroot ${MNTDIR} /bin/sh -c 'echo "LANG=en_US.UTF-8" > /etc/default/locale'
+  chroot ${MNTDIR} /bin/sh -c 'passwd -d root'
 
   umount ${MNTDIR}
   qemu-nbd -d /dev/nbd0

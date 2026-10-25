@@ -39,6 +39,7 @@ create_qemu_img() {
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 1.1.1.2" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'echo "nameserver 8.8.8.8" > /etc/resolv.conf'
   chroot ${MNTDIR} /bin/sh -c 'mknod /dev/null c 1 3 && chmod 0666 /dev/null'
+  chroot ${MNTDIR} /bin/sh -c 'ln -sfv /usr/share/zoneinfo/America/Toronto /etc/localtime'
   chroot ${MNTDIR} /bin/sh -c 'apt update && apt -y remove man-db'
   chroot ${MNTDIR} /bin/sh -c 'apt -y install openssh-server lvm2 fdisk nfs-kernel-server locales numactl'
   chroot ${MNTDIR} /bin/sh -c 'apt -y install cloud-utils sshpass xterm gnupg fonts-noto-color-emoji htop'
