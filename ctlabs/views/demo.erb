@@ -7,6 +7,13 @@
 -->
 
 <style>
+  #sidebar-divider:hover, #sidebar-divider.dragging {
+    background: #0284c7 !important;
+    border-color: #38bdf8 !important;
+  }
+  #sidebar-divider:hover .v-grip-handle, #sidebar-divider.dragging .v-grip-handle {
+    background: #ffffff !important;
+  }
   #set-divider:hover, #set-divider.dragging {
     background: #334155 !important;
     border-top-color: #38bdf8 !important;
@@ -108,6 +115,21 @@
     border-top: 1px solid #334155;
     margin: 1.5em 0;
   }
+  .markdown-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    margin: 1em 0;
+    display: inline-block;
+    cursor: zoom-in;
+    background: #0f172a;
+    transition: box-shadow 0.15s ease;
+  }
+  .markdown-body img:hover {
+    box-shadow: 0 6px 16px rgba(56, 189, 248, 0.25);
+  }
 </style>
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
@@ -117,7 +139,7 @@
     <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;">
       <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: row; min-height: 0; overflow: hidden; border: 1px solid #334155;">
         <!-- Sidebar: recorded sessions -->
-        <aside style="width: 340px; min-width: 280px; max-width: 400px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b;">
+        <aside id="walkthrough-sidebar" style="width: 340px; min-width: 200px; max-width: 850px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b; position: relative;">
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
             <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Steps</div>
             <div style="display: flex; align-items: center; gap: 6px;">
@@ -147,6 +169,10 @@
                 <i class="fas fa-file-archive"></i> Export 
               </a>
               <div id="set-count" style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
+              <!-- Collapse Sidebar Button -->
+              <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" style="background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; border: 1px solid #475569; cursor: pointer; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center;">
+                <i class="fas fa-chevron-left"></i>
+              </button>
             </div>
           </div>
 
@@ -295,11 +321,22 @@
 
         </aside>
 
+        <!-- Vertical Divider / Sidebar Resizer -->
+        <div id="sidebar-divider" title="Drag left/right to resize sidebar. Double-click to toggle collapse." style="width: 8px; cursor: col-resize; background: #0b1120; border-left: 1px solid #334155; border-right: 1px solid #334155; display: flex; align-items: center; justify-content: center; flex-shrink: 0; user-select: none; transition: background 0.15s, border-color 0.15s; z-index: 10;">
+          <div class="v-grip-handle" style="width: 2px; height: 32px; background: #64748b; border-radius: 2px; transition: background 0.15s;"></div>
+        </div>
+
         <!-- Player & Step Viewer -->
         <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #000;">
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid #334155; background: #1e293b; flex-wrap: wrap; gap: 8px;">
-            <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-              <i id="rec-title-icon" class="fas fa-play-circle w3-text-green"></i> <span>Select a recording</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <!-- Sidebar Expand Toggle (visible when collapsed) -->
+              <button type="button" id="sidebar-expand-btn" title="Show sidebar" style="display: none; background: #0284c7; color: #ffffff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; align-items: center; gap: 6px;">
+                <i class="fas fa-chevron-right"></i> <i class="fas fa-bars"></i> Steps
+              </button>
+              <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <i id="rec-title-icon" class="fas fa-play-circle w3-text-green"></i> <span>Select a recording</span>
+              </div>
             </div>
 
             <!-- Metadata Editor & Actions -->
@@ -336,6 +373,11 @@
                 <button type="button" id="md-tab-split" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
                   <i class="fas fa-columns" style="margin-right: 4px;"></i> Split
                 </button>
+                <div style="width: 1px; height: 18px; background: #334155; margin: 0 4px;"></div>
+                <button type="button" id="md-insert-img-btn" title="Insert picture from disk, clipboard paste (Ctrl+V), or drag & drop" style="padding: 4px 10px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                  <i class="fas fa-image" style="color: #38bdf8;"></i> Picture
+                </button>
+                <input type="file" id="md-img-file-input" accept="image/*" style="display: none;" />
               </div>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="md-save-status" style="font-size: 0.8em; color: #10b981; display: none; font-weight: 500;">
@@ -390,7 +432,8 @@
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+    <script src="/js/marked.min.js"></script>
+    <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
     <script src="/js/asciinema-player.min.js"></script>
     <script>
       (function() {
@@ -419,6 +462,8 @@
         const mdTabPreview = document.getElementById('md-tab-preview');
         const mdTabEdit = document.getElementById('md-tab-edit');
         const mdTabSplit = document.getElementById('md-tab-split');
+        const mdInsertImgBtn = document.getElementById('md-insert-img-btn');
+        const mdImgFileInput = document.getElementById('md-img-file-input');
 
         let player = null;
         let activeId = null;
@@ -498,6 +543,14 @@
                 try { hljs.highlightElement(block); } catch (e) {}
               });
             }
+            // Add click-to-view in full size for images
+            mdPreviewPane.querySelectorAll('img').forEach(img => {
+              img.title = img.title || 'Click to view full size';
+              img.addEventListener('click', (e) => {
+                e.stopPropagation();
+                window.open(img.src, '_blank');
+              });
+            });
           } else {
             mdPreviewPane.textContent = raw;
           }
@@ -576,13 +629,92 @@
           });
         }
 
+        // --- Picture Upload & Markdown Embedding ---
+        function uploadAndInsertImage(file) {
+          if (!file) return;
+          const isImg = (file.type && file.type.startsWith('image/')) ||
+                        (/\.(png|jpe?g|gif|svg|webp)$/i.test(file.name || ''));
+          if (!isImg) {
+            alert('Please select an image file (PNG, JPG, GIF, SVG, WebP).');
+            return;
+          }
+
+          if (currentMdMode === 'preview') {
+            setMdMode('split');
+          }
+
+          if (mdSaveStatus) {
+            mdSaveStatus.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: #38bdf8;"></i> Uploading picture...';
+            mdSaveStatus.style.display = 'inline-flex';
+          }
+
+          const formData = new FormData();
+          formData.append('image', file);
+
+          fetch('/recordings/upload-image', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.ok && data.url) {
+              if (mdTextarea) {
+                const start = mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length;
+                const end = mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length;
+                const before = mdTextarea.value.substring(0, start);
+                const after = mdTextarea.value.substring(end);
+                const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+                const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+                const rawName = (file.name || 'Picture').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, ' ').trim();
+                const altText = rawName || 'Picture';
+                const markdownImage = `${prefix}![${altText}](${data.url})${suffix}`;
+
+                mdTextarea.value = before + markdownImage + after;
+                const newPos = start + prefix.length + markdownImage.length - suffix.length;
+                mdTextarea.selectionStart = mdTextarea.selectionEnd = newPos;
+                mdTextarea.focus();
+              }
+              renderMarkdownPreview();
+              saveMarkdownContent();
+
+              if (mdSaveStatus) {
+                mdSaveStatus.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i> Picture inserted & saved';
+                mdSaveStatus.style.display = 'inline-flex';
+                setTimeout(() => { mdSaveStatus.style.display = 'none'; }, 2500);
+              }
+            } else {
+              alert('Failed to upload picture: ' + (data.error || 'Unknown error'));
+              if (mdSaveStatus) mdSaveStatus.style.display = 'none';
+            }
+          })
+          .catch(err => {
+            console.error('Image upload failed:', err);
+            alert('Failed to upload picture.');
+            if (mdSaveStatus) mdSaveStatus.style.display = 'none';
+          });
+        }
+
         // --- Note Tab Mode Listeners ---
         if (mdTabPreview) mdTabPreview.addEventListener('click', () => setMdMode('preview'));
         if (mdTabEdit) mdTabEdit.addEventListener('click', () => setMdMode('edit'));
         if (mdTabSplit) mdTabSplit.addEventListener('click', () => setMdMode('split'));
         if (mdSaveBtn) mdSaveBtn.addEventListener('click', saveMarkdownContent);
 
-        // --- Textarea Tab Indentation, Auto-render and Ctrl+S Shortcut ---
+        // --- Picture Upload Button & Input ---
+        if (mdInsertImgBtn && mdImgFileInput) {
+          mdInsertImgBtn.addEventListener('click', () => {
+            mdImgFileInput.click();
+          });
+          mdImgFileInput.addEventListener('change', () => {
+            if (mdImgFileInput.files && mdImgFileInput.files[0]) {
+              uploadAndInsertImage(mdImgFileInput.files[0]);
+              mdImgFileInput.value = '';
+            }
+          });
+        }
+
+        // --- Textarea Tab Indentation, Auto-render, Paste & Shortcuts ---
         if (mdTextarea) {
           mdTextarea.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
@@ -598,10 +730,56 @@
             }
           });
 
+          // Support pasting images directly from clipboard (Ctrl+V / Cmd+V)
+          mdTextarea.addEventListener('paste', (e) => {
+            const clipboard = e.clipboardData || window.clipboardData;
+            if (!clipboard || !clipboard.items) return;
+            for (let i = 0; i < clipboard.items.length; i++) {
+              const item = clipboard.items[i];
+              if (item.kind === 'file' && item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                if (file) uploadAndInsertImage(file);
+                break;
+              }
+            }
+          });
+
           mdTextarea.addEventListener('input', () => {
             if (currentMdMode === 'split') {
               clearTimeout(mdRenderTimeout);
               mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
+            }
+          });
+        }
+
+        // --- Drag & Drop Image onto Markdown Container ---
+        if (mdContainer) {
+          ['dragenter', 'dragover'].forEach(eventName => {
+            mdContainer.addEventListener(eventName, (e) => {
+              if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+                e.preventDefault();
+                e.stopPropagation();
+                mdContainer.style.boxShadow = 'inset 0 0 0 2px #38bdf8';
+              }
+            });
+          });
+
+          ['dragleave', 'dragend', 'drop'].forEach(eventName => {
+            mdContainer.addEventListener(eventName, (e) => {
+              mdContainer.style.boxShadow = 'none';
+            });
+          });
+
+          mdContainer.addEventListener('drop', (e) => {
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+              const droppedFiles = Array.from(e.dataTransfer.files);
+              const imageFile = droppedFiles.find(f => (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|svg|webp)$/i.test(f.name || ''));
+              if (imageFile) {
+                e.preventDefault();
+                e.stopPropagation();
+                uploadAndInsertImage(imageFile);
+              }
             }
           });
         }
@@ -732,6 +910,95 @@
         if (initialItem) {
           selectRecording(initialItem);
           initialItem.scrollIntoView({ block: 'nearest' });
+        }
+
+        // --- Sidebar Resize & Collapse/Expand ---
+        const sidebarEl = document.getElementById('walkthrough-sidebar');
+        const sidebarDivider = document.getElementById('sidebar-divider');
+        const sidebarCollapseBtn = document.getElementById('sidebar-collapse-btn');
+        const sidebarExpandBtn = document.getElementById('sidebar-expand-btn');
+
+        if (sidebarEl && sidebarDivider) {
+          const savedWidth = localStorage.getItem('ctlabs_sidebar_width');
+          if (savedWidth) {
+            const w = parseInt(savedWidth, 10);
+            if (!isNaN(w) && w >= 200 && w <= 900) {
+              sidebarEl.style.width = w + 'px';
+            }
+          }
+
+          function setSidebarCollapsed(collapsed) {
+            if (collapsed) {
+              sidebarEl.style.display = 'none';
+              sidebarDivider.style.display = 'none';
+              if (sidebarExpandBtn) sidebarExpandBtn.style.display = 'inline-flex';
+              localStorage.setItem('ctlabs_sidebar_collapsed', 'true');
+            } else {
+              sidebarEl.style.display = 'flex';
+              sidebarDivider.style.display = 'flex';
+              if (sidebarExpandBtn) sidebarExpandBtn.style.display = 'none';
+              localStorage.setItem('ctlabs_sidebar_collapsed', 'false');
+            }
+          }
+
+          if (localStorage.getItem('ctlabs_sidebar_collapsed') === 'true') {
+            setSidebarCollapsed(true);
+          }
+
+          if (sidebarCollapseBtn) {
+            sidebarCollapseBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              setSidebarCollapsed(true);
+            });
+          }
+          if (sidebarExpandBtn) {
+            sidebarExpandBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              setSidebarCollapsed(false);
+            });
+          }
+
+          // Double-click on vertical divider toggles collapse/expand
+          sidebarDivider.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            const isCurrentlyCollapsed = (sidebarEl.style.display === 'none');
+            setSidebarCollapsed(!isCurrentlyCollapsed);
+          });
+
+          // Horizontal drag-to-resize sidebar width
+          let isResizingSidebar = false;
+          let startX = 0;
+          let startWidth = 0;
+
+          sidebarDivider.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            isResizingSidebar = true;
+            startX = e.clientX;
+            startWidth = sidebarEl.getBoundingClientRect().width;
+            sidebarDivider.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+          });
+
+          window.addEventListener('mousemove', (e) => {
+            if (!isResizingSidebar) return;
+            const deltaX = e.clientX - startX;
+            const containerWidth = sidebarEl.parentElement ? sidebarEl.parentElement.getBoundingClientRect().width : window.innerWidth;
+            const minW = 200;
+            const maxW = Math.min(850, Math.floor(containerWidth * 0.75));
+            const newW = Math.min(maxW, Math.max(minW, startWidth + deltaX));
+            sidebarEl.style.width = newW + 'px';
+          });
+
+          window.addEventListener('mouseup', () => {
+            if (!isResizingSidebar) return;
+            isResizingSidebar = false;
+            sidebarDivider.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            const finalWidth = sidebarEl.getBoundingClientRect().width;
+            localStorage.setItem('ctlabs_sidebar_width', Math.round(finalWidth));
+          });
         }
 
         // --- Movable Divider / Resizer between Walkthrough Set and Other Recordings ---

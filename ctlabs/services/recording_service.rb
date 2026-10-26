@@ -20,8 +20,10 @@ require 'securerandom'
 
 class RecordingService
   DIR        = '/srv/ctlabs-server/recordings'
+  IMAGES_DIR = File.join(DIR, 'images')
   EXT        = '.cast'
   MD_EXT     = '.md'
+  IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
   MANIFEST   = '_walkthrough.json'
   ID_RE      = /\A[a-zA-Z0-9_.-]{1,120}\z/
   NODE_MAX   = 40
@@ -35,6 +37,48 @@ class RecordingService
     DIR
   end
 
+  def self.ensure_images_dir
+    ensure_dir
+    Dir.mkdir(IMAGES_DIR, 0755) unless Dir.exist?(IMAGES_DIR)
+    IMAGES_DIR
+  rescue SystemCallError
+    IMAGES_DIR
+  end
+
+  def self.save_image(tempfile_or_path, original_filename)
+    ensure_images_dir
+    ext = File.extname(original_filename.to_s).downcase
+    ext = '.png' unless IMAGE_EXTS.include?(ext)
+
+    clean_base = File.basename(original_filename.to_s, ext).gsub(/[^a-zA-Z0-9_-]+/, '_')[0, 30]
+    clean_base = 'img' if clean_base.empty?
+    timestamp  = Time.now.strftime('%Y%m%d-%H%M%S')
+    token      = SecureRandom.hex(3)
+    filename   = "#{clean_base}_#{timestamp}_#{token}#{ext}"
+    target     = File.join(IMAGES_DIR, filename)
+
+    if tempfile_or_path.respond_to?(:path)
+      FileUtils.cp(tempfile_or_path.path, target)
+    else
+      FileUtils.cp(tempfile_or_path.to_s, target)
+    end
+    File.chmod(0644, target) rescue nil
+    filename
+  end
+
+  def self.image_path(filename)
+    clean = File.basename(filename.to_s)
+    return nil if clean.empty? || clean.include?('..')
+    target = File.join(ensure_images_dir, clean)
+    return target if File.file?(target)
+
+    # Also check root DIR in case image is stored directly
+    direct = File.join(ensure_dir, clean)
+    return direct if File.file?(direct)
+
+    nil
+  end
+
   # The public id is the basename without extension. It travels in URLs, so
   # never allow separators or a traversal sequence.
   def self.valid_id?(id)
@@ -46,9 +90,11 @@ class RecordingService
     return nil unless valid_id?(id)
     base = id.to_s
     # Direct match if extension already provided
-    if base.end_with?(EXT) || base.end_with?(MD_EXT)
+    if base.end_with?(EXT) || base.end_with?(MD_EXT) || IMAGE_EXTS.any? { |e| base.end_with?(e) }
       p = File.join(ensure_dir, base)
       return p if File.file?(p)
+      p_img = File.join(ensure_images_dir, base)
+      return p_img if File.file?(p_img)
     end
     # Check .cast then .md
     cast_path = File.join(ensure_dir, "#{base}#{EXT}")

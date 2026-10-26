@@ -66,6 +66,21 @@ class RecordingsController < BaseController
         zipfile.add("#{rec[:id]}#{ext}", rec[:path])
       end
 
+      # Scan markdown steps for referenced pictures and include them in images/ folder
+      images_to_add = {}
+      files.each do |rec|
+        next unless File.file?(rec[:path]) && rec[:path].end_with?(RecordingService::MD_EXT)
+        content = File.read(rec[:path]) rescue ''
+        content.scan(%r{(?:/recordings)?/images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
+          img_path = RecordingService.image_path(img_name)
+          images_to_add[img_name] = img_path if img_path
+        end
+      end
+
+      images_to_add.each do |img_name, img_path|
+        zipfile.add("images/#{img_name}", img_path)
+      end
+
       manifest = {
         'format'         => 'ctlabs-walkthrough',
         'version'        => 1,
@@ -129,6 +144,10 @@ class RecordingsController < BaseController
             File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
             id_map[old_id] = id
             imported << id
+          elsif entry.name.start_with?('images/') || RecordingService::IMAGE_EXTS.include?(File.extname(entry.name).downcase)
+            img_basename = File.basename(entry.name)
+            target = File.join(RecordingService.ensure_images_dir, img_basename)
+            File.binwrite(target, entry.get_input_stream.read)
           end
         end
       end
@@ -159,8 +178,11 @@ class RecordingsController < BaseController
       id   = RecordingService.new_markdown_id('note')
       File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
       walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
+    elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
+      saved_name = RecordingService.save_image(f[:tempfile], filename)
+      return { ok: true, count: 1, image: "/recordings/images/#{saved_name}" }.to_json
     else
-      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, or .md file.' }.to_json
+      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, .md, or image file.' }.to_json
     end
 
     { ok: true, walkthrough: walkthrough }.to_json
@@ -169,9 +191,57 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  post '/recordings/upload-image' do
+    content_type :json
+    file = params[:file] || params[:image]
+    halt 400, { ok: false, error: 'No image provided' }.to_json unless file && file[:tempfile]
+
+    orig_name = file[:filename] || 'image.png'
+    ext = File.extname(orig_name).downcase
+    unless RecordingService::IMAGE_EXTS.include?(ext)
+      halt 400, { ok: false, error: "Unsupported image format #{ext}" }.to_json
+    end
+
+    filename = RecordingService.save_image(file[:tempfile], orig_name)
+    { ok: true, filename: filename, url: "/recordings/images/#{filename}" }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/recordings/images/:filename' do
+    path = RecordingService.image_path(params[:filename])
+    halt 404, 'Image not found' unless path
+
+    ext = File.extname(path).downcase
+    mime = case ext
+           when '.png'          then 'image/png'
+           when '.jpg', '.jpeg' then 'image/jpeg'
+           when '.gif'          then 'image/gif'
+           when '.svg'          then 'image/svg+xml'
+           when '.webp'         then 'image/webp'
+           else 'application/octet-stream'
+           end
+
+    send_file path, type: mime, disposition: 'inline'
+  end
+
   get '/recordings/:id' do
     path = RecordingService.path_for(params[:id])
     halt 404, 'Recording not found' unless path
+
+    ext = File.extname(path).downcase
+    if RecordingService::IMAGE_EXTS.include?(ext)
+      mime = case ext
+             when '.png'          then 'image/png'
+             when '.jpg', '.jpeg' then 'image/jpeg'
+             when '.gif'          then 'image/gif'
+             when '.svg'          then 'image/svg+xml'
+             when '.webp'         then 'image/webp'
+             else 'application/octet-stream'
+             end
+      return send_file path, type: mime, disposition: 'inline'
+    end
 
     is_md = path.end_with?(RecordingService::MD_EXT)
     content_type_str = is_md ? 'text/markdown; charset=utf-8' : (params[:download] ? 'application/x-asciicast' : 'application/x-asciicast; charset=utf-8')
