@@ -63,6 +63,8 @@ class MainController < BaseController
     @active_walkthrough = @walkthroughs.key?(requested) ? requested : 'default'
     @walkthrough_name = RecordingService.walkthrough_name(@active_walkthrough)
     @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
+    selected = params[:recording].to_s
+    @selected_recording = RecordingService.valid_id?(selected) ? selected : ''
     erb :demo
   end
 

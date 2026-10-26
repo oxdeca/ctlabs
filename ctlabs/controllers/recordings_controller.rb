@@ -171,7 +171,10 @@ class RecordingsController < BaseController
       RecordingService.update_meta(params[:id], title: title)
     end
 
-    redirect '/demo'
+    wks  = RecordingService.load_walkthroughs
+    slug = params[:walkthrough].to_s
+    slug = 'default' unless wks.key?(slug)
+    redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
   end
 
   post '/recordings/:id/delete' do

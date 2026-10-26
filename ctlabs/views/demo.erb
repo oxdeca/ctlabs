@@ -94,6 +94,7 @@
             <!-- Metadata Editor & Actions -->
             <div id="rec-actions" style="display: none; align-items: center; gap: 12px;">
               <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
+                <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
                 <input type="text" name="title" id="edit-title" placeholder="Walkthrough title..." title="Custom title" style="width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;" />
                 <button type="submit" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85em;"><i class="fas fa-save"></i> Save</button>
               </form>
@@ -128,6 +129,7 @@
         let player = null;
         let activeId = null;
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
+        const preferredRecording = <%= (@selected_recording || '').to_s.to_json %>;
 
         // --- Import Walkthrough Handler ---
         if (importBtn && importFileInput) {
@@ -189,7 +191,8 @@
         }
 
         // Click handlers for selecting items
-        document.querySelectorAll('.rec-item').forEach((btn, idx) => {
+        const recItems = Array.from(document.querySelectorAll('.rec-item'));
+        recItems.forEach((btn) => {
           btn.addEventListener('click', () => {
             document.querySelectorAll('.rec-item').forEach(b => b.style.backgroundColor = 'transparent');
             btn.style.backgroundColor = 'rgba(56, 189, 248, 0.12)';
@@ -200,8 +203,18 @@
             const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
             play(src, node, id, step, title);
           });
-          if (idx === 0) btn.click();
         });
+
+        // Keep the step the user was editing selected after a title save.
+        let initialItem = null;
+        if (preferredRecording) {
+          initialItem = recItems.find(btn => btn.getAttribute('data-id') === preferredRecording) || null;
+        }
+        initialItem = initialItem || recItems[0] || null;
+        if (initialItem) {
+          initialItem.click();
+          initialItem.scrollIntoView({ block: 'nearest' });
+        }
 
         // --- Drag and Drop Reordering Logic ---
         let draggedItem = null;
