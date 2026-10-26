@@ -60,7 +60,11 @@ class MainController < BaseController
   get '/demo' do
     @walkthroughs = RecordingService.load_walkthroughs
     requested = params[:walkthrough].to_s
+    # Coming back via the nav link (no ?walkthrough=) should reopen the set the
+    # user was last working in, not silently fall back to the default set.
+    requested = session[:walkthrough].to_s if requested.empty?
     @active_walkthrough = @walkthroughs.key?(requested) ? requested : 'default'
+    session[:walkthrough] = @active_walkthrough
     @walkthrough_name = RecordingService.walkthrough_name(@active_walkthrough)
     @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
     selected = params[:recording].to_s

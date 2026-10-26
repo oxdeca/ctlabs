@@ -344,6 +344,9 @@
             } else {
               stopRecording();
             }
+
+            // Return keyboard focus to the terminal after toggling recording.
+            term.focus();
           });
         }
 
