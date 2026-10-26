@@ -7,6 +7,19 @@
 -->
 
 <style>
+  #step-prev-btn:hover:not(:disabled), #step-next-btn:hover:not(:disabled) {
+    background: #0284c7 !important;
+    border-color: #38bdf8 !important;
+    color: #ffffff !important;
+  }
+  #step-prev-btn:hover:not(:disabled) i, #step-next-btn:hover:not(:disabled) i {
+    color: #ffffff !important;
+  }
+  #step-prev-btn:disabled, #step-next-btn:disabled {
+    opacity: 0.35 !important;
+    cursor: not-allowed !important;
+    border-color: #334155 !important;
+  }
   #sidebar-divider:hover, #sidebar-divider.dragging {
     background: #0284c7 !important;
     border-color: #38bdf8 !important;
@@ -339,6 +352,19 @@
               </div>
             </div>
 
+            <!-- Step Navigation (Previous / Next) -->
+            <div id="step-nav" style="display: flex; align-items: center; gap: 4px; background: #0f172a; padding: 3px 6px; border-radius: 6px; border: 1px solid #334155;">
+              <button type="button" id="step-prev-btn" title="Previous step (Alt+Left, PageUp)" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 4px 10px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease;">
+                <i class="fas fa-chevron-left" style="color: #38bdf8;"></i> Prev
+              </button>
+              <span id="step-nav-counter" style="color: #94a3b8; font-size: 0.82em; font-weight: 600; min-width: 86px; text-align: center; padding: 0 4px; user-select: none;">
+                -- / --
+              </span>
+              <button type="button" id="step-next-btn" title="Next step (Alt+Right, PageDown)" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 4px 10px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s ease;">
+                Next <i class="fas fa-chevron-right" style="color: #38bdf8;"></i>
+              </button>
+            </div>
+
             <!-- Metadata Editor & Actions -->
             <div id="rec-actions" style="display: none; align-items: center; gap: 12px;">
               <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
@@ -482,6 +508,10 @@
         const importFileInput = document.getElementById('import-file-input');
         const newSetBtn = document.getElementById('new-set-btn');
         const newSetName = document.getElementById('new-set-name');
+
+        const stepPrevBtn = document.getElementById('step-prev-btn');
+        const stepNextBtn = document.getElementById('step-next-btn');
+        const stepNavCounter = document.getElementById('step-nav-counter');
 
         const mdTextarea = document.getElementById('md-textarea');
         const mdPreviewPane = document.getElementById('md-preview-pane');
@@ -923,7 +953,96 @@
           const dataType = btn.getAttribute('data-type') || 'cast';
           const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
           play(src, node, id, step, title, dataType);
+          updateStepNav();
         }
+
+        // --- Step Navigation Controls ---
+        function getStepButtons() {
+          return Array.from(recsList ? recsList.querySelectorAll('.rec-item-wrapper .rec-item') : []);
+        }
+
+        function updateStepNav() {
+          if (!stepPrevBtn || !stepNextBtn || !stepNavCounter) return;
+          const stepButtons = getStepButtons();
+          const totalSteps = stepButtons.length;
+
+          if (totalSteps === 0) {
+            stepNavCounter.textContent = 'No steps';
+            stepPrevBtn.disabled = true;
+            stepNextBtn.disabled = true;
+            stepPrevBtn.title = 'No steps in this set';
+            stepNextBtn.title = 'No steps in this set';
+            return;
+          }
+
+          const currentIndex = stepButtons.findIndex(b => b.getAttribute('data-id') === activeId);
+
+          if (currentIndex === -1) {
+            stepNavCounter.textContent = `-- / ${totalSteps}`;
+            stepPrevBtn.disabled = true;
+            stepPrevBtn.title = 'No step selected';
+            stepNextBtn.disabled = false;
+            stepNextBtn.title = 'Start with Step 1 (Alt+Right)';
+          } else {
+            stepNavCounter.textContent = `Step ${currentIndex + 1} of ${totalSteps}`;
+            stepPrevBtn.disabled = (currentIndex === 0);
+            stepNextBtn.disabled = (currentIndex === totalSteps - 1);
+
+            if (currentIndex > 0) {
+              stepPrevBtn.title = `Previous: Step ${currentIndex} (Alt+Left, PageUp)`;
+            } else {
+              stepPrevBtn.title = 'First step reached';
+            }
+
+            if (currentIndex < totalSteps - 1) {
+              stepNextBtn.title = `Next: Step ${currentIndex + 2} (Alt+Right, PageDown)`;
+            } else {
+              stepNextBtn.title = 'Last step reached';
+            }
+          }
+        }
+
+        function goToPreviousStep() {
+          const stepButtons = getStepButtons();
+          if (stepButtons.length === 0) return;
+          const currentIndex = stepButtons.findIndex(b => b.getAttribute('data-id') === activeId);
+          if (currentIndex > 0) {
+            const targetBtn = stepButtons[currentIndex - 1];
+            selectRecording(targetBtn);
+            targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+
+        function goToNextStep() {
+          const stepButtons = getStepButtons();
+          if (stepButtons.length === 0) return;
+          const currentIndex = stepButtons.findIndex(b => b.getAttribute('data-id') === activeId);
+          if (currentIndex === -1) {
+            const targetBtn = stepButtons[0];
+            selectRecording(targetBtn);
+            targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          } else if (currentIndex < stepButtons.length - 1) {
+            const targetBtn = stepButtons[currentIndex + 1];
+            selectRecording(targetBtn);
+            targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+
+        if (stepPrevBtn) stepPrevBtn.addEventListener('click', goToPreviousStep);
+        if (stepNextBtn) stepNextBtn.addEventListener('click', goToNextStep);
+
+        window.addEventListener('keydown', (e) => {
+          const isEditing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+          if (isEditing) return;
+
+          if ((e.altKey && e.key === 'ArrowLeft') || e.key === 'PageUp') {
+            e.preventDefault();
+            goToPreviousStep();
+          } else if ((e.altKey && e.key === 'ArrowRight') || e.key === 'PageDown') {
+            e.preventDefault();
+            goToNextStep();
+          }
+        });
 
         // Click handlers for selecting items
         document.querySelectorAll('.rec-item').forEach((btn) => {
@@ -939,6 +1058,8 @@
         if (initialItem) {
           selectRecording(initialItem);
           initialItem.scrollIntoView({ block: 'nearest' });
+        } else {
+          updateStepNav();
         }
 
         // --- Sidebar Resize & Collapse/Expand ---
@@ -1293,6 +1414,8 @@
               opt.textContent = `${currentName} (${setItems})`;
             }
           }
+
+          updateStepNav();
         }
 
         function updateOrderAndSync() {
@@ -1321,6 +1444,8 @@
               titleEl.querySelector('span').textContent = (activeStep ? '#' + activeStep + ': ' : '') + (activeTitle || activeNode);
             }
           }
+
+          updateStepNav();
 
           fetch('/recordings/reorder', {
             method: 'POST',
