@@ -61,7 +61,9 @@ class RecordingsController < BaseController
     Zip::File.open(zip_path, create: true) do |zipfile|
       files.each do |rec|
         next unless File.file?(rec[:path])
-        zipfile.add("#{rec[:id]}#{RecordingService::EXT}", rec[:path])
+        ext = File.extname(rec[:path])
+        ext = RecordingService::EXT if ext.empty?
+        zipfile.add("#{rec[:id]}#{ext}", rec[:path])
       end
 
       manifest = {
@@ -108,24 +110,35 @@ class RecordingsController < BaseController
             end
             next
           end
-          next unless entry.name.end_with?(RecordingService::EXT)
 
-          old_id = File.basename(entry.name, RecordingService::EXT)
-          data   = entry.get_input_stream.read
-          node   = RecordingService.node_from_cast(data) ||
-                   RecordingService.node_from_id(old_id)
-          id     = RecordingService.new_id(node)
+          if entry.name.end_with?(RecordingService::EXT)
+            old_id = File.basename(entry.name, RecordingService::EXT)
+            data   = entry.get_input_stream.read
+            node   = RecordingService.node_from_cast(data) ||
+                     RecordingService.node_from_id(old_id)
+            id     = RecordingService.new_id(node)
 
-          File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
-          id_map[old_id] = id
-          imported << id
+            File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+            id_map[old_id] = id
+            imported << id
+          elsif entry.name.end_with?(RecordingService::MD_EXT)
+            old_id = File.basename(entry.name, RecordingService::MD_EXT)
+            data   = entry.get_input_stream.read
+            id     = RecordingService.new_markdown_id('note')
+
+            File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+            id_map[old_id] = id
+            imported << id
+          end
         end
       end
 
       walkthrough = nil
       if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
         ordered = Array(manifest['recording_ids']).filter_map do |old_id|
-          id_map[old_id.to_s] || id_map[File.basename(old_id.to_s, RecordingService::EXT)]
+          id_map[old_id.to_s] ||
+            id_map[File.basename(old_id.to_s, RecordingService::EXT)] ||
+            id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)]
         end
         ordered += imported - ordered
         walkthrough = RecordingService.create_walkthrough(
@@ -141,8 +154,13 @@ class RecordingsController < BaseController
       id   = RecordingService.new_id(node)
       File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
       walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
+    elsif filename.end_with?(RecordingService::MD_EXT)
+      data = File.binread(f[:tempfile].path)
+      id   = RecordingService.new_markdown_id('note')
+      File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+      walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
     else
-      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip or .cast file.' }.to_json
+      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, or .md file.' }.to_json
     end
 
     { ok: true, walkthrough: walkthrough }.to_json
@@ -155,16 +173,14 @@ class RecordingsController < BaseController
     path = RecordingService.path_for(params[:id])
     halt 404, 'Recording not found' unless path
 
-    if params[:download]
-      send_file path,
-                filename:    File.basename(path),
-                type:        'application/x-asciicast',
-                disposition: 'attachment'
-    else
-      send_file path,
-                type:        'application/x-asciicast; charset=utf-8',
-                disposition: 'inline'
-    end
+    is_md = path.end_with?(RecordingService::MD_EXT)
+    content_type_str = is_md ? 'text/markdown; charset=utf-8' : (params[:download] ? 'application/x-asciicast' : 'application/x-asciicast; charset=utf-8')
+    disposition = params[:download] ? 'attachment' : 'inline'
+
+    send_file path,
+              filename:    File.basename(path),
+              type:        content_type_str,
+              disposition: disposition
   end
 
 #  post '/recordings/:id/meta' do
@@ -252,5 +268,45 @@ class RecordingsController < BaseController
     RecordingService.delete_walkthrough(slug, delete_recordings: delete_recs)
     session.delete(:walkthrough) if session[:walkthrough] == slug
     redirect '/demo'
+  end
+
+  post '/walkthroughs/:slug/markdown' do
+    slug = params[:slug].to_s
+    title = params[:title].to_s.strip
+    title = 'Step Note' if title.empty?
+    id = RecordingService.create_markdown_step(slug, title: title)
+    redirect "/demo?walkthrough=#{slug}&recording=#{id}"
+  end
+
+  get '/recordings/:id/content' do
+    halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
+    content = RecordingService.read_content(params[:id])
+    halt 404, 'Markdown step not found' if content.nil?
+    content_type 'text/plain; charset=utf-8'
+    content
+  end
+
+  post '/recordings/:id/content' do
+    content_type :json
+    halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
+
+    body = request.body.read
+    content = if request.media_type == 'application/json'
+                begin
+                  JSON.parse(body)['content'].to_s
+                rescue StandardError
+                  params[:content].to_s
+                end
+              else
+                params[:content] || body
+              end
+
+    ok = RecordingService.update_content(params[:id], content)
+    halt 500, { ok: false, error: 'Failed to save content' }.to_json unless ok
+
+    path = RecordingService.path_for(params[:id])
+    meta_info = path ? RecordingService.meta(path) : {}
+
+    { ok: true, id: params[:id], title: meta_info[:title] }.to_json
   end
 end

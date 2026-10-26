@@ -38,6 +38,76 @@
     font-weight: 700 !important;
     text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
   }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+    color: #f8fafc;
+    font-weight: 700;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 0.3em;
+  }
+  .markdown-body h1:first-child { margin-top: 0; }
+  .markdown-body h1 { font-size: 1.7em; }
+  .markdown-body h2 { font-size: 1.35em; }
+  .markdown-body h3 { font-size: 1.15em; border-bottom: none; }
+  .markdown-body p { margin-top: 0; margin-bottom: 1em; color: #cbd5e1; }
+  .markdown-body a { color: #38bdf8; text-decoration: underline; }
+  .markdown-body code {
+    background: #1e293b;
+    color: #38bdf8;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .markdown-body pre {
+    background: #090d16 !important;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    margin: 1em 0;
+  }
+  .markdown-body pre code {
+    background: transparent !important;
+    padding: 0;
+    color: inherit;
+    font-size: 0.92em;
+  }
+  .markdown-body blockquote {
+    border-left: 4px solid #38bdf8;
+    margin: 1em 0;
+    padding: 0.5em 1em;
+    background: rgba(56, 189, 248, 0.08);
+    color: #94a3b8;
+  }
+  .markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+  }
+  .markdown-body th, .markdown-body td {
+    border: 1px solid #334155;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  .markdown-body th {
+    background: #1e293b;
+    color: #f8fafc;
+  }
+  .markdown-body ul, .markdown-body ol {
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+    color: #cbd5e1;
+  }
+  .markdown-body li {
+    margin-bottom: 0.3em;
+  }
+  .markdown-body hr {
+    border: none;
+    border-top: 1px solid #334155;
+    margin: 1.5em 0;
+  }
 </style>
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
@@ -59,11 +129,18 @@
                 </button>
               </form>
 
+              <!-- Add Note Step Button -->
+              <form method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/markdown" style="margin: 0;">
+                <button type="submit" id="new-note-btn" title="Add an editable Markdown note as a step" style="background: #0284c7; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                  <i class="fab fa-markdown"></i> + Note
+                </button>
+              </form>
+
               <!-- Import Button & Hidden File Input -->
               <button id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
                 <i class="fas fa-upload"></i> Import
               </button>
-              <input type="file" id="import-file-input" accept=".zip,.cast" style="display: none;" />
+              <input type="file" id="import-file-input" accept=".zip,.cast,.md" style="display: none;" />
 
               <!-- Export Download Button -->
               <a href="/recordings/download-all?walkthrough=<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>" target="_self" title="Export this walkthrough set as ZIP (includes its name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
@@ -100,33 +177,45 @@
             <% if recs.empty? %>
               <div id="recs-empty" style="padding: 18px 14px; color: #94a3b8; font-size: 0.9em; line-height: 1.5;">
                 <div style="margin-bottom: 8px;"><i class="fas fa-info-circle"></i> No recordings yet</div>
-                <div>Open a terminal, click <strong>REC</strong> to capture a step, and it will appear here. You can also drag one in from <strong>RECORDINGS</strong> below.</div>
+                <div>Open a terminal, click <strong>REC</strong> to capture a step, or add a <strong>Note</strong>. You can also drag one in from <strong>RECORDINGS / NOTES</strong> below.</div>
               </div>
             <% else %>
               <% recs.each_with_index do |r, idx| %>
                 <% 
-                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title] 
-                  fpath = File.join(RecordingService::DIR, "#{r[:id]}#{RecordingService::EXT}")
+                  is_md = (r[:type] == :markdown)
+                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? (is_md ? 'Step Note' : r[:node]) : r[:title] 
+                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{is_md ? RecordingService::MD_EXT : RecordingService::EXT}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
-                  node_str = r[:node].to_s.split(' - ').first.strip
+                  node_str = is_md ? 'Note' : r[:node].to_s.split(' - ').first.strip
                 %>
                 <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
                         data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
+                        data-type="<%= is_md ? 'markdown' : 'cast' %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step="<%= r[:step] || (idx + 1) %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
+                        <% if is_md %>
+                          <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% end %>
                         <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
                       </div>
-                      <div style="color: #94a3b8; font-size: 0.8em; white-space: nowrap;"><%= RecordingService.duration_label(r[:duration]) %></div>
+                      <div style="color: #94a3b8; font-size: 0.8em; white-space: nowrap;"><%= is_md ? 'Text' : RecordingService.duration_label(r[:duration]) %></div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.8em;">
-                      <div><i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i> <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %></div>
+                      <div>
+                        <i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i>
+                        <% if is_md %>
+                          <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                        <% else %>
+                          <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
+                        <% end %>
+                      </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></span>
                         <span style="background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.75em;"><%= size_str %></span>
@@ -149,7 +238,7 @@
           <div id="other-section" style="height: 200px; min-height: 80px; max-height: calc(100% - 160px); background: #090d16; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px; border-bottom: 1px solid #334155; background: #0e1726; flex-shrink: 0;">
               <div style="font-weight: 600; color: #cbd5e1; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.04em;">
-                <i class="fas fa-film" style="color: #64748b; margin-right: 4px;"></i> RECORDINGS <span id="other-count" style="color: #94a3b8; font-weight: 400;">(<%= others.size %>)</span>
+                <i class="fas fa-layer-group" style="color: #64748b; margin-right: 4px;"></i> RECORDINGS / NOTES <span id="other-count" style="color: #94a3b8; font-weight: 400;">(<%= others.size %>)</span>
               </div>
               <div style="color: #64748b; font-size: 0.7em; white-space: nowrap;">
                 <i class="fas fa-arrows-alt-v" style="margin-right: 2px;"></i> drag to/from steps
@@ -157,29 +246,40 @@
             </div>
             <div id="other-list" style="flex: 1 1 auto; overflow-y: auto; min-height: 0;">
               <% others.each do |r| %>
-                <%
-                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title]
-                  fpath = File.join(RecordingService::DIR, "#{r[:id]}#{RecordingService::EXT}")
+                <% 
+                  is_md = (r[:type] == :markdown)
+                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? (is_md ? 'Step Note' : r[:node]) : r[:title] 
+                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{is_md ? RecordingService::MD_EXT : RecordingService::EXT}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
-                  node_str = r[:node].to_s.split(' - ').first.strip
+                  node_str = is_md ? 'Note' : r[:node].to_s.split(' - ').first.strip
                 %>
                 <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
-                  <button class="rec-item"
-                        data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>"
+                  <button class="rec-item" 
+                        data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
+                        data-type="<%= is_md ? 'markdown' : 'cast' %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step=""
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         <span class="step-num" style="color: #64748b; margin-right: 4px;">+</span>
+                        <% if is_md %>
+                          <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% end %>
                         <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
                       </div>
-                      <div style="color: #94a3b8; font-size: 0.78em; white-space: nowrap;"><%= RecordingService.duration_label(r[:duration]) %></div>
+                      <div style="color: #94a3b8; font-size: 0.78em; white-space: nowrap;"><%= is_md ? 'Text' : RecordingService.duration_label(r[:duration]) %></div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.76em;">
-                      <div><i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %></div>
+                      <div>
+                        <% if is_md %>
+                          <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                        <% else %>
+                          <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
+                        <% end %>
+                      </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <span><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></span>
                         <span style="background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.75em;"><%= size_str %></span>
@@ -188,37 +288,73 @@
                   </button>
                 </div>
               <% end %>
-              <div id="other-empty" style="padding: 10px 14px; color: #64748b; font-size: 0.8em;<%= ' display: none;' unless others.empty? %>">No unintegrated recordings in this set.</div>
-              <div id="other-end-drop" title="Drop here to move to recordings" style="height: 32px; border-top: 2px solid transparent;"></div>
+              <div id="other-empty" style="padding: 10px 14px; color: #64748b; font-size: 0.8em;<%= ' display: none;' unless others.empty? %>">No unintegrated recordings or notes in this set.</div>
+              <div id="other-end-drop" title="Drop here to move to recordings / notes" style="height: 32px; border-top: 2px solid transparent;"></div>
             </div>
           </div>
 
         </aside>
 
-        <!-- Player -->
+        <!-- Player & Step Viewer -->
         <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: #000;">
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; border-bottom: 1px solid #334155; background: #1e293b; flex-wrap: wrap; gap: 8px;">
             <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px;">
-              <i class="fas fa-play-circle w3-text-green"></i> <span>Select a recording</span>
+              <i id="rec-title-icon" class="fas fa-play-circle w3-text-green"></i> <span>Select a recording</span>
             </div>
 
             <!-- Metadata Editor & Actions -->
             <div id="rec-actions" style="display: none; align-items: center; gap: 12px;">
               <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
                 <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
-                <input type="text" name="title" id="edit-title" placeholder="Walkthrough title..." title="Custom title" style="width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;" />
+                <input type="text" name="title" id="edit-title" placeholder="Step title..." title="Custom title" style="width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;" />
                 <button type="submit" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85em;"><i class="fas fa-save"></i> Save</button>
               </form>
 
-              <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #475569; color: #f8fafc; padding: 4px 10px;"><i class="fas fa-download"></i></a>
-              <form id="rec-delete" method="post" action="#" style="margin: 0;" onsubmit="return confirm('Delete this recording? This cannot be undone.')">
+              <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #475569; color: #f8fafc; padding: 4px 10px;" title="Download"><i class="fas fa-download"></i></a>
+              <form id="rec-delete" method="post" action="#" style="margin: 0;" onsubmit="return confirm('Delete this step? This cannot be undone.')">
                 <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
-                <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px;"><i class="fas fa-trash-alt"></i></button>
+                <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px;" title="Delete"><i class="fas fa-trash-alt"></i></button>
               </form>
             </div>
           </div>
+
+          <!-- Asciinema Player Container -->
           <div id="demo-container" style="flex: 1; min-height: 0; overflow: hidden; display: flex;">
             <div id="demo" style="flex: 1; height: 100%; width: 100%;"></div>
+          </div>
+
+          <!-- Markdown Step Container -->
+          <div id="md-container" style="flex: 1; min-height: 0; display: none; flex-direction: column; background: #0f172a;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155;">
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <button type="button" id="md-tab-preview" class="md-mode-tab active" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #38bdf8; background: #0284c7; color: #ffffff; cursor: pointer; font-weight: 500;">
+                  <i class="fas fa-eye" style="margin-right: 4px;"></i> Preview
+                </button>
+                <button type="button" id="md-tab-edit" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
+                  <i class="fas fa-edit" style="margin-right: 4px;"></i> Edit
+                </button>
+                <button type="button" id="md-tab-split" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
+                  <i class="fas fa-columns" style="margin-right: 4px;"></i> Split
+                </button>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span id="md-save-status" style="font-size: 0.8em; color: #10b981; display: none; font-weight: 500;">
+                  <i class="fas fa-check-circle"></i> Saved
+                </span>
+                <button type="button" id="md-save-btn" style="background: #10b981; color: #ffffff; border: none; padding: 4px 12px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                  <i class="fas fa-save"></i> Save Content
+                </button>
+              </div>
+            </div>
+            <div id="md-content-area" style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
+              <!-- Edit Pane -->
+              <div id="md-edit-pane" style="flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; border-right: 1px solid #334155;">
+                <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size: 0.95em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
+              </div>
+              <!-- Preview Pane -->
+              <div id="md-preview-pane" class="markdown-body" style="flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding: 24px 32px; color: #e2e8f0; line-height: 1.65; box-sizing: border-box;">
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -254,11 +390,15 @@
       </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
     <script src="/js/asciinema-player.min.js"></script>
     <script>
       (function() {
         const demoDiv = document.getElementById('demo');
+        const demoContainer = document.getElementById('demo-container');
+        const mdContainer = document.getElementById('md-container');
         const titleEl = document.getElementById('rec-title');
+        const titleIcon = document.getElementById('rec-title-icon');
         const actionsEl = document.getElementById('rec-actions');
         const downloadEl = document.getElementById('rec-download');
         const deleteForm = document.getElementById('rec-delete');
@@ -271,13 +411,200 @@
         const newSetBtn = document.getElementById('new-set-btn');
         const newSetName = document.getElementById('new-set-name');
 
+        const mdTextarea = document.getElementById('md-textarea');
+        const mdPreviewPane = document.getElementById('md-preview-pane');
+        const mdEditPane = document.getElementById('md-edit-pane');
+        const mdSaveBtn = document.getElementById('md-save-btn');
+        const mdSaveStatus = document.getElementById('md-save-status');
+        const mdTabPreview = document.getElementById('md-tab-preview');
+        const mdTabEdit = document.getElementById('md-tab-edit');
+        const mdTabSplit = document.getElementById('md-tab-split');
+
         let player = null;
         let activeId = null;
+        let activeDataType = 'cast';
+        let currentMdMode = 'preview';
+        let mdCache = {};
+        let mdRenderTimeout = null;
+
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
         const preferredRecording = <%= (@selected_recording || '').to_s.to_json %>;
         try {
           localStorage.setItem('ctlabs_active_walkthrough', activeWalkthrough);
         } catch (e) {}
+
+        if (typeof marked !== 'undefined') {
+          marked.setOptions({
+            gfm: true,
+            breaks: true
+          });
+        }
+
+        // --- Markdown Mode & Editing Functions ---
+        function setMdMode(mode) {
+          currentMdMode = mode;
+          [mdTabPreview, mdTabEdit, mdTabSplit].forEach(tab => {
+            if (!tab) return;
+            tab.classList.remove('active');
+            tab.style.background = '#1e293b';
+            tab.style.color = '#94a3b8';
+            tab.style.borderColor = '#475569';
+          });
+
+          const activeTab = (mode === 'preview') ? mdTabPreview : (mode === 'edit' ? mdTabEdit : mdTabSplit);
+          if (activeTab) {
+            activeTab.classList.add('active');
+            activeTab.style.background = '#0284c7';
+            activeTab.style.color = '#ffffff';
+            activeTab.style.borderColor = '#38bdf8';
+          }
+
+          if (mode === 'preview') {
+            if (mdEditPane) mdEditPane.style.display = 'none';
+            if (mdPreviewPane) {
+              mdPreviewPane.style.display = 'block';
+              mdPreviewPane.style.flex = '1';
+            }
+            renderMarkdownPreview();
+          } else if (mode === 'edit') {
+            if (mdEditPane) {
+              mdEditPane.style.display = 'flex';
+              mdEditPane.style.flex = '1';
+              mdEditPane.style.borderRight = 'none';
+            }
+            if (mdPreviewPane) mdPreviewPane.style.display = 'none';
+            if (mdTextarea) mdTextarea.focus();
+          } else if (mode === 'split') {
+            if (mdEditPane) {
+              mdEditPane.style.display = 'flex';
+              mdEditPane.style.flex = '1';
+              mdEditPane.style.borderRight = '1px solid #334155';
+            }
+            if (mdPreviewPane) {
+              mdPreviewPane.style.display = 'block';
+              mdPreviewPane.style.flex = '1';
+            }
+            renderMarkdownPreview();
+          }
+        }
+
+        function renderMarkdownPreview() {
+          if (!mdTextarea || !mdPreviewPane) return;
+          const raw = mdTextarea.value || '';
+          if (typeof marked !== 'undefined') {
+            mdPreviewPane.innerHTML = marked.parse(raw);
+            if (typeof hljs !== 'undefined') {
+              mdPreviewPane.querySelectorAll('pre code').forEach(block => {
+                try { hljs.highlightElement(block); } catch (e) {}
+              });
+            }
+          } else {
+            mdPreviewPane.textContent = raw;
+          }
+        }
+
+        function loadMarkdownContent(id) {
+          if (mdCache[id] !== undefined) {
+            if (mdTextarea) mdTextarea.value = mdCache[id];
+            renderMarkdownPreview();
+            return;
+          }
+
+          if (mdTextarea) mdTextarea.value = 'Loading...';
+          if (mdPreviewPane) mdPreviewPane.innerHTML = '<div style="color: #94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading note...</div>';
+
+          fetch('/recordings/' + encodeURIComponent(id) + '/content', { credentials: 'same-origin' })
+            .then(res => {
+              if (!res.ok) throw new Error('Status ' + res.status);
+              return res.text();
+            })
+            .then(content => {
+              mdCache[id] = content;
+              if (activeId === id) {
+                if (mdTextarea) mdTextarea.value = content;
+                renderMarkdownPreview();
+              }
+            })
+            .catch(err => {
+              console.error('Failed to load markdown content:', err);
+              if (activeId === id && mdPreviewPane) {
+                mdPreviewPane.innerHTML = '<div style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load note content.</div>';
+              }
+            });
+        }
+
+        function saveMarkdownContent() {
+          if (!activeId || !mdTextarea) return;
+          const content = mdTextarea.value;
+          mdCache[activeId] = content;
+
+          fetch('/recordings/' + encodeURIComponent(activeId) + '/content', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content }),
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.ok) {
+              if (mdSaveStatus) {
+                mdSaveStatus.style.display = 'inline-flex';
+                setTimeout(() => { mdSaveStatus.style.display = 'none'; }, 2200);
+              }
+              renderMarkdownPreview();
+
+              if (data.title) {
+                const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+                if (activeBtn) {
+                  activeBtn.setAttribute('data-title', data.title);
+                  const titleSpan = activeBtn.querySelector('.item-title');
+                  if (titleSpan) titleSpan.textContent = data.title;
+                  const step = activeBtn.getAttribute('data-step');
+                  if (titleEl) {
+                    titleEl.querySelector('span').textContent = (step ? '#' + step + ': ' : '') + data.title;
+                  }
+                  if (editTitle) editTitle.value = data.title;
+                }
+              }
+            } else {
+              alert('Failed to save note: ' + (data.error || 'Unknown error'));
+            }
+          })
+          .catch(err => {
+            console.error('Save error:', err);
+            alert('Failed to save note content.');
+          });
+        }
+
+        // --- Note Tab Mode Listeners ---
+        if (mdTabPreview) mdTabPreview.addEventListener('click', () => setMdMode('preview'));
+        if (mdTabEdit) mdTabEdit.addEventListener('click', () => setMdMode('edit'));
+        if (mdTabSplit) mdTabSplit.addEventListener('click', () => setMdMode('split'));
+        if (mdSaveBtn) mdSaveBtn.addEventListener('click', saveMarkdownContent);
+
+        // --- Textarea Tab Indentation, Auto-render and Ctrl+S Shortcut ---
+        if (mdTextarea) {
+          mdTextarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              const start = mdTextarea.selectionStart;
+              const end = mdTextarea.selectionEnd;
+              mdTextarea.value = mdTextarea.value.substring(0, start) + '  ' + mdTextarea.value.substring(end);
+              mdTextarea.selectionStart = mdTextarea.selectionEnd = start + 2;
+              if (currentMdMode === 'split') renderMarkdownPreview();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+              e.preventDefault();
+              saveMarkdownContent();
+            }
+          });
+
+          mdTextarea.addEventListener('input', () => {
+            if (currentMdMode === 'split') {
+              clearTimeout(mdRenderTimeout);
+              mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
+            }
+          });
+        }
 
         // --- New Walkthrough Set Handler ---
         if (newSetBtn && newSetName) {
@@ -326,13 +653,16 @@
           });
         }
 
-        function play(src, label, id, step, title) {
+        function play(src, label, id, step, title, dataType) {
           if (!src) return;
           activeId = id;
+          activeDataType = dataType || 'cast';
           const formRecInput = document.getElementById('walkthrough-form-recording');
           if (formRecInput) formRecInput.value = id || '';
+
           if (player && typeof player.dispose === 'function') {
             try { player.dispose(); } catch (e) {}
+            player = null;
           }
           demoDiv.innerHTML = '';
           titleEl.querySelector('span').textContent = (step ? '#' + step + ': ' : '') + (title || label);
@@ -346,15 +676,32 @@
           const deleteBtn = deleteForm ? deleteForm.querySelector('button') : null;
           if (deleteBtn) {
             deleteBtn.disabled = false;
-            deleteBtn.title = 'Delete this recording';
+            deleteBtn.title = 'Delete this step';
             deleteBtn.style.opacity = '1';
             deleteBtn.style.cursor = 'pointer';
           }
 
-          if (typeof AsciinemaPlayer !== 'undefined' && typeof AsciinemaPlayer.create === 'function') {
-            player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: false });
+          if (activeDataType === 'markdown') {
+            if (demoContainer) demoContainer.style.display = 'none';
+            if (mdContainer) mdContainer.style.display = 'flex';
+            if (titleIcon) {
+              titleIcon.className = 'fab fa-markdown';
+              titleIcon.style.color = '#38bdf8';
+            }
+            loadMarkdownContent(id);
+            setMdMode(currentMdMode || 'preview');
           } else {
-            titleEl.querySelector('span').textContent = 'Asciinema player not loaded';
+            if (mdContainer) mdContainer.style.display = 'none';
+            if (demoContainer) demoContainer.style.display = 'flex';
+            if (titleIcon) {
+              titleIcon.className = 'fas fa-play-circle w3-text-green';
+              titleIcon.style.color = '';
+            }
+            if (typeof AsciinemaPlayer !== 'undefined' && typeof AsciinemaPlayer.create === 'function') {
+              player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: false });
+            } else {
+              titleEl.querySelector('span').textContent = 'Asciinema player not loaded';
+            }
           }
         }
 
@@ -366,8 +713,9 @@
           const id = btn.getAttribute('data-id');
           const step = btn.getAttribute('data-step');
           const title = btn.getAttribute('data-title');
+          const dataType = btn.getAttribute('data-type') || 'cast';
           const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
-          play(src, node, id, step, title);
+          play(src, node, id, step, title, dataType);
         }
 
         // Click handlers for selecting items
@@ -536,7 +884,6 @@
           const empty = document.getElementById('recs-empty');
           if (empty) empty.style.display = 'none';
 
-          // Persisting the order also adds an item dragged in from "Other".
           updateOrderAndSync();
           updateListMeta();
           clearDragStyles();
@@ -604,32 +951,24 @@
               return;
             }
 
-            if (e.target.closest('.rec-item-wrapper') === draggedItem) {
-              clearDragStyles();
-              return;
-            }
-
-            const wasInRecs = (draggedSource === 'recs');
-
             placeInOther(e);
 
-            if (wasInRecs) {
-              const btn = draggedItem.querySelector('.rec-item');
-              const stepSpan = draggedItem.querySelector('.step-num');
-              if (btn) btn.setAttribute('data-step', '');
-              if (stepSpan) {
-                stepSpan.textContent = '+';
-                stepSpan.style.color = '#64748b';
-              }
+            // Strip step number badge from item placed in unintegrated list
+            const btn = draggedItem.querySelector('.rec-item');
+            const stepSpan = draggedItem.querySelector('.step-num');
+            if (btn) btn.setAttribute('data-step', '');
+            if (stepSpan) {
+              stepSpan.textContent = '+';
+              stepSpan.style.color = '#64748b';
+            }
 
-              // Sync remaining set order to server (removes item from walkthrough)
-              updateOrderAndSync();
+            // Renumber remaining steps in recsList and sync to backend
+            updateOrderAndSync();
 
-              if (btn && btn.classList.contains('active')) {
-                const title = btn.getAttribute('data-title');
-                const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : '';
-                titleEl.querySelector('span').textContent = title || node;
-              }
+            if (btn && btn.classList.contains('active')) {
+              const title = btn.getAttribute('data-title');
+              const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : '';
+              titleEl.querySelector('span').textContent = title || node;
             }
 
             updateListMeta();
@@ -648,6 +987,16 @@
           if (otherCount) otherCount.textContent = '(' + otherItems + ')';
           if (otherEmpty) otherEmpty.style.display = (otherItems === 0) ? '' : 'none';
           if (recsEmpty) recsEmpty.style.display = (setItems === 0) ? '' : 'none';
+
+          // Dynamically update the count badge in the Walkthrough Set selector (<select id="walkthrough-select">)
+          const wtSelect = document.getElementById('walkthrough-select');
+          if (wtSelect) {
+            const opt = wtSelect.querySelector(`option[value="${CSS.escape(activeWalkthrough)}"]`);
+            if (opt) {
+              const currentName = (document.getElementById('walkthrough-name')?.value || opt.value).trim();
+              opt.textContent = `${currentName} (${setItems})`;
+            }
+          }
         }
 
         function updateOrderAndSync() {
@@ -659,10 +1008,12 @@
             const btn = wrapper.querySelector('.rec-item');
             const stepSpan = wrapper.querySelector('.step-num');
 
-            btn.setAttribute('data-step', newStep);
-            stepSpan.textContent = '#' + newStep;
-            stepSpan.style.color = '#38bdf8';
-            orderedIds.push(btn.getAttribute('data-id'));
+            if (btn) btn.setAttribute('data-step', newStep);
+            if (stepSpan) {
+              stepSpan.textContent = '#' + newStep;
+              stepSpan.style.color = '#38bdf8';
+            }
+            if (btn) orderedIds.push(btn.getAttribute('data-id'));
           });
 
           if (activeId) {
@@ -680,6 +1031,21 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: orderedIds, walkthrough: activeWalkthrough })
           }).catch(err => console.error('Failed to sync recording order', err));
+        }
+
+        const wtNameInput = document.getElementById('walkthrough-name');
+        if (wtNameInput) {
+          wtNameInput.addEventListener('input', () => {
+            const wtSelect = document.getElementById('walkthrough-select');
+            if (wtSelect) {
+              const opt = wtSelect.querySelector(`option[value="${CSS.escape(activeWalkthrough)}"]`);
+              if (opt) {
+                const setItems = recsList.querySelectorAll('.rec-item-wrapper').length;
+                const val = wtNameInput.value.trim() || opt.value;
+                opt.textContent = `${val} (${setItems})`;
+              }
+            }
+          });
         }
 
         const wtForm = document.getElementById('walkthrough-form');

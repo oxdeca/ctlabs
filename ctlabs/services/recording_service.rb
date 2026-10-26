@@ -21,6 +21,7 @@ require 'securerandom'
 class RecordingService
   DIR        = '/srv/ctlabs-server/recordings'
   EXT        = '.cast'
+  MD_EXT     = '.md'
   MANIFEST   = '_walkthrough.json'
   ID_RE      = /\A[a-zA-Z0-9_.-]{1,120}\z/
   NODE_MAX   = 40
@@ -43,8 +44,20 @@ class RecordingService
 
   def self.path_for(id)
     return nil unless valid_id?(id)
-    path = File.join(ensure_dir, "#{id}#{EXT}")
-    File.file?(path) ? path : nil
+    base = id.to_s
+    # Direct match if extension already provided
+    if base.end_with?(EXT) || base.end_with?(MD_EXT)
+      p = File.join(ensure_dir, base)
+      return p if File.file?(p)
+    end
+    # Check .cast then .md
+    cast_path = File.join(ensure_dir, "#{base}#{EXT}")
+    return cast_path if File.file?(cast_path)
+
+    md_path = File.join(ensure_dir, "#{base}#{MD_EXT}")
+    return md_path if File.file?(md_path)
+
+    nil
   end
 
   def self.node_slug(node)
@@ -53,6 +66,16 @@ class RecordingService
 
   def self.new_id(node)
     "#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(node)}_#{SecureRandom.hex(3)}"
+  end
+
+  def self.new_markdown_id(label = 'note')
+    "md_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
+  end
+
+  def self.all_disk_files
+    ensure_dir
+    (Dir.glob(File.join(DIR, "*#{EXT}")) + Dir.glob(File.join(DIR, "*#{MD_EXT}")))
+      .reject { |p| File.basename(p).start_with?('_') }
   end
 
   # Opens a recording, writes the asciicast v2 header and returns [id, io].
@@ -91,7 +114,7 @@ class RecordingService
   # Newest first.
   def self.list
     ensure_dir
-    Dir.glob(File.join(DIR, "*#{EXT}"))
+    all_disk_files
        .filter_map { |path| meta(path) }
        .sort_by { |m| [m[:created_at], m[:id]] }
        .reverse
@@ -99,6 +122,33 @@ class RecordingService
 
   def self.meta(path)
     return nil unless File.file?(path)
+
+    if path.end_with?(MD_EXT)
+      id   = File.basename(path, MD_EXT)
+      size = File.size(path)
+      content = begin
+        File.read(path, encoding: 'UTF-8')
+      rescue StandardError
+        ''
+      end
+      title = 'Step Note'
+      content.to_s.lines.each do |line|
+        l = line.strip
+        next if l.empty?
+        title = l.sub(/^#+\s*/, '')
+        break
+      end
+      return {
+        id:         id,
+        path:       path,
+        node:       'Markdown',
+        title:      title,
+        type:       :markdown,
+        created_at: File.mtime(path),
+        duration:   0.0,
+        size:       size
+      }
+    end
 
     id   = File.basename(path, EXT)
     size = File.size(path)
@@ -122,6 +172,7 @@ class RecordingService
       path:       path,
       node:       header.dig('ctlabs', 'node') || node_from_id(id),
       title:      header['title'].to_s,
+      type:       :cast,
       cols:       header['width'],
       rows:       header['height'],
       created_at: created_at,
@@ -235,10 +286,34 @@ class RecordingService
   end
 
 
-  # Updates the title in the JSON header of the .cast file
+  # Updates the title in the JSON header of the .cast file or heading of .md file
   def self.update_meta(id, title:)
     path = path_for(id)
     return false unless path
+
+    if path.end_with?(MD_EXT)
+      content = begin
+        File.read(path, encoding: 'UTF-8')
+      rescue StandardError
+        ''
+      end
+      lines = content.lines
+      new_title = title.to_s.strip
+      new_title = 'Step Note' if new_title.empty?
+      new_heading = "# #{new_title}\n"
+
+      first_non_empty_idx = lines.find_index { |l| !l.strip.empty? }
+      if first_non_empty_idx.nil?
+        File.write(path, new_heading)
+      elsif lines[first_non_empty_idx].strip.start_with?('#')
+        lines[first_non_empty_idx] = new_heading
+        File.write(path, lines.join)
+      else
+        lines.insert(first_non_empty_idx, new_heading + "\n")
+        File.write(path, lines.join)
+      end
+      return true
+    end
 
     lines = File.readlines(path)
     return false if lines.empty?
@@ -259,6 +334,35 @@ class RecordingService
     false
   end
 
+  def self.create_markdown_step(slug, title: 'Step Note', content: nil)
+    ensure_dir
+    id = new_markdown_id('note')
+    path = File.join(DIR, "#{id}#{MD_EXT}")
+    clean_title = title.to_s.strip
+    clean_title = 'Step Note' if clean_title.empty?
+    initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
+    File.write(path, initial_content, encoding: 'UTF-8')
+    add_to_walkthrough(slug, [id])
+    id
+  end
+
+  def self.read_content(id)
+    path = path_for(id)
+    return nil unless path && path.end_with?(MD_EXT)
+    File.read(path, encoding: 'UTF-8')
+  rescue StandardError
+    nil
+  end
+
+  def self.update_content(id, content)
+    path = path_for(id)
+    return false unless path && path.end_with?(MD_EXT)
+    File.write(path, content.to_s, encoding: 'UTF-8')
+    true
+  rescue StandardError
+    false
+  end
+
   # Saves the drag-and-drop custom order array to an index file
   def self.reorder!(ordered_ids)
     ensure_dir
@@ -272,7 +376,7 @@ class RecordingService
   # Lists recordings ordered by saved drag-and-drop sequence, falling back to newest first
   def self.list
     ensure_dir
-    files = Dir.glob(File.join(DIR, "*#{EXT}"))
+    files = all_disk_files
     recs = files.filter_map { |path| meta(path) }
 
     order_file = File.join(DIR, '_order.json')
@@ -324,8 +428,8 @@ class RecordingService
     data ||= {
       'walkthrough_1' => {
         'name'             => 'Walkthrough 1',
-        'recording_ids'    => Dir.glob(File.join(DIR, "*#{EXT}"))
-                                 .map { |f| File.basename(f, EXT) }
+        'recording_ids'    => all_disk_files
+                                 .map { |f| File.basename(f, File.extname(f)) }
                                  .sort
                                  .reverse,
         'unintegrated_ids' => []
@@ -353,9 +457,9 @@ class RecordingService
     end
 
     # Ensure no recordings exist that are not part of a set.
-    # Any cast on disk not yet in any set gets claimed into the first set.
-    existing_casts = Dir.glob(File.join(DIR, "*#{EXT}"))
-                        .map { |f| File.basename(f, EXT) }
+    # Any recording or note on disk not yet in any set gets claimed into the first set.
+    existing_files = all_disk_files
+                        .map { |f| File.basename(f, File.extname(f)) }
     known_members = {}
     data.each_value do |entry|
       (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).each do |id|
@@ -363,7 +467,7 @@ class RecordingService
       end
     end
 
-    orphans = existing_casts.reject { |id| known_members[id] }
+    orphans = existing_files.reject { |id| known_members[id] }
     if orphans.any?
       target_key = data.keys.first
       if target_key && data[target_key]
@@ -476,7 +580,7 @@ class RecordingService
     key, wk, = walkthrough_entry(slug, wks)
     allowed_ids = Array(wk['recording_ids']).map(&:to_s)
 
-    all_recs = Dir.glob(File.join(DIR, "*#{EXT}"))
+    all_recs = all_disk_files
                   .filter_map { |path| meta(path) }
                   .sort_by { |m| [m[:created_at], m[:id]] }
                   .reverse
@@ -496,7 +600,7 @@ class RecordingService
     step_ids = Array(wk['recording_ids']).map(&:to_s)
     unint_ids = (Array(wk['unintegrated_ids']) + Array(wk['excluded_ids'])).map(&:to_s).uniq - step_ids
 
-    all_recs = Dir.glob(File.join(DIR, "*#{EXT}"))
+    all_recs = all_disk_files
                   .filter_map { |path| meta(path) }
                   .sort_by { |m| [m[:created_at], m[:id]] }
                   .reverse
