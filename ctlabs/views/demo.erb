@@ -17,6 +17,14 @@
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
             <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Walkthrough Steps</div>
             <div style="display: flex; align-items: center; gap: 6px;">
+              <!-- New Set Button -->
+              <form method="post" action="/walkthroughs/create" style="margin: 0;">
+                <input type="hidden" name="name" id="new-set-name" />
+                <button type="button" id="new-set-btn" title="Create a new walkthrough set" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
+                  <i class="fas fa-plus"></i> New
+                </button>
+              </form>
+
               <!-- Import Button & Hidden File Input -->
               <button id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
                 <i class="fas fa-upload"></i> Import
@@ -125,11 +133,23 @@
         const recsList = document.getElementById('recs-list');
         const importBtn = document.getElementById('import-btn');
         const importFileInput = document.getElementById('import-file-input');
+        const newSetBtn = document.getElementById('new-set-btn');
+        const newSetName = document.getElementById('new-set-name');
 
         let player = null;
         let activeId = null;
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
         const preferredRecording = <%= (@selected_recording || '').to_s.to_json %>;
+
+        // --- New Walkthrough Set Handler ---
+        if (newSetBtn && newSetName) {
+          newSetBtn.addEventListener('click', () => {
+            const name = window.prompt('Name for the new walkthrough set:', 'New Walkthrough');
+            if (name === null) return;
+            newSetName.value = name.trim() || 'New Walkthrough';
+            newSetBtn.form.submit();
+          });
+        }
 
         // --- Import Walkthrough Handler ---
         if (importBtn && importFileInput) {
