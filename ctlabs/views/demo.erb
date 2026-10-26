@@ -968,7 +968,7 @@
           });
         }
 
-        function play(src, label, id, step, title, dataType) {
+        function play(src, label, id, step, title, dataType, autoPlay = false) {
           if (!src) return;
           activeId = id;
           activeDataType = dataType || 'cast';
@@ -1013,14 +1013,20 @@
               titleIcon.style.color = '';
             }
             if (typeof AsciinemaPlayer !== 'undefined' && typeof AsciinemaPlayer.create === 'function') {
-              player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: false });
+              player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: autoPlay, autoPlay: autoPlay });
+              if (autoPlay && player && typeof player.play === 'function') {
+                try {
+                  const p = player.play();
+                  if (p && typeof p.catch === 'function') p.catch(() => {});
+                } catch (e) {}
+              }
             } else {
               titleEl.querySelector('span').textContent = 'Asciinema player not loaded';
             }
           }
         }
 
-        function selectRecording(btn) {
+        function selectRecording(btn, autoPlay = false) {
           if (!btn) return;
           document.querySelectorAll('.rec-item').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
@@ -1030,7 +1036,7 @@
           const title = btn.getAttribute('data-title');
           const dataType = btn.getAttribute('data-type') || 'cast';
           const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
-          play(src, node, id, step, title, dataType);
+          play(src, node, id, step, title, dataType, autoPlay);
           updateStepNav();
 
           // Persist the last highlighted step in localStorage, browser URL, and session
@@ -1098,34 +1104,34 @@
           }
         }
 
-        function goToPreviousStep() {
+        function goToPreviousStep(autoPlay = true) {
           const stepButtons = getStepButtons();
           if (stepButtons.length === 0) return;
           const currentIndex = stepButtons.findIndex(b => b.getAttribute('data-id') === activeId);
           if (currentIndex > 0) {
             const targetBtn = stepButtons[currentIndex - 1];
-            selectRecording(targetBtn);
+            selectRecording(targetBtn, autoPlay);
             targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           }
         }
 
-        function goToNextStep() {
+        function goToNextStep(autoPlay = true) {
           const stepButtons = getStepButtons();
           if (stepButtons.length === 0) return;
           const currentIndex = stepButtons.findIndex(b => b.getAttribute('data-id') === activeId);
           if (currentIndex === -1) {
             const targetBtn = stepButtons[0];
-            selectRecording(targetBtn);
+            selectRecording(targetBtn, autoPlay);
             targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           } else if (currentIndex < stepButtons.length - 1) {
             const targetBtn = stepButtons[currentIndex + 1];
-            selectRecording(targetBtn);
+            selectRecording(targetBtn, autoPlay);
             targetBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
           }
         }
 
-        if (stepPrevBtn) stepPrevBtn.addEventListener('click', goToPreviousStep);
-        if (stepNextBtn) stepNextBtn.addEventListener('click', goToNextStep);
+        if (stepPrevBtn) stepPrevBtn.addEventListener('click', () => goToPreviousStep(true));
+        if (stepNextBtn) stepNextBtn.addEventListener('click', () => goToNextStep(true));
 
         window.addEventListener('keydown', (e) => {
           if (e.key === 'Escape') {
@@ -1144,10 +1150,10 @@
 
           if ((e.altKey && e.key === 'ArrowLeft') || e.key === 'PageUp') {
             e.preventDefault();
-            goToPreviousStep();
+            goToPreviousStep(true);
           } else if ((e.altKey && e.key === 'ArrowRight') || e.key === 'PageDown') {
             e.preventDefault();
-            goToNextStep();
+            goToNextStep(true);
           }
         });
 
