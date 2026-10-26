@@ -165,9 +165,9 @@
               <input type="file" id="import-file-input" accept=".zip,.cast,.md" style="display: none;" />
 
               <!-- Export Download Button -->
-              <a href="/recordings/download-all?walkthrough=<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>" target="_self" title="Export this walkthrough set as ZIP (includes its name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
+              <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                 <i class="fas fa-file-archive"></i> Export 
-              </a>
+              </button>
               <div id="set-count" style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
               <!-- Collapse Sidebar Button -->
               <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" style="background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; border: 1px solid #475569; cursor: pointer; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center;">
@@ -427,6 +427,35 @@
           <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" onclick="document.getElementById('delete-set-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
             <button type="submit" class="w3-button w3-round w3-red" style="font-size: 0.85em; padding: 6px 14px; font-weight: 600;"><i class="fas fa-trash-alt"></i> Delete Set</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Export Walkthrough Set Modal -->
+    <div id="export-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 480px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8;"><i class="fas fa-file-archive"></i> Export Walkthrough Set</h3>
+          <span onclick="document.getElementById('export-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <form method="get" action="/recordings/download-all" id="export-form" style="padding: 16px; margin: 0;">
+          <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+            Export <strong>&ldquo;<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>&rdquo;</strong> as a portable ZIP bundle containing recordings, notes, and embedded pictures.
+          </p>
+          <div style="margin-bottom: 16px;">
+            <label for="export-filename" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+              Export File Name
+            </label>
+            <input type="text" id="export-filename" name="filename" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" placeholder="walkthrough.zip" required />
+            <span style="display: block; color: #94a3b8; font-size: 0.8em; margin-top: 5px;">
+              The <code>.zip</code> extension will be added automatically if omitted.
+            </span>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" onclick="document.getElementById('export-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="submit" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600;"><i class="fas fa-download"></i> Download ZIP</button>
           </div>
         </form>
       </div>
@@ -1323,10 +1352,39 @@
           });
         }
 
+        // --- Export Modal Handler ---
+        window.openExportModal = function() {
+          const exportModal = document.getElementById('export-modal');
+          const exportInput = document.getElementById('export-filename');
+          if (exportModal && exportInput) {
+            const rawName = <%= (@walkthrough_name || @active_walkthrough || 'walkthrough').to_s.to_json %>;
+            const clean = rawName.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'walkthrough';
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            exportInput.value = `ctlabs_${clean}_${dateStr}.zip`;
+            exportModal.style.display = 'block';
+            exportInput.focus();
+            exportInput.select();
+          }
+        };
+
+        const exportForm = document.getElementById('export-form');
+        if (exportForm) {
+          exportForm.addEventListener('submit', () => {
+            setTimeout(() => {
+              const exportModal = document.getElementById('export-modal');
+              if (exportModal) exportModal.style.display = 'none';
+            }, 600);
+          });
+        }
+
         window.addEventListener('click', (e) => {
           const deleteModal = document.getElementById('delete-set-modal');
           if (e.target === deleteModal) {
             deleteModal.style.display = 'none';
+          }
+          const exportModal = document.getElementById('export-modal');
+          if (e.target === exportModal) {
+            exportModal.style.display = 'none';
           }
         });
       })();

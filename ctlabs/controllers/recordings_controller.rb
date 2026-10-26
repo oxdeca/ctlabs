@@ -54,9 +54,23 @@ class RecordingsController < BaseController
     label = bundle[:slug] if label.empty?
     label = 'walkthrough' if label.empty?
 
-    # Write directly to a safe path in DIR to prevent premature Tempfile unlinking issues
-    zip_filename = "ctlabs_walkthrough_#{label}_#{Time.now.strftime('%Y%m%d_%H%M%S')}.zip"
-    zip_path = File.join(RecordingService::DIR, zip_filename)
+    # Custom export filename if provided
+    custom_name = params[:filename].to_s.strip
+    custom_name = File.basename(custom_name)
+    custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+
+    zip_filename = if !custom_name.empty? && custom_name != '.zip'
+                     custom_name.downcase.end_with?('.zip') ? custom_name : "#{custom_name}.zip"
+                   else
+                     "ctlabs_walkthrough_#{label}_#{Time.now.strftime('%Y%m%d_%H%M%S')}.zip"
+                   end
+
+    # Clean up older export zip files (>1 hour old)
+    Dir.glob(File.join(RecordingService::DIR, 'export_*_*.zip')).each do |old_zip|
+      File.delete(old_zip) rescue nil if File.mtime(old_zip) < (Time.now - 3600)
+    end
+
+    zip_path = File.join(RecordingService::DIR, "export_#{SecureRandom.hex(4)}_#{zip_filename}")
 
     Zip::File.open(zip_path, create: true) do |zipfile|
       files.each do |rec|
