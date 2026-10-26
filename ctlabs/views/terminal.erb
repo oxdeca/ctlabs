@@ -274,6 +274,12 @@
           const fname = 'term_' + nodeName.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now() + '.cast';
           form.append('file', blob, fname);
           form.append('node', nodeName);
+          try {
+            const activeWalkthrough = localStorage.getItem('ctlabs_active_walkthrough');
+            if (activeWalkthrough) {
+              form.append('walkthrough', activeWalkthrough);
+            }
+          } catch (e) {}
           fetch('/recordings/upload', { method: 'POST', body: form, credentials: 'same-origin' })
             .catch(() => {});
         };

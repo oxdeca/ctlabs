@@ -20,11 +20,25 @@ class RecordingsController < BaseController
     f = params[:file]
     halt 400, { ok: false }.to_json unless f && f[:tempfile]
     node = params[:node].to_s
+
+    wks = RecordingService.load_walkthroughs
+    target_slug = params[:walkthrough].to_s
+    target_slug = session[:walkthrough].to_s if target_slug.empty? || !wks.key?(target_slug)
+    target_slug = wks.keys.first.to_s if target_slug.empty? || !wks.key?(target_slug)
+
+    if target_slug.empty?
+      target_slug = RecordingService.create_walkthrough('Walkthrough 1')
+      wks = RecordingService.load_walkthroughs
+    end
+
     id = RecordingService.new_id(node.empty? ? 'terminal' : node)
     path = File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}")
     FileUtils.mkdir_p(File.dirname(path))
     FileUtils.cp(f[:tempfile].path, path)
-    { ok: true, id: id }.to_json
+
+    RecordingService.add_to_walkthrough(target_slug, [id])
+
+    { ok: true, id: id, walkthrough: target_slug }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
@@ -54,6 +68,7 @@ class RecordingsController < BaseController
         'format'         => 'ctlabs-walkthrough',
         'version'        => 1,
         'name'           => bundle[:name],
+        'sealed'         => bundle[:sealed],
         'recording_ids'  => files.map { |rec| rec[:id] },
         'exported_at'    => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
       }
@@ -114,7 +129,7 @@ class RecordingsController < BaseController
         end
         ordered += imported - ordered
         walkthrough = RecordingService.create_walkthrough(
-          manifest['name'], recording_ids: ordered, sealed: true, unique: true
+          manifest['name'], recording_ids: ordered, unique: true
         )
       elsif !imported.empty?
         walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
@@ -173,7 +188,7 @@ class RecordingsController < BaseController
 
     wks  = RecordingService.load_walkthroughs
     slug = params[:walkthrough].to_s
-    slug = 'default' unless wks.key?(slug)
+    slug = wks.keys.first.to_s unless wks.key?(slug)
     redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
   end
 
@@ -183,7 +198,13 @@ class RecordingsController < BaseController
     deleted = RecordingService.delete(params[:id])
     halt 404, 'Recording not found' unless deleted
 
-    redirect '/demo'
+    slug = params[:walkthrough].to_s
+    wks  = RecordingService.load_walkthroughs
+    if wks.key?(slug)
+      redirect "/demo?walkthrough=#{slug}"
+    else
+      redirect '/demo'
+    end
   end
 
   post '/recordings/reorder' do
@@ -193,7 +214,8 @@ class RecordingsController < BaseController
 
     data = JSON.parse(body)
     ordered_ids = data['order']
-    walkthrough_slug = data['walkthrough'] || 'default'
+    wks = RecordingService.load_walkthroughs
+    walkthrough_slug = data['walkthrough'] || session[:walkthrough] || wks.keys.first.to_s
     
     halt 400, { ok: false, error: 'Invalid order data' }.to_json unless ordered_ids.is_a?(Array)
 
@@ -218,6 +240,17 @@ class RecordingsController < BaseController
 
   post '/walkthroughs/:slug/rename' do
     slug, = RecordingService.rename_walkthrough(params[:slug].to_s, params[:name].to_s)
-    redirect "/demo?walkthrough=#{slug}"
+    rec = params[:recording].to_s
+    redirect_url = "/demo?walkthrough=#{slug}"
+    redirect_url += "&recording=#{rec}" if RecordingService.valid_id?(rec)
+    redirect redirect_url
+  end
+
+  post '/walkthroughs/:slug/delete' do
+    slug = params[:slug].to_s
+    delete_recs = %w[1 true yes on].include?(params[:delete_recordings].to_s.downcase)
+    RecordingService.delete_walkthrough(slug, delete_recordings: delete_recs)
+    session.delete(:walkthrough) if session[:walkthrough] == slug
+    redirect '/demo'
   end
 end

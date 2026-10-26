@@ -63,10 +63,15 @@ class MainController < BaseController
     # Coming back via the nav link (no ?walkthrough=) should reopen the set the
     # user was last working in, not silently fall back to the default set.
     requested = session[:walkthrough].to_s if requested.empty?
-    @active_walkthrough = @walkthroughs.key?(requested) ? requested : 'default'
+    @active_walkthrough = if @walkthroughs.key?(requested)
+                            requested
+                          else
+                            @walkthroughs.keys.first.to_s
+                          end
     session[:walkthrough] = @active_walkthrough
     @walkthrough_name = RecordingService.walkthrough_name(@active_walkthrough)
     @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
+    @other_recordings = RecordingService.list_unintegrated_for_walkthrough(@active_walkthrough)
     selected = params[:recording].to_s
     @selected_recording = RecordingService.valid_id?(selected) ? selected : ''
     erb :demo

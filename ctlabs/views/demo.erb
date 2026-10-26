@@ -6,6 +6,40 @@
 # -----------------------------------------------------------------------------
 -->
 
+<style>
+  #set-divider:hover, #set-divider.dragging {
+    background: #334155 !important;
+    border-top-color: #38bdf8 !important;
+    border-bottom-color: #38bdf8 !important;
+  }
+  #set-divider:hover .grip-handle, #set-divider.dragging .grip-handle {
+    background: #38bdf8 !important;
+  }
+  .rec-item {
+    border-left: 4px solid transparent !important;
+    transition: background 0.15s ease, border-left-color 0.15s ease;
+  }
+  .rec-item:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+  }
+  .rec-item.active {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.22) 0%, rgba(56, 189, 248, 0.06) 100%) !important;
+    border-left: 4px solid #38bdf8 !important;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.2);
+  }
+  .rec-item.active:hover {
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.28) 0%, rgba(56, 189, 248, 0.10) 100%) !important;
+  }
+  .rec-item.active .item-title {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+  }
+  .rec-item.active .step-num {
+    font-weight: 700 !important;
+    text-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  }
+</style>
+
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
       <h2><i class="fas fa-video"></i> Walkthrough <span style="font-size: 0.55em; opacity: 0.8;">&mdash; <%= ERB::Util.html_escape(@walkthrough_name.to_s) %></span></h2>
     </div>
@@ -15,7 +49,7 @@
         <!-- Sidebar: recorded sessions -->
         <aside style="width: 340px; min-width: 280px; max-width: 400px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b;">
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
-            <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Walkthrough Steps</div>
+            <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Steps</div>
             <div style="display: flex; align-items: center; gap: 6px;">
               <!-- New Set Button -->
               <form method="post" action="/walkthroughs/create" style="margin: 0;">
@@ -31,26 +65,42 @@
               </button>
               <input type="file" id="import-file-input" accept=".zip,.cast" style="display: none;" />
 
-              <!-- Zip Download Button -->
-              <a href="/recordings/download-all?walkthrough=<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>" target="_self" title="Download this walkthrough set as ZIP (includes its name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
-                <i class="fas fa-file-archive"></i> Zip
+              <!-- Export Download Button -->
+              <a href="/recordings/download-all?walkthrough=<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>" target="_self" title="Export this walkthrough set as ZIP (includes its name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
+                <i class="fas fa-file-archive"></i> Export 
               </a>
-              <div style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
+              <div id="set-count" style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
             </div>
           </div>
 
-          <form method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; margin: 0;">
-            <label for="walkthrough-name" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Set name</label>
+          <!-- Walkthrough Set Selector -->
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a;">
+            <label for="walkthrough-select" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;"><i class="fas fa-layer-group" style="margin-right: 2px;"></i> Set</label>
+            <select id="walkthrough-select" onchange="window.location.href='/demo?walkthrough=' + encodeURIComponent(this.value);" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; cursor: pointer;">
+              <% (@walkthroughs || {}).each do |slug, data| %>
+                <option value="<%= ERB::Util.html_escape(slug) %>"<%= ' selected' if slug == @active_walkthrough %>>
+                  <%= ERB::Util.html_escape(data['name'] || slug) %> (<%= Array(data['recording_ids']).size %>)
+                </option>
+              <% end %>
+            </select>
+            <button type="button" id="delete-set-btn" title="Delete current walkthrough set" onclick="document.getElementById('delete-set-modal').style.display='block'" class="w3-button w3-small" style="background: #ef4444; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+
+          <form id="walkthrough-form" method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; margin: 0;">
+            <input type="hidden" name="recording" id="walkthrough-form-recording" value="<%= ERB::Util.html_escape(@selected_recording.to_s) %>" />
+            <label for="walkthrough-name" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Name</label>
             <input type="text" id="walkthrough-name" name="name" value="<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>" maxlength="<%= RecordingService::NAME_MAX %>" title="Name of this walkthrough set (kept when exporting/importing the ZIP)" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;" />
             <button type="submit" title="Save walkthrough name" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em;"><i class="fas fa-save"></i></button>
           </form>
 
-          <div id="recs-list" style="flex: 1; min-height: 0; overflow-y: auto;">
+          <div id="recs-list" style="flex: 1; min-height: 80px; overflow-y: auto;">
             <% recs = (@recordings || []) %>
             <% if recs.empty? %>
-              <div style="padding: 18px 14px; color: #94a3b8; font-size: 0.9em; line-height: 1.5;">
+              <div id="recs-empty" style="padding: 18px 14px; color: #94a3b8; font-size: 0.9em; line-height: 1.5;">
                 <div style="margin-bottom: 8px;"><i class="fas fa-info-circle"></i> No recordings yet</div>
-                <div>Open a terminal, click <strong>REC</strong> to capture a step, and it will appear here.</div>
+                <div>Open a terminal, click <strong>REC</strong> to capture a step, and it will appear here. You can also drag one in from <strong>RECORDINGS</strong> below.</div>
               </div>
             <% else %>
               <% recs.each_with_index do |r, idx| %>
@@ -67,9 +117,7 @@
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step="<%= r[:step] || (idx + 1) %>"
-                        style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;" 
-                        onmouseover="this.style.backgroundColor='rgba(255,255,255,0.03)'" 
-                        onmouseout="this.style.backgroundColor='transparent'">
+                        style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                         <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
@@ -88,6 +136,61 @@
                 </div>
               <% end %>
             <% end %>
+            <div id="recs-end-drop" title="Drop here to move a step to the end" style="height: 32px; border-top: 2px solid transparent;"></div>
+          </div>
+
+
+          <!-- Movable divider / separation line -->
+          <div id="set-divider" title="Drag up or down to resize" style="height: 10px; cursor: row-resize; background: #0b1120; border-top: 2px solid #475569; border-bottom: 2px solid #475569; display: flex; align-items: center; justify-content: center; flex-shrink: 0; user-select: none; transition: background 0.15s, border-color 0.15s;">
+            <div class="grip-handle" style="width: 42px; height: 3px; background: #64748b; border-radius: 2px; transition: background 0.15s;"></div>
+          </div>
+
+          <% others = (@other_recordings || []) %>
+          <div id="other-section" style="height: 200px; min-height: 80px; max-height: calc(100% - 160px); background: #090d16; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px; border-bottom: 1px solid #334155; background: #0e1726; flex-shrink: 0;">
+              <div style="font-weight: 600; color: #cbd5e1; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.04em;">
+                <i class="fas fa-film" style="color: #64748b; margin-right: 4px;"></i> RECORDINGS <span id="other-count" style="color: #94a3b8; font-weight: 400;">(<%= others.size %>)</span>
+              </div>
+              <div style="color: #64748b; font-size: 0.7em; white-space: nowrap;">
+                <i class="fas fa-arrows-alt-v" style="margin-right: 2px;"></i> drag to/from steps
+              </div>
+            </div>
+            <div id="other-list" style="flex: 1 1 auto; overflow-y: auto; min-height: 0;">
+              <% others.each do |r| %>
+                <%
+                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? r[:node] : r[:title]
+                  fpath = File.join(RecordingService::DIR, "#{r[:id]}#{RecordingService::EXT}")
+                  fsize = File.exist?(fpath) ? File.size(fpath) : 0
+                  size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
+                  node_str = r[:node].to_s.split(' - ').first.strip
+                %>
+                <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
+                  <button class="rec-item"
+                        data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>"
+                        data-id="<%= ERB::Util.html_escape(r[:id]) %>"
+                        data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
+                        data-step=""
+                        style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                      <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span class="step-num" style="color: #64748b; margin-right: 4px;">+</span>
+                        <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
+                      </div>
+                      <div style="color: #94a3b8; font-size: 0.78em; white-space: nowrap;"><%= RecordingService.duration_label(r[:duration]) %></div>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.76em;">
+                      <div><i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %></div>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span><%= r[:created_at].strftime('%Y-%m-%d %H:%M') %></span>
+                        <span style="background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 3px; font-size: 0.75em;"><%= size_str %></span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              <% end %>
+              <div id="other-empty" style="padding: 10px 14px; color: #64748b; font-size: 0.8em;<%= ' display: none;' unless others.empty? %>">No unintegrated recordings in this set.</div>
+              <div id="other-end-drop" title="Drop here to move to recordings" style="height: 32px; border-top: 2px solid transparent;"></div>
+            </div>
           </div>
 
         </aside>
@@ -109,6 +212,7 @@
 
               <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #475569; color: #f8fafc; padding: 4px 10px;"><i class="fas fa-download"></i></a>
               <form id="rec-delete" method="post" action="#" style="margin: 0;" onsubmit="return confirm('Delete this recording? This cannot be undone.')">
+                <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
                 <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px;"><i class="fas fa-trash-alt"></i></button>
               </form>
             </div>
@@ -117,6 +221,36 @@
             <div id="demo" style="flex: 1; height: 100%; width: 100%;"></div>
           </div>
         </main>
+      </div>
+    </div>
+
+    <!-- Delete Walkthrough Set Modal -->
+    <div id="delete-set-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 480px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #ef4444;"><i class="fas fa-trash-alt"></i> Delete Walkthrough Set</h3>
+          <span onclick="document.getElementById('delete-set-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <form method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/delete" style="padding: 16px; margin: 0;">
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 12px; line-height: 1.5;">
+            Are you sure you want to delete the walkthrough set <strong>&ldquo;<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>&rdquo;</strong>?
+          </p>
+          <div style="background: #0f172a; padding: 12px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
+            <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; color: #f8fafc; font-size: 0.85em; user-select: none;">
+              <input type="checkbox" name="delete_recordings" value="1" style="margin-top: 2px; accent-color: #ef4444;" />
+              <span>
+                <strong>Also delete recordings from disk</strong>
+                <span style="display: block; color: #94a3b8; font-size: 0.85em; margin-top: 2px;">
+                  Permanently deletes .cast recording files belonging to this set. Recordings shared with other sets will be preserved.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" onclick="document.getElementById('delete-set-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="submit" class="w3-button w3-round w3-red" style="font-size: 0.85em; padding: 6px 14px; font-weight: 600;"><i class="fas fa-trash-alt"></i> Delete Set</button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -131,6 +265,7 @@
         const metaForm = document.getElementById('meta-form');
         const editTitle = document.getElementById('edit-title');
         const recsList = document.getElementById('recs-list');
+        const otherList = document.getElementById('other-list');
         const importBtn = document.getElementById('import-btn');
         const importFileInput = document.getElementById('import-file-input');
         const newSetBtn = document.getElementById('new-set-btn');
@@ -140,6 +275,9 @@
         let activeId = null;
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
         const preferredRecording = <%= (@selected_recording || '').to_s.to_json %>;
+        try {
+          localStorage.setItem('ctlabs_active_walkthrough', activeWalkthrough);
+        } catch (e) {}
 
         // --- New Walkthrough Set Handler ---
         if (newSetBtn && newSetName) {
@@ -191,6 +329,8 @@
         function play(src, label, id, step, title) {
           if (!src) return;
           activeId = id;
+          const formRecInput = document.getElementById('walkthrough-form-recording');
+          if (formRecInput) formRecInput.value = id || '';
           if (player && typeof player.dispose === 'function') {
             try { player.dispose(); } catch (e) {}
           }
@@ -203,6 +343,14 @@
           
           editTitle.value = title || '';
 
+          const deleteBtn = deleteForm ? deleteForm.querySelector('button') : null;
+          if (deleteBtn) {
+            deleteBtn.disabled = false;
+            deleteBtn.title = 'Delete this recording';
+            deleteBtn.style.opacity = '1';
+            deleteBtn.style.cursor = 'pointer';
+          }
+
           if (typeof AsciinemaPlayer !== 'undefined' && typeof AsciinemaPlayer.create === 'function') {
             player = AsciinemaPlayer.create(src, demoDiv, { fit: 'both', autoplay: false });
           } else {
@@ -210,111 +358,343 @@
           }
         }
 
+        function selectRecording(btn) {
+          if (!btn) return;
+          document.querySelectorAll('.rec-item').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const src = btn.getAttribute('data-src');
+          const id = btn.getAttribute('data-id');
+          const step = btn.getAttribute('data-step');
+          const title = btn.getAttribute('data-title');
+          const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
+          play(src, node, id, step, title);
+        }
+
         // Click handlers for selecting items
-        const recItems = Array.from(document.querySelectorAll('.rec-item'));
-        recItems.forEach((btn) => {
-          btn.addEventListener('click', () => {
-            document.querySelectorAll('.rec-item').forEach(b => b.style.backgroundColor = 'transparent');
-            btn.style.backgroundColor = 'rgba(56, 189, 248, 0.12)';
-            const src = btn.getAttribute('data-src');
-            const id = btn.getAttribute('data-id');
-            const step = btn.getAttribute('data-step');
-            const title = btn.getAttribute('data-title');
-            const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
-            play(src, node, id, step, title);
-          });
+        document.querySelectorAll('.rec-item').forEach((btn) => {
+          btn.addEventListener('click', () => selectRecording(btn));
         });
 
-        // Keep the step the user was editing selected after a title save.
+        // Keep the step the user was editing selected after a title save, or select the first item
         let initialItem = null;
         if (preferredRecording) {
-          initialItem = recItems.find(btn => btn.getAttribute('data-id') === preferredRecording) || null;
+          initialItem = Array.from(document.querySelectorAll('.rec-item')).find(btn => btn.getAttribute('data-id') === preferredRecording) || null;
         }
-        initialItem = initialItem || recItems[0] || null;
+        initialItem = initialItem || document.querySelector('.rec-item') || null;
         if (initialItem) {
-          initialItem.click();
+          selectRecording(initialItem);
           initialItem.scrollIntoView({ block: 'nearest' });
         }
 
-        // --- Drag and Drop Reordering Logic ---
-        let draggedItem = null;
+        // --- Movable Divider / Resizer between Walkthrough Set and Other Recordings ---
+        const setDivider = document.getElementById('set-divider');
+        const otherSection = document.getElementById('other-section');
+        const sidebar = setDivider ? setDivider.closest('aside') : null;
 
-        recsList.addEventListener('dragstart', (e) => {
+        if (setDivider && otherSection && sidebar) {
+          const savedHeight = localStorage.getItem('ctlabs_other_section_height');
+          if (savedHeight) {
+            const h = parseInt(savedHeight, 10);
+            if (!isNaN(h) && h >= 60) {
+              otherSection.style.height = h + 'px';
+            }
+          }
+
+          let isDragging = false;
+          let startY = 0;
+          let startHeight = 0;
+
+          setDivider.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startY = e.clientY;
+            startHeight = otherSection.getBoundingClientRect().height;
+            setDivider.classList.add('dragging');
+            document.body.style.cursor = 'row-resize';
+            document.body.style.userSelect = 'none';
+          });
+
+          window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const deltaY = startY - e.clientY; // Dragging UP increases height of otherSection
+            const sidebarHeight = sidebar.getBoundingClientRect().height;
+            const minHeight = 60;
+            const maxHeight = Math.max(minHeight, sidebarHeight - 160);
+            const newHeight = Math.min(maxHeight, Math.max(minHeight, startHeight + deltaY));
+            otherSection.style.height = newHeight + 'px';
+          });
+
+          window.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            setDivider.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            localStorage.setItem('ctlabs_other_section_height', parseInt(otherSection.style.height, 10));
+          });
+        }
+
+        // --- Drag and Drop: reorder in the set, pull in from "Other", or move to "Other" ---
+        let draggedItem = null;
+        let draggedSource = null; // 'recs' or 'other'
+
+        function clearDragStyles() {
+          document.querySelectorAll('.rec-item-wrapper').forEach(w => {
+            w.style.opacity = '1';
+            w.style.borderTop = '1px solid #334155';
+          });
+          const recsEnd = document.getElementById('recs-end-drop');
+          if (recsEnd) recsEnd.style.borderTop = '2px solid transparent';
+          const otherEnd = document.getElementById('other-end-drop');
+          if (otherEnd) otherEnd.style.borderTop = '2px solid transparent';
+          if (recsList) recsList.style.boxShadow = '';
+          if (otherList) otherList.style.boxShadow = '';
+        }
+
+        function beginDrag(e) {
           draggedItem = e.target.closest('.rec-item-wrapper');
           if (draggedItem) {
+            draggedSource = recsList.contains(draggedItem) ? 'recs' : 'other';
             draggedItem.style.opacity = '0.4';
             e.dataTransfer.effectAllowed = 'move';
           }
+        }
+
+        [recsList, otherList].forEach(list => {
+          if (list) list.addEventListener('dragstart', beginDrag);
         });
 
-        recsList.addEventListener('dragend', (e) => {
-          if (draggedItem) {
-            draggedItem.style.opacity = '1';
-            draggedItem = null;
-          }
-          document.querySelectorAll('.rec-item-wrapper').forEach(w => w.style.borderTop = '1px solid #334155');
+        document.addEventListener('dragend', () => {
+          clearDragStyles();
+          draggedItem = null;
+          draggedSource = null;
         });
 
+        // --- recsList dragover & drop (Walkthrough Set) ---
         recsList.addEventListener('dragover', (e) => {
+          if (!draggedItem) return;
+
+          recsList.style.boxShadow = '';
           e.preventDefault();
           e.dataTransfer.dropEffect = 'move';
+          const endZone = document.getElementById('recs-end-drop');
+          if (endZone) {
+            endZone.style.borderTop = (e.target === endZone) ? '2px solid #38bdf8' : '2px solid transparent';
+          }
           const targetWrapper = e.target.closest('.rec-item-wrapper');
-          if (targetWrapper && targetWrapper !== draggedItem) {
+          if (targetWrapper && targetWrapper !== draggedItem && recsList.contains(targetWrapper)) {
             const rect = targetWrapper.getBoundingClientRect();
             const midpoint = rect.top + rect.height / 2;
-            if (e.clientY < midpoint) {
-              targetWrapper.style.borderTop = '2px solid #38bdf8';
-            } else {
-              targetWrapper.style.borderTop = '1px solid #334155';
-            }
+            targetWrapper.style.borderTop = (e.clientY < midpoint) ? '2px solid #38bdf8' : '1px solid #334155';
           }
         });
 
         recsList.addEventListener('dragleave', (e) => {
           const targetWrapper = e.target.closest('.rec-item-wrapper');
-          if (targetWrapper) {
-            targetWrapper.style.borderTop = '1px solid #334155';
+          if (targetWrapper) targetWrapper.style.borderTop = '1px solid #334155';
+          if (!recsList.contains(e.relatedTarget)) {
+            recsList.style.boxShadow = '';
           }
         });
 
-        recsList.addEventListener('drop', (e) => {
-          e.preventDefault();
+        function placeInSet(e) {
+          const endZone = document.getElementById('recs-end-drop');
           const targetWrapper = e.target.closest('.rec-item-wrapper');
-          if (targetWrapper && draggedItem && targetWrapper !== draggedItem) {
+          const wrappers = Array.from(recsList.querySelectorAll('.rec-item-wrapper')).filter(w => w !== draggedItem);
+
+          if (targetWrapper && targetWrapper !== draggedItem && recsList.contains(targetWrapper)) {
             const rect = targetWrapper.getBoundingClientRect();
-            const midpoint = rect.top + rect.height / 2;
-            
-            if (e.clientY < midpoint) {
+            if (e.clientY < rect.top + rect.height / 2) {
               recsList.insertBefore(draggedItem, targetWrapper);
             } else {
               recsList.insertBefore(draggedItem, targetWrapper.nextSibling);
             }
-
-            updateOrderAndSync();
+            return;
           }
-          document.querySelectorAll('.rec-item-wrapper').forEach(w => w.style.borderTop = '1px solid #334155');
+
+          const first = wrappers[0];
+          if (first && e.clientY < first.getBoundingClientRect().top) {
+            recsList.insertBefore(draggedItem, first);
+          } else if (endZone && endZone.parentNode === recsList) {
+            recsList.insertBefore(draggedItem, endZone);
+          } else {
+            recsList.appendChild(draggedItem);
+          }
+        }
+
+        recsList.addEventListener('drop', (e) => {
+          e.preventDefault();
+          recsList.style.boxShadow = '';
+          if (!draggedItem) return;
+
+          if (e.target.closest('.rec-item-wrapper') === draggedItem) {
+            clearDragStyles();
+            return;
+          }
+
+          placeInSet(e);
+
+          const empty = document.getElementById('recs-empty');
+          if (empty) empty.style.display = 'none';
+
+          // Persisting the order also adds an item dragged in from "Other".
+          updateOrderAndSync();
+          updateListMeta();
+          clearDragStyles();
         });
 
+        // --- otherList dragover & drop (Other recordings) ---
+        if (otherList) {
+          otherList.addEventListener('dragover', (e) => {
+            if (!draggedItem) return;
+
+            otherList.style.boxShadow = '';
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const endZone = document.getElementById('other-end-drop');
+            if (endZone) {
+              endZone.style.borderTop = (e.target === endZone) ? '2px solid #38bdf8' : '2px solid transparent';
+            }
+            const targetWrapper = e.target.closest('.rec-item-wrapper');
+            if (targetWrapper && targetWrapper !== draggedItem && otherList.contains(targetWrapper)) {
+              const rect = targetWrapper.getBoundingClientRect();
+              const midpoint = rect.top + rect.height / 2;
+              targetWrapper.style.borderTop = (e.clientY < midpoint) ? '2px solid #38bdf8' : '1px solid #334155';
+            }
+          });
+
+          otherList.addEventListener('dragleave', (e) => {
+            const targetWrapper = e.target.closest('.rec-item-wrapper');
+            if (targetWrapper) targetWrapper.style.borderTop = '1px solid #334155';
+            if (!otherList.contains(e.relatedTarget)) {
+              otherList.style.boxShadow = '';
+            }
+          });
+
+          function placeInOther(e) {
+            const endZone = document.getElementById('other-end-drop');
+            const targetWrapper = e.target.closest('.rec-item-wrapper');
+            const wrappers = Array.from(otherList.querySelectorAll('.rec-item-wrapper')).filter(w => w !== draggedItem);
+
+            if (targetWrapper && targetWrapper !== draggedItem && otherList.contains(targetWrapper)) {
+              const rect = targetWrapper.getBoundingClientRect();
+              if (e.clientY < rect.top + rect.height / 2) {
+                otherList.insertBefore(draggedItem, targetWrapper);
+              } else {
+                otherList.insertBefore(draggedItem, targetWrapper.nextSibling);
+              }
+              return;
+            }
+
+            const first = wrappers[0];
+            if (first && e.clientY < first.getBoundingClientRect().top) {
+              otherList.insertBefore(draggedItem, first);
+            } else if (endZone && endZone.parentNode === otherList) {
+              otherList.insertBefore(draggedItem, endZone);
+            } else {
+              otherList.appendChild(draggedItem);
+            }
+          }
+
+          otherList.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggedItem) return;
+
+            if (e.target.closest('.rec-item-wrapper') === draggedItem) {
+              clearDragStyles();
+              return;
+            }
+
+            if (e.target.closest('.rec-item-wrapper') === draggedItem) {
+              clearDragStyles();
+              return;
+            }
+
+            const wasInRecs = (draggedSource === 'recs');
+
+            placeInOther(e);
+
+            if (wasInRecs) {
+              const btn = draggedItem.querySelector('.rec-item');
+              const stepSpan = draggedItem.querySelector('.step-num');
+              if (btn) btn.setAttribute('data-step', '');
+              if (stepSpan) {
+                stepSpan.textContent = '+';
+                stepSpan.style.color = '#64748b';
+              }
+
+              // Sync remaining set order to server (removes item from walkthrough)
+              updateOrderAndSync();
+
+              if (btn && btn.classList.contains('active')) {
+                const title = btn.getAttribute('data-title');
+                const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : '';
+                titleEl.querySelector('span').textContent = title || node;
+              }
+            }
+
+            updateListMeta();
+            clearDragStyles();
+          });
+        }
+
+        function updateListMeta() {
+          const setCount = document.getElementById('set-count');
+          const otherCount = document.getElementById('other-count');
+          const otherEmpty = document.getElementById('other-empty');
+          const recsEmpty = document.getElementById('recs-empty');
+          const setItems = recsList.querySelectorAll('.rec-item-wrapper').length;
+          const otherItems = otherList ? otherList.querySelectorAll('.rec-item-wrapper').length : 0;
+          if (setCount) setCount.textContent = setItems;
+          if (otherCount) otherCount.textContent = '(' + otherItems + ')';
+          if (otherEmpty) otherEmpty.style.display = (otherItems === 0) ? '' : 'none';
+          if (recsEmpty) recsEmpty.style.display = (setItems === 0) ? '' : 'none';
+        }
+
         function updateOrderAndSync() {
-          const wrappers = document.querySelectorAll('.rec-item-wrapper');
+          const wrappers = recsList.querySelectorAll('.rec-item-wrapper');
           const orderedIds = [];
 
           wrappers.forEach((wrapper, index) => {
             const newStep = index + 1;
             const btn = wrapper.querySelector('.rec-item');
             const stepSpan = wrapper.querySelector('.step-num');
-            
+
             btn.setAttribute('data-step', newStep);
             stepSpan.textContent = '#' + newStep;
+            stepSpan.style.color = '#38bdf8';
             orderedIds.push(btn.getAttribute('data-id'));
           });
 
-          // Posts the new ordered ID sequence to your backend handler
+          if (activeId) {
+            const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+            if (activeBtn) {
+              const activeStep = activeBtn.getAttribute('data-step');
+              const activeTitle = activeBtn.getAttribute('data-title');
+              const activeNode = activeBtn.querySelectorAll('div')[0] ? activeBtn.querySelectorAll('div')[0].textContent.trim() : '';
+              titleEl.querySelector('span').textContent = (activeStep ? '#' + activeStep + ': ' : '') + (activeTitle || activeNode);
+            }
+          }
+
           fetch('/recordings/reorder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: orderedIds, walkthrough: activeWalkthrough })
           }).catch(err => console.error('Failed to sync recording order', err));
         }
+
+        const wtForm = document.getElementById('walkthrough-form');
+        if (wtForm) {
+          wtForm.addEventListener('submit', () => {
+            const formRecInput = document.getElementById('walkthrough-form-recording');
+            if (formRecInput && activeId) formRecInput.value = activeId;
+          });
+        }
+
+        window.addEventListener('click', (e) => {
+          const deleteModal = document.getElementById('delete-set-modal');
+          if (e.target === deleteModal) {
+            deleteModal.style.display = 'none';
+          }
+        });
       })();
     </script>

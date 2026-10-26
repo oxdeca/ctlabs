@@ -182,6 +182,24 @@ class RecordingService
     path = path_for(id)
     return false unless path
     File.delete(path)
+
+    # Clean up references across all walkthrough sets
+    wks = load_walkthroughs
+    changed = false
+    wks.each_value do |entry|
+      current = Array(entry['recording_ids']).map(&:to_s)
+      if current.include?(id.to_s)
+        entry['recording_ids'] = current - [id.to_s]
+        changed = true
+      end
+      unintegrated = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
+      if unintegrated.include?(id.to_s)
+        entry['unintegrated_ids'] = unintegrated - [id.to_s]
+        entry.delete('excluded_ids')
+        changed = true
+      end
+    end
+    save_walkthroughs(wks) if changed
     true
   rescue SystemCallError
     false
@@ -280,11 +298,12 @@ class RecordingService
 
   # --- Walkthrough Collections Management ---
   #
-  # A walkthrough is a named, ordered list of recording ids stored in
-  # _walkthroughs.json. New recordings are appended to the set being viewed so
-  # that the simple "record then open Walkthrough" flow keeps working. Imported
-  # sets are marked `sealed` so unrelated local recordings are not pulled into
-  # a restored bundle.
+  # A walkthrough is a named set of recordings stored in _walkthroughs.json.
+  # Each set contains:
+  #   - `recording_ids`: recordings integrated as ordered steps in the walkthrough.
+  #   - `unintegrated_ids`: recordings belonging to this set, but not integrated as a step.
+  #
+  # Every recording belongs to a set — no recordings exist without a set.
 
   def self.walkthroughs_file
     File.join(ensure_dir, '_walkthroughs.json')
@@ -292,31 +311,83 @@ class RecordingService
 
   def self.load_walkthroughs
     file = walkthroughs_file
+    data = nil
     if File.file?(file)
       begin
-        data = JSON.parse(File.read(file))
-        return data if data.is_a?(Hash)
+        parsed = JSON.parse(File.read(file))
+        data = parsed if parsed.is_a?(Hash) && !parsed.empty?
       rescue StandardError
-        # Fall through to default
+        # Fall through
       end
     end
 
-    # Default fallback walkthrough if none exist. Ids start with a timestamp,
-    # so a reverse sort is newest first (matching the old list behaviour).
-    {
-      'default' => {
-        'name' => 'Default Walkthrough',
-        'recording_ids' => Dir.glob(File.join(DIR, "*#{EXT}"))
-                              .map { |f| File.basename(f, EXT) }
-                              .sort
-                              .reverse
+    data ||= {
+      'walkthrough_1' => {
+        'name'             => 'Walkthrough 1',
+        'recording_ids'    => Dir.glob(File.join(DIR, "*#{EXT}"))
+                                 .map { |f| File.basename(f, EXT) }
+                                 .sort
+                                 .reverse,
+        'unintegrated_ids' => []
       }
     }
+
+    # Ensure each recording belongs to only one set and steps take precedence
+    step_owners = {}
+    data.each do |slug, entry|
+      Array(entry['recording_ids']).each do |id|
+        step_owners[id.to_s] ||= slug
+      end
+    end
+
+    seen_unint = {}
+    data.each do |slug, entry|
+      entry['recording_ids'] = Array(entry['recording_ids']).map(&:to_s).select { |id| step_owners[id] == slug }
+
+      entry_unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
+      entry['unintegrated_ids'] = entry_unint.reject do |id|
+        step_owners[id] || seen_unint[id]
+      end
+      entry['unintegrated_ids'].each { |id| seen_unint[id] = true }
+      entry.delete('excluded_ids')
+    end
+
+    # Ensure no recordings exist that are not part of a set.
+    # Any cast on disk not yet in any set gets claimed into the first set.
+    existing_casts = Dir.glob(File.join(DIR, "*#{EXT}"))
+                        .map { |f| File.basename(f, EXT) }
+    known_members = {}
+    data.each_value do |entry|
+      (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).each do |id|
+        known_members[id.to_s] = true
+      end
+    end
+
+    orphans = existing_casts.reject { |id| known_members[id] }
+    if orphans.any?
+      target_key = data.keys.first
+      if target_key && data[target_key]
+        current_unint = Array(data[target_key]['unintegrated_ids']).map(&:to_s)
+        data[target_key]['unintegrated_ids'] = (current_unint + orphans).uniq - Array(data[target_key]['recording_ids']).map(&:to_s)
+      end
+    end
+
+    data
   end
 
   def self.save_walkthroughs(walkthroughs)
     ensure_dir
-    File.write(walkthroughs_file, JSON.pretty_generate(walkthroughs))
+    cleaned = walkthroughs.each_with_object({}) do |(k, v), h|
+      entry = v.dup
+      entry.delete('sealed')
+      if entry['excluded_ids']
+        unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s).uniq
+        entry['unintegrated_ids'] = unint - Array(entry['recording_ids']).map(&:to_s)
+        entry.delete('excluded_ids')
+      end
+      h[k] = entry
+    end
+    File.write(walkthroughs_file, JSON.pretty_generate(cleaned))
   end
 
   def self.slug_for(name)
@@ -326,14 +397,24 @@ class RecordingService
 
   def self.walkthrough_entry(slug, walkthroughs = nil)
     wks   = walkthroughs || load_walkthroughs
-    key   = wks.key?(slug.to_s) ? slug.to_s : 'default'
-    entry = wks[key] ||= { 'name' => 'Default Walkthrough', 'recording_ids' => [] }
+    key   = if wks.key?(slug.to_s)
+              slug.to_s
+            elsif wks.any?
+              wks.keys.first.to_s
+            else
+              'walkthrough_1'
+            end
+    entry = wks[key] ||= { 'name' => 'Walkthrough 1', 'recording_ids' => [], 'unintegrated_ids' => [] }
     [key, entry, wks]
   end
 
   def self.walkthrough_name(slug = 'default')
     _key, entry = walkthrough_entry(slug)
     entry['name'].to_s
+  end
+
+  def self.walkthrough_sealed?(_slug = 'default')
+    false
   end
 
   def self.rename_walkthrough(slug, name)
@@ -344,7 +425,7 @@ class RecordingService
     [key, entry['name'].to_s]
   end
 
-  def self.create_walkthrough(name, recording_ids: [], sealed: false, unique: false)
+  def self.create_walkthrough(name, recording_ids: [], unique: false)
     wks   = load_walkthroughs
     clean = name.to_s.strip[0, NAME_MAX]
     clean = 'New Walkthrough' if clean.empty?
@@ -358,24 +439,34 @@ class RecordingService
     end
 
     entry = {
-      'name'          => clean,
-      'recording_ids' => Array(recording_ids).map(&:to_s),
-      # Only recordings uploaded from now on are auto-appended, so a new set
-      # starts empty instead of inheriting every existing cast.
-      'created_at'    => Time.now.to_f
+      'name'             => clean,
+      'recording_ids'    => Array(recording_ids).map(&:to_s),
+      'unintegrated_ids' => [],
+      'created_at'       => Time.now.to_f
     }
-    entry['sealed'] = true if sealed
     wks[base] = entry
     save_walkthroughs(wks)
     base
   end
 
-  # Appends ids to a set (used by import) without duplicating membership.
+  # Appends ids to a set's steps without duplicating membership.
+  # Removes them from unintegrated_ids and purges them from all other sets.
   def self.add_to_walkthrough(slug, recording_ids)
     key, entry, wks = walkthrough_entry(slug)
-    current = Array(entry['recording_ids']).map(&:to_s)
     wanted  = Array(recording_ids).map(&:to_s)
+
+    wks.each do |k, other_entry|
+      next if k == key
+      other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - wanted
+      other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - wanted
+      other_entry.delete('excluded_ids')
+    end
+
+    current = Array(entry['recording_ids']).map(&:to_s)
     entry['recording_ids'] = current + (wanted - current)
+    unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
+    entry['unintegrated_ids'] = unint - wanted
+    entry.delete('excluded_ids')
     save_walkthroughs(wks)
     key
   end
@@ -385,41 +476,123 @@ class RecordingService
     key, wk, = walkthrough_entry(slug, wks)
     allowed_ids = Array(wk['recording_ids']).map(&:to_s)
 
-    # Newest first makes the appended order deterministic.
     all_recs = Dir.glob(File.join(DIR, "*#{EXT}"))
                   .filter_map { |path| meta(path) }
                   .sort_by { |m| [m[:created_at], m[:id]] }
                   .reverse
     recs_map = all_recs.map { |r| [r[:id], r] }.to_h
 
-    unless wk['sealed']
-      known  = allowed_ids.each_with_object({}) { |id, h| h[id] = true }
-      cutoff = wk['created_at'].to_f
-      new_ids = all_recs.filter_map do |rec|
-        next if known[rec[:id]]
-        next if cutoff.positive? && File.mtime(rec[:path]).to_f < cutoff
-        rec[:id]
-      end
-
-      unless new_ids.empty?
-        wk['recording_ids'] = allowed_ids + new_ids
-        save_walkthroughs(wks)
-        allowed_ids = wk['recording_ids']
-      end
-    end
-
-    if key == 'default' && allowed_ids.empty?
+    if allowed_ids.empty? && Array(wk['unintegrated_ids']).empty? && Array(wk['excluded_ids']).empty? && wks.size <= 1
       all_recs
     else
       allowed_ids.filter_map { |id| recs_map[id] }
     end
   end
 
+  # Returns recordings that belong to this walkthrough set but are not integrated as steps.
+  def self.list_unintegrated_for_walkthrough(slug = 'default')
+    wks = load_walkthroughs
+    key, wk, = walkthrough_entry(slug, wks)
+    step_ids = Array(wk['recording_ids']).map(&:to_s)
+    unint_ids = (Array(wk['unintegrated_ids']) + Array(wk['excluded_ids'])).map(&:to_s).uniq - step_ids
+
+    all_recs = Dir.glob(File.join(DIR, "*#{EXT}"))
+                  .filter_map { |path| meta(path) }
+                  .sort_by { |m| [m[:created_at], m[:id]] }
+                  .reverse
+    recs_map = all_recs.map { |r| [r[:id], r] }.to_h
+
+    unint_ids.filter_map { |id| recs_map[id] }
+  end
+
+  class << self
+    alias list_other_recordings list_unintegrated_for_walkthrough
+  end
+
+  # Returns a hash mapping recording_id => true for all recordings that are
+  # members of ANY walkthrough set (steps or unintegrated).
+  def self.all_set_member_ids(walkthroughs = nil)
+    wks = walkthroughs || load_walkthroughs
+    member_ids = {}
+    wks.each_value do |entry|
+      (Array(entry['recording_ids']) + Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).each do |id|
+        member_ids[id.to_s] = true
+      end
+    end
+    member_ids
+  end
+
+  # Deletes a complete walkthrough set. If delete_recordings is true, any
+  # recording file belonging to this set (step or unintegrated) that is not also
+  # referenced by another set will be permanently removed from disk.
+  def self.delete_walkthrough(slug, delete_recordings: false)
+    wks = load_walkthroughs
+    slug_str = slug.to_s
+    return false unless wks.key?(slug_str)
+
+    entry = wks.delete(slug_str)
+    if delete_recordings
+      ids = (Array(entry['recording_ids']) + Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s).uniq
+      remaining_members = all_set_member_ids(wks)
+      ids.each do |rec_id|
+        next if remaining_members[rec_id]
+        path = path_for(rec_id)
+        begin
+          File.delete(path) if path && File.file?(path)
+        rescue SystemCallError
+          # continue deleting others
+        end
+      end
+    end
+
+    if wks.empty?
+      wks['walkthrough_1'] = { 'name' => 'Walkthrough 1', 'recording_ids' => [], 'unintegrated_ids' => [] }
+    end
+
+    save_walkthroughs(wks)
+    true
+  end
+
   def self.update_walkthrough_order(slug, ordered_ids)
     key, entry, wks = walkthrough_entry(slug)
-    entry['recording_ids'] = Array(ordered_ids).map(&:to_s)
+    ordered = Array(ordered_ids).map(&:to_s)
+
+    wks.each do |k, other_entry|
+      next if k == key
+      other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - ordered
+      other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - ordered
+      other_entry.delete('excluded_ids')
+    end
+
+    current = Array(entry['recording_ids']).map(&:to_s)
+    removed = current - ordered
+
+    entry['recording_ids'] = ordered
+    unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
+    entry['unintegrated_ids'] = (unint + removed).uniq - ordered
+    entry.delete('excluded_ids')
+
     save_walkthroughs(wks)
     key
+  end
+
+  def self.remove_from_walkthrough(slug, recording_id, order: nil)
+    key, entry, wks = walkthrough_entry(slug)
+    id = recording_id.to_s
+    current = Array(entry['recording_ids']).map(&:to_s)
+    remaining = order.nil? ? (current - [id]) : (Array(order).map(&:to_s) - [id])
+    entry['recording_ids'] = remaining
+
+    unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
+    entry['unintegrated_ids'] = (unint + [id]).uniq - remaining
+    entry.delete('excluded_ids')
+
+    save_walkthroughs(wks)
+    key
+  end
+
+  def self.recording_in_sealed_walkthrough?(_id)
+    false
   end
 
   # Everything the ZIP export needs: the resolved set name/membership, in the
@@ -429,6 +602,7 @@ class RecordingService
     {
       slug:       key,
       name:       entry['name'].to_s,
+      sealed:     false,
       recordings: list_for_walkthrough(key)
     }
   end
