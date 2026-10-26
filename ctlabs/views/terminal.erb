@@ -75,8 +75,76 @@
     #terminal-container {
       width: 100%; flex: 1; min-height: 0;
       padding: 0; box-sizing: border-box; overflow: hidden;
+      position: relative;
     }
     .xterm { height: 100%; padding: 0; }
+
+    /* File Transfer Modal & Drag-Drop Styles */
+    .transfer-tab-btn {
+      transition: all 0.15s ease;
+    }
+    .transfer-tab-btn:hover {
+      color: #f8fafc !important;
+    }
+    .transfer-tab-btn.active {
+      background: #1e293b !important;
+      border-bottom: 2px solid #38bdf8 !important;
+      color: #f8fafc !important;
+      font-weight: 600 !important;
+    }
+    .dir-pill {
+      background: #334155;
+      border: 1px solid #475569;
+      color: #94a3b8;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75em;
+      cursor: pointer;
+      font-family: monospace;
+      transition: all 0.15s;
+    }
+    .dir-pill:hover {
+      background: #475569;
+      color: #f8fafc;
+      border-color: #38bdf8;
+    }
+    #upload-dropzone.dragover {
+      border-color: #38bdf8 !important;
+      background: rgba(56, 189, 248, 0.08) !important;
+    }
+    .file-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.82em;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+    }
+    .file-item-row:hover {
+      background: #1e293b;
+    }
+    .file-item-row.selected {
+      background: #1e3a8a;
+    }
+    .quick-download-btn {
+      background: #0f766e;
+      border: none;
+      color: #fff;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-size: 0.8em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      transition: background 0.15s;
+    }
+    .quick-download-btn:hover {
+      background: #0d9488;
+    }
   </style>
 </head>
 <body data-node-name="<%= ERB::Util.html_escape(@node_name) %>" data-is-controller="<%= @is_controller ? 'true' : 'false' %>">
@@ -85,6 +153,12 @@
     <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
     <div style="display: flex; align-items: center; gap: 10px; position: relative;">
       
+      <!-- Files Button for Any Terminal -->
+      <button id="files-btn" title="File Transfer (Upload / Download)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-folder-open" style="color: #38bdf8;"></i>
+        <span>Files</span>
+      </button>
+
       <% if @is_controller %>
       <!-- Env Files Button for Controller -->
       <button id="env-files-btn" title="Controller Environment Files (GCP credentials, Kubeconfig, etc.)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
@@ -229,7 +303,162 @@
   </div>
   <% end %>
 
-  <div id="terminal-container"></div>
+  <!-- File Transfer Modal Backdrop -->
+  <div id="files-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center;">
+    <div id="files-modal" style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; width: 560px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
+      
+      <!-- Modal Header -->
+      <div style="padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 1em; color: #f8fafc;">
+          <i class="fas fa-folder-open" style="color: #38bdf8;"></i>
+          <span>File Transfer (<%= ERB::Util.html_escape(@node_name) %>)</span>
+        </div>
+        <button id="files-modal-close" style="background: transparent; border: none; color: #94a3b8; font-size: 1.3em; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Tab Buttons -->
+      <div style="display: flex; background: #0f172a; border-bottom: 1px solid #334155;">
+        <button type="button" id="tab-btn-upload" class="transfer-tab-btn active" style="flex: 1; padding: 10px 16px; background: #1e293b; border: none; border-bottom: 2px solid #38bdf8; color: #f8fafc; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9em;">
+          <i class="fas fa-upload" style="color: #38bdf8;"></i> Upload to Node
+        </button>
+        <button type="button" id="tab-btn-download" class="transfer-tab-btn" style="flex: 1; padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9em;">
+          <i class="fas fa-download"></i> Download from Node
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: 16px; overflow-y: auto; flex: 1; font-size: 0.88em; line-height: 1.4;">
+        
+        <!-- UPLOAD TAB PANE -->
+        <div id="pane-upload">
+          <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 0.85em;">
+            Upload files directly from your computer to <code><%= ERB::Util.html_escape(@node_name) %></code>.
+          </p>
+
+          <!-- Destination directory -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Destination Directory:</label>
+            <input type="text" id="upload-dir-input" placeholder="/root or ~" style="width: 100%; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 6px 10px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+            <!-- Shortcut pills -->
+            <div id="upload-dir-shortcuts" style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center;">
+              <span style="color: #64748b; font-size: 0.75em; margin-right: 2px;">Quick dirs:</span>
+            </div>
+          </div>
+
+          <!-- Drag and drop zone -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Select File:</label>
+            <div id="upload-dropzone" style="border: 2px dashed #475569; border-radius: 6px; padding: 22px 14px; text-align: center; cursor: pointer; background: #0f172a; transition: all 0.2s ease;">
+              <i class="fas fa-cloud-upload-alt" style="font-size: 2.2em; color: #38bdf8; margin-bottom: 8px;"></i>
+              <div style="color: #cbd5e1; font-weight: 500;">Drop file here or <span style="color: #38bdf8; text-decoration: underline;">click to browse</span></div>
+              <div style="color: #64748b; font-size: 0.8em; margin-top: 4px;">Streams directly to container / remote filesystem</div>
+              <input type="file" id="upload-file-input" style="display: none;" />
+            </div>
+          </div>
+
+          <!-- Selected file preview -->
+          <div id="upload-file-preview" style="display: none; margin-bottom: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 8px 12px; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+              <i class="fas fa-file-alt" style="color: #38bdf8; font-size: 1.1em;"></i>
+              <span id="upload-preview-name" style="color: #f8fafc; font-size: 0.9em; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;"></span>
+              <span id="upload-preview-size" style="color: #64748b; font-size: 0.8em;"></span>
+            </div>
+            <button type="button" id="upload-file-clear" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 1.2em; line-height: 1; padding: 0 4px;" title="Remove file">&times;</button>
+          </div>
+
+          <!-- Optional custom filename -->
+          <div style="margin-bottom: 8px;">
+            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Rename on Node (Optional):</label>
+            <input type="text" id="upload-custom-name" placeholder="Leave empty to keep original filename" style="width: 100%; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 6px 10px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+          </div>
+
+          <div style="margin-top: 10px; padding: 8px 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; color: #94a3b8; font-size: 0.8em; display: flex; align-items: flex-start; gap: 8px;">
+            <i class="fas fa-shield-alt" style="color: #38bdf8; margin-top: 2px;"></i>
+            <span><strong>SSH Keys &amp; Scripts:</strong> Keys uploaded to <code>~/.ssh</code> automatically receive <code>0700</code> dir / <code>0600</code> file permissions. Uploaded scripts (<code>.sh</code>, <code>.py</code>) are automatically marked executable (<code>0755</code>).</span>
+          </div>
+
+          <div id="upload-feedback" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 4px; font-size: 0.85em;"></div>
+        </div>
+
+        <!-- DOWNLOAD TAB PANE -->
+        <div id="pane-download" style="display: none;">
+          <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 0.85em;">
+            Download any file or directory from <code><%= ERB::Util.html_escape(@node_name) %></code> to your browser. Directories will be automatically streamed as a compressed <code>.tar.gz</code> archive.
+          </p>
+
+          <!-- Remote path input -->
+          <div style="margin-bottom: 12px;">
+            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Node File or Directory Path:</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <input type="text" id="download-path-input" placeholder="e.g. ~/script.sh or ~/.ssh/id_ed25519 or /tmp/data" style="flex: 1; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 6px 10px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+              <button type="button" id="download-inspect-btn" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.85em; white-space: nowrap; display: flex; align-items: center; gap: 5px;">
+                <i class="fas fa-search"></i> Check
+              </button>
+            </div>
+            <!-- Shortcut pills -->
+            <div id="download-path-shortcuts" style="display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center;">
+              <span style="color: #64748b; font-size: 0.75em; margin-right: 2px;">Quick paths:</span>
+            </div>
+          </div>
+
+          <!-- Status / Inspection card -->
+          <div id="download-inspect-card" style="margin-bottom: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; min-height: 52px; display: flex; align-items: center;">
+            <div id="download-inspect-content" style="color: #64748b; font-style: italic; font-size: 0.85em;">
+              Enter a path and click "Check" or "Download". Directories will be archived as <code>.tar.gz</code>.
+            </div>
+          </div>
+
+          <!-- Node Files Browser List -->
+          <div style="margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: #cbd5e1; font-weight: 600; font-size: 0.82em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-folder-tree" style="color: #38bdf8;"></i>
+                <span>Directory Files (<code id="download-browse-dir" style="color: #94a3b8;">~</code>):</span>
+              </span>
+              <button type="button" id="download-refresh-btn" style="background: transparent; border: none; color: #38bdf8; cursor: pointer; font-size: 0.8em; display: flex; align-items: center; gap: 4px;" title="Refresh file list">
+                <i class="fas fa-sync-alt"></i> Refresh
+              </button>
+            </div>
+            <div id="download-files-container" style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; max-height: 140px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 3px;">
+              <div style="color: #64748b; font-style: italic; font-size: 0.82em; text-align: center; padding: 10px;">Loading files...</div>
+            </div>
+          </div>
+
+          <div id="download-feedback" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 4px; font-size: 0.85em;"></div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: 10px 16px; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 10px; background: #0f172a; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+        <button id="files-modal-cancel" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Close</button>
+        <button id="upload-submit-btn" style="background: #2563eb; opacity: 0.6; cursor: not-allowed; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; font-weight: 600; font-size: 0.9em; display: flex; align-items: center; gap: 6px;" disabled>
+          <i class="fas fa-upload"></i>
+          <span>Upload File</span>
+        </button>
+        <button id="download-submit-btn" style="display: none; background: #10b981; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9em; align-items: center; gap: 6px;">
+          <i class="fas fa-download"></i>
+          <span>Download</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="terminal-container">
+    <!-- Drag & Drop Overlay on Terminal -->
+    <div id="term-drop-overlay" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 1500; border: 3px dashed #38bdf8; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
+      <i class="fas fa-cloud-upload-alt" style="font-size: 3.5em; color: #38bdf8; margin-bottom: 12px;"></i>
+      <div style="font-size: 1.2em; font-weight: 600; color: #f8fafc;">Drop file to upload to <%= ERB::Util.html_escape(@node_name) %></div>
+      <div id="term-drop-dest-hint" style="color: #94a3b8; font-size: 0.9em; margin-top: 6px;"></div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification -->
+  <div id="term-toast" style="display: none; position: fixed; bottom: 20px; right: 20px; background: #1e293b; border: 1px solid #334155; color: #f8fafc; padding: 10px 16px; border-radius: 6px; font-size: 0.88em; box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 3000; align-items: center; gap: 8px; transition: opacity 0.3s ease;">
+    <i id="term-toast-icon" class="fas fa-check-circle" style="color: #10b981;"></i>
+    <span id="term-toast-msg"></span>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
@@ -506,6 +735,653 @@
           });
         }
       }
+
+      // =========================================================================
+      // General File Transfer (Upload & Download)
+      // =========================================================================
+      const filesBtn = document.getElementById('files-btn');
+      const filesModalBackdrop = document.getElementById('files-modal-backdrop');
+      const filesModalClose = document.getElementById('files-modal-close');
+      const filesModalCancel = document.getElementById('files-modal-cancel');
+
+      const tabBtnUpload = document.getElementById('tab-btn-upload');
+      const tabBtnDownload = document.getElementById('tab-btn-download');
+      const paneUpload = document.getElementById('pane-upload');
+      const paneDownload = document.getElementById('pane-download');
+
+      const uploadDirInput = document.getElementById('upload-dir-input');
+      const uploadDirShortcuts = document.getElementById('upload-dir-shortcuts');
+      const uploadDropzone = document.getElementById('upload-dropzone');
+      const uploadFileInput = document.getElementById('upload-file-input');
+      const uploadFilePreview = document.getElementById('upload-file-preview');
+      const uploadPreviewName = document.getElementById('upload-preview-name');
+      const uploadPreviewSize = document.getElementById('upload-preview-size');
+      const uploadFileClear = document.getElementById('upload-file-clear');
+      const uploadCustomName = document.getElementById('upload-custom-name');
+      const uploadFeedback = document.getElementById('upload-feedback');
+      const uploadSubmitBtn = document.getElementById('upload-submit-btn');
+
+      const downloadPathInput = document.getElementById('download-path-input');
+      const downloadPathShortcuts = document.getElementById('download-path-shortcuts');
+      const downloadInspectBtn = document.getElementById('download-inspect-btn');
+      const downloadInspectContent = document.getElementById('download-inspect-content');
+      const downloadBrowseDir = document.getElementById('download-browse-dir');
+      const downloadRefreshBtn = document.getElementById('download-refresh-btn');
+      const downloadFilesContainer = document.getElementById('download-files-container');
+      const downloadFeedback = document.getElementById('download-feedback');
+      const downloadSubmitBtn = document.getElementById('download-submit-btn');
+
+      const termDropOverlay = document.getElementById('term-drop-overlay');
+      const termDropDestHint = document.getElementById('term-drop-dest-hint');
+      const termToast = document.getElementById('term-toast');
+      const termToastIcon = document.getElementById('term-toast-icon');
+      const termToastMsg = document.getElementById('term-toast-msg');
+
+      let currentUploadFile = null;
+      let activeTransferTab = 'upload';
+      let nodeTargetInfo = { default_dir: '/root' };
+      let currentBrowsedDir = '~';
+      let toastTimer = null;
+      let dragCounter = 0;
+
+      function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function showToast(msg, type = 'info') {
+        if (!termToast || !termToastMsg) return;
+        termToastMsg.textContent = msg;
+        if (type === 'success') {
+          termToastIcon.className = 'fas fa-check-circle';
+          termToastIcon.style.color = '#10b981';
+        } else if (type === 'error') {
+          termToastIcon.className = 'fas fa-exclamation-circle';
+          termToastIcon.style.color = '#ef4444';
+        } else {
+          termToastIcon.className = 'fas fa-info-circle';
+          termToastIcon.style.color = '#38bdf8';
+        }
+        termToast.style.display = 'flex';
+        termToast.style.opacity = '1';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          termToast.style.opacity = '0';
+          setTimeout(() => { termToast.style.display = 'none'; }, 300);
+        }, 4000);
+      }
+
+      function showUploadFeedback(msg, type = 'info') {
+        if (!uploadFeedback) return;
+        uploadFeedback.style.display = 'block';
+        if (type === 'success') {
+          uploadFeedback.style.background = '#064e3b';
+          uploadFeedback.style.color = '#a7f3d0';
+        } else if (type === 'error') {
+          uploadFeedback.style.background = '#7f1d1d';
+          uploadFeedback.style.color = '#fecaca';
+        } else {
+          uploadFeedback.style.background = '#1e3a8a';
+          uploadFeedback.style.color = '#bfdbfe';
+        }
+        uploadFeedback.innerHTML = msg;
+      }
+
+      function showDownloadFeedback(msg, type = 'info') {
+        if (!downloadFeedback) return;
+        downloadFeedback.style.display = 'block';
+        if (type === 'success') {
+          downloadFeedback.style.background = '#064e3b';
+          downloadFeedback.style.color = '#a7f3d0';
+        } else if (type === 'error') {
+          downloadFeedback.style.background = '#7f1d1d';
+          downloadFeedback.style.color = '#fecaca';
+        } else {
+          downloadFeedback.style.background = '#1e3a8a';
+          downloadFeedback.style.color = '#bfdbfe';
+        }
+        downloadFeedback.innerHTML = msg;
+      }
+
+      function switchTransferTab(tab) {
+        activeTransferTab = tab;
+        if (tab === 'upload') {
+          tabBtnUpload.classList.add('active');
+          tabBtnDownload.classList.remove('active');
+          tabBtnUpload.style.background = '#1e293b';
+          tabBtnUpload.style.borderBottom = '2px solid #38bdf8';
+          tabBtnUpload.style.color = '#f8fafc';
+          tabBtnUpload.style.fontWeight = '600';
+          tabBtnDownload.style.background = 'transparent';
+          tabBtnDownload.style.borderBottom = '2px solid transparent';
+          tabBtnDownload.style.color = '#94a3b8';
+          tabBtnDownload.style.fontWeight = '500';
+
+          paneUpload.style.display = 'block';
+          paneDownload.style.display = 'none';
+          uploadSubmitBtn.style.display = 'flex';
+          downloadSubmitBtn.style.display = 'none';
+        } else {
+          tabBtnDownload.classList.add('active');
+          tabBtnUpload.classList.remove('active');
+          tabBtnDownload.style.background = '#1e293b';
+          tabBtnDownload.style.borderBottom = '2px solid #38bdf8';
+          tabBtnDownload.style.color = '#f8fafc';
+          tabBtnDownload.style.fontWeight = '600';
+          tabBtnUpload.style.background = 'transparent';
+          tabBtnUpload.style.borderBottom = '2px solid transparent';
+          tabBtnUpload.style.color = '#94a3b8';
+          tabBtnUpload.style.fontWeight = '500';
+
+          paneUpload.style.display = 'none';
+          paneDownload.style.display = 'block';
+          uploadSubmitBtn.style.display = 'none';
+          downloadSubmitBtn.style.display = 'flex';
+
+          const currentPath = (downloadPathInput && downloadPathInput.value.trim()) || (nodeTargetInfo && nodeTargetInfo.default_dir) || '~';
+          fetchNodeFileList(currentPath);
+        }
+      }
+
+      function openFilesModal(tab = 'upload') {
+        switchTransferTab(tab);
+        if (uploadFeedback) uploadFeedback.style.display = 'none';
+        if (downloadFeedback) downloadFeedback.style.display = 'none';
+        if (filesModalBackdrop) filesModalBackdrop.style.display = 'flex';
+      }
+
+      function closeFilesModal() {
+        if (filesModalBackdrop) filesModalBackdrop.style.display = 'none';
+        if (uploadFeedback) uploadFeedback.style.display = 'none';
+        if (downloadFeedback) downloadFeedback.style.display = 'none';
+      }
+
+      function handleSelectedUploadFile(file) {
+        if (!file) return;
+        currentUploadFile = file;
+        uploadPreviewName.textContent = file.name;
+        uploadPreviewSize.textContent = `(${formatBytes(file.size)})`;
+        uploadFilePreview.style.display = 'flex';
+        uploadSubmitBtn.disabled = false;
+        uploadSubmitBtn.style.opacity = '1';
+        uploadSubmitBtn.style.cursor = 'pointer';
+        if (uploadFeedback) uploadFeedback.style.display = 'none';
+      }
+
+      function clearSelectedUploadFile() {
+        currentUploadFile = null;
+        if (uploadFileInput) uploadFileInput.value = '';
+        if (uploadPreviewName) uploadPreviewName.textContent = '';
+        if (uploadPreviewSize) uploadPreviewSize.textContent = '';
+        if (uploadFilePreview) uploadFilePreview.style.display = 'none';
+        if (uploadCustomName) uploadCustomName.value = '';
+        if (uploadSubmitBtn) {
+          uploadSubmitBtn.disabled = true;
+          uploadSubmitBtn.style.opacity = '0.6';
+          uploadSubmitBtn.style.cursor = 'not-allowed';
+        }
+      }
+
+      // Populate shortcuts
+      function setupDirectoryShortcuts(defaultDir) {
+        const uploadDirs = ['~/.ssh', '~', '/tmp', '/root'];
+        if (defaultDir && !uploadDirs.includes(defaultDir)) {
+          uploadDirs.unshift(defaultDir);
+        }
+
+        const downloadDirs = ['~', '~/.ssh', '/tmp', '/root'];
+        if (defaultDir && !downloadDirs.includes(defaultDir)) {
+          downloadDirs.unshift(defaultDir);
+        }
+
+        if (uploadDirShortcuts) {
+          uploadDirShortcuts.innerHTML = '<span style="color: #64748b; font-size: 0.75em; margin-right: 2px;">Quick dirs:</span>';
+          uploadDirs.forEach(d => {
+            const pill = document.createElement('span');
+            pill.className = 'dir-pill';
+            pill.textContent = d;
+            pill.title = `Use ${d} as destination`;
+            pill.addEventListener('click', () => {
+              uploadDirInput.value = d;
+            });
+            uploadDirShortcuts.appendChild(pill);
+          });
+        }
+
+        if (downloadPathShortcuts) {
+          downloadPathShortcuts.innerHTML = '<span style="color: #64748b; font-size: 0.75em; margin-right: 2px;">Quick paths:</span>';
+          downloadDirs.forEach(d => {
+            const pill = document.createElement('span');
+            pill.className = 'dir-pill';
+            pill.textContent = d;
+            pill.title = `Browse & inspect ${d}`;
+            pill.addEventListener('click', () => {
+              downloadPathInput.value = d;
+              inspectRemotePath(d);
+              fetchNodeFileList(d);
+            });
+            downloadPathShortcuts.appendChild(pill);
+          });
+        }
+      }
+
+      // Fetch node target info to set default paths and shortcuts
+      fetch('/terminal/' + encodeURIComponent(nodeName) + '/target_info', { credentials: 'same-origin' })
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            nodeTargetInfo = data;
+            if (uploadDirInput && !uploadDirInput.value) {
+              uploadDirInput.value = data.default_dir || '~';
+            }
+            if (termDropDestHint) {
+              termDropDestHint.textContent = `Destination: ${data.default_dir || '~'}`;
+            }
+            setupDirectoryShortcuts(data.default_dir);
+          }
+        })
+        .catch(() => {
+          setupDirectoryShortcuts('/root');
+        });
+
+      // Files button and modal open/close
+      if (filesBtn) filesBtn.addEventListener('click', () => openFilesModal('upload'));
+      if (filesModalClose) filesModalClose.addEventListener('click', closeFilesModal);
+      if (filesModalCancel) filesModalCancel.addEventListener('click', closeFilesModal);
+      if (filesModalBackdrop) {
+        filesModalBackdrop.addEventListener('click', (e) => {
+          if (e.target === filesModalBackdrop) closeFilesModal();
+        });
+      }
+
+      // Tab switching
+      if (tabBtnUpload) tabBtnUpload.addEventListener('click', () => switchTransferTab('upload'));
+      if (tabBtnDownload) tabBtnDownload.addEventListener('click', () => switchTransferTab('download'));
+
+      // Dropzone and file picking
+      if (uploadDropzone && uploadFileInput) {
+        uploadDropzone.addEventListener('click', () => uploadFileInput.click());
+        uploadFileInput.addEventListener('change', () => {
+          if (uploadFileInput.files && uploadFileInput.files.length > 0) {
+            handleSelectedUploadFile(uploadFileInput.files[0]);
+          }
+        });
+
+        uploadDropzone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          uploadDropzone.classList.add('dragover');
+        });
+        uploadDropzone.addEventListener('dragleave', (e) => {
+          e.preventDefault();
+          uploadDropzone.classList.remove('dragover');
+        });
+        uploadDropzone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          uploadDropzone.classList.remove('dragover');
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleSelectedUploadFile(e.dataTransfer.files[0]);
+          }
+        });
+      }
+
+      if (uploadFileClear) {
+        uploadFileClear.addEventListener('click', clearSelectedUploadFile);
+      }
+
+      // Upload submit
+      if (uploadSubmitBtn) {
+        uploadSubmitBtn.addEventListener('click', async () => {
+          if (!currentUploadFile) return;
+          const destDir = (uploadDirInput.value || '').trim();
+          const customName = (uploadCustomName.value || '').trim();
+
+          uploadSubmitBtn.disabled = true;
+          uploadSubmitBtn.style.opacity = '0.7';
+          uploadSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Uploading...</span>';
+          showUploadFeedback('<i class="fas fa-spinner fa-spin"></i> Uploading file to node...', 'info');
+
+          const formData = new FormData();
+          formData.append('file', currentUploadFile);
+          if (destDir) formData.append('dest_dir', destDir);
+          if (customName) formData.append('filename', customName);
+
+          try {
+            const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/upload', {
+              method: 'POST',
+              body: formData,
+              credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (data.ok) {
+              const msg = `Successfully uploaded <strong>${escapeHtml(data.filename)}</strong> (${formatBytes(data.size)}) to <code>${escapeHtml(data.path)}</code>`;
+              showUploadFeedback(`<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> ${msg}`, 'success');
+              showToast(`Uploaded ${data.filename} (${formatBytes(data.size)})`, 'success');
+              clearSelectedUploadFile();
+              fetchNodeFileList(destDir || (nodeTargetInfo && nodeTargetInfo.default_dir) || '~');
+            } else {
+              showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(data.error || 'Upload failed')}`, 'error');
+            }
+          } catch (err) {
+            showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(err.message || 'Network error')}`, 'error');
+          } finally {
+            uploadSubmitBtn.disabled = !currentUploadFile;
+            uploadSubmitBtn.style.opacity = currentUploadFile ? '1' : '0.6';
+            uploadSubmitBtn.style.cursor = currentUploadFile ? 'pointer' : 'not-allowed';
+            uploadSubmitBtn.innerHTML = '<i class="fas fa-upload"></i> <span>Upload File</span>';
+          }
+        });
+      }
+
+      // Download Inspect & Download logic
+      async function inspectRemotePath(path) {
+        const queryPath = (path || '').trim();
+        if (!queryPath) {
+          if (downloadInspectContent) {
+            downloadInspectContent.innerHTML = '<span style="color: #64748b; font-style: italic;">Enter a path and click "Check" or "Download". Directories will be archived as <code>.tar.gz</code>.</span>';
+          }
+          return null;
+        }
+
+        if (downloadInspectContent) {
+          downloadInspectContent.innerHTML = '<span style="color: #38bdf8;"><i class="fas fa-spinner fa-spin"></i> Checking path...</span>';
+        }
+
+        try {
+          const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/check_file?path=' + encodeURIComponent(queryPath), {
+            credentials: 'same-origin'
+          });
+          const info = await res.json();
+          renderInspectResult(info);
+          return info;
+        } catch (err) {
+          if (downloadInspectContent) {
+            downloadInspectContent.innerHTML = `<span style="color: #ef4444;"><i class="fas fa-exclamation-circle"></i> Error checking path: ${escapeHtml(err.message)}</span>`;
+          }
+          return null;
+        }
+      }
+
+      function renderInspectResult(info) {
+        if (!downloadInspectContent) return;
+        if (!info || !info.ok || !info.exists) {
+          downloadInspectContent.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px; color: #ef4444;">
+              <i class="fas fa-times-circle" style="font-size: 1.1em;"></i>
+              <div>
+                <span style="font-weight: 500;">Not found</span>
+                <span style="color: #94a3b8; font-size: 0.85em; margin-left: 6px;"><code>${escapeHtml(info ? info.path : downloadPathInput.value)}</code></span>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
+        if (info.type === 'file') {
+          downloadInspectContent.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-file-alt" style="color: #38bdf8; font-size: 1.3em;"></i>
+                <div>
+                  <div style="color: #f8fafc; font-weight: 600; font-family: monospace;">${escapeHtml(info.name)}</div>
+                  <div style="color: #94a3b8; font-size: 0.85em;">Regular File &bull; ${formatBytes(info.size)} &bull; <code>${escapeHtml(info.path)}</code></div>
+                </div>
+              </div>
+              <span style="background: #1e3a8a; color: #93c5fd; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600;">Ready</span>
+            </div>
+          `;
+        } else if (info.type === 'dir') {
+          downloadInspectContent.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-folder" style="color: #f59e0b; font-size: 1.3em;"></i>
+                <div>
+                  <div style="color: #f8fafc; font-weight: 600; font-family: monospace;">${escapeHtml(info.name)}/</div>
+                  <div style="color: #94a3b8; font-size: 0.85em;">Directory &bull; Will download as <code>${escapeHtml(info.name)}.tar.gz</code> archive</div>
+                </div>
+              </div>
+              <span style="background: #854d0e; color: #fef08a; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: 600;">Archive</span>
+            </div>
+          `;
+        }
+      }
+
+      if (downloadInspectBtn) {
+        downloadInspectBtn.addEventListener('click', () => {
+          inspectRemotePath(downloadPathInput.value);
+        });
+      }
+
+      if (downloadPathInput) {
+        downloadPathInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            inspectRemotePath(downloadPathInput.value);
+          }
+        });
+      }
+
+      if (downloadSubmitBtn) {
+        downloadSubmitBtn.addEventListener('click', async () => {
+          const path = (downloadPathInput.value || '').trim();
+          if (!path) {
+            showDownloadFeedback('Please enter a file or directory path to download', 'error');
+            return;
+          }
+
+          showDownloadFeedback('<i class="fas fa-spinner fa-spin"></i> Checking path before download...', 'info');
+          downloadSubmitBtn.disabled = true;
+          downloadSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Preparing...</span>';
+
+          try {
+            const info = await inspectRemotePath(path);
+            if (!info || !info.exists) {
+              showDownloadFeedback(`<i class="fas fa-exclamation-triangle"></i> Path not found on node: <code>${escapeHtml(path)}</code>`, 'error');
+              return;
+            }
+
+            const downloadFilename = info.type === 'dir' ? `${info.name}.tar.gz` : info.name;
+            showDownloadFeedback(`<i class="fas fa-check-circle" style="color: #10b981;"></i> Starting download of <strong>${escapeHtml(downloadFilename)}</strong>...`, 'success');
+            showToast(`Downloading ${downloadFilename}...`, 'info');
+
+            // Trigger browser download via location
+            window.location.href = '/terminal/' + encodeURIComponent(nodeName) + '/download?path=' + encodeURIComponent(path);
+          } catch (err) {
+            showDownloadFeedback(`<i class="fas fa-exclamation-triangle"></i> ${escapeHtml(err.message || 'Download error')}`, 'error');
+          } finally {
+            downloadSubmitBtn.disabled = false;
+            downloadSubmitBtn.innerHTML = '<i class="fas fa-download"></i> <span>Download</span>';
+          }
+        });
+      }
+
+      // Fetch and render files/directories for node file browser in Download tab
+      async function fetchNodeFileList(dir) {
+        if (!downloadFilesContainer) return;
+        const targetDir = (dir || currentBrowsedDir || (nodeTargetInfo && nodeTargetInfo.default_dir) || '~').trim();
+        currentBrowsedDir = targetDir;
+        if (downloadBrowseDir) {
+          downloadBrowseDir.textContent = targetDir;
+        }
+
+        downloadFilesContainer.innerHTML = '<div style="color: #64748b; font-style: italic; font-size: 0.82em; text-align: center; padding: 12px;"><i class="fas fa-spinner fa-spin"></i> Loading directory contents...</div>';
+
+        try {
+          const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/list_files?dir=' + encodeURIComponent(targetDir), {
+            credentials: 'same-origin'
+          });
+          const data = await res.json();
+          if (!data.ok) {
+            downloadFilesContainer.innerHTML = `<div style="color: #ef4444; font-size: 0.82em; padding: 8px;"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(data.error || 'Failed to list directory')}</div>`;
+            return;
+          }
+
+          const resolvedDir = data.dir || targetDir;
+          currentBrowsedDir = resolvedDir;
+          if (downloadBrowseDir) downloadBrowseDir.textContent = resolvedDir;
+
+          downloadFilesContainer.innerHTML = '';
+
+          // If not at filesystem root '/', render parent directory '..' row
+          if (resolvedDir !== '/' && resolvedDir !== '') {
+            const parentDir = resolvedDir.replace(/\/[^\/]+\/?$/, '') || '/';
+            const parentRow = document.createElement('div');
+            parentRow.className = 'file-item-row';
+            parentRow.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; color: #94a3b8;">
+                <i class="fas fa-level-up-alt" style="color: #94a3b8; font-size: 0.9em; width: 16px; text-align: center;"></i>
+                <span style="font-family: monospace; font-weight: 500;">.. (parent directory)</span>
+              </div>
+            `;
+            parentRow.addEventListener('click', () => {
+              downloadPathInput.value = parentDir;
+              inspectRemotePath(parentDir);
+              fetchNodeFileList(parentDir);
+            });
+            downloadFilesContainer.appendChild(parentRow);
+          }
+
+          if (!data.items || data.items.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.style.cssText = 'color: #64748b; font-style: italic; font-size: 0.82em; text-align: center; padding: 12px;';
+            emptyDiv.textContent = 'Directory is empty';
+            downloadFilesContainer.appendChild(emptyDiv);
+            return;
+          }
+
+          data.items.forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'file-item-row';
+
+            let iconHtml = '<i class="fas fa-file-alt" style="color: #94a3b8; width: 16px; text-align: center;"></i>';
+            if (item.type === 'dir') {
+              iconHtml = '<i class="fas fa-folder" style="color: #f59e0b; width: 16px; text-align: center;"></i>';
+            } else if (item.name.startsWith('id_') || item.name.endsWith('.pub') || item.name.endsWith('.pem') || item.name.endsWith('.key') || item.name === 'authorized_keys' || item.name === 'known_hosts' || item.name === 'config') {
+              iconHtml = '<i class="fas fa-key" style="color: #eab308; width: 16px; text-align: center;"></i>';
+            } else if (/\.(sh|bash|py|rb|pl|js|ts|yml|yaml|json|conf|cfg|ini)$/i.test(item.name)) {
+              iconHtml = '<i class="fas fa-file-code" style="color: #38bdf8; width: 16px; text-align: center;"></i>';
+            } else if (/\.(tar|gz|zip|bz2|xz|7z|tgz)$/i.test(item.name)) {
+              iconHtml = '<i class="fas fa-file-archive" style="color: #ec4899; width: 16px; text-align: center;"></i>';
+            }
+
+            const leftDiv = document.createElement('div');
+            leftDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden;';
+            leftDiv.innerHTML = `
+              ${iconHtml}
+              <span style="font-family: monospace; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(item.name)}${item.type === 'dir' ? '/' : ''}</span>
+            `;
+
+            const rightDiv = document.createElement('div');
+            rightDiv.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-left: 8px;';
+
+            if (item.type === 'file') {
+              const sizeSpan = document.createElement('span');
+              sizeSpan.style.cssText = 'color: #64748b; font-size: 0.85em; font-variant-numeric: tabular-nums;';
+              sizeSpan.textContent = formatBytes(item.size);
+              rightDiv.appendChild(sizeSpan);
+
+              const dlBtn = document.createElement('button');
+              dlBtn.className = 'quick-download-btn';
+              dlBtn.innerHTML = '<i class="fas fa-download"></i>';
+              dlBtn.title = `Download ${item.name}`;
+              dlBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadPathInput.value = item.path;
+                inspectRemotePath(item.path);
+                showToast(`Downloading ${item.name}...`, 'info');
+                window.location.href = '/terminal/' + encodeURIComponent(nodeName) + '/download?path=' + encodeURIComponent(item.path);
+              });
+              rightDiv.appendChild(dlBtn);
+            } else {
+              const browseBtn = document.createElement('button');
+              browseBtn.style.cssText = 'background: #334155; border: 1px solid #475569; color: #cbd5e1; padding: 1px 6px; border-radius: 3px; font-size: 0.78em; cursor: pointer;';
+              browseBtn.textContent = 'Open';
+              browseBtn.title = `Open directory ${item.name}`;
+              browseBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                downloadPathInput.value = item.path;
+                inspectRemotePath(item.path);
+                fetchNodeFileList(item.path);
+              });
+              rightDiv.appendChild(browseBtn);
+            }
+
+            row.appendChild(leftDiv);
+            row.appendChild(rightDiv);
+
+            row.addEventListener('click', () => {
+              downloadPathInput.value = item.path;
+              inspectRemotePath(item.path);
+              if (item.type === 'dir') {
+                fetchNodeFileList(item.path);
+              }
+            });
+
+            downloadFilesContainer.appendChild(row);
+          });
+        } catch (err) {
+          downloadFilesContainer.innerHTML = `<div style="color: #ef4444; font-size: 0.82em; padding: 8px;"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(err.message || 'Error fetching files')}</div>`;
+        }
+      }
+
+      if (downloadRefreshBtn) {
+        downloadRefreshBtn.addEventListener('click', () => {
+          fetchNodeFileList(currentBrowsedDir || (downloadPathInput && downloadPathInput.value) || '~');
+        });
+      }
+
+      // Drag and drop onto terminal canvas
+      window.addEventListener('dragenter', (e) => {
+        if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+          e.preventDefault();
+          dragCounter++;
+          if (termDropOverlay) {
+            termDropOverlay.style.display = 'flex';
+            if (termDropDestHint) {
+              const currentDir = (uploadDirInput && uploadDirInput.value.trim()) || nodeTargetInfo.default_dir || '~';
+              termDropDestHint.textContent = `Destination: ${currentDir}`;
+            }
+          }
+        }
+      });
+
+      window.addEventListener('dragover', (e) => {
+        if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+          e.preventDefault();
+        }
+      });
+
+      window.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter <= 0) {
+          dragCounter = 0;
+          if (termDropOverlay) termDropOverlay.style.display = 'none';
+        }
+      });
+
+      window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragCounter = 0;
+        if (termDropOverlay) termDropOverlay.style.display = 'none';
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          handleSelectedUploadFile(e.dataTransfer.files[0]);
+          openFilesModal('upload');
+        }
+      });
+
+      // Escape key closes modal
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (filesModalBackdrop && filesModalBackdrop.style.display === 'flex') {
+            closeFilesModal();
+          }
+        }
+      });
 
       // --- Load saved preferences from localStorage ---
       if (localStorage.getItem('ctlabs_max_len')) {

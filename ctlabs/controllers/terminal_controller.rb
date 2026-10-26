@@ -62,4 +62,111 @@ class TerminalController < BaseController
       { ok: false, error: e.message }.to_json
     end
   end
+
+  get '/terminal/:node_name/target_info' do
+    content_type :json
+    node_name = params[:node_name]
+    target = TerminalService.resolve_node_target(node_name)
+    if target
+      {
+        ok: true,
+        node: node_name,
+        type: target[:type],
+        default_dir: target[:default_dir] || '/root',
+        user: target[:user]
+      }.to_json
+    else
+      status 404
+      { ok: false, error: "Node #{node_name} not found" }.to_json
+    end
+  end
+
+  get '/terminal/:node_name/check_file' do
+    content_type :json
+    node_name = params[:node_name]
+    path = params[:path].to_s.strip
+    if path.empty?
+      status 400
+      return { ok: false, exists: false, error: 'Path parameter is required' }.to_json
+    end
+
+    info = TerminalService.check_node_file(node_name, path)
+    info.to_json
+  end
+
+  get '/terminal/:node_name/list_files' do
+    content_type :json
+    node_name = params[:node_name]
+    dir = params[:dir].to_s.strip
+    dir = nil if dir.empty?
+
+    result = TerminalService.list_node_files(node_name, dir)
+    result.to_json
+  end
+
+  post '/terminal/:node_name/upload' do
+    content_type :json
+    node_name = params[:node_name]
+
+    file_param = params[:file]
+    unless file_param && file_param[:tempfile]
+      status 400
+      return { ok: false, error: 'No file uploaded' }.to_json
+    end
+
+    dest_dir = params[:dest_dir].to_s.strip
+    dest_dir = nil if dest_dir.empty?
+    custom_filename = params[:filename].to_s.strip
+    custom_filename = nil if custom_filename.empty?
+
+    begin
+      result = TerminalService.upload_file(
+        node_name,
+        file_param[:tempfile],
+        file_param[:filename],
+        dest_dir: dest_dir,
+        custom_filename: custom_filename
+      )
+      result.to_json
+    rescue => e
+      status 500
+      { ok: false, error: e.message }.to_json
+    end
+  end
+
+  get '/terminal/:node_name/download' do
+    node_name = params[:node_name]
+    path = params[:path].to_s.strip
+    if path.empty?
+      status 400
+      content_type :json
+      return { ok: false, error: 'Path parameter is required' }.to_json
+    end
+
+    info = TerminalService.check_node_file(node_name, path)
+    unless info[:exists]
+      status 404
+      content_type :json
+      return { ok: false, error: "File or directory not found: #{path}" }.to_json
+    end
+
+    filename = info[:name] || File.basename(info[:path])
+    is_dir = (info[:type] == :dir)
+
+    if is_dir
+      filename = "#{filename}.tar.gz" unless filename.end_with?('.tar.gz')
+      content_type 'application/gzip'
+    else
+      content_type 'application/octet-stream'
+      headers['Content-Length'] = info[:size].to_s if info[:size]
+    end
+
+    headers['Content-Disposition'] = "attachment; filename=\"#{filename}\""
+
+    stream do |out|
+      TerminalService.stream_file(node_name, info[:path], is_dir: is_dir) do |chunk|
+        out << chunk
+      end
+    end
+  end
 end

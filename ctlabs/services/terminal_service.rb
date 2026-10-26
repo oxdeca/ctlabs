@@ -10,6 +10,8 @@ require 'timeout'
 require 'securerandom'
 require 'base64'
 require 'open3'
+require 'shellwords'
+require 'fileutils'
 
 require_relative 'recording_service'
 
@@ -650,6 +652,448 @@ class TerminalService
         end
       end
       driver.close rescue nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # General File Upload & Download Support
+  # ---------------------------------------------------------------------------
+
+  def self.resolve_node_target(node_name)
+    if node_name == 'ctlabs_host'
+      return {
+        type: :host,
+        default_dir: '/root'
+      }
+    end
+
+    custom_term = nil
+    node_type = nil
+    node_user = nil
+    exec_name = node_name
+
+    if Lab.running?
+      runtime_path = Lab.get_file_path(Lab.current_name)
+      if File.file?(runtime_path)
+        begin
+          lab = Lab.new(cfg: runtime_path, log: LabLog.null)
+          if node = lab.find_node(node_name)
+            node_type = node.type
+            custom_term = node.term
+            profile_user = sanitize_login_user(node.user)
+            exec_name = lab.controller_exec_name if node_type == 'controller'
+            node_user = node_type == 'controller' ? profile_user : nil
+
+            if (!custom_term || custom_term.empty?) && node.remote?
+              ip_target = node.gw || node.ipv4 || (node.nics && node.nics.values.first)
+              custom_term = "ssh://#{profile_user || 'root'}@#{ip_target.split('/').first}" if ip_target
+            end
+          end
+        rescue => e
+          puts "[Terminal Target Lookup Error] #{e.message}"
+        end
+      end
+    end
+
+    if defined?(Controller)
+      cname = Controller::NAME rescue 'ctl-ctrl'
+      if exec_name == cname || node_name == cname || node_name == 'ctl-ctrl'
+        exec_name = cname
+        node_type = 'controller'
+      end
+    end
+
+    if custom_term && custom_term.start_with?('ssh://')
+      require 'uri'
+      uri = URI.parse(custom_term)
+      user = uri.user || 'root'
+      host = uri.host
+      priv_key_path = nil
+      if Lab.running?
+        safe_name = Lab.current_name.gsub('/', '_')
+        key_path = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
+        priv_key_path = key_path if File.exist?(key_path)
+      end
+      return {
+        type: :ssh,
+        user: user,
+        host: host,
+        key: priv_key_path,
+        default_dir: "/home/#{user}"
+      }
+    end
+
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    default_dir = nil
+    if node_type == 'controller'
+      workspace = Automation::ANSIBLE_DIR_CTL
+      default_dir = workspace if container_dir_exists?(engine, exec_name, workspace)
+    end
+    default_dir ||= resolve_home_dir(engine, exec_name, node_user || 'root') || (node_user ? "/home/#{node_user}" : "/root")
+
+    {
+      type: :container,
+      engine: engine,
+      container: exec_name,
+      user: node_user,
+      default_dir: default_dir
+    }
+  end
+
+  def self.resolve_target_path(target, input_path, default_filename: nil)
+    raw = input_path.to_s.strip
+    raw = target[:default_dir] if raw.empty?
+
+    home_dir = if target[:type] == :container
+      resolve_home_dir(target[:engine], target[:container], target[:user] || 'root') || (target[:user] ? "/home/#{target[:user]}" : "/root")
+    elsif target[:type] == :ssh
+      "/home/#{target[:user]}"
+    else
+      ENV['HOME'] || '/root'
+    end
+
+    if raw == '~'
+      raw = home_dir
+    elsif raw.start_with?('~/')
+      raw = File.join(home_dir, raw[2..-1])
+    elsif !raw.start_with?('/')
+      raw = File.join(target[:default_dir] || home_dir, raw)
+    end
+
+    clean_path = File.expand_path(raw, '/')
+
+    if default_filename
+      fname = File.basename(default_filename.to_s.strip).gsub(/[^a-zA-Z0-9_.-]/, '_')
+      fname = 'file.dat' if fname.empty? || fname == '.' || fname == '..'
+      if raw.end_with?('/') || is_target_directory?(target, clean_path)
+        clean_path = File.join(clean_path, fname)
+      end
+    end
+
+    clean_path
+  end
+
+  def self.is_target_directory?(target, path)
+    return false if path.to_s.empty?
+    case target[:type]
+    when :container
+      system("#{target[:engine]} exec #{target[:container]} test -d #{Shellwords.escape(path)} >/dev/null 2>&1")
+    when :host
+      File.directory?(path)
+    when :ssh
+      cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      cmd.push("-i", target[:key]) if target[:key]
+      cmd.push("#{target[:user]}@#{target[:host]}", "test -d #{Shellwords.escape(path)}")
+      system(*cmd)
+    else
+      false
+    end
+  end
+
+  def self.upload_file(node_name, tempfile_or_io, original_filename, dest_dir: nil, custom_filename: nil)
+    target = resolve_node_target(node_name)
+    raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
+
+    fname = (custom_filename && !custom_filename.strip.empty?) ? custom_filename.strip : original_filename.to_s.strip
+    fname = File.basename(fname).gsub(/[^a-zA-Z0-9_.-]/, '_')
+    fname = "uploaded_file.dat" if fname.empty? || fname == '.' || fname == '..'
+
+    target_path = resolve_target_path(target, dest_dir, default_filename: fname)
+    parent_dir = File.dirname(target_path)
+
+    case target[:type]
+    when :container
+      engine = target[:engine]
+      container = target[:container]
+      escaped_parent = Shellwords.escape(parent_dir)
+      escaped_path = Shellwords.escape(target_path)
+
+      system("#{engine} exec #{container} mkdir -p #{escaped_parent} >/dev/null 2>&1")
+
+      cmd = "#{engine} exec -i #{container} sh -c \"cat > #{escaped_path}\""
+      Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
+        if tempfile_or_io.respond_to?(:read)
+          IO.copy_stream(tempfile_or_io, stdin)
+        else
+          File.open(tempfile_or_io.to_s, 'rb') { |f| IO.copy_stream(f, stdin) }
+        end
+        stdin.close
+        status = wait_thr.value
+        raise "Container upload failed: #{stderr.read}" unless status.success?
+      end
+
+      # Smart permissions for SSH keys and scripts
+      if parent_dir.end_with?('/.ssh')
+        system("#{engine} exec #{container} chmod 700 #{escaped_parent} >/dev/null 2>&1")
+        if target[:user] && !target[:user].empty?
+          system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{escaped_parent} >/dev/null 2>&1")
+        end
+      end
+
+      if target[:user] && !target[:user].empty?
+        system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{escaped_path} >/dev/null 2>&1")
+      end
+
+      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+        '0600'
+      elsif fname.end_with?('.pub')
+        '0644'
+      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+        '0755'
+      end
+      if mode
+        system("#{engine} exec #{container} chmod #{mode} #{escaped_path} >/dev/null 2>&1")
+      end
+
+      size_out, _ = Open3.capture2("#{engine} exec #{container} sh -c \"wc -c < #{escaped_path}\" 2>/dev/null")
+      file_size = size_out.to_s.strip.to_i
+
+      { ok: true, filename: fname, path: target_path, size: file_size }
+
+    when :host
+      FileUtils.mkdir_p(parent_dir)
+      if tempfile_or_io.respond_to?(:read)
+        File.open(target_path, 'wb') { |f| IO.copy_stream(tempfile_or_io, f) }
+      else
+        FileUtils.cp(tempfile_or_io.to_s, target_path)
+      end
+
+      if parent_dir.end_with?('/.ssh')
+        File.chmod(0700, parent_dir) rescue nil
+      end
+      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+        0600
+      elsif fname.end_with?('.pub')
+        0644
+      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+        0755
+      end
+      File.chmod(mode, target_path) if mode rescue nil
+
+      { ok: true, filename: fname, path: target_path, size: File.size(target_path) }
+
+    when :ssh
+      require 'tempfile'
+      local_src = if tempfile_or_io.is_a?(String) && File.exist?(tempfile_or_io)
+        tempfile_or_io
+      else
+        tf = Tempfile.new('ctlabs_upload')
+        tf.binmode
+        IO.copy_stream(tempfile_or_io, tf)
+        tf.close
+        tf.path
+      end
+
+      ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      ssh_cmd.push("-i", target[:key]) if target[:key]
+      ssh_cmd.push("#{target[:user]}@#{target[:host]}", "mkdir -p #{Shellwords.escape(parent_dir)}")
+      system(*ssh_cmd)
+
+      if parent_dir.end_with?('/.ssh')
+        chmod_dir_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+        chmod_dir_cmd.push("-i", target[:key]) if target[:key]
+        chmod_dir_cmd.push("#{target[:user]}@#{target[:host]}", "chmod 700 #{Shellwords.escape(parent_dir)}")
+        system(*chmod_dir_cmd)
+      end
+
+      scp_cmd = ["scp", "-o", "StrictHostKeyChecking=no"]
+      scp_cmd.push("-i", target[:key]) if target[:key]
+      scp_cmd.push(local_src, "#{target[:user]}@#{target[:host]}:#{target_path}")
+      success = system(*scp_cmd)
+      raise "SCP transfer failed" unless success
+
+      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+        '0600'
+      elsif fname.end_with?('.pub')
+        '0644'
+      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+        '0755'
+      end
+      if mode
+        chmod_file_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+        chmod_file_cmd.push("-i", target[:key]) if target[:key]
+        chmod_file_cmd.push("#{target[:user]}@#{target[:host]}", "chmod #{mode} #{Shellwords.escape(target_path)}")
+        system(*chmod_file_cmd)
+      end
+
+      { ok: true, filename: fname, path: target_path, size: File.size(local_src) }
+    end
+  end
+
+  def self.list_node_files(node_name, remote_dir = nil)
+    target = resolve_node_target(node_name)
+    return { ok: false, error: "Node not found" } unless target
+
+    resolved_dir = resolve_target_path(target, remote_dir || target[:default_dir] || '~')
+    escaped = Shellwords.escape(resolved_dir)
+
+    list_script = "for f in #{escaped}/* #{escaped}/.*; do " \
+                  "[ \"$f\" = \"#{escaped}/*\" ] && continue; " \
+                  "[ \"$f\" = \"#{escaped}/.\" ] && continue; " \
+                  "[ \"$f\" = \"#{escaped}/..\" ] && continue; " \
+                  "if [ -f \"$f\" ]; then echo \"FILE:$(wc -c < \"$f\" 2>/dev/null):$(basename \"$f\")\"; " \
+                  "elif [ -d \"$f\" ]; then echo \"DIR:0:$(basename \"$f\")\"; fi; " \
+                  "done 2>/dev/null"
+
+    raw_output = case target[:type]
+    when :container
+      out, _ = Open3.capture2("#{target[:engine]} exec #{target[:container]} sh -c #{Shellwords.escape(list_script)}")
+      out
+    when :host
+      out, _ = Open3.capture2("sh", "-c", list_script)
+      out
+    when :ssh
+      ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      ssh_cmd.push("-i", target[:key]) if target[:key]
+      ssh_cmd.push("#{target[:user]}@#{target[:host]}", list_script)
+      out, _ = Open3.capture2(*ssh_cmd)
+      out
+    end
+
+    items = []
+    raw_output.to_s.each_line do |line|
+      line = line.strip
+      parts = line.split(':', 3)
+      next unless parts.length == 3
+      type = parts[0] == 'FILE' ? :file : :dir
+      size = parts[1].to_i
+      name = parts[2]
+      next if name.empty?
+      items << {
+        name: name,
+        type: type,
+        size: type == :file ? size : nil,
+        path: File.join(resolved_dir, name)
+      }
+    end
+
+    # Sort directories first, then files alphabetically
+    items.sort_by! { |item| [item[:type] == :dir ? 0 : 1, item[:name].downcase] }
+
+    { ok: true, dir: resolved_dir, items: items }
+  end
+
+  def self.check_node_file(node_name, remote_path)
+    target = resolve_node_target(node_name)
+    return { ok: false, exists: false, error: "Node not found" } unless target
+
+    resolved_path = resolve_target_path(target, remote_path)
+    bname = File.basename(resolved_path)
+
+    case target[:type]
+    when :container
+      engine = target[:engine]
+      container = target[:container]
+      escaped = Shellwords.escape(resolved_path)
+      cmd = "#{engine} exec #{container} sh -c 'if [ -f #{escaped} ]; then echo \"FILE:$(wc -c < #{escaped} 2>/dev/null)\"; elif [ -d #{escaped} ]; then echo DIR; else echo NOT_FOUND; fi' 2>/dev/null"
+      out, _ = Open3.capture2(cmd)
+      line = out.to_s.strip
+
+      if line.start_with?('FILE:')
+        size = line.sub('FILE:', '').strip.to_i
+        { ok: true, exists: true, type: :file, size: size, path: resolved_path, name: bname }
+      elsif line == 'DIR'
+        { ok: true, exists: true, type: :dir, size: nil, path: resolved_path, name: bname }
+      else
+        { ok: true, exists: false, path: resolved_path, name: bname }
+      end
+
+    when :host
+      if File.file?(resolved_path)
+        { ok: true, exists: true, type: :file, size: File.size(resolved_path), path: resolved_path, name: bname }
+      elsif File.directory?(resolved_path)
+        { ok: true, exists: true, type: :dir, size: nil, path: resolved_path, name: bname }
+      else
+        { ok: true, exists: false, path: resolved_path, name: bname }
+      end
+
+    when :ssh
+      ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      ssh_cmd.push("-i", target[:key]) if target[:key]
+      escaped = Shellwords.escape(resolved_path)
+      check_script = "if [ -f #{escaped} ]; then echo FILE:$(wc -c < #{escaped} 2>/dev/null); elif [ -d #{escaped} ]; then echo DIR; else echo NOT_FOUND; fi"
+      ssh_cmd.push("#{target[:user]}@#{target[:host]}", check_script)
+      out, _ = Open3.capture2(*ssh_cmd)
+      line = out.to_s.strip
+
+      if line.start_with?('FILE:')
+        size = line.sub('FILE:', '').strip.to_i
+        { ok: true, exists: true, type: :file, size: size, path: resolved_path, name: bname }
+      elsif line == 'DIR'
+        { ok: true, exists: true, type: :dir, size: nil, path: resolved_path, name: bname }
+      else
+        { ok: true, exists: false, path: resolved_path, name: bname }
+      end
+    end
+  end
+
+  def self.stream_file(node_name, remote_path, is_dir: false, &block)
+    target = resolve_node_target(node_name)
+    raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
+
+    resolved_path = resolve_target_path(target, remote_path)
+
+    case target[:type]
+    when :container
+      engine = target[:engine]
+      container = target[:container]
+
+      if is_dir
+        parent = File.dirname(resolved_path)
+        bname = File.basename(resolved_path)
+        cmd = "#{engine} exec #{container} tar -czf - -C #{Shellwords.escape(parent)} #{Shellwords.escape(bname)}"
+      else
+        cmd = "#{engine} exec #{container} cat #{Shellwords.escape(resolved_path)}"
+      end
+
+      Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
+        stdin.close
+        while (chunk = stdout.read(65536))
+          block.call(chunk)
+        end
+        wait_thr.value
+      end
+
+    when :host
+      if is_dir
+        parent = File.dirname(resolved_path)
+        bname = File.basename(resolved_path)
+        cmd = "tar -czf - -C #{Shellwords.escape(parent)} #{Shellwords.escape(bname)}"
+        Open3.popen3(cmd) do |stdin, stdout, stderr, wait_thr|
+          stdin.close
+          while (chunk = stdout.read(65536))
+            block.call(chunk)
+          end
+          wait_thr.value
+        end
+      else
+        File.open(resolved_path, 'rb') do |f|
+          while (chunk = f.read(65536))
+            block.call(chunk)
+          end
+        end
+      end
+
+    when :ssh
+      ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      ssh_cmd.push("-i", target[:key]) if target[:key]
+      if is_dir
+        parent = File.dirname(resolved_path)
+        bname = File.basename(resolved_path)
+        ssh_cmd.push("#{target[:user]}@#{target[:host]}", "tar -czf - -C #{Shellwords.escape(parent)} #{Shellwords.escape(bname)}")
+      else
+        ssh_cmd.push("#{target[:user]}@#{target[:host]}", "cat #{Shellwords.escape(resolved_path)}")
+      end
+      Open3.popen3(*ssh_cmd) do |stdin, stdout, stderr, wait_thr|
+        stdin.close
+        while (chunk = stdout.read(65536))
+          block.call(chunk)
+        end
+        wait_thr.value
+      end
     end
   end
 end
