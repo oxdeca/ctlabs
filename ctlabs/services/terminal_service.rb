@@ -8,6 +8,8 @@ require 'pty'
 require 'json'
 require 'timeout'
 require 'securerandom'
+require 'base64'
+require 'open3'
 
 require_relative 'recording_service'
 
@@ -15,6 +17,9 @@ class TerminalService
   @@sessions = {}
   @@mutex = Mutex.new
   @@session_ttl = 24 * 60 * 60
+
+  @@staged_env = {}
+  @@env_mutex = Mutex.new
 
   def self.register_session(node_name, session_info)
     @@mutex.synchronize do
@@ -78,6 +83,131 @@ class TerminalService
     end
   end
 
+  def self.is_controller?(node_name)
+    return true if node_name == 'ansible' || node_name == 'ctl-ctrl'
+    if defined?(Controller)
+      cname = Controller::NAME rescue 'ctl-ctrl'
+      return true if node_name == cname
+    end
+    if Lab.running?
+      runtime_path = Lab.get_file_path(Lab.current_name)
+      if File.file?(runtime_path)
+        begin
+          lab = Lab.new(cfg: runtime_path, log: LabLog.null)
+          node = lab.find_node(node_name)
+          return node.type == 'controller' if node
+        rescue => e
+          puts "[Terminal Controller Check Error] #{e.message}"
+        end
+      end
+    end
+    false
+  end
+
+  def self.stage_env_files(node_name, files)
+    raise ArgumentError, 'Files must be an array' unless files.is_a?(Array)
+    raise ArgumentError, 'Too many files (max 10 allowed)' if files.size > 10
+
+    validated = []
+    summary = []
+
+    files.each do |f|
+      next unless f.is_a?(Hash)
+      var_name = f['env_var'].to_s.strip.upcase
+      raise ArgumentError, "Invalid environment variable name: #{var_name}" unless var_name =~ /\A[A-Z_][A-Z0-9_]*\z/
+
+      raw_fname = f['filename'].to_s.strip
+      fname = File.basename(raw_fname).gsub(/[^a-zA-Z0-9_.-]/, '_')
+      fname = "#{var_name.downcase}.dat" if fname.empty? || fname == '.' || fname == '..'
+
+      b64 = f['content_base64'].to_s
+      b64 = b64.sub(/\Adata:[^;]+;base64,/, '')
+
+      content = begin
+        Base64.decode64(b64)
+      rescue => e
+        raise ArgumentError, "Invalid base64 encoding for #{var_name}: #{e.message}"
+      end
+
+      if content.bytesize > 5 * 1024 * 1024
+        raise ArgumentError, "File for #{var_name} exceeds 5MB size limit"
+      end
+
+      validated << { env_var: var_name, filename: fname, content: content }
+      summary << { env_var: var_name, filename: fname, size: content.bytesize }
+    end
+
+    return [nil, []] if validated.empty?
+
+    token = SecureRandom.hex(16)
+    @@env_mutex.synchronize do
+      cutoff = Time.now - 900
+      @@staged_env.reject! { |_, v| v[:created_at] && v[:created_at] < cutoff }
+      @@staged_env[token] = {
+        node_name: node_name,
+        created_at: Time.now,
+        files: validated
+      }
+    end
+
+    [token, summary]
+  end
+
+  def self.apply_staged_env_files(engine, exec_name, node_user, env_token)
+    staged = nil
+    @@env_mutex.synchronize do
+      staged = @@staged_env[env_token]
+    end
+    return {} unless staged && staged[:files] && !staged[:files].empty?
+
+    base_dir = resolve_home_dir(engine, exec_name, node_user || 'root') || (node_user ? "/home/#{node_user}" : "/root")
+    target_dir = "#{base_dir}/.ctlabs_env/#{env_token}"
+
+    system("#{engine} exec #{exec_name} mkdir -p -m 700 #{target_dir} >/dev/null 2>&1")
+
+    env_map = {}
+    staged[:files].each do |f|
+      target_path = "#{target_dir}/#{f[:filename]}"
+      begin
+        Open3.popen3("#{engine} exec -i #{exec_name} sh -c \"cat > #{target_path} && chmod 600 #{target_path}\"") do |stdin, stdout, stderr, wait_thr|
+          stdin.write(f[:content])
+          stdin.close
+          wait_thr.value
+        end
+        env_map[f[:env_var]] = target_path
+      rescue => e
+        puts "[Terminal Env File Write Error] #{f[:filename]}: #{e.message}"
+      end
+    end
+
+    if node_user && !node_user.empty?
+      system("#{engine} exec #{exec_name} chown -R #{node_user}:#{node_user} #{target_dir} >/dev/null 2>&1")
+    end
+
+    @@env_mutex.synchronize do
+      if @@staged_env[env_token]
+        @@staged_env[env_token][:engine] = engine
+        @@staged_env[env_token][:exec_name] = exec_name
+        @@staged_env[env_token][:target_dir] = target_dir
+      end
+    end
+
+    env_map
+  end
+
+  def self.cleanup_env_files(env_token)
+    return if env_token.to_s.empty?
+    staged = nil
+    @@env_mutex.synchronize do
+      staged = @@staged_env.delete(env_token)
+    end
+    return unless staged
+
+    if staged[:engine] && staged[:exec_name] && staged[:target_dir]
+      system("#{staged[:engine]} exec #{staged[:exec_name]} rm -rf #{staged[:target_dir]} >/dev/null 2>&1")
+    end
+  end
+
   # Login names come from lab/profile YAML, so they are interpolated into a
   # shell command below. Only accept a plain POSIX user name; anything else
   # (or a nil/blank profile user) means "no opinion" and we fall back to root.
@@ -117,7 +247,7 @@ class TerminalService
     system("#{engine} exec #{container} test -d #{path} >/dev/null 2>&1")
   end
 
-  def self.resolve_terminal_command(node_name, session)
+  def self.resolve_terminal_command(node_name, session, env_token: nil)
     if node_name == 'ctlabs_host'
       cmd = ['env', 'TERM=linux']
       cmd.push("VAULT_TOKEN=#{session[:vault_token]}") if session[:vault_token]
@@ -235,12 +365,23 @@ class TerminalService
           puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
         end
       end
+
+      # Inject user-provided environment files on controller containers
+      if is_controller_container && env_token && !env_token.to_s.empty?
+        begin
+          staged_vars = apply_staged_env_files(engine, exec_name, node_user, env_token)
+          staged_vars.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
+        rescue => e
+          puts "[Terminal Env Files Error] #{e.message}"
+        end
+      end
+
       cmd.push(exec_name, 'bash')
     end
     cmd
   end
 
-  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil)
+  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil, env_token: nil)
     pty_read     = nil
     pty_write    = nil
     pty_pid      = nil
@@ -321,6 +462,7 @@ class TerminalService
       begin
         available, info = register_if_available(node_name)
         unless available
+          cleanup_env_files(env_token) if env_token
           driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n")
           driver.close
           return
@@ -379,6 +521,7 @@ class TerminalService
           driver.close rescue nil
         end
       rescue => e
+        cleanup_env_files(env_token) if env_token
         unregister_session(node_name, session_info) if session_info
         driver.text("\r\n\x1b[31m[Error spawning terminal: #{e.message}]\x1b[0m\r\n") rescue nil
         driver.close rescue nil
@@ -443,6 +586,7 @@ class TerminalService
       next if closed
       closed = true
       begin
+        cleanup_env_files(env_token) if env_token
         # Finalize any in-flight recording before the PTY is torn down so the
         # cast is complete and closed even if the tab is simply closed.
         rec_stop.call

@@ -15,15 +15,18 @@ class TerminalController < BaseController
       driver = WebSocket::Driver.rack(wrapper)
       
       node_name = params[:node_name]
-      cmd = TerminalService.resolve_terminal_command(node_name, session)
+      env_token = params[:token]
+      cmd = TerminalService.resolve_terminal_command(node_name, session, env_token: env_token)
       
       TerminalService.handle_websocket(driver, cmd, io, ssl_mutex, node_name, 
                                        initial_cols: params[:cols], 
-                                       initial_rows: params[:rows])
+                                       initial_rows: params[:rows],
+                                       env_token: env_token)
 
       return [-1, {}, []]
     else
       @node_name = params[:node_name]
+      @is_controller = TerminalService.is_controller?(@node_name)
       erb :terminal, layout: false
     end
   end
@@ -37,5 +40,26 @@ class TerminalController < BaseController
     content_type :json
     success = TerminalService.terminate_oldest(params[:node_name])
     { success: success }.to_json
+  end
+
+  post '/terminal/:node_name/env_files' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Env files are only supported on controller terminals' }.to_json
+    end
+
+    begin
+      payload = JSON.parse(request.body.read)
+      files = payload['files'] || []
+      token, summary = TerminalService.stage_env_files(node_name, files)
+      { ok: true, token: token, files: summary }.to_json
+    rescue ArgumentError => e
+      status 400
+      { ok: false, error: e.message }.to_json
+    rescue => e
+      status 500
+      { ok: false, error: e.message }.to_json
+    end
   end
 end
