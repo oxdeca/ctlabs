@@ -32,16 +32,33 @@ class RecordingsController < BaseController
 
   get '/recordings/download-all' do
     RecordingService.ensure_dir
-    files = Dir.glob(File.join(RecordingService::DIR, "*#{RecordingService::EXT}"))
+    bundle = RecordingService.export_bundle(params[:walkthrough].to_s)
+    files  = bundle[:recordings]
     halt 404, 'No recordings found to download' if files.empty?
 
+    label = RecordingService.node_slug(bundle[:name])
+    label = bundle[:slug] if label.empty?
+    label = 'walkthrough' if label.empty?
+
     # Write directly to a safe path in DIR to prevent premature Tempfile unlinking issues
-    zip_filename = "ctlabs_walkthrough_#{Time.now.strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_filename = "ctlabs_walkthrough_#{label}_#{Time.now.strftime('%Y%m%d_%H%M%S')}.zip"
     zip_path = File.join(RecordingService::DIR, zip_filename)
 
     Zip::File.open(zip_path, create: true) do |zipfile|
-      files.each do |file|
-        zipfile.add(File.basename(file), file)
+      files.each do |rec|
+        next unless File.file?(rec[:path])
+        zipfile.add("#{rec[:id]}#{RecordingService::EXT}", rec[:path])
+      end
+
+      manifest = {
+        'format'         => 'ctlabs-walkthrough',
+        'version'        => 1,
+        'name'           => bundle[:name],
+        'recording_ids'  => files.map { |rec| rec[:id] },
+        'exported_at'    => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+      }
+      zipfile.get_output_stream(RecordingService::MANIFEST) do |io|
+        io.write(JSON.pretty_generate(manifest))
       end
     end
 
@@ -60,26 +77,60 @@ class RecordingsController < BaseController
     RecordingService.ensure_dir
 
     if filename.end_with?('.zip')
+      imported   = []
+      id_map     = {}
+      manifest   = nil
+
       Zip::File.open(f[:tempfile].path) do |zipfile|
         zipfile.each do |entry|
+          base = File.basename(entry.name)
+
+          if base == RecordingService::MANIFEST
+            manifest = begin
+              JSON.parse(entry.get_input_stream.read)
+            rescue StandardError
+              nil
+            end
+            next
+          end
           next unless entry.name.end_with?(RecordingService::EXT)
-          dest_path = File.join(RecordingService::DIR, File.basename(entry.name))
-          
-          # Ensure target directory exists and write stream directly
-          FileUtils.mkdir_p(File.dirname(dest_path))
-          File.write(dest_path, entry.get_input_stream.read)
+
+          old_id = File.basename(entry.name, RecordingService::EXT)
+          data   = entry.get_input_stream.read
+          node   = RecordingService.node_from_cast(data) ||
+                   RecordingService.node_from_id(old_id)
+          id     = RecordingService.new_id(node)
+
+          File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+          id_map[old_id] = id
+          imported << id
         end
       end
+
+      walkthrough = nil
+      if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
+        ordered = Array(manifest['recording_ids']).filter_map do |old_id|
+          id_map[old_id.to_s] || id_map[File.basename(old_id.to_s, RecordingService::EXT)]
+        end
+        ordered += imported - ordered
+        walkthrough = RecordingService.create_walkthrough(
+          manifest['name'], recording_ids: ordered, sealed: true, unique: true
+        )
+      elsif !imported.empty?
+        walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
+      end
     elsif filename.end_with?(RecordingService::EXT)
-      id = RecordingService.new_id('imported')
-      dest_path = File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}")
-      FileUtils.mkdir_p(File.dirname(dest_path))
-      FileUtils.cp(f[:tempfile].path, dest_path)
+      data = File.binread(f[:tempfile].path)
+      node = RecordingService.node_from_cast(data) ||
+             RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
+      id   = RecordingService.new_id(node)
+      File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+      walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
     else
       halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip or .cast file.' }.to_json
     end
 
-    { ok: true }.to_json
+    { ok: true, walkthrough: walkthrough }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
@@ -159,6 +210,11 @@ class RecordingsController < BaseController
     name = params[:name].to_s.strip
     name = "New Walkthrough" if name.empty?
     slug = RecordingService.create_walkthrough(name)
+    redirect "/demo?walkthrough=#{slug}"
+  end
+
+  post '/walkthroughs/:slug/rename' do
+    slug, = RecordingService.rename_walkthrough(params[:slug].to_s, params[:name].to_s)
     redirect "/demo?walkthrough=#{slug}"
   end
 end

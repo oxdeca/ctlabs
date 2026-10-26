@@ -7,7 +7,7 @@
 -->
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
-      <h2><i class="fas fa-video"></i> Walkthrough</h2>
+      <h2><i class="fas fa-video"></i> Walkthrough <span style="font-size: 0.55em; opacity: 0.8;">&mdash; <%= ERB::Util.html_escape(@walkthrough_name.to_s) %></span></h2>
     </div>
 
     <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;">
@@ -24,17 +24,21 @@
               <input type="file" id="import-file-input" accept=".zip,.cast" style="display: none;" />
 
               <!-- Zip Download Button -->
-              <a href="/recordings/download-all" target="_self" title="Download all recordings as ZIP" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
+              <a href="/recordings/download-all?walkthrough=<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>" target="_self" title="Download this walkthrough set as ZIP (includes its name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; text-decoration: none;">
                 <i class="fas fa-file-archive"></i> Zip
               </a>
               <div style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
             </div>
-          </div> 
+          </div>
+
+          <form method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; margin: 0;">
+            <label for="walkthrough-name" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Set name</label>
+            <input type="text" id="walkthrough-name" name="name" value="<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>" maxlength="<%= RecordingService::NAME_MAX %>" title="Name of this walkthrough set (kept when exporting/importing the ZIP)" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;" />
+            <button type="submit" title="Save walkthrough name" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em;"><i class="fas fa-save"></i></button>
+          </form>
 
           <div id="recs-list" style="flex: 1; min-height: 0; overflow-y: auto;">
-            <% 
-              recs = (@recordings || []).sort_by { |r| [r[:step].to_i > 0 ? r[:step].to_i : 999, r[:created_at] || Time.now] }
-            %>
+            <% recs = (@recordings || []) %>
             <% if recs.empty? %>
               <div style="padding: 18px 14px; color: #94a3b8; font-size: 0.9em; line-height: 1.5;">
                 <div style="margin-bottom: 8px;"><i class="fas fa-info-circle"></i> No recordings yet</div>
@@ -123,6 +127,7 @@
 
         let player = null;
         let activeId = null;
+        const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
 
         // --- Import Walkthrough Handler ---
         if (importBtn && importFileInput) {
@@ -135,6 +140,7 @@
             const file = importFileInput.files[0];
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('walkthrough', activeWalkthrough);
 
             fetch('/recordings/import', {
               method: 'POST',
@@ -144,7 +150,11 @@
             .then(res => res.json())
             .then(data => {
               if (data.ok) {
-                window.location.reload();
+                if (data.walkthrough && data.walkthrough !== activeWalkthrough) {
+                  window.location.href = '/demo?walkthrough=' + encodeURIComponent(data.walkthrough);
+                } else {
+                  window.location.reload();
+                }
               } else {
                 alert('Import failed: ' + (data.error || 'Unknown error'));
               }
@@ -270,7 +280,7 @@
           fetch('/recordings/reorder', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ order: orderedIds })
+            body: JSON.stringify({ order: orderedIds, walkthrough: activeWalkthrough })
           }).catch(err => console.error('Failed to sync recording order', err));
         }
       })();

@@ -58,8 +58,10 @@ class MainController < BaseController
 #  end
 
   get '/demo' do
-    @active_walkthrough = params[:walkthrough] || 'default'
     @walkthroughs = RecordingService.load_walkthroughs
+    requested = params[:walkthrough].to_s
+    @active_walkthrough = @walkthroughs.key?(requested) ? requested : 'default'
+    @walkthrough_name = RecordingService.walkthrough_name(@active_walkthrough)
     @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
     erb :demo
   end

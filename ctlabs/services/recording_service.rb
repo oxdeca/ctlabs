@@ -21,8 +21,10 @@ require 'securerandom'
 class RecordingService
   DIR        = '/srv/ctlabs-server/recordings'
   EXT        = '.cast'
+  MANIFEST   = '_walkthrough.json'
   ID_RE      = /\A[a-zA-Z0-9_.-]{1,120}\z/
   NODE_MAX   = 40
+  NAME_MAX   = 80
   TAIL_BYTES = 8192
 
   def self.ensure_dir
@@ -160,6 +162,22 @@ class RecordingService
     parts.length >= 3 ? parts[1] : id.to_s
   end
 
+  # Reads the ctlabs.node hint from a cast header (if the file has one). The
+  # client-side recorder did not always write it, so callers must still fall
+  # back to the file name.
+  def self.node_from_cast(data)
+    first = data.to_s.lines.first
+    return nil unless first
+
+    header = JSON.parse(first)
+    return nil unless header.is_a?(Hash)
+
+    node = header.dig('ctlabs', 'node').to_s.strip
+    node.empty? ? nil : node
+  rescue StandardError
+    nil
+  end
+
   def self.delete(id)
     path = path_for(id)
     return false unless path
@@ -261,6 +279,12 @@ class RecordingService
 
 
   # --- Walkthrough Collections Management ---
+  #
+  # A walkthrough is a named, ordered list of recording ids stored in
+  # _walkthroughs.json. New recordings are appended to the set being viewed so
+  # that the simple "record then open Walkthrough" flow keeps working. Imported
+  # sets are marked `sealed` so unrelated local recordings are not pulled into
+  # a restored bundle.
 
   def self.walkthroughs_file
     File.join(ensure_dir, '_walkthroughs.json')
@@ -277,11 +301,15 @@ class RecordingService
       end
     end
 
-    # Default fallback walkthrough if none exist
+    # Default fallback walkthrough if none exist. Ids start with a timestamp,
+    # so a reverse sort is newest first (matching the old list behaviour).
     {
       'default' => {
         'name' => 'Default Walkthrough',
-        'recording_ids' => Dir.glob(File.join(DIR, "*#{EXT}")).map { |f| File.basename(f, EXT) }
+        'recording_ids' => Dir.glob(File.join(DIR, "*#{EXT}"))
+                              .map { |f| File.basename(f, EXT) }
+                              .sort
+                              .reverse
       }
     }
   end
@@ -291,36 +319,83 @@ class RecordingService
     File.write(walkthroughs_file, JSON.pretty_generate(walkthroughs))
   end
 
-  def self.create_walkthrough(name)
-    wks = load_walkthroughs
+  def self.slug_for(name)
     slug = name.to_s.strip.downcase.gsub(/[^a-z0-9_-]+/, '_')
-    slug = "walkthrough_#{SecureRandom.hex(3)}" if slug.empty?
-    
-    unless wks.key?(slug)
-      wks[slug] = { 'name' => name.to_s.strip, 'recording_ids' => [] }
-      save_walkthroughs(wks)
+    slug.empty? ? "walkthrough_#{SecureRandom.hex(3)}" : slug
+  end
+
+  def self.walkthrough_entry(slug, walkthroughs = nil)
+    wks   = walkthroughs || load_walkthroughs
+    key   = wks.key?(slug.to_s) ? slug.to_s : 'default'
+    entry = wks[key] ||= { 'name' => 'Default Walkthrough', 'recording_ids' => [] }
+    [key, entry, wks]
+  end
+
+  def self.walkthrough_name(slug = 'default')
+    _key, entry = walkthrough_entry(slug)
+    entry['name'].to_s
+  end
+
+  def self.rename_walkthrough(slug, name)
+    key, entry, wks = walkthrough_entry(slug)
+    clean = name.to_s.strip[0, NAME_MAX]
+    entry['name'] = clean unless clean.empty?
+    save_walkthroughs(wks)
+    [key, entry['name'].to_s]
+  end
+
+  def self.create_walkthrough(name, recording_ids: [], sealed: false, unique: false)
+    wks   = load_walkthroughs
+    clean = name.to_s.strip[0, NAME_MAX]
+    clean = 'New Walkthrough' if clean.empty?
+    base  = slug_for(clean)
+
+    if wks.key?(base)
+      return base unless unique
+
+      base = "#{base}_#{SecureRandom.hex(3)}"
+      base = "#{base}_#{SecureRandom.hex(3)}" while wks.key?(base)
     end
-    slug
+
+    entry = { 'name' => clean, 'recording_ids' => Array(recording_ids).map(&:to_s) }
+    entry['sealed'] = true if sealed
+    wks[base] = entry
+    save_walkthroughs(wks)
+    base
+  end
+
+  # Appends ids to a set (used by import) without duplicating membership.
+  def self.add_to_walkthrough(slug, recording_ids)
+    key, entry, wks = walkthrough_entry(slug)
+    current = Array(entry['recording_ids']).map(&:to_s)
+    wanted  = Array(recording_ids).map(&:to_s)
+    entry['recording_ids'] = current + (wanted - current)
+    save_walkthroughs(wks)
+    key
   end
 
   def self.list_for_walkthrough(slug = 'default')
     wks = load_walkthroughs
-    wk = wks[slug] || wks['default'] || { 'recording_ids' => [] }
-    allowed_ids = wk['recording_ids'] || []
+    key, wk, = walkthrough_entry(slug, wks)
+    allowed_ids = Array(wk['recording_ids']).map(&:to_s)
 
-    all_recs = Dir.glob(File.join(DIR, "*#{EXT}")).filter_map { |path| meta(path) }
+    # Newest first makes the appended order deterministic.
+    all_recs = Dir.glob(File.join(DIR, "*#{EXT}"))
+                  .filter_map { |path| meta(path) }
+                  .sort_by { |m| [m[:created_at], m[:id]] }
+                  .reverse
     recs_map = all_recs.map { |r| [r[:id], r] }.to_h
-    all_ids = recs_map.keys
 
-    # Automatically add any newly recorded files that aren't in this walkthrough yet
-    new_ids = all_ids - allowed_ids
-    if !new_ids.empty?
-      wk['recording_ids'] = allowed_ids + new_ids
-      save_walkthroughs(wks)
-      allowed_ids = wk['recording_ids']
+    unless wk['sealed']
+      new_ids = recs_map.keys - allowed_ids
+      unless new_ids.empty?
+        wk['recording_ids'] = allowed_ids + new_ids
+        save_walkthroughs(wks)
+        allowed_ids = wk['recording_ids']
+      end
     end
 
-    if slug == 'default' && allowed_ids.empty?
+    if key == 'default' && allowed_ids.empty?
       all_recs
     else
       allowed_ids.filter_map { |id| recs_map[id] }
@@ -328,9 +403,20 @@ class RecordingService
   end
 
   def self.update_walkthrough_order(slug, ordered_ids)
-    wks = load_walkthroughs
-    slug = 'default' unless wks.key?(slug)
-    wks[slug]['recording_ids'] = ordered_ids
+    key, entry, wks = walkthrough_entry(slug)
+    entry['recording_ids'] = Array(ordered_ids).map(&:to_s)
     save_walkthroughs(wks)
+    key
+  end
+
+  # Everything the ZIP export needs: the resolved set name/membership, in the
+  # exact order the page shows them.
+  def self.export_bundle(slug = 'default')
+    key, entry = walkthrough_entry(slug)
+    {
+      slug:       key,
+      name:       entry['name'].to_s,
+      recordings: list_for_walkthrough(key)
+    }
   end
 end
