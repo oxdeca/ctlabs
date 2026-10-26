@@ -357,7 +357,13 @@ class RecordingService
       base = "#{base}_#{SecureRandom.hex(3)}" while wks.key?(base)
     end
 
-    entry = { 'name' => clean, 'recording_ids' => Array(recording_ids).map(&:to_s) }
+    entry = {
+      'name'          => clean,
+      'recording_ids' => Array(recording_ids).map(&:to_s),
+      # Only recordings uploaded from now on are auto-appended, so a new set
+      # starts empty instead of inheriting every existing cast.
+      'created_at'    => Time.now.to_f
+    }
     entry['sealed'] = true if sealed
     wks[base] = entry
     save_walkthroughs(wks)
@@ -387,7 +393,14 @@ class RecordingService
     recs_map = all_recs.map { |r| [r[:id], r] }.to_h
 
     unless wk['sealed']
-      new_ids = recs_map.keys - allowed_ids
+      known  = allowed_ids.each_with_object({}) { |id, h| h[id] = true }
+      cutoff = wk['created_at'].to_f
+      new_ids = all_recs.filter_map do |rec|
+        next if known[rec[:id]]
+        next if cutoff.positive? && File.mtime(rec[:path]).to_f < cutoff
+        rec[:id]
+      end
+
       unless new_ids.empty?
         wk['recording_ids'] = allowed_ids + new_ids
         save_walkthroughs(wks)
