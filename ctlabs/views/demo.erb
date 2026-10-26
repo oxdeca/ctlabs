@@ -20,6 +20,22 @@
     cursor: not-allowed !important;
     border-color: #334155 !important;
   }
+  #image-modal {
+    cursor: zoom-out;
+  }
+  #image-modal-img {
+    cursor: default;
+  }
+  #image-modal-close:hover {
+    background: #ef4444 !important;
+    border-color: #f87171 !important;
+    color: #ffffff !important;
+  }
+  #image-modal-external:hover {
+    background: #0284c7 !important;
+    border-color: #38bdf8 !important;
+    color: #ffffff !important;
+  }
   #sidebar-divider:hover, #sidebar-divider.dragging {
     background: #0284c7 !important;
     border-color: #38bdf8 !important;
@@ -487,6 +503,27 @@
       </div>
     </div>
 
+    <!-- Image Lightbox / Full Size Modal -->
+    <div id="image-modal" style="display: none; position: fixed; z-index: 10000; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(4px); align-items: center; justify-content: center; flex-direction: column; padding: 24px;">
+      <!-- Top Action Bar -->
+      <div style="position: absolute; top: 16px; right: 20px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
+        <a id="image-modal-external" href="#" target="_blank" title="Open original in new window" style="color: #cbd5e1; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all 0.15s ease;">
+          <i class="fas fa-external-link-alt" style="font-size: 0.9em;"></i>
+        </a>
+        <button type="button" id="image-modal-close" title="Close (Esc)" style="color: #f8fafc; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3em; cursor: pointer; transition: all 0.15s ease;">
+          &times;
+        </button>
+      </div>
+
+      <!-- Image Display Container -->
+      <div style="max-width: 95vw; max-height: 85vh; display: flex; align-items: center; justify-content: center; position: relative;">
+        <img id="image-modal-img" src="" alt="" style="max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); border: 1px solid #334155; background: #0b1120;" />
+      </div>
+
+      <!-- Caption -->
+      <div id="image-modal-caption" style="margin-top: 12px; color: #cbd5e1; font-size: 0.9em; font-weight: 500; text-align: center; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,0.8);"></div>
+    </div>
+
     <script src="/js/marked.min.js"></script>
     <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
     <script src="/js/asciinema-player.min.js"></script>
@@ -523,6 +560,12 @@
         const mdTabSplit = document.getElementById('md-tab-split');
         const mdInsertImgBtn = document.getElementById('md-insert-img-btn');
         const mdImgFileInput = document.getElementById('md-img-file-input');
+
+        const imageModal = document.getElementById('image-modal');
+        const imageModalImg = document.getElementById('image-modal-img');
+        const imageModalCaption = document.getElementById('image-modal-caption');
+        const imageModalExternal = document.getElementById('image-modal-external');
+        const imageModalClose = document.getElementById('image-modal-close');
 
         let player = null;
         let activeId = null;
@@ -602,17 +645,52 @@
                 try { hljs.highlightElement(block); } catch (e) {}
               });
             }
-            // Add click-to-view in full size for images
+            // Add click-to-view in full size modal for images
             mdPreviewPane.querySelectorAll('img').forEach(img => {
-              img.title = img.title || 'Click to view full size';
+              img.title = img.title || 'Click to enlarge';
               img.addEventListener('click', (e) => {
                 e.stopPropagation();
-                window.open(img.src, '_blank');
+                openImageModal(img.src, img.alt, img.title);
               });
             });
           } else {
             mdPreviewPane.textContent = raw;
           }
+        }
+
+        // --- Image Lightbox Modal Functions ---
+        function openImageModal(src, alt, title) {
+          if (!imageModal || !imageModalImg) return;
+          imageModalImg.src = src;
+          imageModalImg.alt = alt || '';
+          if (imageModalCaption) {
+            const cap = (alt || title || '').trim();
+            imageModalCaption.textContent = cap;
+            imageModalCaption.style.display = cap ? 'block' : 'none';
+          }
+          if (imageModalExternal) imageModalExternal.href = src;
+          imageModal.style.display = 'flex';
+        }
+
+        function closeImageModal() {
+          if (!imageModal) return;
+          imageModal.style.display = 'none';
+          if (imageModalImg) imageModalImg.src = '';
+        }
+
+        if (imageModalClose) {
+          imageModalClose.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeImageModal();
+          });
+        }
+
+        if (imageModal) {
+          imageModal.addEventListener('click', (e) => {
+            if (e.target !== imageModalImg && !e.target.closest('#image-modal-external')) {
+              closeImageModal();
+            }
+          });
         }
 
         function loadMarkdownContent(id) {
@@ -954,6 +1032,24 @@
           const node = btn.querySelectorAll('div')[0] ? btn.querySelectorAll('div')[0].textContent.trim() : src;
           play(src, node, id, step, title, dataType);
           updateStepNav();
+
+          // Persist the last highlighted step in localStorage, browser URL, and session
+          if (id) {
+            try {
+              localStorage.setItem('ctlabs_last_step_' + activeWalkthrough, id);
+              const url = new URL(window.location);
+              url.searchParams.set('walkthrough', activeWalkthrough);
+              url.searchParams.set('recording', id);
+              window.history.replaceState({}, '', url);
+            } catch (e) {}
+
+            try {
+              fetch('/recordings/' + encodeURIComponent(id) + '/active?walkthrough=' + encodeURIComponent(activeWalkthrough), {
+                method: 'POST',
+                credentials: 'same-origin'
+              }).catch(() => {});
+            } catch (e) {}
+          }
         }
 
         // --- Step Navigation Controls ---
@@ -1032,6 +1128,17 @@
         if (stepNextBtn) stepNextBtn.addEventListener('click', goToNextStep);
 
         window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (imageModal && imageModal.style.display === 'flex') {
+              closeImageModal();
+              return;
+            }
+            const deleteModal = document.getElementById('delete-set-modal');
+            if (deleteModal && deleteModal.style.display === 'block') deleteModal.style.display = 'none';
+            const exportModal = document.getElementById('export-modal');
+            if (exportModal && exportModal.style.display === 'block') exportModal.style.display = 'none';
+          }
+
           const isEditing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
           if (isEditing) return;
 
@@ -1049,10 +1156,18 @@
           btn.addEventListener('click', () => selectRecording(btn));
         });
 
-        // Keep the step the user was editing selected after a title save, or select the first item
+        // Keep the step the user was editing selected, or restore the last highlighted step, or select the first item
         let initialItem = null;
         if (preferredRecording) {
           initialItem = Array.from(document.querySelectorAll('.rec-item')).find(btn => btn.getAttribute('data-id') === preferredRecording) || null;
+        }
+        if (!initialItem) {
+          try {
+            const lastStepId = localStorage.getItem('ctlabs_last_step_' + activeWalkthrough);
+            if (lastStepId) {
+              initialItem = Array.from(document.querySelectorAll('.rec-item')).find(btn => btn.getAttribute('data-id') === lastStepId) || null;
+            }
+          } catch (e) {}
         }
         initialItem = initialItem || document.querySelector('.rec-item') || null;
         if (initialItem) {

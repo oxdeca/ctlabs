@@ -73,7 +73,9 @@ class MainController < BaseController
     @recordings = RecordingService.list_for_walkthrough(@active_walkthrough)
     @other_recordings = RecordingService.list_unintegrated_for_walkthrough(@active_walkthrough)
     selected = params[:recording].to_s
+    selected = session["last_recording_#{@active_walkthrough}"].to_s if selected.empty?
     @selected_recording = RecordingService.valid_id?(selected) ? selected : ''
+    session["last_recording_#{@active_walkthrough}"] = @selected_recording unless @selected_recording.empty?
     erb :demo
   end
 

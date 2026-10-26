@@ -299,6 +299,8 @@ class RecordingsController < BaseController
     halt 404, 'Recording not found' unless deleted
 
     slug = params[:walkthrough].to_s
+    session.delete("last_recording_#{slug}") if session["last_recording_#{slug}"] == params[:id]
+
     wks  = RecordingService.load_walkthroughs
     if wks.key?(slug)
       redirect "/demo?walkthrough=#{slug}"
@@ -360,6 +362,15 @@ class RecordingsController < BaseController
     title = 'Step Note' if title.empty?
     id = RecordingService.create_markdown_step(slug, title: title)
     redirect "/demo?walkthrough=#{slug}&recording=#{id}"
+  end
+
+  post '/recordings/:id/active' do
+    slug = params[:walkthrough].to_s
+    if RecordingService.valid_id?(params[:id])
+      session["last_recording_#{slug}"] = params[:id].to_s unless slug.empty?
+    end
+    content_type :json
+    { ok: true }.to_json
   end
 
   get '/recordings/:id/content' do
