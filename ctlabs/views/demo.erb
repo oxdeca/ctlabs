@@ -81,10 +81,13 @@
 
   /* Responsive Walkthrough Sidebar & Compact Buttons */
   #walkthrough-sidebar {
-    overflow: hidden !important;
-    overflow-x: hidden !important;
+    position: relative;
+    z-index: 50;
     container-type: inline-size;
     container-name: sidebar-container;
+  }
+  #record-dropdown-btn:hover {
+    background: #0369a1 !important;
   }
 
   @container sidebar-container (max-width: 360px) {
@@ -225,7 +228,7 @@
     <div class="w3-container" style="height: calc(100vh - 120px); display: flex; flex-direction: column; overflow: hidden;">
       <div class="w3-card-4 w3-2021-inkwell" style="flex: 1; display: flex; flex-direction: row; min-height: 0; overflow: hidden; border: 1px solid #334155;">
         <!-- Sidebar: recorded sessions -->
-        <aside id="walkthrough-sidebar" style="width: 340px; min-width: 180px; max-width: 850px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b; position: relative; overflow: hidden; overflow-x: hidden;">
+        <aside id="walkthrough-sidebar" style="width: 340px; min-width: 180px; max-width: 850px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b; position: relative; z-index: 50;">
           <!-- Drag & Drop Import Overlay for Sidebar -->
           <div id="sidebar-drop-overlay" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.93); z-index: 200; border: 2px dashed #38bdf8; border-radius: 4px; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; padding: 24px; box-sizing: border-box;">
             <div id="sidebar-drop-idle" style="display: flex; flex-direction: column; align-items: center;">
@@ -245,19 +248,19 @@
             </div>
           </div>
 
-          <div class="sidebar-header-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155; min-width: 0; overflow: hidden;">
+          <div class="sidebar-header-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155; min-width: 0; position: relative; z-index: 60;">
             <div style="font-weight: 600; color: #f8fafc; display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               <i class="fas fa-record-vinyl w3-text-red" style="flex-shrink: 0;"></i>
               <span class="sidebar-title-text" style="overflow: hidden; text-overflow: ellipsis;">Steps</span>
               <span id="set-count" style="color: #94a3b8; font-size: 0.8em; font-weight: normal; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 10px; flex-shrink: 0;"><%= (@recordings || []).size %></span>
             </div>
             <div class="sidebar-btn-group" style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
-              <!-- Record / Add Step Dropdown -->
-              <div class="step-dropdown-wrapper" style="position: relative; display: inline-block;">
-                <button type="button" id="record-dropdown-btn" title="Add or record a step (Cast, Screen, Note)" style="background: #e11d48; color: #ffffff; padding: 3px 9px; border-radius: 4px; font-size: 0.8em; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); white-space: nowrap;">
-                  <i class="fas fa-circle" style="color: #ffffff; font-size: 0.65em;"></i><span class="sidebar-btn-label"> Record</span> <i class="fas fa-caret-down" style="font-size: 0.85em;"></i>
+              <!-- Add Step Dropdown -->
+              <div class="step-dropdown-wrapper" style="position: relative; display: inline-block; z-index: 70;">
+                <button type="button" id="record-dropdown-btn" title="Add step (Terminal Cast, Screen Video, Note)" style="background: #0284c7; color: #ffffff; padding: 3px 9px; border-radius: 4px; font-size: 0.8em; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); white-space: nowrap; transition: background 0.15s ease;">
+                  <i class="fas fa-plus-circle" style="color: #ffffff; font-size: 0.85em;"></i><span class="sidebar-btn-label"> Add</span> <i class="fas fa-caret-down" style="font-size: 0.85em; opacity: 0.85;"></i>
                 </button>
-                <div id="record-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; width: 220px; max-width: calc(100vw - 20px); background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden;">
+                <div id="record-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 220px; max-width: calc(100vw - 20px); background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden;">
                   <!-- Terminal Cast Option -->
                   <button type="button" id="record-cast-btn" style="width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #f8fafc; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
                     <div style="width: 28px; height: 28px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #10b981; flex-shrink: 0; font-size: 0.95em;">
