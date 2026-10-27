@@ -646,7 +646,7 @@ class RecordingService
     [key, entry['name'].to_s]
   end
 
-  def self.create_walkthrough(name, recording_ids: [], unique: false)
+  def self.create_walkthrough(name, recording_ids: [], unintegrated_ids: [], unique: false)
     wks   = load_walkthroughs
     clean = name.to_s.strip[0, NAME_MAX]
     clean = 'New Walkthrough' if clean.empty?
@@ -659,10 +659,19 @@ class RecordingService
       base = "#{base}_#{SecureRandom.hex(3)}" while wks.key?(base)
     end
 
+    recs   = Array(recording_ids).map(&:to_s).uniq
+    unints = (Array(unintegrated_ids).map(&:to_s) - recs).uniq
+    all_claimed = recs + unints
+
+    wks.each_value do |other_entry|
+      other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - all_claimed
+      other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - all_claimed
+    end
+
     entry = {
       'name'             => clean,
-      'recording_ids'    => Array(recording_ids).map(&:to_s),
-      'unintegrated_ids' => [],
+      'recording_ids'    => recs,
+      'unintegrated_ids' => unints,
       'created_at'       => Time.now.to_f
     }
     wks[base] = entry
@@ -821,10 +830,11 @@ class RecordingService
   def self.export_bundle(slug = 'default')
     key, entry = walkthrough_entry(slug)
     {
-      slug:       key,
-      name:       entry['name'].to_s,
-      sealed:     false,
-      recordings: list_for_walkthrough(key)
+      slug:         key,
+      name:         entry['name'].to_s,
+      sealed:       false,
+      recordings:   list_for_walkthrough(key),
+      unintegrated: list_unintegrated_for_walkthrough(key)
     }
   end
 end

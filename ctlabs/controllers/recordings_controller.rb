@@ -90,9 +90,11 @@ class RecordingsController < BaseController
 
   get '/recordings/download-all' do
     RecordingService.ensure_dir
-    bundle = RecordingService.export_bundle(params[:walkthrough].to_s)
-    files  = bundle[:recordings]
-    halt 404, 'No recordings found to download' if files.empty?
+    bundle      = RecordingService.export_bundle(params[:walkthrough].to_s)
+    step_files  = bundle[:recordings] || []
+    unint_files = bundle[:unintegrated] || []
+    all_files   = (step_files + unint_files).uniq { |rec| rec[:id] }
+    halt 404, 'No recordings found to download' if all_files.empty?
 
     label = RecordingService.node_slug(bundle[:name])
     label = bundle[:slug] if label.empty?
@@ -117,7 +119,7 @@ class RecordingsController < BaseController
     zip_path = File.join(RecordingService::DIR, "export_#{SecureRandom.hex(4)}_#{zip_filename}")
 
     Zip::File.open(zip_path, create: true) do |zipfile|
-      files.each do |rec|
+      all_files.each do |rec|
         next unless File.file?(rec[:path])
         ext = File.extname(rec[:path])
         ext = RecordingService::EXT if ext.empty?
@@ -128,9 +130,9 @@ class RecordingsController < BaseController
         end
       end
 
-      # Scan markdown steps for referenced pictures and include them in images/ folder
+      # Scan markdown steps and notes for referenced pictures and include them in images/ folder
       images_to_add = {}
-      files.each do |rec|
+      all_files.each do |rec|
         next unless File.file?(rec[:path]) && rec[:path].end_with?(RecordingService::MD_EXT)
         content = File.read(rec[:path]) rescue ''
         content.scan(%r{(?:/recordings)?/images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
@@ -144,12 +146,13 @@ class RecordingsController < BaseController
       end
 
       manifest = {
-        'format'         => 'ctlabs-walkthrough',
-        'version'        => 1,
-        'name'           => bundle[:name],
-        'sealed'         => bundle[:sealed],
-        'recording_ids'  => files.map { |rec| rec[:id] },
-        'exported_at'    => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        'format'           => 'ctlabs-walkthrough',
+        'version'          => 1,
+        'name'             => bundle[:name],
+        'sealed'           => bundle[:sealed],
+        'recording_ids'    => step_files.map { |rec| rec[:id] },
+        'unintegrated_ids' => unint_files.map { |rec| rec[:id] },
+        'exported_at'      => Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')
       }
       zipfile.get_output_stream(RecordingService::MANIFEST) do |io|
         io.write(JSON.pretty_generate(manifest))
@@ -175,6 +178,7 @@ class RecordingsController < BaseController
     walkthrough = nil
     image_count = 0
     last_saved_image = nil
+    selected_id = nil
 
     upload_files.each do |f|
       filename = f[:filename].to_s.downcase
@@ -197,8 +201,13 @@ class RecordingsController < BaseController
               next
             end
 
-            if entry.name.end_with?(RecordingService::EXT)
-              old_id = File.basename(entry.name, RecordingService::EXT)
+            next if entry.name.start_with?('__MACOSX/') || entry.name.include?('/.') || (entry.respond_to?(:directory?) && entry.directory?)
+
+            ext = File.extname(entry.name).downcase
+            clean_base = File.basename(entry.name, File.extname(entry.name))
+
+            if ext == RecordingService::EXT
+              old_id = clean_base
               data   = entry.get_input_stream.read
               node   = RecordingService.node_from_cast(data) ||
                        RecordingService.node_from_id(old_id)
@@ -206,28 +215,36 @@ class RecordingsController < BaseController
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
               id_map[old_id] = id
+              id_map[old_id.downcase] = id
+              id_map[base] = id
+              id_map[base.downcase] = id
               imported << id
-            elsif entry.name.end_with?(RecordingService::MD_EXT)
-              old_id = File.basename(entry.name, RecordingService::MD_EXT)
+            elsif ext == RecordingService::MD_EXT
+              old_id = clean_base
               data   = entry.get_input_stream.read
               id     = RecordingService.new_markdown_id('note')
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
               id_map[old_id] = id
+              id_map[old_id.downcase] = id
+              id_map[base] = id
+              id_map[base.downcase] = id
               imported << id
-            elsif RecordingService::VIDEO_EXTS.any? { |e| entry.name.downcase.end_with?(e) }
-              vext   = File.extname(entry.name).downcase
-              old_id = File.basename(entry.name, vext)
+            elsif RecordingService::VIDEO_EXTS.include?(ext)
+              old_id = clean_base
               id     = RecordingService.new_video_id('screen')
 
-              File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), entry.get_input_stream.read)
+              File.binwrite(File.join(RecordingService::DIR, "#{id}#{ext}"), entry.get_input_stream.read)
               id_map[old_id] = id
+              id_map[old_id.downcase] = id
+              id_map[base] = id
+              id_map[base.downcase] = id
               imported << id
-            elsif entry.name.end_with?('.json') && !entry.name.start_with?('_') && entry.name != RecordingService::MANIFEST
-              old_id = File.basename(entry.name, '.json')
+            elsif ext == '.json' && !base.start_with?('_') && base != RecordingService::MANIFEST
+              old_id = clean_base
               pending_sidecars[old_id] = entry.get_input_stream.read
-            elsif entry.name.start_with?('images/') || RecordingService::IMAGE_EXTS.include?(File.extname(entry.name).downcase)
-              img_basename = File.basename(entry.name)
+            elsif entry.name.start_with?('images/') || entry.name.include?('/images/') || RecordingService::IMAGE_EXTS.include?(ext)
+              img_basename = base
               target = File.join(RecordingService.ensure_images_dir, img_basename)
               File.binwrite(target, entry.get_input_stream.read)
               image_count += 1
@@ -237,22 +254,33 @@ class RecordingsController < BaseController
         end
 
         pending_sidecars.each do |old_id, json_str|
-          new_id = id_map[old_id]
+          new_id = id_map[old_id] || id_map[old_id.downcase]
           File.binwrite(File.join(RecordingService::DIR, "#{new_id}.json"), json_str) if new_id
         end
 
         if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
-          ordered = Array(manifest['recording_ids']).filter_map do |old_id|
-            id_map[old_id.to_s] ||
-              id_map[File.basename(old_id.to_s, RecordingService::EXT)] ||
-              id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)] ||
-              id_map[File.basename(old_id.to_s, '.webm')] ||
-              id_map[File.basename(old_id.to_s, '.mp4')]
+          lookup_id = lambda do |raw_id|
+            s = raw_id.to_s.strip
+            return nil if s.empty?
+            id_map[s] ||
+              id_map[s.downcase] ||
+              id_map[File.basename(s, File.extname(s))] ||
+              id_map[File.basename(s, File.extname(s)).downcase]
           end
-          ordered += imported - ordered
+
+          ordered = Array(manifest['recording_ids']).filter_map(&lookup_id)
+          unint_ordered = Array(manifest['unintegrated_ids']).filter_map(&lookup_id)
+
+          remaining = imported - ordered - unint_ordered
+          unint_ordered += remaining
+
           walkthrough = RecordingService.create_walkthrough(
-            manifest['name'], recording_ids: ordered, unique: true
+            manifest['name'],
+            recording_ids: ordered,
+            unintegrated_ids: unint_ordered,
+            unique: true
           )
+          selected_id = ordered.first unless ordered.empty?
         end
       elsif filename.end_with?(RecordingService::EXT)
         data = File.binread(f[:tempfile].path)
@@ -309,7 +337,7 @@ class RecordingsController < BaseController
       walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
     end
 
-    { ok: true, count: imported.size, imported: imported, walkthrough: walkthrough }.to_json
+    { ok: true, count: imported.size, imported: imported, selected: (selected_id || imported.first), walkthrough: walkthrough }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json

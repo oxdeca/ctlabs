@@ -812,15 +812,15 @@
               </span>
             </div>
             <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
-              Launch a target window to record. Choose <strong>Standard</strong> to keep the tab bar and split-mode support, or <strong>Clean Popup</strong> for a fixed 16:9 canvas.
+              Launch a target to record. <strong>New Tab</strong> keeps the tab bar, navigation, and split-screen mode (drag the tab header to detach into a separate window). <strong>Clean Popup</strong> opens a fixed 16:9 canvas without browser toolbars.
             </p>
             <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
               <input type="text" id="rec-win-url" value="/labs" placeholder="/labs, https://..., or custom URL" class="w3-input" style="flex: 1; min-width: 180px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 10px; font-size: 0.83em;" />
-              <select id="rec-win-res" class="w3-select" style="width: 220px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
-                <option value="standard" selected>New Window (Tabs &amp; Full Nav)</option>
-                <option value="1280x720">Clean Window: 1280 &times; 720 (16:9)</option>
-                <option value="1920x1080">Clean Window: 1920 &times; 1080 (HD)</option>
-                <option value="1024x768">Clean Window: 1024 &times; 768 (4:3)</option>
+              <select id="rec-win-res" class="w3-select" style="width: 230px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
+                <option value="tab" selected>New Tab (Tabs &amp; Full Nav)</option>
+                <option value="1280x720">Clean Popup: 1280 &times; 720 (16:9)</option>
+                <option value="1920x1080">Clean Popup: 1920 &times; 1080 (HD)</option>
+                <option value="1024x768">Clean Popup: 1024 &times; 768 (4:3)</option>
               </select>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -1594,8 +1594,9 @@
             if (data.ok) {
               const targetWk = data.walkthrough || activeWalkthrough;
               let url = '/demo?walkthrough=' + encodeURIComponent(targetWk);
-              if (data.imported && data.imported.length > 0) {
-                url += '&recording=' + encodeURIComponent(data.imported[0]);
+              const targetRec = data.selected || (data.imported && data.imported[0]);
+              if (targetRec) {
+                url += '&recording=' + encodeURIComponent(targetRec);
               }
               window.location.href = url;
             } else {
@@ -2328,7 +2329,7 @@
             const rawUrl = (recWinUrlInput ? recWinUrlInput.value.trim() : '') || '/labs';
             const url = normalizeRecUrl(rawUrl);
             if (recWinUrlInput) recWinUrlInput.value = url;
-            const mode = (recWinResSelect ? recWinResSelect.value : '') || 'standard';
+            const mode = (recWinResSelect ? recWinResSelect.value : '') || 'tab';
 
             recWindowLaunched = true;
             recWindowUrl = url;
@@ -2338,18 +2339,12 @@
               if (activeRecWindow && !activeRecWindow.closed) {
                 activeRecWindow.location.href = url;
                 focusTargetWindow();
-              } else if (mode === 'standard') {
-                // To guarantee opening in a NEW SEPARATE WINDOW rather than a tab,
-                // explicit window geometry (width/height/left/top) must be provided.
-                // We leave menubar/toolbar enabled (no "menubar=no" / "toolbar=no") so tabs & split mode are supported.
-                const screenW = window.screen.availWidth || window.screen.width || 1280;
-                const screenH = window.screen.availHeight || window.screen.height || 800;
-                const width = Math.max(900, Math.min(1440, screenW - 80));
-                const height = Math.max(650, Math.min(900, screenH - 80));
-                const left = Math.max(0, Math.round((screenW - width) / 2));
-                const top = Math.max(0, Math.round((screenH - height) / 2));
-                const windowFeatures = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
-                activeRecWindow = window.open(url, 'ctlabs_recorder_window', windowFeatures);
+              } else if (mode === 'tab' || mode === 'standard') {
+                // To keep the browser's tab strip, navigation controls, bookmarks, and split-screen mode,
+                // window.open() must be called without dimension/feature parameters.
+                // In modern Chromium/Firefox, passing any width/height parameter automatically forces
+                // the browser into "popup mode", which intentionally strips the tab bar.
+                activeRecWindow = window.open(url, 'ctlabs_recorder_window');
                 if (activeRecWindow) focusTargetWindow();
               } else {
                 // Open as clean popup with fixed dimensions
