@@ -23,6 +23,8 @@ class RecordingService
   IMAGES_DIR = File.join(DIR, 'images')
   EXT        = '.cast'
   MD_EXT     = '.md'
+  VIDEO_EXTS = ['.webm', '.mp4'].freeze
+  VIDEO_EXT  = '.webm'
   IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
   MANIFEST   = '_walkthrough.json'
   ID_RE      = /\A[a-zA-Z0-9_.-]{1,120}\z/
@@ -90,7 +92,7 @@ class RecordingService
     return nil unless valid_id?(id)
     base = id.to_s
     # Direct match if extension already provided
-    if base.end_with?(EXT) || base.end_with?(MD_EXT) || IMAGE_EXTS.any? { |e| base.end_with?(e) }
+    if base.end_with?(EXT) || base.end_with?(MD_EXT) || VIDEO_EXTS.any? { |e| base.end_with?(e) } || IMAGE_EXTS.any? { |e| base.end_with?(e) }
       p = File.join(ensure_dir, base)
       return p if File.file?(p)
       p_img = File.join(ensure_images_dir, base)
@@ -102,6 +104,12 @@ class RecordingService
 
     md_path = File.join(ensure_dir, "#{base}#{MD_EXT}")
     return md_path if File.file?(md_path)
+
+    # Check video extensions (.webm, .mp4)
+    VIDEO_EXTS.each do |vext|
+      v_path = File.join(ensure_dir, "#{base}#{vext}")
+      return v_path if File.file?(v_path)
+    end
 
     nil
   end
@@ -118,9 +126,15 @@ class RecordingService
     "md_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
   end
 
+  def self.new_video_id(label = 'screen')
+    "vid_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
+  end
+
   def self.all_disk_files
     ensure_dir
-    (Dir.glob(File.join(DIR, "*#{EXT}")) + Dir.glob(File.join(DIR, "*#{MD_EXT}")))
+    (Dir.glob(File.join(DIR, "*#{EXT}")) +
+     Dir.glob(File.join(DIR, "*#{MD_EXT}")) +
+     VIDEO_EXTS.flat_map { |ext| Dir.glob(File.join(DIR, "*#{ext}")) })
       .reject { |p| File.basename(p).start_with?('_') }
   end
 
@@ -192,6 +206,37 @@ class RecordingService
         type:       :markdown,
         created_at: File.mtime(path),
         duration:   0.0,
+        size:       size
+      }
+    end
+
+    if VIDEO_EXTS.any? { |e| path.end_with?(e) }
+      ext  = File.extname(path)
+      id   = File.basename(path, ext)
+      size = File.size(path)
+      meta_file = File.join(DIR, "#{id}.json")
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
+      end
+      meta_data = {} unless meta_data.is_a?(Hash)
+      title = meta_data['title'].to_s.strip
+      title = 'Browser Recording' if title.empty?
+      duration = meta_data['duration'].to_f
+      created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
+
+      return {
+        id:         id,
+        path:       path,
+        node:       'Screen',
+        title:      title,
+        type:       :video,
+        created_at: created_at,
+        duration:   duration,
         size:       size
       }
     end
@@ -280,6 +325,11 @@ class RecordingService
     return false unless path
     File.delete(path)
 
+    # Clean up sidecar metadata if present
+    base_id = File.basename(path, File.extname(path))
+    sidecar = File.join(DIR, "#{base_id}.json")
+    File.delete(sidecar) if File.file?(sidecar)
+
     # Clean up references across all walkthrough sets
     wks = load_walkthroughs
     changed = false
@@ -358,6 +408,27 @@ class RecordingService
         lines.insert(first_non_empty_idx, new_heading + "\n")
         File.write(path, lines.join)
       end
+      return true
+    end
+
+    if VIDEO_EXTS.any? { |e| path.end_with?(e) }
+      ext = File.extname(path)
+      id_clean = File.basename(path, ext)
+      meta_file = File.join(DIR, "#{id_clean}.json")
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
+      end
+      meta_data = {} unless meta_data.is_a?(Hash)
+      clean_title = title.to_s.strip
+      meta_data['title'] = clean_title.empty? ? 'Browser Recording' : clean_title
+      meta_data['type'] ||= 'video'
+      meta_data['created_at'] ||= File.mtime(path).to_i
+      File.write(meta_file, JSON.pretty_generate(meta_data))
       return true
     end
 

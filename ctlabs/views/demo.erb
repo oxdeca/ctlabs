@@ -179,7 +179,7 @@
               <i class="fas fa-file-import" style="font-size: 3em; color: #38bdf8; margin-bottom: 12px; animation: pulse 1.5s infinite;"></i>
               <div style="font-size: 1.1em; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">Drop files to import</div>
               <div style="color: #94a3b8; font-size: 0.85em; line-height: 1.4; max-width: 260px;">
-                Drop <strong style="color: #cbd5e1;">.cast</strong> recordings or <strong style="color: #cbd5e1;">.md</strong> notes to import into this walkthrough
+                Drop <strong style="color: #cbd5e1;">.cast</strong>, <strong style="color: #cbd5e1;">.webm</strong>, or <strong style="color: #cbd5e1;">.md</strong> files to import into this walkthrough
               </div>
               <div id="sidebar-drop-target-hint" style="color: #38bdf8; font-size: 0.8em; margin-top: 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 3px 8px; border-radius: 4px;">
                 Adding to: <%= ERB::Util.html_escape(@walkthrough_name.to_s.empty? ? @active_walkthrough : @walkthrough_name) %>
@@ -210,11 +210,16 @@
                 </button>
               </form>
 
+              <!-- Add Screen Recording Step Button -->
+              <button type="button" id="record-screen-btn" title="Record browser screen walkthrough" style="background: #be185d; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                <i class="fas fa-video"></i> + Screen
+              </button>
+
               <!-- Import Button & Hidden File Input -->
               <button id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
                 <i class="fas fa-upload"></i> Import
               </button>
-              <input type="file" id="import-file-input" accept=".zip,.cast,.md" multiple style="display: none;" />
+              <input type="file" id="import-file-input" accept=".zip,.cast,.md,.webm,.mp4" multiple style="display: none;" />
 
               <!-- Export Download Button -->
               <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
@@ -261,17 +266,46 @@
               <% recs.each_with_index do |r, idx| %>
                 <% 
                   is_md = (r[:type] == :markdown)
-                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? (is_md ? 'Step Note' : r[:node]) : r[:title] 
-                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{is_md ? RecordingService::MD_EXT : RecordingService::EXT}")
+                  is_vid = (r[:type] == :video)
+                  display_title = if r[:title] && !r[:title].strip.empty?
+                                    r[:title]
+                                  elsif is_md
+                                    'Step Note'
+                                  elsif is_vid
+                                    'Browser Recording'
+                                  else
+                                    r[:node]
+                                  end
+                  data_type_str = if is_md
+                                    'markdown'
+                                  elsif is_vid
+                                    'video'
+                                  else
+                                    'cast'
+                                  end
+                  fext = if is_md
+                           RecordingService::MD_EXT
+                         elsif is_vid
+                           RecordingService::VIDEO_EXT
+                         else
+                           RecordingService::EXT
+                         end
+                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
-                  node_str = is_md ? 'Note' : r[:node].to_s.split(' - ').first.strip
+                  node_str = if is_md
+                               'Markdown'
+                             elsif is_vid
+                               'Screen'
+                             else
+                               r[:node].to_s.split(' - ').first.strip
+                             end
                 %>
                 <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
                         data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
-                        data-type="<%= is_md ? 'markdown' : 'cast' %>"
+                        data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step="<%= r[:step] || (idx + 1) %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
@@ -280,6 +314,8 @@
                         <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
                         <% if is_md %>
                           <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% elsif is_vid %>
+                          <i class="fas fa-video" style="color: #f43f5e; margin-right: 3px; font-size: 0.95em;"></i>
                         <% end %>
                         <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
                       </div>
@@ -290,6 +326,8 @@
                         <i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i>
                         <% if is_md %>
                           <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                        <% elsif is_vid %>
+                          <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
                         <% else %>
                           <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
                         <% end %>
@@ -326,17 +364,46 @@
               <% others.each do |r| %>
                 <% 
                   is_md = (r[:type] == :markdown)
-                  display_title = (r[:title].nil? || r[:title].strip.empty?) ? (is_md ? 'Step Note' : r[:node]) : r[:title] 
-                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{is_md ? RecordingService::MD_EXT : RecordingService::EXT}")
+                  is_vid = (r[:type] == :video)
+                  display_title = if r[:title] && !r[:title].strip.empty?
+                                    r[:title]
+                                  elsif is_md
+                                    'Step Note'
+                                  elsif is_vid
+                                    'Browser Recording'
+                                  else
+                                    r[:node]
+                                  end
+                  data_type_str = if is_md
+                                    'markdown'
+                                  elsif is_vid
+                                    'video'
+                                  else
+                                    'cast'
+                                  end
+                  fext = if is_md
+                           RecordingService::MD_EXT
+                         elsif is_vid
+                           RecordingService::VIDEO_EXT
+                         else
+                           RecordingService::EXT
+                         end
+                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
-                  node_str = is_md ? 'Note' : r[:node].to_s.split(' - ').first.strip
+                  node_str = if is_md
+                               'Markdown'
+                             elsif is_vid
+                               'Screen'
+                             else
+                               r[:node].to_s.split(' - ').first.strip
+                             end
                 %>
                 <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
                         data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
-                        data-type="<%= is_md ? 'markdown' : 'cast' %>"
+                        data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step=""
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
@@ -345,6 +412,8 @@
                         <span class="step-num" style="color: #64748b; margin-right: 4px;">+</span>
                         <% if is_md %>
                           <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% elsif is_vid %>
+                          <i class="fas fa-video" style="color: #f43f5e; margin-right: 3px; font-size: 0.95em;"></i>
                         <% end %>
                         <span class="item-title"><%= ERB::Util.html_escape(display_title) %></span>
                       </div>
@@ -354,6 +423,8 @@
                       <div>
                         <% if is_md %>
                           <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                        <% elsif is_vid %>
+                          <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
                         <% else %>
                           <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
                         <% end %>
@@ -423,6 +494,11 @@
           <!-- Asciinema Player Container -->
           <div id="demo-container" style="flex: 1; min-height: 0; overflow: hidden; display: flex;">
             <div id="demo" style="flex: 1; height: 100%; width: 100%;"></div>
+          </div>
+
+          <!-- Video Step Container -->
+          <div id="video-container" style="flex: 1; min-height: 0; display: none; align-items: center; justify-content: center; background: #000; position: relative;">
+            <video id="video-player" controls playsinline style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; outline: none; background: #000;"></video>
           </div>
 
           <!-- Markdown Step Container -->
@@ -526,6 +602,101 @@
       </div>
     </div>
 
+    <!-- Record Screen Modal -->
+    <div id="record-screen-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.15em; font-weight: 600; color: #f43f5e; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-video"></i> Record Browser Screen
+          </h3>
+          <span id="close-record-screen-modal" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 20px 18px;">
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+            Capture your browser tab, window, or entire screen directly into this walkthrough set as a video step.
+          </p>
+
+          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
+            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: #f8fafc; font-size: 0.9em; user-select: none;">
+              <input type="checkbox" id="rec-screen-mic" style="margin-top: 3px; accent-color: #f43f5e; width: 16px; height: 16px;" />
+              <div>
+                <strong>Include Microphone Audio</strong>
+                <span style="display: block; color: #94a3b8; font-size: 0.85em; margin-top: 3px;">
+                  Mix voiceover commentary together with tab audio into the recording.
+                </span>
+              </div>
+            </label>
+          </div>
+
+          <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-start;">
+            <i class="fas fa-info-circle" style="color: #38bdf8; margin-top: 3px;"></i>
+            <div style="color: #cbd5e1; font-size: 0.83em; line-height: 1.45;">
+              When you click <strong>Start Recording</strong>, your browser will prompt you to choose which tab, window, or screen you want to share.
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" id="cancel-record-screen-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="button" id="confirm-record-screen-btn" class="w3-button w3-round" style="background: #e11d48; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-circle" style="font-size: 0.75em;"></i> Start Recording
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Screen Recording Bar -->
+    <div id="screen-rec-bar" style="display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10005; background: #0f172a; border: 2px solid #e11d48; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(225, 29, 72, 0.35); padding: 8px 18px; align-items: center; gap: 14px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-block; width: 12px; height: 12px; background: #e11d48; border-radius: 50%; animation: pulse 1.2s infinite;"></span>
+        <span style="font-size: 0.82em; font-weight: 700; color: #f43f5e; letter-spacing: 0.06em;">REC</span>
+      </div>
+      <div id="screen-rec-timer" style="font-family: ui-monospace, monospace; font-size: 1.05em; font-weight: 700; color: #f8fafc; min-width: 52px; text-align: center;">
+        00:00
+      </div>
+      <div style="width: 1px; height: 20px; background: #334155;"></div>
+      <button type="button" id="screen-rec-stop-btn" style="background: #10b981; color: #ffffff; border: none; padding: 6px 14px; border-radius: 20px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-check"></i> Stop &amp; Save
+      </button>
+      <button type="button" id="screen-rec-cancel-btn" style="background: #334155; color: #94a3b8; border: none; padding: 6px 12px; border-radius: 20px; font-size: 0.82em; cursor: pointer;">
+        Discard
+      </button>
+    </div>
+
+    <!-- Save Screen Recording Modal -->
+    <div id="save-screen-modal" class="w3-modal" style="z-index: 10006;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 480px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.15em; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-video"></i> Save Recording Step
+          </h3>
+        </header>
+        <div style="padding: 20px 18px;">
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+            Recording captured! <span id="save-screen-duration" style="color: #38bdf8; font-weight: 600;"></span>
+          </p>
+
+          <div style="margin-bottom: 18px;">
+            <label for="save-screen-title" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+              Step Title
+            </label>
+            <input type="text" id="save-screen-title" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" placeholder="Browser Recording" />
+          </div>
+
+          <div id="save-screen-progress" style="display: none; align-items: center; gap: 8px; color: #38bdf8; font-size: 0.88em; margin-bottom: 14px;">
+            <i class="fas fa-spinner fa-spin"></i> Uploading video to walkthrough...
+          </div>
+
+          <div id="save-screen-actions" style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" id="discard-screen-save-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Discard</button>
+            <button type="button" id="confirm-screen-save-btn" class="w3-button w3-round" style="background: #10b981; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-save"></i> Save Step
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Image Lightbox / Full Size Modal -->
     <div id="image-modal" style="display: none; position: fixed; z-index: 10000; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(4px); align-items: center; justify-content: center; flex-direction: column; padding: 24px;">
       <!-- Top Action Bar -->
@@ -589,6 +760,29 @@
         const imageModalCaption = document.getElementById('image-modal-caption');
         const imageModalExternal = document.getElementById('image-modal-external');
         const imageModalClose = document.getElementById('image-modal-close');
+
+        const videoContainer = document.getElementById('video-container');
+        const videoPlayer = document.getElementById('video-player');
+
+        const recordScreenBtn = document.getElementById('record-screen-btn');
+        const recordScreenModal = document.getElementById('record-screen-modal');
+        const recScreenMic = document.getElementById('rec-screen-mic');
+        const confirmRecordScreenBtn = document.getElementById('confirm-record-screen-btn');
+        const cancelRecordScreenBtn = document.getElementById('cancel-record-screen-btn');
+        const closeRecordScreenModal = document.getElementById('close-record-screen-modal');
+
+        const screenRecBar = document.getElementById('screen-rec-bar');
+        const screenRecTimer = document.getElementById('screen-rec-timer');
+        const screenRecStopBtn = document.getElementById('screen-rec-stop-btn');
+        const screenRecCancelBtn = document.getElementById('screen-rec-cancel-btn');
+
+        const saveScreenModal = document.getElementById('save-screen-modal');
+        const saveScreenDuration = document.getElementById('save-screen-duration');
+        const saveScreenTitle = document.getElementById('save-screen-title');
+        const confirmScreenSaveBtn = document.getElementById('confirm-screen-save-btn');
+        const discardScreenSaveBtn = document.getElementById('discard-screen-save-btn');
+        const saveScreenProgress = document.getElementById('save-screen-progress');
+        const saveScreenActions = document.getElementById('save-screen-actions');
 
         let player = null;
         let activeId = null;
@@ -959,14 +1153,14 @@
           const files = Array.from(fileList || []);
           if (files.length === 0) return;
 
-          const validExts = ['.cast', '.md', '.zip', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
+          const validExts = ['.cast', '.md', '.zip', '.webm', '.mp4', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
           const validFiles = files.filter(f => {
             const name = f.name.toLowerCase();
             return validExts.some(ext => name.endsWith(ext));
           });
 
           if (validFiles.length === 0) {
-            alert('Unsupported file format. Please drop or upload .cast recordings, .md notes, or .zip archives.');
+            alert('Unsupported file format. Please drop or upload .cast recordings, .webm/.mp4 videos, .md notes, or .zip archives.');
             return;
           }
 
@@ -1109,6 +1303,380 @@
           }
         });
 
+        // --- Browser Screen Recorder ---
+        class ScreenRecorder {
+          constructor() {
+            this.mediaRecorder = null;
+            this.recordedChunks = [];
+            this.stream = null;
+            this.displayStream = null;
+            this.micStream = null;
+            this.audioCtx = null;
+            this.timerInterval = null;
+            this.startTime = 0;
+            this.durationSec = 0;
+            this.isRecording = false;
+            this.isStopping = false;
+          }
+
+          async start(enableMic = false) {
+            this.cleanup();
+            this.recordedChunks = [];
+            this.durationSec = 0;
+            this.isRecording = false;
+            this.isStopping = false;
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+              throw new Error('Screen capture API (getDisplayMedia) is not supported in this browser.');
+            }
+
+            const supported = (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints()) || {};
+            const videoConstraints = supported.cursor ? { cursor: 'always' } : true;
+
+            let displayStream;
+            try {
+              displayStream = await navigator.mediaDevices.getDisplayMedia({
+                video: videoConstraints,
+                audio: true
+              });
+            } catch (err) {
+              if (err.name === 'NotAllowedError') throw err;
+              // Fallback to video-only if audio: true or cursor constraint is unsupported (e.g. Firefox)
+              displayStream = await navigator.mediaDevices.getDisplayMedia({
+                video: true
+              });
+            }
+
+            this.displayStream = displayStream;
+            let combinedStream = displayStream;
+
+            // Mix microphone audio if requested
+            if (enableMic && navigator.mediaDevices.getUserMedia) {
+              try {
+                const micStream = await navigator.mediaDevices.getUserMedia({
+                  audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true
+                  }
+                });
+                this.micStream = micStream;
+
+                const hasDisplayAudio = displayStream.getAudioTracks().length > 0;
+                const hasMicAudio = micStream.getAudioTracks().length > 0;
+
+                if (hasDisplayAudio || hasMicAudio) {
+                  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                  if (AudioContextClass) {
+                    const ctx = new AudioContextClass();
+                    this.audioCtx = ctx;
+                    const dest = ctx.createMediaStreamDestination();
+
+                    if (hasDisplayAudio) {
+                      const displaySource = ctx.createMediaStreamSource(new MediaStream(displayStream.getAudioTracks()));
+                      displaySource.connect(dest);
+                    }
+                    if (hasMicAudio) {
+                      const micSource = ctx.createMediaStreamSource(micStream);
+                      micSource.connect(dest);
+                    }
+
+                    combinedStream = new MediaStream([
+                      ...displayStream.getVideoTracks(),
+                      ...dest.stream.getAudioTracks()
+                    ]);
+                  } else {
+                    combinedStream = new MediaStream([
+                      ...displayStream.getVideoTracks(),
+                      ...displayStream.getAudioTracks(),
+                      ...micStream.getAudioTracks()
+                    ]);
+                  }
+                }
+              } catch (micErr) {
+                console.warn('Microphone access could not be acquired; proceeding with screen video only:', micErr);
+              }
+            }
+
+            this.stream = combinedStream;
+
+            // Pick preferred mimeType based on available audio
+            const hasAudio = combinedStream.getAudioTracks().length > 0;
+            const candidates = hasAudio ? [
+              'video/webm;codecs=vp9,opus',
+              'video/webm;codecs=vp8,opus',
+              'video/webm;codecs=h264,opus',
+              'video/webm'
+            ] : [
+              'video/webm;codecs=vp9',
+              'video/webm;codecs=vp8',
+              'video/webm;codecs=h264',
+              'video/webm'
+            ];
+
+            let mimeType = '';
+            if (typeof MediaRecorder.isTypeSupported === 'function') {
+              for (const candidate of candidates) {
+                if (MediaRecorder.isTypeSupported(candidate)) {
+                  mimeType = candidate;
+                  break;
+                }
+              }
+            }
+
+            const options = mimeType ? { mimeType } : {};
+            this.mediaRecorder = new MediaRecorder(combinedStream, options);
+
+            this.isRecording = true;
+            this.isStopping = false;
+
+            this.mediaRecorder.ondataavailable = (event) => {
+              if (event.data && event.data.size > 0) {
+                this.recordedChunks.push(event.data);
+              }
+            };
+
+            // Detect when user clicks native browser "Stop sharing" chrome (Chrome, Firefox, Safari)
+            displayStream.getTracks().forEach(track => {
+              track.onended = () => {
+                if (this.isRecording && !this.isStopping) {
+                  handleStopRecording();
+                }
+              };
+            });
+
+            // In Firefox/Safari, recorder may automatically transition to inactive and stop when tracks end
+            this.mediaRecorder.onstop = () => {
+              if (this.isRecording && !this.isStopping) {
+                handleStopRecording();
+              }
+            };
+
+            this.mediaRecorder.start(1000);
+            this.startTime = Date.now();
+
+            if (screenRecTimer) screenRecTimer.textContent = '00:00';
+            if (screenRecBar) screenRecBar.style.display = 'flex';
+
+            this.timerInterval = setInterval(() => {
+              this.durationSec = Math.round((Date.now() - this.startTime) / 1000);
+              const mins = String(Math.floor(this.durationSec / 60)).padStart(2, '0');
+              const secs = String(this.durationSec % 60).padStart(2, '0');
+              if (screenRecTimer) screenRecTimer.textContent = `${mins}:${secs}`;
+            }, 500);
+          }
+
+          stop() {
+            return new Promise((resolve) => {
+              if (this.timerInterval) {
+                clearInterval(this.timerInterval);
+                this.timerInterval = null;
+              }
+              this.durationSec = Math.max(1, Math.round((Date.now() - this.startTime) / 1000));
+
+              const finish = () => {
+                const mimeType = (this.mediaRecorder && this.mediaRecorder.mimeType) || 'video/webm';
+                const blob = this.recordedChunks.length > 0 ? new Blob(this.recordedChunks, { type: mimeType }) : null;
+                this.cleanupTracks();
+                this.isRecording = false;
+                this.isStopping = false;
+                resolve({ blob, duration: this.durationSec });
+              };
+
+              if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+                setTimeout(finish, 60);
+                return;
+              }
+
+              this.mediaRecorder.onstop = () => {
+                setTimeout(finish, 60);
+              };
+
+              try {
+                this.mediaRecorder.stop();
+              } catch (e) {
+                finish();
+              }
+            });
+          }
+
+          cleanupTracks() {
+            if (this.stream) {
+              this.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+              this.stream = null;
+            }
+            if (this.displayStream) {
+              this.displayStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+              this.displayStream = null;
+            }
+            if (this.micStream) {
+              this.micStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+              this.micStream = null;
+            }
+            if (this.audioCtx) {
+              try { this.audioCtx.close(); } catch (e) {}
+              this.audioCtx = null;
+            }
+          }
+
+          cleanup() {
+            if (this.timerInterval) {
+              clearInterval(this.timerInterval);
+              this.timerInterval = null;
+            }
+            this.cleanupTracks();
+            this.mediaRecorder = null;
+            this.recordedChunks = [];
+            this.isRecording = false;
+            this.isStopping = false;
+            if (screenRecBar) screenRecBar.style.display = 'none';
+          }
+        }
+
+        const screenRecorder = new ScreenRecorder();
+        let currentRecordingBlob = null;
+        let currentRecordingDuration = 0;
+
+        async function handleStopRecording() {
+          if (!screenRecorder.isRecording || screenRecorder.isStopping) return;
+          screenRecorder.isStopping = true;
+
+          if (screenRecBar) screenRecBar.style.display = 'none';
+          const result = await screenRecorder.stop();
+          if (!result || !result.blob || result.blob.size === 0) {
+            alert('No video was recorded or recording was empty.');
+            screenRecorder.cleanup();
+            return;
+          }
+          currentRecordingBlob = result.blob;
+          currentRecordingDuration = result.duration;
+
+          const mins = Math.floor(currentRecordingDuration / 60);
+          const secs = currentRecordingDuration % 60;
+          const durStr = `${mins}:${String(secs).padStart(2, '0')}`;
+          const sizeMB = (result.blob.size / (1024 * 1024)).toFixed(1);
+
+          if (saveScreenDuration) {
+            saveScreenDuration.textContent = `(${durStr}, ${sizeMB} MB)`;
+          }
+
+          const nextStepNum = recsList ? recsList.querySelectorAll('.rec-item-wrapper').length + 1 : 1;
+          if (saveScreenTitle) {
+            saveScreenTitle.value = `Browser Screen - Step ${nextStepNum}`;
+          }
+
+          if (saveScreenProgress) saveScreenProgress.style.display = 'none';
+          if (saveScreenActions) saveScreenActions.style.display = 'flex';
+          if (confirmScreenSaveBtn) confirmScreenSaveBtn.disabled = false;
+          if (discardScreenSaveBtn) discardScreenSaveBtn.disabled = false;
+
+          if (saveScreenModal) saveScreenModal.style.display = 'block';
+          if (saveScreenTitle) {
+            saveScreenTitle.focus();
+            saveScreenTitle.select();
+          }
+        }
+
+        if (recordScreenBtn) {
+          recordScreenBtn.addEventListener('click', () => {
+            if (recordScreenModal) recordScreenModal.style.display = 'block';
+          });
+        }
+        if (closeRecordScreenModal) {
+          closeRecordScreenModal.addEventListener('click', () => {
+            if (recordScreenModal) recordScreenModal.style.display = 'none';
+          });
+        }
+        if (cancelRecordScreenBtn) {
+          cancelRecordScreenBtn.addEventListener('click', () => {
+            if (recordScreenModal) recordScreenModal.style.display = 'none';
+          });
+        }
+        if (confirmRecordScreenBtn) {
+          confirmRecordScreenBtn.addEventListener('click', async () => {
+            if (recordScreenModal) recordScreenModal.style.display = 'none';
+            const enableMic = recScreenMic ? recScreenMic.checked : false;
+            try {
+              await screenRecorder.start(enableMic);
+            } catch (err) {
+              console.error('Failed to start screen recording:', err);
+              if (err.name !== 'NotAllowedError') {
+                alert('Could not start screen recording: ' + err.message);
+              }
+              screenRecorder.cleanup();
+            }
+          });
+        }
+
+        if (screenRecStopBtn) {
+          screenRecStopBtn.addEventListener('click', () => {
+            handleStopRecording();
+          });
+        }
+
+        if (screenRecCancelBtn) {
+          screenRecCancelBtn.addEventListener('click', () => {
+            if (confirm('Discard this screen recording?')) {
+              screenRecorder.cleanup();
+              currentRecordingBlob = null;
+            }
+          });
+        }
+
+        if (confirmScreenSaveBtn) {
+          confirmScreenSaveBtn.addEventListener('click', async () => {
+            if (!currentRecordingBlob) return;
+            const title = (saveScreenTitle ? saveScreenTitle.value.trim() : '') || 'Browser Screen';
+
+            if (saveScreenProgress) saveScreenProgress.style.display = 'flex';
+            if (confirmScreenSaveBtn) confirmScreenSaveBtn.disabled = true;
+            if (discardScreenSaveBtn) discardScreenSaveBtn.disabled = true;
+
+            try {
+              const formData = new FormData();
+              formData.append('video', currentRecordingBlob, 'screen.webm');
+              formData.append('title', title);
+              formData.append('duration', currentRecordingDuration);
+              formData.append('walkthrough', activeWalkthrough);
+
+              const resp = await fetch('/recordings/upload-video', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+              });
+
+              const data = await resp.json();
+              if (resp.ok && (data.ok || data.success)) {
+                if (saveScreenModal) saveScreenModal.style.display = 'none';
+                currentRecordingBlob = null;
+                const nextId = data.id;
+                const targetWk = data.walkthrough || activeWalkthrough;
+                const targetUrl = new URL(window.location);
+                if (targetWk) targetUrl.searchParams.set('walkthrough', targetWk);
+                if (nextId) targetUrl.searchParams.set('recording', nextId);
+                window.location.href = targetUrl.toString();
+              } else {
+                alert('Failed to save screen recording: ' + (data.error || 'Server error'));
+                if (saveScreenProgress) saveScreenProgress.style.display = 'none';
+                if (confirmScreenSaveBtn) confirmScreenSaveBtn.disabled = false;
+                if (discardScreenSaveBtn) discardScreenSaveBtn.disabled = false;
+              }
+            } catch (err) {
+              console.error('Error saving recording:', err);
+              alert('Error saving screen recording: ' + err.message);
+              if (saveScreenProgress) saveScreenProgress.style.display = 'none';
+              if (confirmScreenSaveBtn) confirmScreenSaveBtn.disabled = false;
+              if (discardScreenSaveBtn) discardScreenSaveBtn.disabled = false;
+            }
+          });
+        }
+
+        if (discardScreenSaveBtn) {
+          discardScreenSaveBtn.addEventListener('click', () => {
+            currentRecordingBlob = null;
+            if (saveScreenModal) saveScreenModal.style.display = 'none';
+          });
+        }
+
         function play(src, label, id, step, title, dataType, autoPlay = false) {
           if (!src) return;
           activeId = id;
@@ -1139,6 +1707,8 @@
 
           if (activeDataType === 'markdown') {
             if (demoContainer) demoContainer.style.display = 'none';
+            if (videoContainer) videoContainer.style.display = 'none';
+            if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
             if (mdContainer) mdContainer.style.display = 'flex';
             if (titleIcon) {
               titleIcon.className = 'fab fa-markdown';
@@ -1146,8 +1716,24 @@
             }
             loadMarkdownContent(id);
             setMdMode(currentMdMode || 'preview');
+          } else if (activeDataType === 'video') {
+            if (demoContainer) demoContainer.style.display = 'none';
+            if (mdContainer) mdContainer.style.display = 'none';
+            if (videoContainer) videoContainer.style.display = 'flex';
+            if (titleIcon) {
+              titleIcon.className = 'fas fa-video';
+              titleIcon.style.color = '#f43f5e';
+            }
+            if (videoPlayer) {
+              videoPlayer.src = src;
+              if (autoPlay) {
+                videoPlayer.play().catch(() => {});
+              }
+            }
           } else {
             if (mdContainer) mdContainer.style.display = 'none';
+            if (videoContainer) videoContainer.style.display = 'none';
+            if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
             if (demoContainer) demoContainer.style.display = 'flex';
             if (titleIcon) {
               titleIcon.className = 'fas fa-play-circle w3-text-green';
@@ -1284,6 +1870,7 @@
             if (deleteModal && deleteModal.style.display === 'block') deleteModal.style.display = 'none';
             const exportModal = document.getElementById('export-modal');
             if (exportModal && exportModal.style.display === 'block') exportModal.style.display = 'none';
+            if (recordScreenModal && recordScreenModal.style.display === 'block') recordScreenModal.style.display = 'none';
           }
 
           const isEditing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
@@ -1772,6 +2359,9 @@
           const exportModal = document.getElementById('export-modal');
           if (e.target === exportModal) {
             exportModal.style.display = 'none';
+          }
+          if (e.target === recordScreenModal) {
+            recordScreenModal.style.display = 'none';
           }
         });
       })();

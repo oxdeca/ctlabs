@@ -38,7 +38,51 @@ class RecordingsController < BaseController
 
     RecordingService.add_to_walkthrough(target_slug, [id])
 
-    { ok: true, id: id, walkthrough: target_slug }.to_json
+    { ok: true, success: true, id: id, walkthrough: target_slug }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/upload-video' do
+    content_type :json
+    f = params[:video] || params[:file]
+    halt 400, { ok: false, error: 'No video file uploaded' }.to_json unless f && f[:tempfile]
+
+    wks = RecordingService.load_walkthroughs
+    target_slug = params[:walkthrough].to_s
+    target_slug = session[:walkthrough].to_s if target_slug.empty? || !wks.key?(target_slug)
+    target_slug = wks.keys.first.to_s if target_slug.empty? || !wks.key?(target_slug)
+
+    if target_slug.empty?
+      target_slug = RecordingService.create_walkthrough('Walkthrough 1')
+      wks = RecordingService.load_walkthroughs
+    end
+
+    orig_name = f[:filename].to_s
+    ext = File.extname(orig_name).downcase
+    ext = RecordingService::VIDEO_EXT unless RecordingService::VIDEO_EXTS.include?(ext)
+
+    id = RecordingService.new_video_id('screen')
+    path = File.join(RecordingService::DIR, "#{id}#{ext}")
+    FileUtils.mkdir_p(File.dirname(path))
+    FileUtils.cp(f[:tempfile].path, path)
+
+    clean_title = params[:title].to_s.strip
+    clean_title = 'Browser Recording' if clean_title.empty?
+    duration = params[:duration].to_f
+
+    meta = {
+      'title'      => clean_title,
+      'duration'   => duration,
+      'created_at' => Time.now.to_i,
+      'type'       => 'video'
+    }
+    File.write(File.join(RecordingService::DIR, "#{id}.json"), JSON.pretty_generate(meta))
+
+    RecordingService.add_to_walkthrough(target_slug, [id])
+
+    { ok: true, success: true, id: id, walkthrough: target_slug }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
@@ -78,6 +122,10 @@ class RecordingsController < BaseController
         ext = File.extname(rec[:path])
         ext = RecordingService::EXT if ext.empty?
         zipfile.add("#{rec[:id]}#{ext}", rec[:path])
+        if RecordingService::VIDEO_EXTS.include?(ext)
+          sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json")
+          zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
+        end
       end
 
       # Scan markdown steps for referenced pictures and include them in images/ folder
@@ -133,6 +181,7 @@ class RecordingsController < BaseController
 
       if filename.end_with?('.zip')
         id_map   = {}
+        pending_sidecars = {}
         manifest = nil
 
         Zip::File.open(f[:tempfile].path) do |zipfile|
@@ -166,6 +215,17 @@ class RecordingsController < BaseController
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
               id_map[old_id] = id
               imported << id
+            elsif RecordingService::VIDEO_EXTS.any? { |e| entry.name.downcase.end_with?(e) }
+              vext   = File.extname(entry.name).downcase
+              old_id = File.basename(entry.name, vext)
+              id     = RecordingService.new_video_id('screen')
+
+              File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), entry.get_input_stream.read)
+              id_map[old_id] = id
+              imported << id
+            elsif entry.name.end_with?('.json') && !entry.name.start_with?('_') && entry.name != RecordingService::MANIFEST
+              old_id = File.basename(entry.name, '.json')
+              pending_sidecars[old_id] = entry.get_input_stream.read
             elsif entry.name.start_with?('images/') || RecordingService::IMAGE_EXTS.include?(File.extname(entry.name).downcase)
               img_basename = File.basename(entry.name)
               target = File.join(RecordingService.ensure_images_dir, img_basename)
@@ -176,11 +236,18 @@ class RecordingsController < BaseController
           end
         end
 
+        pending_sidecars.each do |old_id, json_str|
+          new_id = id_map[old_id]
+          File.binwrite(File.join(RecordingService::DIR, "#{new_id}.json"), json_str) if new_id
+        end
+
         if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
           ordered = Array(manifest['recording_ids']).filter_map do |old_id|
             id_map[old_id.to_s] ||
               id_map[File.basename(old_id.to_s, RecordingService::EXT)] ||
-              id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)]
+              id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)] ||
+              id_map[File.basename(old_id.to_s, '.webm')] ||
+              id_map[File.basename(old_id.to_s, '.mp4')]
           end
           ordered += imported - ordered
           walkthrough = RecordingService.create_walkthrough(
@@ -210,6 +277,20 @@ class RecordingsController < BaseController
         id   = RecordingService.new_markdown_id('note')
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
         imported << id
+      elsif RecordingService::VIDEO_EXTS.include?(File.extname(filename))
+        vext = File.extname(filename).downcase
+        id   = RecordingService.new_video_id('screen')
+        File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), File.binread(f[:tempfile].path))
+        base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+        base_name = 'Browser Recording' if base_name.empty?
+        meta = {
+          'title'      => base_name,
+          'duration'   => 0.0,
+          'created_at' => Time.now.to_i,
+          'type'       => 'video'
+        }
+        File.write(File.join(RecordingService::DIR, "#{id}.json"), JSON.pretty_generate(meta))
+        imported << id
       elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
         last_saved_image = RecordingService.save_image(f[:tempfile], filename)
         image_count += 1
@@ -217,7 +298,7 @@ class RecordingsController < BaseController
     end
 
     if imported.empty? && image_count.zero?
-      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, .md, or image file.' }.to_json
+      halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, .md, video (.webm, .mp4), or image file.' }.to_json
     end
 
     if upload_files.size == 1 && image_count == 1 && imported.empty?
@@ -284,6 +365,15 @@ class RecordingsController < BaseController
              else 'application/octet-stream'
              end
       return send_file path, type: mime, disposition: 'inline'
+    end
+
+    if RecordingService::VIDEO_EXTS.include?(ext)
+      mime = (ext == '.mp4') ? 'video/mp4' : 'video/webm'
+      disposition = params[:download] ? 'attachment' : 'inline'
+      return send_file path,
+                       filename:    File.basename(path),
+                       type:        mime,
+                       disposition: disposition
     end
 
     is_md = path.end_with?(RecordingService::MD_EXT)
