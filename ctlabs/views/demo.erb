@@ -219,6 +219,17 @@
   .markdown-body img:hover {
     box-shadow: 0 6px 16px rgba(56, 189, 248, 0.25);
   }
+  #md-edit-pane .CodeMirror {
+    height: 100% !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+    font-size: 0.88em;
+    line-height: 1.6;
+    background: #090d16 !important;
+  }
+  #md-edit-pane .CodeMirror-gutters {
+    background: #0b1120 !important;
+    border-right: 1px solid #334155 !important;
+  }
 </style>
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
@@ -928,6 +939,11 @@
 
     <script src="/js/marked.min.js"></script>
     <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/overlay.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/gfm/gfm.min.js"></script>
+    <script src="/js/code_editor.js"></script>
     <script src="/js/asciinema-player.min.js"></script>
     <script src="/js/terminal.js"></script>
     <script>
@@ -1020,6 +1036,79 @@
         let currentMdMode = 'preview';
         let mdCache = {};
         let mdRenderTimeout = null;
+        let mdCodeEditor = null;
+
+        function getMdEditor() {
+          if (mdCodeEditor) return mdCodeEditor;
+          if (typeof CodeMirror === 'undefined') return null;
+          const ta = document.getElementById('md-textarea');
+          if (!ta) return null;
+
+          try {
+            let modeName = 'markdown';
+            if (typeof CodeMirror.overlayMode === 'function') {
+              modeName = 'gfm';
+            }
+
+            mdCodeEditor = CodeMirror.fromTextArea(ta, {
+              mode: modeName,
+              theme: 'material-ocean',
+              lineNumbers: true,
+              tabSize: 2,
+              lineWrapping: true,
+              viewportMargin: Infinity,
+              extraKeys: {
+                'Ctrl-S': () => saveMarkdownContent(),
+                'Cmd-S': () => saveMarkdownContent(),
+                'Tab': (cm) => {
+                  if (cm.somethingSelected()) {
+                    cm.indentSelection('add');
+                  } else {
+                    cm.replaceSelection('  ', 'end');
+                  }
+                }
+              }
+            });
+
+            mdCodeEditor.setSize('100%', '100%');
+            window.cmEditors = window.cmEditors || {};
+            window.cmEditors['md-textarea'] = mdCodeEditor;
+
+            mdCodeEditor.on('change', () => {
+              if (currentMdMode === 'split') {
+                clearTimeout(mdRenderTimeout);
+                mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
+              }
+            });
+
+            mdCodeEditor.on('paste', (cm, e) => {
+              const clipboard = e.clipboardData || window.clipboardData;
+              if (!clipboard || !clipboard.items) return;
+              for (let i = 0; i < clipboard.items.length; i++) {
+                const item = clipboard.items[i];
+                if (item.kind === 'file' && item.type.startsWith('image/')) {
+                  e.preventDefault();
+                  const file = item.getAsFile();
+                  if (file) uploadAndInsertImage(file);
+                  break;
+                }
+              }
+            });
+
+            mdCodeEditor.on('drop', (cm, e) => {
+              const files = e.dataTransfer && e.dataTransfer.files;
+              if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+                e.preventDefault();
+                uploadAndInsertImage(files[0]);
+              }
+            });
+
+            return mdCodeEditor;
+          } catch (err) {
+            console.error('Failed to initialize CodeMirror editor:', err);
+            return null;
+          }
+        }
 
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
         const preferredRecording = <%= (@selected_recording || '').to_s.to_json %>;
@@ -1067,7 +1156,15 @@
               mdEditPane.style.borderRight = 'none';
             }
             if (mdPreviewPane) mdPreviewPane.style.display = 'none';
-            if (mdTextarea) mdTextarea.focus();
+            const cm = getMdEditor();
+            if (cm) {
+              if (mdTextarea && mdTextarea.value && cm.getValue() !== mdTextarea.value) {
+                cm.setValue(mdTextarea.value);
+              }
+              setTimeout(() => { cm.refresh(); cm.focus(); }, 40);
+            } else if (mdTextarea) {
+              mdTextarea.focus();
+            }
           } else if (mode === 'split') {
             if (mdEditPane) {
               mdEditPane.style.display = 'flex';
@@ -1079,12 +1176,19 @@
               mdPreviewPane.style.flex = '1';
             }
             renderMarkdownPreview();
+            const cm = getMdEditor();
+            if (cm) {
+              if (mdTextarea && mdTextarea.value && cm.getValue() !== mdTextarea.value) {
+                cm.setValue(mdTextarea.value);
+              }
+              setTimeout(() => { cm.refresh(); cm.focus(); }, 40);
+            }
           }
         }
 
         function renderMarkdownPreview() {
-          if (!mdTextarea || !mdPreviewPane) return;
-          const raw = mdTextarea.value || '';
+          if (!mdPreviewPane) return;
+          const raw = (mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '')) || '';
           if (typeof marked !== 'undefined') {
             mdPreviewPane.innerHTML = marked.parse(raw);
             if (typeof hljs !== 'undefined') {
@@ -1142,12 +1246,18 @@
 
         function loadMarkdownContent(id) {
           if (mdCache[id] !== undefined) {
-            if (mdTextarea) mdTextarea.value = mdCache[id];
+            const cached = mdCache[id];
+            if (mdTextarea) mdTextarea.value = cached;
+            if (mdCodeEditor) {
+              mdCodeEditor.setValue(cached);
+              mdCodeEditor.clearHistory();
+            }
             renderMarkdownPreview();
             return;
           }
 
           if (mdTextarea) mdTextarea.value = 'Loading...';
+          if (mdCodeEditor) mdCodeEditor.setValue('Loading...');
           if (mdPreviewPane) mdPreviewPane.innerHTML = '<div style="color: #94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading note...</div>';
 
           fetch('/recordings/' + encodeURIComponent(id) + '/content', { credentials: 'same-origin' })
@@ -1159,6 +1269,10 @@
               mdCache[id] = content;
               if (activeId === id) {
                 if (mdTextarea) mdTextarea.value = content;
+                if (mdCodeEditor) {
+                  mdCodeEditor.setValue(content);
+                  mdCodeEditor.clearHistory();
+                }
                 renderMarkdownPreview();
               }
             })
@@ -1171,9 +1285,11 @@
         }
 
         function saveMarkdownContent() {
-          if (!activeId || !mdTextarea) return;
-          const content = mdTextarea.value;
+          if (!activeId) return;
+          const content = mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '');
+          if (content === undefined || content === null) return;
           mdCache[activeId] = content;
+          if (mdTextarea) mdTextarea.value = content;
 
           fetch('/recordings/' + encodeURIComponent(activeId) + '/content', {
             method: 'POST',
@@ -1243,15 +1359,25 @@
           .then(res => res.json())
           .then(data => {
             if (data.ok && data.url) {
-              if (mdTextarea) {
+              const rawName = (file.name || 'Picture').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, ' ').trim();
+              const altText = rawName || 'Picture';
+              const cm = getMdEditor();
+              if (cm) {
+                const doc = cm.getDoc();
+                const cursor = doc.getCursor();
+                const line = doc.getLine(cursor.line) || '';
+                const prefix = (line.trim().length > 0) ? '\n\n' : '';
+                const markdownImage = `${prefix}![${altText}](${data.url})\n\n`;
+                doc.replaceRange(markdownImage, cursor);
+                cm.focus();
+                if (mdTextarea) mdTextarea.value = cm.getValue();
+              } else if (mdTextarea) {
                 const start = mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length;
                 const end = mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length;
                 const before = mdTextarea.value.substring(0, start);
                 const after = mdTextarea.value.substring(end);
                 const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
                 const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
-                const rawName = (file.name || 'Picture').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, ' ').trim();
-                const altText = rawName || 'Picture';
                 const markdownImage = `${prefix}![${altText}](${data.url})${suffix}`;
 
                 mdTextarea.value = before + markdownImage + after;
@@ -2590,7 +2716,12 @@
               const finalWidth = sidebarEl.getBoundingClientRect().width;
               localStorage.setItem('ctlabs_sidebar_width', Math.round(finalWidth));
               updateSidebarCompactState(finalWidth);
+              if (mdCodeEditor) mdCodeEditor.refresh();
             }
+          });
+
+          window.addEventListener('resize', () => {
+            if (mdCodeEditor) mdCodeEditor.refresh();
           });
         }
 
