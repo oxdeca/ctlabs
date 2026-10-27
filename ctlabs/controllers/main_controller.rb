@@ -76,6 +76,17 @@ class MainController < BaseController
     selected = session["last_recording_#{@active_walkthrough}"].to_s if selected.empty?
     @selected_recording = RecordingService.valid_id?(selected) ? selected : ''
     session["last_recording_#{@active_walkthrough}"] = @selected_recording unless @selected_recording.empty?
+
+    @running_nodes = []
+    begin
+      current_lab = Lab.current if defined?(Lab) && Lab.respond_to?(:current)
+      @running_nodes += current_lab.nodes.select(&:running?).map(&:name) if current_lab && current_lab.respond_to?(:nodes)
+      @running_nodes += Controller.running_node_names if defined?(Controller) && Controller.respond_to?(:running_node_names)
+      @running_nodes.uniq!
+    rescue => _e
+      # Safe fallback
+    end
+
     erb :demo
   end
 

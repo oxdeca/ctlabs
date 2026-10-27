@@ -193,48 +193,74 @@
           </div>
 
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155;">
-            <div style="font-weight: 600; color: #f8fafc;"><i class="fas fa-record-vinyl w3-text-red"></i> Steps</div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <!-- New Set Button -->
-              <form method="post" action="/walkthroughs/create" style="margin: 0;">
-                <input type="hidden" name="name" id="new-set-name" />
-                <button type="button" id="new-set-btn" title="Create a new walkthrough set" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
-                  <i class="fas fa-plus"></i> New
+            <div style="font-weight: 600; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-record-vinyl w3-text-red"></i> Steps
+              <span id="set-count" style="color: #94a3b8; font-size: 0.8em; font-weight: normal; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 10px;"><%= (@recordings || []).size %></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <!-- Record / Add Step Dropdown -->
+              <div class="step-dropdown-wrapper" style="position: relative; display: inline-block;">
+                <button type="button" id="record-dropdown-btn" title="Add or record a step (Cast, Screen, Note)" style="background: #e11d48; color: #ffffff; padding: 3px 9px; border-radius: 4px; font-size: 0.8em; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.3);">
+                  <i class="fas fa-circle" style="color: #ffffff; font-size: 0.65em;"></i> Record <i class="fas fa-caret-down" style="font-size: 0.85em;"></i>
                 </button>
-              </form>
+                <div id="record-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 240px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden;">
+                  <!-- Terminal Cast Option -->
+                  <button type="button" id="record-cast-btn" style="width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #f8fafc; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <div style="width: 28px; height: 28px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #10b981; flex-shrink: 0; font-size: 0.95em;">
+                      <i class="fas fa-terminal"></i>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.82em; color: #10b981;">Terminal Cast</div>
+                      <div style="color: #94a3b8; font-size: 0.72em;">Shell session recording (.cast)</div>
+                    </div>
+                  </button>
 
-              <!-- Add Note Step Button -->
-              <form method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/markdown" style="margin: 0;">
-                <button type="submit" id="new-note-btn" title="Add an editable Markdown note as a step" style="background: #0284c7; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <i class="fab fa-markdown"></i> + Note
-                </button>
-              </form>
+                  <!-- Screen Recording Option -->
+                  <button type="button" id="record-screen-btn" style="width: 100%; text-align: left; background: transparent; border: none; border-top: 1px solid #334155; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #f8fafc; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <div style="width: 28px; height: 28px; border-radius: 4px; background: rgba(244, 63, 94, 0.15); display: flex; align-items: center; justify-content: center; color: #f43f5e; flex-shrink: 0; font-size: 0.95em;">
+                      <i class="fas fa-video"></i>
+                    </div>
+                    <div>
+                      <div style="font-weight: 600; font-size: 0.82em; color: #f43f5e;">Screen Video</div>
+                      <div style="color: #94a3b8; font-size: 0.72em;">Browser tab or screen (.webm)</div>
+                    </div>
+                  </button>
 
-              <!-- Add Screen Recording Step Button -->
-              <button type="button" id="record-screen-btn" title="Record browser screen walkthrough" style="background: #be185d; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                <i class="fas fa-video"></i> + Screen
-              </button>
+                  <!-- Markdown Note Option -->
+                  <form id="new-note-form" method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/markdown" style="margin: 0;">
+                    <button type="submit" id="new-note-btn" style="width: 100%; text-align: left; background: transparent; border: none; border-top: 1px solid #334155; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #f8fafc; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <div style="width: 28px; height: 28px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); display: flex; align-items: center; justify-content: center; color: #38bdf8; flex-shrink: 0; font-size: 0.95em;">
+                        <i class="fab fa-markdown"></i>
+                      </div>
+                      <div>
+                        <div style="font-weight: 600; font-size: 0.82em; color: #38bdf8;">Markdown Note</div>
+                        <div style="color: #94a3b8; font-size: 0.72em;">Written step guide (.md)</div>
+                      </div>
+                    </button>
+                  </form>
+                </div>
+              </div>
 
               <!-- Import Button & Hidden File Input -->
-              <button id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer;">
+              <button type="button" id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                 <i class="fas fa-upload"></i> Import
               </button>
               <input type="file" id="import-file-input" accept=".zip,.cast,.md,.webm,.mp4" multiple style="display: none;" />
 
               <!-- Export Download Button -->
-              <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" style="background: #334155; color: #f8fafc; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
                 <i class="fas fa-file-archive"></i> Export 
               </button>
-              <div id="set-count" style="color: #94a3b8; font-size: 0.85em; margin-left: 2px;"><%= (@recordings || []).size %></div>
+
               <!-- Collapse Sidebar Button -->
-              <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" style="background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; border: 1px solid #475569; cursor: pointer; margin-left: 4px; display: inline-flex; align-items: center; justify-content: center;">
+              <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" style="background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; border: 1px solid #475569; cursor: pointer; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center;">
                 <i class="fas fa-chevron-left"></i>
               </button>
             </div>
           </div>
 
           <!-- Walkthrough Set Selector -->
-          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a;">
+          <div style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a;">
             <label for="walkthrough-select" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;"><i class="fas fa-layer-group" style="margin-right: 2px;"></i> Set</label>
             <select id="walkthrough-select" onchange="window.location.href='/demo?walkthrough=' + encodeURIComponent(this.value);" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; cursor: pointer;">
               <% (@walkthroughs || {}).each do |slug, data| %>
@@ -243,6 +269,13 @@
                 </option>
               <% end %>
             </select>
+            <!-- New Set Button -->
+            <form method="post" action="/walkthroughs/create" style="margin: 0;">
+              <input type="hidden" name="name" id="new-set-name" />
+              <button type="button" id="new-set-btn" title="Create a new walkthrough set" class="w3-button w3-small" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
+                <i class="fas fa-plus"></i> New
+              </button>
+            </form>
             <button type="button" id="delete-set-btn" title="Delete current walkthrough set" onclick="document.getElementById('delete-set-modal').style.display='block'" class="w3-button w3-small" style="background: #ef4444; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
               <i class="fas fa-trash-alt"></i>
             </button>
@@ -292,7 +325,7 @@
                          end
                   fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
-                  size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
+                  size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
                                'Markdown'
                              elsif is_vid
@@ -390,7 +423,7 @@
                          end
                   fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
-                  size_str = fsize > 1024 ? "#{(fsize.to_f / 1024).round(1)} KB" : "#{fsize} B"
+                  size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
                                'Markdown'
                              elsif is_vid
@@ -602,9 +635,72 @@
       </div>
     </div>
 
+    <!-- Record Cast Modal -->
+    <div id="record-cast-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 520px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.15em; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-terminal"></i> Record Terminal Cast
+          </h3>
+          <span id="close-record-cast-modal" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 20px 18px;">
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+            Terminal steps (<code style="color: #10b981;">.cast</code>) capture interactive shell commands and full output in asciicast format.
+          </p>
+
+          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
+            <div style="font-weight: 600; font-size: 0.85em; color: #f8fafc; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-list-ol" style="color: #10b981;"></i> How to record:
+            </div>
+            <ol style="margin: 0; padding-left: 20px; color: #94a3b8; font-size: 0.84em; line-height: 1.6;">
+              <li>Open a terminal for any running node below.</li>
+              <li>Click the <strong style="color: #ef4444;"><i class="fas fa-circle" style="font-size: 0.7em;"></i> REC</strong> button in the terminal header.</li>
+              <li>Execute commands to demonstrate your workflow.</li>
+              <li>Click <strong style="color: #f8fafc;">Stop</strong> &mdash; the recording is uploaded directly into <strong><%= ERB::Util.html_escape(@walkthrough_name.to_s) %></strong>.</li>
+            </ol>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <% running_nodes = (@running_nodes || []) %>
+            <% if running_nodes.any? %>
+              <div style="font-weight: 600; font-size: 0.85em; color: #cbd5e1; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                <span><i class="fas fa-server" style="color: #10b981; margin-right: 4px;"></i> Select Running Node:</span>
+                <span style="color: #64748b; font-size: 0.8em; font-weight: normal;"><%= running_nodes.size %> running</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <select id="cast-node-select" style="flex: 1; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 10px; border-radius: 4px; font-size: 0.88em; cursor: pointer;">
+                  <% running_nodes.each do |node_name| %>
+                    <option value="<%= ERB::Util.html_escape(node_name) %>"><%= ERB::Util.html_escape(node_name) %></option>
+                  <% end %>
+                </select>
+                <button type="button" id="cast-open-term-btn" class="w3-button w3-round" style="background: #10b981; color: #042f2e; font-weight: 600; font-size: 0.85em; padding: 8px 16px; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-external-link-alt"></i> Open Terminal
+                </button>
+              </div>
+            <% else %>
+              <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 6px; padding: 12px 14px; color: #fca5a5; font-size: 0.85em; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-info-circle fa-lg" style="color: #ef4444;"></i>
+                <div>
+                  No lab nodes are currently running. <a href="/labs" style="color: #38bdf8; text-decoration: underline;">Start a lab</a> or controller node to open an interactive terminal.
+                </div>
+              </div>
+            <% end %>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid #334155;">
+            <button type="button" id="cast-import-btn" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.82em; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-upload"></i> Import .cast file
+            </button>
+            <button type="button" id="cancel-record-cast-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Record Screen Modal -->
     <div id="record-screen-modal" class="w3-modal" style="z-index: 9999;">
-      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 520px;">
         <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
           <h3 style="margin: 0; font-size: 1.15em; font-weight: 600; color: #f43f5e; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-video"></i> Record Browser Screen
@@ -615,6 +711,58 @@
           <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
             Capture your browser tab, window, or entire screen directly into this walkthrough set as a video step.
           </p>
+
+          <!-- Dedicated Clean Recording Window Launcher -->
+          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-external-link-alt" style="color: #38bdf8;"></i> Dedicated Recording Window
+              </span>
+              <span id="rec-win-status-badge" style="font-size: 0.75em; padding: 2px 8px; border-radius: 10px; background: #334155; color: #94a3b8;">
+                Not open
+              </span>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
+              Launch a target window to record. Choose <strong>Standard</strong> to keep the tab bar and split-mode support, or <strong>Clean Popup</strong> for a fixed 16:9 canvas.
+            </p>
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+              <input type="text" id="rec-win-url" value="/labs" placeholder="/labs or custom URL" class="w3-input" style="flex: 1; min-width: 180px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 10px; font-size: 0.83em;" />
+              <select id="rec-win-res" class="w3-select" style="width: 220px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
+                <option value="standard" selected>Standard (Tabs &amp; Split Mode)</option>
+                <option value="1280x720">Clean Popup: 1280 &times; 720 (16:9)</option>
+                <option value="1920x1080">Clean Popup: 1920 &times; 1080 (HD)</option>
+                <option value="1024x768">Clean Popup: 1024 &times; 768 (4:3)</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button type="button" id="launch-rec-win-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.8em; padding: 5px 12px; display: flex; align-items: center; gap: 5px;">
+                <i class="fas fa-external-link-alt"></i> Launch Window
+              </button>
+              <button type="button" id="focus-rec-win-btn" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.8em; padding: 5px 12px; display: none; align-items: center; gap: 5px;">
+                <i class="fas fa-bullseye"></i> Focus Window
+              </button>
+            </div>
+          </div>
+
+          <!-- Video Quality & Compression Selector -->
+          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label for="rec-screen-quality" style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin: 0;">
+                <i class="fas fa-compress-arrows-alt" style="color: #10b981;"></i> Video Quality &amp; Compression
+              </label>
+              <span id="rec-codec-badge" style="font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-family: ui-monospace, monospace;">
+                VP9
+              </span>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 8px; line-height: 1.4;">
+              Select compression level. High compression keeps file sizes compact (~7&ndash;9 MB/min) with razor-sharp text.
+            </p>
+            <select id="rec-screen-quality" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
+              <option value="compact" selected>High Compression (~1.0 Mbps) - Recommended</option>
+              <option value="balanced">Balanced (~1.8 Mbps)</option>
+              <option value="hq">High Bitrate (~3.5 Mbps)</option>
+            </select>
+          </div>
 
           <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
             <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: #f8fafc; font-size: 0.9em; user-select: none;">
@@ -631,7 +779,7 @@
           <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-start;">
             <i class="fas fa-info-circle" style="color: #38bdf8; margin-top: 3px;"></i>
             <div style="color: #cbd5e1; font-size: 0.83em; line-height: 1.45;">
-              When you click <strong>Start Recording</strong>, your browser will prompt you to choose which tab, window, or screen you want to share.
+              When you click <strong>Start Recording</strong>, your browser prompts you to select a surface. The browser will automatically focus to the chosen window or tab.
             </div>
           </div>
 
@@ -655,6 +803,9 @@
         00:00
       </div>
       <div style="width: 1px; height: 20px; background: #334155;"></div>
+      <button type="button" id="screen-rec-focus-btn" style="display: none; background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; padding: 5px 12px; border-radius: 20px; font-size: 0.82em; font-weight: 600; cursor: pointer; align-items: center; gap: 6px;">
+        <i class="fas fa-bullseye"></i> Focus Target
+      </button>
       <button type="button" id="screen-rec-stop-btn" style="background: #10b981; color: #ffffff; border: none; padding: 6px 14px; border-radius: 20px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
         <i class="fas fa-check"></i> Stop &amp; Save
       </button>
@@ -721,6 +872,7 @@
     <script src="/js/marked.min.js"></script>
     <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
     <script src="/js/asciinema-player.min.js"></script>
+    <script src="/js/terminal.js"></script>
     <script>
       (function() {
         const demoDiv = document.getElementById('demo');
@@ -764,6 +916,17 @@
         const videoContainer = document.getElementById('video-container');
         const videoPlayer = document.getElementById('video-player');
 
+        const recordDropdownBtn = document.getElementById('record-dropdown-btn');
+        const recordDropdownMenu = document.getElementById('record-dropdown-menu');
+
+        const recordCastBtn = document.getElementById('record-cast-btn');
+        const recordCastModal = document.getElementById('record-cast-modal');
+        const closeRecordCastModal = document.getElementById('close-record-cast-modal');
+        const cancelRecordCastBtn = document.getElementById('cancel-record-cast-btn');
+        const castOpenTermBtn = document.getElementById('cast-open-term-btn');
+        const castNodeSelect = document.getElementById('cast-node-select');
+        const castImportBtn = document.getElementById('cast-import-btn');
+
         const recordScreenBtn = document.getElementById('record-screen-btn');
         const recordScreenModal = document.getElementById('record-screen-modal');
         const recScreenMic = document.getElementById('rec-screen-mic');
@@ -775,6 +938,16 @@
         const screenRecTimer = document.getElementById('screen-rec-timer');
         const screenRecStopBtn = document.getElementById('screen-rec-stop-btn');
         const screenRecCancelBtn = document.getElementById('screen-rec-cancel-btn');
+        const screenRecFocusBtn = document.getElementById('screen-rec-focus-btn');
+
+        const launchRecWinBtn = document.getElementById('launch-rec-win-btn');
+        const focusRecWinBtn = document.getElementById('focus-rec-win-btn');
+        const recWinUrlInput = document.getElementById('rec-win-url');
+        const recWinResSelect = document.getElementById('rec-win-res');
+        const recWinStatusBadge = document.getElementById('rec-win-status-badge');
+
+        let activeRecWindow = null;
+        let recFramePollTimer = null;
 
         const saveScreenModal = document.getElementById('save-screen-modal');
         const saveScreenDuration = document.getElementById('save-screen-duration');
@@ -1220,6 +1393,7 @@
         // --- Import Walkthrough Handler ---
         if (importBtn && importFileInput) {
           importBtn.addEventListener('click', () => {
+            importFileInput.accept = '.zip,.cast,.md,.webm,.mp4';
             importFileInput.click();
           });
 
@@ -1303,6 +1477,124 @@
           }
         });
 
+        // --- Dedicated Recording Window Helpers & Focus Flash ---
+        let recFlashTimeout = null;
+
+        function updateRecWindowUI() {
+          const isOpen = !!(activeRecWindow && !activeRecWindow.closed);
+          if (recWinStatusBadge) {
+            if (isOpen) {
+              recWinStatusBadge.textContent = 'Window Open';
+              recWinStatusBadge.style.background = '#065f46';
+              recWinStatusBadge.style.color = '#34d399';
+            } else {
+              recWinStatusBadge.textContent = 'Not open';
+              recWinStatusBadge.style.background = '#334155';
+              recWinStatusBadge.style.color = '#94a3b8';
+            }
+          }
+          if (focusRecWinBtn) {
+            focusRecWinBtn.style.display = isOpen ? 'inline-flex' : 'none';
+          }
+          if (screenRecFocusBtn) {
+            screenRecFocusBtn.style.display = (isOpen && screenRecorder && screenRecorder.isRecording) ? 'inline-flex' : 'none';
+          }
+        }
+
+        function flashRecWindowHighlight(win, durationMs = 1500) {
+          if (!win || win.closed) return;
+          try {
+            const doc = win.document;
+            if (!doc || !doc.body) return;
+
+            let styleEl = doc.getElementById('ctlabs-rec-flash-style');
+            if (!styleEl) {
+              styleEl = doc.createElement('style');
+              styleEl.id = 'ctlabs-rec-flash-style';
+              styleEl.textContent = `
+                @keyframes ctlabsFocusFlash {
+                  0% { opacity: 0; box-shadow: inset 0 0 0 5px #38bdf8, inset 0 0 26px rgba(56, 189, 248, 0.85); }
+                  20% { opacity: 1; box-shadow: inset 0 0 0 5px #38bdf8, inset 0 0 32px rgba(56, 189, 248, 0.95); }
+                  75% { opacity: 1; box-shadow: inset 0 0 0 5px #38bdf8, inset 0 0 26px rgba(56, 189, 248, 0.85); }
+                  100% { opacity: 0; box-shadow: inset 0 0 0 5px #0284c7, inset 0 0 10px rgba(2, 132, 199, 0.2); }
+                }
+                #ctlabs-rec-flash-indicator {
+                  position: fixed !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  right: 0 !important;
+                  bottom: 0 !important;
+                  border: 5px solid #38bdf8 !important;
+                  animation: ctlabsFocusFlash ${durationMs}ms ease-out forwards !important;
+                  pointer-events: none !important;
+                  z-index: 2147483647 !important;
+                }
+              `;
+              doc.head.appendChild(styleEl);
+            }
+
+            const existing = doc.getElementById('ctlabs-rec-flash-indicator');
+            if (existing) existing.remove();
+
+            const ind = doc.createElement('div');
+            ind.id = 'ctlabs-rec-flash-indicator';
+            doc.body.appendChild(ind);
+
+            if (recFlashTimeout) clearTimeout(recFlashTimeout);
+            recFlashTimeout = setTimeout(() => {
+              try {
+                const el = doc.getElementById('ctlabs-rec-flash-indicator');
+                if (el) el.remove();
+              } catch (e) {}
+            }, durationMs);
+          } catch (e) {
+            // Gracefully ignore cross-origin security errors or closed window
+          }
+        }
+
+        function removeRecWindowHighlight(win) {
+          if (!win || win.closed) return;
+          try {
+            const doc = win.document;
+            if (!doc) return;
+            const ind = doc.getElementById('ctlabs-rec-flash-indicator');
+            if (ind) ind.remove();
+            const legacyInd = doc.getElementById('ctlabs-rec-active-indicator');
+            if (legacyInd) legacyInd.remove();
+            const legacyBadge = doc.getElementById('ctlabs-rec-active-badge');
+            if (legacyBadge) legacyBadge.remove();
+          } catch (e) {}
+        }
+
+        function focusAndHighlightWindow(win) {
+          if (!win || win.closed) return;
+          try { win.focus(); } catch (e) {}
+          flashRecWindowHighlight(win, 1500);
+        }
+
+        function formatFileSize(bytes) {
+          const b = Number(bytes) || 0;
+          if (b <= 0) return '0 B';
+          if (b < 1024) return `${b} B`;
+          const units = ['KB', 'MB', 'GB', 'TB'];
+          let val = b / 1024;
+          let idx = 0;
+          while (val >= 1024 && idx < units.length - 1) {
+            val /= 1024;
+            idx++;
+          }
+          return `${val.toFixed(1)} ${units[idx]}`;
+        }
+
+        function detectSupportedVideoCodec() {
+          if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return 'WebM';
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=av01.0.08M.10,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=av1')) return 'AV1';
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'VP9';
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) return 'VP8';
+          if (MediaRecorder.isTypeSupported('video/webm;codecs=h264,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=h264')) return 'H.264';
+          return 'WebM';
+        }
+
         // --- Browser Screen Recorder ---
         class ScreenRecorder {
           constructor() {
@@ -1312,6 +1604,7 @@
             this.displayStream = null;
             this.micStream = null;
             this.audioCtx = null;
+            this.captureController = null;
             this.timerInterval = null;
             this.startTime = 0;
             this.durationSec = 0;
@@ -1333,18 +1626,64 @@
             const supported = (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints()) || {};
             const videoConstraints = supported.cursor ? { cursor: 'always' } : true;
 
+            let controller = null;
+            if (typeof CaptureController !== 'undefined') {
+              try {
+                controller = new CaptureController();
+              } catch (e) {
+                controller = null;
+              }
+            }
+            this.captureController = controller;
+
+            const gdmOptions = {
+              video: videoConstraints,
+              audio: true,
+              preferCurrentTab: false,
+              selfBrowserSurface: 'exclude',
+              surfaceSwitching: 'include',
+              systemAudio: 'include'
+            };
+            if (controller) {
+              gdmOptions.controller = controller;
+            }
+
             let displayStream;
             try {
-              displayStream = await navigator.mediaDevices.getDisplayMedia({
-                video: videoConstraints,
-                audio: true
-              });
+              displayStream = await navigator.mediaDevices.getDisplayMedia(gdmOptions);
             } catch (err) {
               if (err.name === 'NotAllowedError') throw err;
-              // Fallback to video-only if audio: true or cursor constraint is unsupported (e.g. Firefox)
-              displayStream = await navigator.mediaDevices.getDisplayMedia({
-                video: true
-              });
+              // Fallback to basic getDisplayMedia if options or controller rejected (e.g. Firefox)
+              try {
+                displayStream = await navigator.mediaDevices.getDisplayMedia({
+                  video: videoConstraints,
+                  audio: true
+                });
+              } catch (err2) {
+                if (err2.name === 'NotAllowedError') throw err2;
+                displayStream = await navigator.mediaDevices.getDisplayMedia({
+                  video: true
+                });
+              }
+            }
+
+            // In Chromium, automatically focus the captured surface
+            if (controller && typeof controller.setFocusBehavior === 'function') {
+              try {
+                const videoTrack = displayStream.getVideoTracks()[0];
+                const settings = videoTrack && videoTrack.getSettings ? videoTrack.getSettings() : {};
+                if (settings.displaySurface !== 'monitor') {
+                  controller.setFocusBehavior('focus-captured-surface');
+                }
+              } catch (focusErr) {
+                console.warn('CaptureController setFocusBehavior notice:', focusErr);
+              }
+            }
+
+            // If dedicated window is open, bring it to focus and make sure NO border is visible in the recording
+            if (activeRecWindow && !activeRecWindow.closed) {
+              try { activeRecWindow.focus(); } catch (e) {}
+              removeRecWindowHighlight(activeRecWindow);
             }
 
             this.displayStream = displayStream;
@@ -1399,17 +1738,23 @@
 
             this.stream = combinedStream;
 
-            // Pick preferred mimeType based on available audio
+            // Pick preferred mimeType based on available codecs: AV1 -> VP9 -> VP8 -> H.264
             const hasAudio = combinedStream.getAudioTracks().length > 0;
             const candidates = hasAudio ? [
+              'video/webm;codecs=av01.0.08M.10,opus',
+              'video/webm;codecs=av1,opus',
               'video/webm;codecs=vp9,opus',
               'video/webm;codecs=vp8,opus',
               'video/webm;codecs=h264,opus',
+              'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
               'video/webm'
             ] : [
+              'video/webm;codecs=av01.0.08M.10',
+              'video/webm;codecs=av1',
               'video/webm;codecs=vp9',
               'video/webm;codecs=vp8',
               'video/webm;codecs=h264',
+              'video/mp4',
               'video/webm'
             ];
 
@@ -1423,8 +1768,33 @@
               }
             }
 
-            const options = mimeType ? { mimeType } : {};
-            this.mediaRecorder = new MediaRecorder(combinedStream, options);
+            // Bitrate based on compression quality choice
+            const qualitySelect = document.getElementById('rec-screen-quality');
+            const quality = qualitySelect ? qualitySelect.value : 'compact';
+            let videoBps = 1000000; // 1.0 Mbps default: high compression (~7.5 MB/min, crisp UI text in VP9/AV1)
+            let audioBps = 96000;
+            if (quality === 'balanced') {
+              videoBps = 1800000; // 1.8 Mbps (~13.5 MB/min)
+            } else if (quality === 'hq') {
+              videoBps = 3500000; // 3.5 Mbps (~26 MB/min)
+              audioBps = 128000;
+            }
+
+            const options = {
+              videoBitsPerSecond: videoBps,
+              audioBitsPerSecond: audioBps
+            };
+            if (mimeType) {
+              options.mimeType = mimeType;
+            }
+
+            try {
+              this.mediaRecorder = new MediaRecorder(combinedStream, options);
+            } catch (recErr) {
+              // Fallback to basic options if browser rejects explicit bitrate constraints
+              const fallbackOpts = mimeType ? { mimeType } : {};
+              this.mediaRecorder = new MediaRecorder(combinedStream, fallbackOpts);
+            }
 
             this.isRecording = true;
             this.isStopping = false;
@@ -1456,6 +1826,9 @@
 
             if (screenRecTimer) screenRecTimer.textContent = '00:00';
             if (screenRecBar) screenRecBar.style.display = 'flex';
+            if (screenRecFocusBtn) {
+              screenRecFocusBtn.style.display = (activeRecWindow && !activeRecWindow.closed) ? 'inline-flex' : 'none';
+            }
 
             this.timerInterval = setInterval(() => {
               this.durationSec = Math.round((Date.now() - this.startTime) / 1000);
@@ -1466,6 +1839,10 @@
           }
 
           stop() {
+            if (activeRecWindow && !activeRecWindow.closed) {
+              removeRecWindowHighlight(activeRecWindow);
+            }
+            if (screenRecFocusBtn) screenRecFocusBtn.style.display = 'none';
             return new Promise((resolve) => {
               if (this.timerInterval) {
                 clearInterval(this.timerInterval);
@@ -1519,6 +1896,10 @@
           }
 
           cleanup() {
+            if (activeRecWindow && !activeRecWindow.closed) {
+              removeRecWindowHighlight(activeRecWindow);
+            }
+            if (screenRecFocusBtn) screenRecFocusBtn.style.display = 'none';
             if (this.timerInterval) {
               clearInterval(this.timerInterval);
               this.timerInterval = null;
@@ -1553,10 +1934,10 @@
           const mins = Math.floor(currentRecordingDuration / 60);
           const secs = currentRecordingDuration % 60;
           const durStr = `${mins}:${String(secs).padStart(2, '0')}`;
-          const sizeMB = (result.blob.size / (1024 * 1024)).toFixed(1);
+          const sizeStr = formatFileSize(result.blob.size);
 
           if (saveScreenDuration) {
-            saveScreenDuration.textContent = `(${durStr}, ${sizeMB} MB)`;
+            saveScreenDuration.textContent = `(${durStr}, ${sizeStr})`;
           }
 
           const nextStepNum = recsList ? recsList.querySelectorAll('.rec-item-wrapper').length + 1 : 1;
@@ -1576,8 +1957,70 @@
           }
         }
 
+        // --- Record Dropdown Menu Handler ---
+        if (recordDropdownBtn && recordDropdownMenu) {
+          recordDropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = recordDropdownMenu.style.display === 'block';
+            recordDropdownMenu.style.display = isOpen ? 'none' : 'block';
+          });
+
+          window.addEventListener('click', (e) => {
+            if (!recordDropdownBtn.contains(e.target) && !recordDropdownMenu.contains(e.target)) {
+              recordDropdownMenu.style.display = 'none';
+            }
+          });
+
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && recordDropdownMenu.style.display === 'block') {
+              recordDropdownMenu.style.display = 'none';
+            }
+          });
+        }
+
+        // --- Record Cast Modal Handlers ---
+        if (recordCastBtn && recordCastModal) {
+          recordCastBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (recordDropdownMenu) recordDropdownMenu.style.display = 'none';
+            recordCastModal.style.display = 'block';
+          });
+        }
+        if (closeRecordCastModal && recordCastModal) {
+          closeRecordCastModal.addEventListener('click', () => {
+            recordCastModal.style.display = 'none';
+          });
+        }
+        if (cancelRecordCastBtn && recordCastModal) {
+          cancelRecordCastBtn.addEventListener('click', () => {
+            recordCastModal.style.display = 'none';
+          });
+        }
+        if (castOpenTermBtn && castNodeSelect) {
+          castOpenTermBtn.addEventListener('click', () => {
+            const node = castNodeSelect.value;
+            if (!node) return;
+            if (typeof window.openTerminal === 'function') {
+              window.openTerminal(node);
+            } else {
+              const w = 960, h = 660, t = (window.top.outerHeight / 2) + window.top.screenY - (h / 2), l = (window.top.outerWidth / 2) + window.top.screenX - (w / 2);
+              window.open('/terminal/' + encodeURIComponent(node), 'term_' + node.replace(/[^a-zA-Z0-9]/g, '_') + '_' + Date.now(), `width=${w},height=${h},top=${t},left=${l},resizable=yes,scrollbars=yes,toolbar=no,location=no`);
+            }
+          });
+        }
+        if (castImportBtn && importFileInput) {
+          castImportBtn.addEventListener('click', () => {
+            if (recordCastModal) recordCastModal.style.display = 'none';
+            importFileInput.accept = '.cast';
+            importFileInput.click();
+          });
+        }
+
         if (recordScreenBtn) {
           recordScreenBtn.addEventListener('click', () => {
+            if (recordDropdownMenu) recordDropdownMenu.style.display = 'none';
+            const badge = document.getElementById('rec-codec-badge');
+            if (badge) badge.textContent = detectSupportedVideoCodec();
             if (recordScreenModal) recordScreenModal.style.display = 'block';
           });
         }
@@ -1603,6 +2046,64 @@
                 alert('Could not start screen recording: ' + err.message);
               }
               screenRecorder.cleanup();
+            }
+          });
+        }
+
+        if (launchRecWinBtn) {
+          launchRecWinBtn.addEventListener('click', () => {
+            let url = (recWinUrlInput ? recWinUrlInput.value.trim() : '') || '/labs';
+            const mode = (recWinResSelect ? recWinResSelect.value : '') || 'standard';
+
+            try {
+              if (activeRecWindow && !activeRecWindow.closed) {
+                activeRecWindow.location.href = url;
+                focusAndHighlightWindow(activeRecWindow);
+              } else if (mode === 'standard') {
+                // Open as standard window/tab without popup features to preserve tab strip and split-screen mode
+                activeRecWindow = window.open(url, 'ctlabs_recorder_window');
+                if (activeRecWindow) focusAndHighlightWindow(activeRecWindow);
+              } else {
+                // Open as clean popup with fixed dimensions
+                const [wStr, hStr] = mode.split('x');
+                const width = parseInt(wStr, 10) || 1280;
+                const height = parseInt(hStr, 10) || 720;
+                const left = Math.max(0, Math.round((screen.width - width) / 2));
+                const top = Math.max(0, Math.round((screen.height - height) / 2));
+                const windowFeatures = `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
+                activeRecWindow = window.open(url, 'ctlabs_recorder_window', windowFeatures);
+                if (activeRecWindow) focusAndHighlightWindow(activeRecWindow);
+              }
+            } catch (err) {
+              console.warn('Could not launch or focus window:', err);
+            }
+
+            updateRecWindowUI();
+            if (activeRecWindow) {
+              const checkLoadedInterval = setInterval(() => {
+                if (!activeRecWindow || activeRecWindow.closed) {
+                  clearInterval(checkLoadedInterval);
+                  updateRecWindowUI();
+                  return;
+                }
+                updateRecWindowUI();
+              }, 1500);
+            }
+          });
+        }
+
+        if (focusRecWinBtn) {
+          focusRecWinBtn.addEventListener('click', () => {
+            if (activeRecWindow && !activeRecWindow.closed) {
+              focusAndHighlightWindow(activeRecWindow);
+            }
+          });
+        }
+
+        if (screenRecFocusBtn) {
+          screenRecFocusBtn.addEventListener('click', () => {
+            if (activeRecWindow && !activeRecWindow.closed) {
+              focusAndHighlightWindow(activeRecWindow);
             }
           });
         }
