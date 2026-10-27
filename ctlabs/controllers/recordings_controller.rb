@@ -116,90 +116,119 @@ class RecordingsController < BaseController
 
   post '/recordings/import' do
     content_type :json
-    f = params[:file]
-    halt 400, { ok: false, error: 'No file uploaded' }.to_json unless f && f[:tempfile]
+    raw_files = params[:files] || params['files'] || params[:file] || params['file']
+    raw_files = [raw_files] unless raw_files.is_a?(Array)
+    upload_files = raw_files.select { |f| f.is_a?(Hash) && f[:tempfile] }
 
-    filename = f[:filename].to_s.downcase
+    halt 400, { ok: false, error: 'No file uploaded' }.to_json if upload_files.empty?
+
     RecordingService.ensure_dir
+    imported = []
+    walkthrough = nil
+    image_count = 0
+    last_saved_image = nil
 
-    if filename.end_with?('.zip')
-      imported   = []
-      id_map     = {}
-      manifest   = nil
+    upload_files.each do |f|
+      filename = f[:filename].to_s.downcase
 
-      Zip::File.open(f[:tempfile].path) do |zipfile|
-        zipfile.each do |entry|
-          base = File.basename(entry.name)
+      if filename.end_with?('.zip')
+        id_map   = {}
+        manifest = nil
 
-          if base == RecordingService::MANIFEST
-            manifest = begin
-              JSON.parse(entry.get_input_stream.read)
-            rescue StandardError
-              nil
+        Zip::File.open(f[:tempfile].path) do |zipfile|
+          zipfile.each do |entry|
+            base = File.basename(entry.name)
+
+            if base == RecordingService::MANIFEST
+              manifest = begin
+                JSON.parse(entry.get_input_stream.read)
+              rescue StandardError
+                nil
+              end
+              next
             end
-            next
-          end
 
-          if entry.name.end_with?(RecordingService::EXT)
-            old_id = File.basename(entry.name, RecordingService::EXT)
-            data   = entry.get_input_stream.read
-            node   = RecordingService.node_from_cast(data) ||
-                     RecordingService.node_from_id(old_id)
-            id     = RecordingService.new_id(node)
+            if entry.name.end_with?(RecordingService::EXT)
+              old_id = File.basename(entry.name, RecordingService::EXT)
+              data   = entry.get_input_stream.read
+              node   = RecordingService.node_from_cast(data) ||
+                       RecordingService.node_from_id(old_id)
+              id     = RecordingService.new_id(node)
 
-            File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
-            id_map[old_id] = id
-            imported << id
-          elsif entry.name.end_with?(RecordingService::MD_EXT)
-            old_id = File.basename(entry.name, RecordingService::MD_EXT)
-            data   = entry.get_input_stream.read
-            id     = RecordingService.new_markdown_id('note')
+              File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+              id_map[old_id] = id
+              imported << id
+            elsif entry.name.end_with?(RecordingService::MD_EXT)
+              old_id = File.basename(entry.name, RecordingService::MD_EXT)
+              data   = entry.get_input_stream.read
+              id     = RecordingService.new_markdown_id('note')
 
-            File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
-            id_map[old_id] = id
-            imported << id
-          elsif entry.name.start_with?('images/') || RecordingService::IMAGE_EXTS.include?(File.extname(entry.name).downcase)
-            img_basename = File.basename(entry.name)
-            target = File.join(RecordingService.ensure_images_dir, img_basename)
-            File.binwrite(target, entry.get_input_stream.read)
+              File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+              id_map[old_id] = id
+              imported << id
+            elsif entry.name.start_with?('images/') || RecordingService::IMAGE_EXTS.include?(File.extname(entry.name).downcase)
+              img_basename = File.basename(entry.name)
+              target = File.join(RecordingService.ensure_images_dir, img_basename)
+              File.binwrite(target, entry.get_input_stream.read)
+              image_count += 1
+              last_saved_image = img_basename
+            end
           end
         end
-      end
 
-      walkthrough = nil
-      if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
-        ordered = Array(manifest['recording_ids']).filter_map do |old_id|
-          id_map[old_id.to_s] ||
-            id_map[File.basename(old_id.to_s, RecordingService::EXT)] ||
-            id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)]
+        if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
+          ordered = Array(manifest['recording_ids']).filter_map do |old_id|
+            id_map[old_id.to_s] ||
+              id_map[File.basename(old_id.to_s, RecordingService::EXT)] ||
+              id_map[File.basename(old_id.to_s, RecordingService::MD_EXT)]
+          end
+          ordered += imported - ordered
+          walkthrough = RecordingService.create_walkthrough(
+            manifest['name'], recording_ids: ordered, unique: true
+          )
         end
-        ordered += imported - ordered
-        walkthrough = RecordingService.create_walkthrough(
-          manifest['name'], recording_ids: ordered, unique: true
-        )
-      elsif !imported.empty?
-        walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
+      elsif filename.end_with?(RecordingService::EXT)
+        data = File.binread(f[:tempfile].path)
+        node = RecordingService.node_from_cast(data) ||
+               RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
+        id   = RecordingService.new_id(node)
+        File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+
+        begin
+          header_json = JSON.parse(data.to_s.lines.first)
+          if header_json.is_a?(Hash) && header_json['title'].to_s.strip.empty?
+            base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+            RecordingService.set_title(id, base_name) unless base_name.empty?
+          end
+        rescue StandardError
+          # ignore
+        end
+
+        imported << id
+      elsif filename.end_with?(RecordingService::MD_EXT)
+        data = File.binread(f[:tempfile].path)
+        id   = RecordingService.new_markdown_id('note')
+        File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+        imported << id
+      elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
+        last_saved_image = RecordingService.save_image(f[:tempfile], filename)
+        image_count += 1
       end
-    elsif filename.end_with?(RecordingService::EXT)
-      data = File.binread(f[:tempfile].path)
-      node = RecordingService.node_from_cast(data) ||
-             RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
-      id   = RecordingService.new_id(node)
-      File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
-      walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
-    elsif filename.end_with?(RecordingService::MD_EXT)
-      data = File.binread(f[:tempfile].path)
-      id   = RecordingService.new_markdown_id('note')
-      File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
-      walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, [id])
-    elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
-      saved_name = RecordingService.save_image(f[:tempfile], filename)
-      return { ok: true, count: 1, image: "/recordings/images/#{saved_name}" }.to_json
-    else
+    end
+
+    if imported.empty? && image_count.zero?
       halt 400, { ok: false, error: 'Unsupported file format. Please upload a .zip, .cast, .md, or image file.' }.to_json
     end
 
-    { ok: true, walkthrough: walkthrough }.to_json
+    if upload_files.size == 1 && image_count == 1 && imported.empty?
+      return { ok: true, count: 1, image: "/recordings/images/#{last_saved_image}" }.to_json
+    end
+
+    if !imported.empty? && walkthrough.nil?
+      walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
+    end
+
+    { ok: true, count: imported.size, imported: imported, walkthrough: walkthrough }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
