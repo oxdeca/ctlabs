@@ -230,6 +230,27 @@
     background: #0b1120 !important;
     border-right: 1px solid #334155 !important;
   }
+
+  /* Rich Markdown Syntax Highlighting in Editor (Headers, Formatting, Code Fences, Links, Lists) */
+  #md-edit-pane .cm-header { font-weight: 700; color: #82aaff !important; }
+  #md-edit-pane .cm-header-1 { font-size: 1.3em; color: #89ddff !important; }
+  #md-edit-pane .cm-header-2 { font-size: 1.18em; color: #82aaff !important; }
+  #md-edit-pane .cm-header-3 { font-size: 1.08em; color: #c792ea !important; }
+  #md-edit-pane .cm-header-4, #md-edit-pane .cm-header-5, #md-edit-pane .cm-header-6 { color: #f78c6c !important; }
+  #md-edit-pane .cm-strong { font-weight: 700; color: #ffcb6b !important; }
+  #md-edit-pane .cm-em { font-style: italic; color: #f07178 !important; }
+  #md-edit-pane .cm-link { color: #80cbc4 !important; text-decoration: underline; }
+  #md-edit-pane .cm-url { color: #89ddff !important; opacity: 0.85; }
+  #md-edit-pane .cm-formatting { color: #546e7a !important; font-weight: normal; }
+  #md-edit-pane .cm-formatting-header { color: #38bdf8 !important; font-weight: bold; }
+  #md-edit-pane .cm-formatting-strong { color: #ffcb6b !important; }
+  #md-edit-pane .cm-formatting-em { color: #f07178 !important; }
+  #md-edit-pane .cm-formatting-code, #md-edit-pane .cm-formatting-code-block { color: #676e95 !important; }
+  #md-edit-pane .cm-comment.cm-formatting-code, #md-edit-pane .cm-comment:not(.cm-formatting) { color: #c3e88d !important; background: rgba(255, 255, 255, 0.04); border-radius: 3px; padding: 1px 3px; }
+  #md-edit-pane .cm-quote { color: #94a3b8 !important; font-style: italic; }
+  #md-edit-pane .cm-variable-2 { color: #c792ea !important; }
+  #md-edit-pane .cm-variable-3 { color: #ffcb6b !important; }
+  #md-edit-pane .cm-hr { color: #475569 !important; font-weight: bold; }
 </style>
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
@@ -794,20 +815,23 @@
               Launch a target window to record. Choose <strong>Standard</strong> to keep the tab bar and split-mode support, or <strong>Clean Popup</strong> for a fixed 16:9 canvas.
             </p>
             <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
-              <input type="text" id="rec-win-url" value="/labs" placeholder="/labs or custom URL" class="w3-input" style="flex: 1; min-width: 180px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 10px; font-size: 0.83em;" />
+              <input type="text" id="rec-win-url" value="/labs" placeholder="/labs, https://..., or custom URL" class="w3-input" style="flex: 1; min-width: 180px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 10px; font-size: 0.83em;" />
               <select id="rec-win-res" class="w3-select" style="width: 220px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
-                <option value="standard" selected>Standard (Tabs &amp; Split Mode)</option>
-                <option value="1280x720">Clean Popup: 1280 &times; 720 (16:9)</option>
-                <option value="1920x1080">Clean Popup: 1920 &times; 1080 (HD)</option>
-                <option value="1024x768">Clean Popup: 1024 &times; 768 (4:3)</option>
+                <option value="standard" selected>New Window (Tabs &amp; Full Nav)</option>
+                <option value="1280x720">Clean Window: 1280 &times; 720 (16:9)</option>
+                <option value="1920x1080">Clean Window: 1920 &times; 1080 (HD)</option>
+                <option value="1024x768">Clean Window: 1024 &times; 768 (4:3)</option>
               </select>
             </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <button type="button" id="launch-rec-win-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.8em; padding: 5px 12px; display: flex; align-items: center; gap: 5px;">
                 <i class="fas fa-external-link-alt"></i> Launch Window
               </button>
               <button type="button" id="focus-rec-win-btn" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.8em; padding: 5px 12px; display: none; align-items: center; gap: 5px;">
                 <i class="fas fa-bullseye"></i> Focus Window
+              </button>
+              <button type="button" id="close-rec-win-btn" class="w3-button w3-round" style="background: #1e293b; color: #94a3b8; border: 1px solid #475569; font-size: 0.8em; padding: 5px 10px; display: none; align-items: center; gap: 5px;" title="Close window and reset state">
+                <i class="fas fa-times"></i> Close / Reset
               </button>
             </div>
           </div>
@@ -1015,11 +1039,15 @@
 
         const launchRecWinBtn = document.getElementById('launch-rec-win-btn');
         const focusRecWinBtn = document.getElementById('focus-rec-win-btn');
+        const closeRecWinBtn = document.getElementById('close-rec-win-btn');
         const recWinUrlInput = document.getElementById('rec-win-url');
         const recWinResSelect = document.getElementById('rec-win-res');
         const recWinStatusBadge = document.getElementById('rec-win-status-badge');
 
         let activeRecWindow = null;
+        let recWindowLaunched = false;
+        let recWindowUrl = '';
+        let recWindowIsCross = false;
         let recFramePollTimer = null;
 
         const saveScreenModal = document.getElementById('save-screen-modal');
@@ -1045,13 +1073,26 @@
           if (!ta) return null;
 
           try {
-            let modeName = 'markdown';
-            if (typeof CodeMirror.overlayMode === 'function') {
-              modeName = 'gfm';
-            }
+            const modeConfig = {
+              name: (typeof CodeMirror.overlayMode === 'function') ? 'gfm' : 'markdown',
+              highlightFormatting: true,
+              fencedCodeBlockHighlighting: true,
+              tokenTypeOverrides: {
+                header: 'header',
+                code: 'comment',
+                quote: 'quote',
+                list1: 'variable-2',
+                list2: 'variable-3',
+                list3: 'keyword',
+                linkText: 'link',
+                linkHref: 'string url',
+                em: 'em',
+                strong: 'strong'
+              }
+            };
 
             mdCodeEditor = CodeMirror.fromTextArea(ta, {
-              mode: modeName,
+              mode: modeConfig,
               theme: 'material-ocean',
               lineNumbers: true,
               tabSize: 2,
@@ -1663,13 +1704,58 @@
         // --- Dedicated Recording Window Helpers & Focus Flash ---
         let recFlashTimeout = null;
 
+        function isCrossOriginUrl(testUrl) {
+          try {
+            const parsed = new URL(testUrl, window.location.href);
+            return parsed.origin !== window.location.origin;
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function normalizeRecUrl(raw) {
+          let s = (raw || '').trim();
+          if (!s) return '/labs';
+          if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s)) return s;
+          if (s.startsWith('/') || s.startsWith('./') || s.startsWith('../')) return s;
+          if (s.startsWith('localhost') || s.startsWith('127.0.0.1')) return 'http://' + s;
+          return 'https://' + s;
+        }
+
+        function isRecWindowOpen() {
+          if (activeRecWindow && !activeRecWindow.closed) return true;
+          if (recWindowLaunched && recWindowIsCross) return true;
+          return false;
+        }
+
+        function focusTargetWindow() {
+          if (activeRecWindow && !activeRecWindow.closed) {
+            try {
+              activeRecWindow.focus();
+              flashRecWindowHighlight(activeRecWindow, 1500);
+              return;
+            } catch (e) {}
+          }
+          // Note: If COOP isolated the window (e.g. https://www.suse.de), calling
+          // window.open('', target) opens an about:blank tab because the browser prevents
+          // referencing cross-origin isolated browsing context groups.
+          // Therefore, do NOT call window.open('', ...) if the opener handle is detached.
+        }
+
         function updateRecWindowUI() {
-          const isOpen = !!(activeRecWindow && !activeRecWindow.closed);
+          const isOpen = isRecWindowOpen();
+          const canFocusDirectly = !!(activeRecWindow && !activeRecWindow.closed);
           if (recWinStatusBadge) {
             if (isOpen) {
-              recWinStatusBadge.textContent = 'Window Open';
-              recWinStatusBadge.style.background = '#065f46';
-              recWinStatusBadge.style.color = '#34d399';
+              if (recWindowIsCross) {
+                recWinStatusBadge.innerHTML = '<i class="fas fa-external-link-alt" style="margin-right: 4px;"></i>Window Open (External)';
+                recWinStatusBadge.style.background = '#065f46';
+                recWinStatusBadge.style.color = '#34d399';
+              } else {
+                recWinStatusBadge.textContent = 'Window Open';
+                recWinStatusBadge.style.background = '#065f46';
+                recWinStatusBadge.style.color = '#34d399';
+              }
             } else {
               recWinStatusBadge.textContent = 'Not open';
               recWinStatusBadge.style.background = '#334155';
@@ -1677,10 +1763,14 @@
             }
           }
           if (focusRecWinBtn) {
-            focusRecWinBtn.style.display = isOpen ? 'inline-flex' : 'none';
+            // Only show Focus button if browser still maintains an attached window handle
+            focusRecWinBtn.style.display = canFocusDirectly ? 'inline-flex' : 'none';
+          }
+          if (closeRecWinBtn) {
+            closeRecWinBtn.style.display = isOpen ? 'inline-flex' : 'none';
           }
           if (screenRecFocusBtn) {
-            screenRecFocusBtn.style.display = (isOpen && screenRecorder && screenRecorder.isRecording) ? 'inline-flex' : 'none';
+            screenRecFocusBtn.style.display = (canFocusDirectly && screenRecorder && screenRecorder.isRecording) ? 'inline-flex' : 'none';
           }
         }
 
@@ -2235,27 +2325,44 @@
 
         if (launchRecWinBtn) {
           launchRecWinBtn.addEventListener('click', () => {
-            let url = (recWinUrlInput ? recWinUrlInput.value.trim() : '') || '/labs';
+            const rawUrl = (recWinUrlInput ? recWinUrlInput.value.trim() : '') || '/labs';
+            const url = normalizeRecUrl(rawUrl);
+            if (recWinUrlInput) recWinUrlInput.value = url;
             const mode = (recWinResSelect ? recWinResSelect.value : '') || 'standard';
+
+            recWindowLaunched = true;
+            recWindowUrl = url;
+            recWindowIsCross = isCrossOriginUrl(url);
 
             try {
               if (activeRecWindow && !activeRecWindow.closed) {
                 activeRecWindow.location.href = url;
-                focusAndHighlightWindow(activeRecWindow);
+                focusTargetWindow();
               } else if (mode === 'standard') {
-                // Open as standard window/tab without popup features to preserve tab strip and split-screen mode
-                activeRecWindow = window.open(url, 'ctlabs_recorder_window');
-                if (activeRecWindow) focusAndHighlightWindow(activeRecWindow);
+                // To guarantee opening in a NEW SEPARATE WINDOW rather than a tab,
+                // explicit window geometry (width/height/left/top) must be provided.
+                // We leave menubar/toolbar enabled (no "menubar=no" / "toolbar=no") so tabs & split mode are supported.
+                const screenW = window.screen.availWidth || window.screen.width || 1280;
+                const screenH = window.screen.availHeight || window.screen.height || 800;
+                const width = Math.max(900, Math.min(1440, screenW - 80));
+                const height = Math.max(650, Math.min(900, screenH - 80));
+                const left = Math.max(0, Math.round((screenW - width) / 2));
+                const top = Math.max(0, Math.round((screenH - height) / 2));
+                const windowFeatures = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+                activeRecWindow = window.open(url, 'ctlabs_recorder_window', windowFeatures);
+                if (activeRecWindow) focusTargetWindow();
               } else {
                 // Open as clean popup with fixed dimensions
                 const [wStr, hStr] = mode.split('x');
                 const width = parseInt(wStr, 10) || 1280;
                 const height = parseInt(hStr, 10) || 720;
-                const left = Math.max(0, Math.round((screen.width - width) / 2));
-                const top = Math.max(0, Math.round((screen.height - height) / 2));
+                const screenW = window.screen.availWidth || window.screen.width || 1280;
+                const screenH = window.screen.availHeight || window.screen.height || 800;
+                const left = Math.max(0, Math.round((screenW - width) / 2));
+                const top = Math.max(0, Math.round((screenH - height) / 2));
                 const windowFeatures = `width=${width},height=${height},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes`;
                 activeRecWindow = window.open(url, 'ctlabs_recorder_window', windowFeatures);
-                if (activeRecWindow) focusAndHighlightWindow(activeRecWindow);
+                if (activeRecWindow) focusTargetWindow();
               }
             } catch (err) {
               console.warn('Could not launch or focus window:', err);
@@ -2264,8 +2371,13 @@
             updateRecWindowUI();
             if (activeRecWindow) {
               const checkLoadedInterval = setInterval(() => {
-                if (!activeRecWindow || activeRecWindow.closed) {
+                // If it's a cross-origin URL (e.g. https://www.suse.de), Cross-Origin-Opener-Policy (COOP)
+                // or browsing context isolation severs the opener window reference once the remote
+                // page finishes loading (activeRecWindow.closed evaluates to true).
+                // Do NOT mark it closed or clear interval if it's cross-origin!
+                if (!recWindowIsCross && (!activeRecWindow || activeRecWindow.closed)) {
                   clearInterval(checkLoadedInterval);
+                  recWindowLaunched = false;
                   updateRecWindowUI();
                   return;
                 }
@@ -2277,17 +2389,27 @@
 
         if (focusRecWinBtn) {
           focusRecWinBtn.addEventListener('click', () => {
-            if (activeRecWindow && !activeRecWindow.closed) {
-              focusAndHighlightWindow(activeRecWindow);
-            }
+            focusTargetWindow();
+          });
+        }
+
+        if (closeRecWinBtn) {
+          closeRecWinBtn.addEventListener('click', () => {
+            try {
+              if (activeRecWindow && !activeRecWindow.closed) {
+                activeRecWindow.close();
+              }
+            } catch (e) {}
+            activeRecWindow = null;
+            recWindowLaunched = false;
+            recWindowIsCross = false;
+            updateRecWindowUI();
           });
         }
 
         if (screenRecFocusBtn) {
           screenRecFocusBtn.addEventListener('click', () => {
-            if (activeRecWindow && !activeRecWindow.closed) {
-              focusAndHighlightWindow(activeRecWindow);
-            }
+            focusTargetWindow();
           });
         }
 
