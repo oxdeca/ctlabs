@@ -1600,6 +1600,15 @@ class Lab
       l.map { |ep| ep.to_s =~ /^#{sw}:eth(\d+)$/ ? $1.to_i : nil }
     end.compact
 
+    if running?
+      engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+      cid = %x( #{engine} inspect -f '{{.Id}}' #{switch_name} 2>/dev/null ).strip
+      if !cid.empty?
+        out = %x( ip netns exec #{cid} ip -br link show 2>/dev/null )
+        out.scan(/eth(\d+)/) { |m| used << m[0].to_i }
+      end
+    end
+
     port = 1
     port += 1 while used.include?(port)
     port
@@ -1613,6 +1622,25 @@ class Lab
         $1.to_i
       end
     end.compact
+
+    sw_node = find_node(switch_name)
+    if sw_node
+      sw_node.resolve_runtime! if sw_node.respond_to?(:resolve_runtime!)
+      sw_node.nics&.keys&.each do |k|
+        used_ports << $1.to_i if k.to_s =~ /^eth(\d+)$/
+      end
+      if sw_node.netns && !sw_node.netns.to_s.empty?
+        out = %x( ip netns exec #{sw_node.netns} ip -br link show 2>/dev/null )
+        out.scan(/eth(\d+)/) { |m| used_ports << m[0].to_i }
+      end
+    elsif Lab.running?
+      engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+      cid = %x( #{engine} inspect -f '{{.Id}}' #{switch_name} 2>/dev/null ).strip
+      if !cid.empty?
+        out = %x( ip netns exec #{cid} ip -br link show 2>/dev/null )
+        out.scan(/eth(\d+)/) { |m| used_ports << m[0].to_i }
+      end
+    end
     
     next_port = 1
     next_port += 1 while used_ports.include?(next_port)
@@ -1788,11 +1816,14 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       # DATA PLANE: Needs OOB Mgmt (eth0 -> mgmt switch) AND Data NICs
       if !(kind == 'mgmt' && type == 'switch') && type != 'gateway'
         msw = mgmt_switch_name
-        if find_node(msw)
+        msw_node = find_node(msw)
+        if msw_node
           next_sw0 = get_next_switch_port(msw)
           mgmt_link = ["#{msw}:eth#{next_sw0}", "#{node_name}:eth0"]
           @links << mgmt_link
+          msw_node.nics["eth#{next_sw0}"] = '' if msw_node.nics
           Link.new('nodes' => @nodes, 'links' => mgmt_link, 'log' => @log, 'mgmt' => mgmt)
+          data_links << mgmt_link
         end
       end
 

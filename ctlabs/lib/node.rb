@@ -191,8 +191,23 @@ class Node
     if params[:nics] && !params[:nics].strip.empty?
       parsed = params[:nics].split("\n").map { |l| l.split('=', 2).map(&:strip) }.reject { |k, v| k.nil? || k.empty? || v.nil? }
       new_cfg['nics'] = parsed.each_with_object({}) { |(k, v), h| h[k] = v.split('@', 2).first.to_s.strip }
+      existing_eth0 = (base_data['nics'] || {})['eth0'] || (base_data['nics'] || {})[:eth0]
+      is_local_data = (new_cfg['provider'] || base_data['provider'] || 'local') == 'local' &&
+                      (new_cfg['plane'] || base_data['plane']) != 'mgmt' &&
+                      new_cfg['type'] != 'controller'
+      if existing_eth0 && !new_cfg['nics'].key?('eth0') && is_local_data
+        new_cfg['nics']['eth0'] = existing_eth0
+      end
     else
-      new_cfg.delete('nics')
+      existing_eth0 = (base_data['nics'] || {})['eth0'] || (base_data['nics'] || {})[:eth0]
+      is_local_data = (new_cfg['provider'] || base_data['provider'] || 'local') == 'local' &&
+                      (new_cfg['plane'] || base_data['plane']) != 'mgmt' &&
+                      new_cfg['type'] != 'controller'
+      if existing_eth0 && is_local_data
+        new_cfg['nics'] = { 'eth0' => existing_eth0 }
+      else
+        new_cfg.delete('nics')
+      end
     end
 
     # Legacy single-address nodes (natgw, switches, ...) keep their address in

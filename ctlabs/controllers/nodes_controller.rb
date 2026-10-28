@@ -7,7 +7,7 @@
 class NodesController < BaseController
   # --- Fetch Node Details ---
   get '/labs/*/node/:node_name' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     node_name = params[:node_name]
     lab_path = Lab.get_file_path(lab_name)
 
@@ -72,7 +72,7 @@ class NodesController < BaseController
 
   # --- Add New Node to Base Config ---
   post '/labs/*/node/new' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     labs_dir = LabRepository.labs_dir
     lab_path = File.join(labs_dir, lab_name)
 
@@ -124,7 +124,7 @@ class NodesController < BaseController
 
   # --- Add AdHoc Node to Running Lab ---
   post '/labs/*/node' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     halt 400, "AdHoc Nodes only allowed on the running lab" unless Lab.current_name == lab_name
     node_name = params[:node_name]
 
@@ -151,7 +151,7 @@ class NodesController < BaseController
 
       vm['links'] ||= []
       Array(data_links).compact.each do |data_link|
-        vm['links'] << data_link
+        vm['links'] << data_link unless vm['links'].include?(data_link)
         sw_name = data_link[0].split(':eth').first
         sw_port = data_link[0].split(':eth').last.to_i
 
@@ -170,7 +170,7 @@ class NodesController < BaseController
 
   # --- Edit Node Configuration ---
   post '/labs/*/node_edit/:node_name' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     node_name = params[:node_name]
     lab_path = Lab.get_file_path(lab_name)
 
@@ -304,7 +304,7 @@ class NodesController < BaseController
 
   # --- Delete Node ---
   post '/labs/*/node/:node_name/delete' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     node_name = params[:node_name]
     lab_path = Lab.get_file_path(lab_name)
 
@@ -339,7 +339,7 @@ class NodesController < BaseController
 
   # --- Ping Node ---
   get '/labs/*/node/:node_name/ping' do
-    lab_name = params[:splat].first
+    lab_name = Lab.resolve_name(params[:splat].first)
     node_name = params[:node_name]
     lab_path = Lab.get_file_path(lab_name)
 
