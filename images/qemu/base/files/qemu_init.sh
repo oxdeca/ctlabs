@@ -219,7 +219,7 @@ qemu_base_cmd() {
     "-machine type=q35,smm=on,graphics=off,vmport=off,dump-guest-core=off,accel=kvm ${qemu_numa}"
     "${ENABLE_KVM} -device qemu-xhci,id=xhci -device usb-tablet ${qemu_uefi}"
     "-global ICH9-LPC.disable_s3=1 -global ICH9-LPC.disable_s4=1"
-    "-device virtio-balloon-pci,free-page-reporting=on,id=ballon0,bus=pcie.0,addr=0x5"
+    "-device virtio-balloon-pci,free-page-reporting=on,id=ballon0,bus=pcie.0,addr=0x6"
   )
 }
 
