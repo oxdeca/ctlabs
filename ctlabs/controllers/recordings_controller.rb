@@ -174,6 +174,108 @@ class RecordingsController < BaseController
     halt 400, { ok: false, error: 'No file uploaded' }.to_json if upload_files.empty?
 
     RecordingService.ensure_dir
+    conflict_action = params[:conflict_action].to_s.strip # 'rename', 'overwrite'
+    custom_name     = params[:custom_name].to_s.strip
+    target_id       = params[:target_id].to_s.strip
+
+    # Duplicate detection: If no explicit conflict action was specified, check against existing items in active walkthrough
+    if conflict_action.empty?
+      wk_slug = params[:walkthrough].to_s.strip
+      wk_slug = 'default' if wk_slug.empty?
+      existing_steps = RecordingService.list_for_walkthrough(wk_slug) + RecordingService.list_unintegrated_for_walkthrough(wk_slug)
+
+      duplicate_info = nil
+      upload_files.each do |f|
+        break if duplicate_info
+        fname = f[:filename].to_s
+        fext = File.extname(fname).downcase
+        fbase = File.basename(fname, '.*').strip
+
+        if fext == '.zip'
+          Zip::File.open(f[:tempfile].path) do |zipfile|
+            has_manifest = zipfile.any? { |e| File.basename(e.name) == RecordingService::MANIFEST }
+            next if has_manifest # walkthrough package with manifest creates its own new unique set
+            zipfile.each do |entry|
+              next if entry.name.start_with?('__MACOSX/') || entry.name.include?('/.') || (entry.respond_to?(:directory?) && entry.directory?)
+              e_ext = File.extname(entry.name).downcase
+              e_base = File.basename(entry.name, e_ext).strip
+              next unless [RecordingService::MD_EXT, RecordingService::EXT, *RecordingService::VIDEO_EXTS].include?(e_ext)
+
+              e_title = ''
+              if e_ext == RecordingService::MD_EXT
+                first_l = entry.get_input_stream.read(1024).to_s.lines.find { |l| !l.strip.empty? }.to_s.strip.sub(/^#+\s*/, '') rescue ''
+                e_title = first_l unless first_l.empty?
+              elsif e_ext == RecordingService::EXT
+                hdr = entry.get_input_stream.read(1024).to_s.lines.first rescue ''
+                e_title = (JSON.parse(hdr)['title'] rescue '') || ''
+              end
+
+              matched = existing_steps.find do |rec|
+                rec_id = rec[:id].to_s
+                rec_title = rec[:title].to_s.strip.downcase
+                rec_id == e_base || rec_id == fbase ||
+                  (!rec_title.empty? && rec_title != 'step note' && rec_title != 'browser recording' &&
+                   (rec_title == e_base.downcase || rec_title == fbase.downcase || (!e_title.empty? && rec_title == e_title.downcase)))
+              end
+
+              if matched
+                matched_title = matched[:title].to_s.strip
+                matched_title = e_title unless e_title.empty?
+                matched_title = e_base if matched_title.empty?
+                duplicate_info = {
+                  filename: fname,
+                  existing_id: matched[:id],
+                  existing_title: matched_title,
+                  suggested_name: "#{matched_title} (1)"
+                }
+                break
+              end
+            end
+          end
+        elsif [RecordingService::MD_EXT, RecordingService::EXT, *RecordingService::VIDEO_EXTS].include?(fext)
+          item_title = ''
+          if fext == RecordingService::MD_EXT
+            first_l = File.open(f[:tempfile].path, 'rb') { |io| io.read(1024) }.to_s.lines.find { |l| !l.strip.empty? }.to_s.strip.sub(/^#+\s*/, '') rescue ''
+            item_title = first_l unless first_l.empty?
+          elsif fext == RecordingService::EXT
+            hdr = File.open(f[:tempfile].path, 'rb') { |io| io.gets }.to_s rescue ''
+            item_title = (JSON.parse(hdr)['title'] rescue '') || ''
+          end
+
+          matched = existing_steps.find do |rec|
+            rec_id = rec[:id].to_s
+            rec_title = rec[:title].to_s.strip.downcase
+            rec_id == fbase ||
+              (!rec_title.empty? && rec_title != 'step note' && rec_title != 'browser recording' &&
+               (rec_title == fbase.downcase || (!item_title.empty? && rec_title == item_title.downcase)))
+          end
+
+          if matched
+            matched_title = matched[:title].to_s.strip
+            matched_title = item_title unless item_title.empty?
+            matched_title = fbase if matched_title.empty?
+            duplicate_info = {
+              filename: fname,
+              existing_id: matched[:id],
+              existing_title: matched_title,
+              suggested_name: "#{matched_title} (1)"
+            }
+          end
+        end
+      end
+
+      if duplicate_info
+        return {
+          ok: true,
+          conflict: true,
+          filename: duplicate_info[:filename],
+          existing_id: duplicate_info[:existing_id],
+          existing_title: duplicate_info[:existing_title],
+          suggested_name: duplicate_info[:suggested_name]
+        }.to_json
+      end
+    end
+
     imported = []
     walkthrough = nil
     image_count = 0
@@ -211,9 +313,12 @@ class RecordingsController < BaseController
               data   = entry.get_input_stream.read
               node   = RecordingService.node_from_cast(data) ||
                        RecordingService.node_from_id(old_id)
-              id     = RecordingService.new_id(node)
+              id     = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_id(node)
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+              if conflict_action == 'rename' && !custom_name.empty?
+                RecordingService.set_title(id, custom_name)
+              end
               id_map[old_id] = id
               id_map[old_id.downcase] = id
               id_map[base] = id
@@ -222,7 +327,19 @@ class RecordingsController < BaseController
             elsif ext == RecordingService::MD_EXT
               old_id = clean_base
               data   = entry.get_input_stream.read
-              id     = RecordingService.new_markdown_id('note')
+              data   = data.force_encoding('UTF-8') rescue data
+              # Update image paths from relative images/ to /recordings/images/
+              data   = data.gsub(%r{(?:\./)?images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+
+              if conflict_action == 'rename' && !custom_name.empty?
+                if data =~ /\A(\s*#+\s*)([^\n]+)/
+                  data = data.sub(/\A(\s*#+\s*)([^\n]+)/, "\\1#{custom_name}")
+                else
+                  data = "# #{custom_name}\n\n" + data
+                end
+              end
+
+              id = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_markdown_id('note')
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
               id_map[old_id] = id
@@ -232,7 +349,7 @@ class RecordingsController < BaseController
               imported << id
             elsif RecordingService::VIDEO_EXTS.include?(ext)
               old_id = clean_base
-              id     = RecordingService.new_video_id('screen')
+              id     = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_video_id('screen')
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{ext}"), entry.get_input_stream.read)
               id_map[old_id] = id
@@ -255,7 +372,17 @@ class RecordingsController < BaseController
 
         pending_sidecars.each do |old_id, json_str|
           new_id = id_map[old_id] || id_map[old_id.downcase]
-          File.binwrite(File.join(RecordingService::DIR, "#{new_id}.json"), json_str) if new_id
+          if new_id
+            if conflict_action == 'rename' && !custom_name.empty?
+              begin
+                parsed = JSON.parse(json_str)
+                parsed['title'] = custom_name if parsed.is_a?(Hash)
+                json_str = JSON.pretty_generate(parsed)
+              rescue StandardError
+              end
+            end
+            File.binwrite(File.join(RecordingService::DIR, "#{new_id}.json"), json_str)
+          end
         end
 
         if manifest.is_a?(Hash) && !manifest['name'].to_s.strip.empty?
@@ -286,30 +413,50 @@ class RecordingsController < BaseController
         data = File.binread(f[:tempfile].path)
         node = RecordingService.node_from_cast(data) ||
                RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
-        id   = RecordingService.new_id(node)
+        id   = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_id(node)
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
 
-        begin
-          header_json = JSON.parse(data.to_s.lines.first)
-          if header_json.is_a?(Hash) && header_json['title'].to_s.strip.empty?
-            base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
-            RecordingService.set_title(id, base_name) unless base_name.empty?
+        if conflict_action == 'rename' && !custom_name.empty?
+          RecordingService.set_title(id, custom_name)
+        else
+          begin
+            header_json = JSON.parse(data.to_s.lines.first)
+            if header_json.is_a?(Hash) && header_json['title'].to_s.strip.empty?
+              base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+              RecordingService.set_title(id, base_name) unless base_name.empty?
+            end
+          rescue StandardError
+            # ignore
           end
-        rescue StandardError
-          # ignore
         end
 
         imported << id
       elsif filename.end_with?(RecordingService::MD_EXT)
         data = File.binread(f[:tempfile].path)
-        id   = RecordingService.new_markdown_id('note')
+        data = data.force_encoding('UTF-8') rescue data
+        # Update image paths from relative images/ to /recordings/images/
+        data = data.gsub(%r{(?:\./)?images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+
+        if conflict_action == 'rename' && !custom_name.empty?
+          if data =~ /\A(\s*#+\s*)([^\n]+)/
+            data = data.sub(/\A(\s*#+\s*)([^\n]+)/, "\\1#{custom_name}")
+          else
+            data = "# #{custom_name}\n\n" + data
+          end
+        end
+
+        id = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_markdown_id('note')
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
         imported << id
       elsif RecordingService::VIDEO_EXTS.include?(File.extname(filename))
         vext = File.extname(filename).downcase
-        id   = RecordingService.new_video_id('screen')
+        id   = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_video_id('screen')
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), File.binread(f[:tempfile].path))
-        base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+        base_name = if conflict_action == 'rename' && !custom_name.empty?
+                      custom_name
+                    else
+                      File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+                    end
         base_name = 'Browser Recording' if base_name.empty?
         meta = {
           'title'      => base_name,
@@ -405,6 +552,41 @@ class RecordingsController < BaseController
     end
 
     is_md = path.end_with?(RecordingService::MD_EXT)
+    if is_md && (params[:bundle] == '1' || params[:format] == 'zip')
+      base_name = File.basename(path, RecordingService::MD_EXT)
+      zip_filename = "#{base_name}.zip"
+
+      # Clean up older export note zip files (>1 hour old)
+      Dir.glob(File.join(RecordingService::DIR, 'export_note_*_*.zip')).each do |old_zip|
+        File.delete(old_zip) rescue nil if File.mtime(old_zip) < (Time.now - 3600)
+      end
+
+      zip_path = File.join(RecordingService::DIR, "export_note_#{SecureRandom.hex(4)}_#{zip_filename}")
+
+      content = File.read(path) rescue ''
+      rewritten_content = content.gsub(%r{(?:/recordings)?/images/([a-zA-Z0-9_.-]+)}, 'images/\1')
+
+      images_to_add = {}
+      content.scan(%r{(?:(?:/recordings)?/images/|images/)([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
+        img_path = RecordingService.image_path(img_name)
+        images_to_add[img_name] = img_path if img_path && File.file?(img_path)
+      end
+
+      Zip::File.open(zip_path, create: true) do |zipfile|
+        zipfile.get_output_stream("#{base_name}.md") do |io|
+          io.write(rewritten_content)
+        end
+        images_to_add.each do |img_name, img_path|
+          zipfile.add("images/#{img_name}", img_path)
+        end
+      end
+
+      return send_file zip_path,
+                       filename:    zip_filename,
+                       type:        'application/zip',
+                       disposition: 'attachment'
+    end
+
     content_type_str = is_md ? 'text/markdown; charset=utf-8' : (params[:download] ? 'application/x-asciicast' : 'application/x-asciicast; charset=utf-8')
     disposition = params[:download] ? 'attachment' : 'inline'
 

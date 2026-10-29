@@ -170,6 +170,15 @@
     color: inherit;
     font-size: 0.92em;
   }
+  .markdown-body.wrap-code pre {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    overflow-x: hidden !important;
+  }
+  .markdown-body.wrap-code pre code {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+  }
   .markdown-body blockquote {
     border-left: 4px solid #38bdf8;
     margin: 1em 0;
@@ -598,18 +607,59 @@
             </div>
 
             <!-- Metadata Editor & Actions -->
-            <div id="rec-actions" style="display: none; align-items: center; gap: 12px;">
+            <div id="rec-actions" style="display: none; align-items: center; gap: 6px;">
               <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
                 <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
-                <input type="text" name="title" id="edit-title" placeholder="Step title..." title="Custom title" style="width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.85em;" />
-                <button type="submit" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85em;"><i class="fas fa-save"></i> Save</button>
+                <!-- 1. Title -->
+                <input type="text" name="title" id="edit-title" placeholder="Step title..." title="Step title" style="width: 210px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; height: 28px;" />
+                <!-- 2. Save -->
+                <button type="submit" id="rec-save-btn" class="w3-button w3-small" style="background: #10b981; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 0.82em; display: inline-flex; align-items: center; gap: 5px; height: 28px; border: none; cursor: pointer;" title="Save (Ctrl+S)">
+                  <i class="fas fa-save"></i> Save
+                </button>
+                <span id="md-save-status" style="font-size: 0.8em; color: #10b981; display: none; font-weight: 500; align-items: center; gap: 4px; white-space: nowrap;">
+                  <i class="fas fa-check-circle"></i> Saved
+                </span>
               </form>
 
-              <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #475569; color: #f8fafc; padding: 4px 10px;" title="Download"><i class="fas fa-download"></i></a>
-              <form id="rec-delete" method="post" action="#" style="margin: 0;" onsubmit="return confirm('Delete this step? This cannot be undone.')">
+              <!-- 3. Import (Picture Upload / Insert) -->
+              <button type="button" id="md-insert-img-btn" title="Upload / insert picture into note (or drag & drop / paste)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                <i class="fas fa-upload" style="color: #38bdf8;"></i>
+              </button>
+              <input type="file" id="md-img-file-input" accept="image/*" style="display: none;" />
+
+              <!-- 4. Export (Download / Package) -->
+              <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'" title="Export / Download">
+                <i class="fas fa-download" style="color: #38bdf8;"></i>
+              </a>
+
+              <!-- 5. Delete -->
+              <form id="rec-delete" method="post" action="#" style="margin: 0; display: inline-flex;" onsubmit="return confirm('Delete this step? This cannot be undone.')">
                 <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
-                <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px;" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px;" title="Delete this step">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
               </form>
+
+              <!-- Divider -->
+              <div id="md-settings-divider" style="width: 1px; height: 18px; background: #334155; margin: 0 4px; display: none;"></div>
+
+              <!-- 6. Settings (All the way to the right) -->
+              <div id="md-settings-wrapper" style="position: relative; display: none;">
+                <button type="button" id="md-settings-btn" title="Editor settings (Wrap Code, options)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-cog" style="color: #94a3b8;"></i>
+                </button>
+                <div id="md-settings-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                    Editor Settings
+                  </div>
+                  <label id="md-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap code blocks
+                    </span>
+                    <input type="checkbox" id="md-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -625,7 +675,7 @@
 
           <!-- Markdown Step Container -->
           <div id="md-container" style="flex: 1; min-height: 0; display: none; flex-direction: column; background: #0f172a;">
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155;">
+            <div id="md-editor-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155;">
               <div style="display: flex; align-items: center; gap: 4px;">
                 <button type="button" id="md-tab-preview" class="md-mode-tab active" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #38bdf8; background: #0284c7; color: #ffffff; cursor: pointer; font-weight: 500;">
                   <i class="fas fa-eye" style="margin-right: 4px;"></i> Preview
@@ -635,19 +685,6 @@
                 </button>
                 <button type="button" id="md-tab-split" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
                   <i class="fas fa-columns" style="margin-right: 4px;"></i> Split
-                </button>
-                <div style="width: 1px; height: 18px; background: #334155; margin: 0 4px;"></div>
-                <button type="button" id="md-insert-img-btn" title="Insert picture from disk, clipboard paste (Ctrl+V), or drag & drop" style="padding: 4px 10px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: flex; align-items: center; gap: 5px;">
-                  <i class="fas fa-image" style="color: #38bdf8;"></i> Picture
-                </button>
-                <input type="file" id="md-img-file-input" accept="image/*" style="display: none;" />
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="md-save-status" style="font-size: 0.8em; color: #10b981; display: none; font-weight: 500;">
-                  <i class="fas fa-check-circle"></i> Saved
-                </span>
-                <button type="button" id="md-save-btn" style="background: #10b981; color: #ffffff; border: none; padding: 4px 12px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px;">
-                  <i class="fas fa-save"></i> Save Content
                 </button>
               </div>
             </div>
@@ -721,6 +758,90 @@
             <button type="submit" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600;"><i class="fas fa-download"></i> Download ZIP</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Export Note Modal -->
+    <div id="export-note-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 480px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-file-export"></i> Export Note
+          </h3>
+          <span onclick="document.getElementById('export-note-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 18px 16px; margin: 0;">
+          <p id="export-note-name-label" style="color: #f8fafc; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; font-weight: 500;">
+            Export note <strong id="export-note-title-span"></strong>:
+          </p>
+
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;">
+            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 12px;">
+              <input type="radio" name="export-note-format" value="bundle" checked style="margin-top: 3px; cursor: pointer;" />
+              <div>
+                <div style="color: #38bdf8; font-weight: 600; font-size: 0.88em; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-file-archive"></i> Package with Pictures (.zip)
+                </div>
+                <div style="color: #94a3b8; font-size: 0.8em; margin-top: 2px;">
+                  Bundles the Markdown file and all referenced pictures into an <code>images/</code> folder.
+                </div>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 0;">
+              <input type="radio" name="export-note-format" value="raw" style="margin-top: 3px; cursor: pointer;" />
+              <div>
+                <div style="color: #f8fafc; font-weight: 600; font-size: 0.88em; display: flex; align-items: center; gap: 6px;">
+                  <i class="fab fa-markdown"></i> Markdown File only (.md)
+                </div>
+                <div style="color: #94a3b8; font-size: 0.8em; margin-top: 2px;">
+                  Downloads only the raw Markdown document without pictures.
+                </div>
+              </div>
+            </label>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" onclick="document.getElementById('export-note-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="button" id="confirm-export-note-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: gap: 6px;">
+              <i class="fas fa-download"></i> Export
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Duplicate Import Warning & Rename Modal -->
+    <div id="duplicate-import-modal" class="w3-modal" style="z-index: 10000;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #f59e0b; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-triangle"></i> Duplicate Step Detected
+          </h3>
+          <span id="close-duplicate-modal-btn" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 18px 16px; margin: 0;">
+          <p id="duplicate-modal-msg" style="color: #f8fafc; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.4;">
+            A step or file matching <strong id="duplicate-existing-name-span" style="color: #38bdf8;"></strong> already exists in this walkthrough set.
+          </p>
+
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;">
+            <label for="duplicate-rename-input" style="display: block; color: #94a3b8; font-size: 0.82em; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+              Change name to keep both:
+            </label>
+            <input type="text" id="duplicate-rename-input" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.9em;" />
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="duplicate-cancel-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="button" id="duplicate-overwrite-btn" class="w3-button w3-round" style="background: #e11d48; color: #ffffff; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Overwrite
+            </button>
+            <button type="button" id="duplicate-rename-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-copy"></i> Keep Both (Rename)
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -996,13 +1117,22 @@
         const mdTextarea = document.getElementById('md-textarea');
         const mdPreviewPane = document.getElementById('md-preview-pane');
         const mdEditPane = document.getElementById('md-edit-pane');
-        const mdSaveBtn = document.getElementById('md-save-btn');
+        const recSaveBtn = document.getElementById('rec-save-btn');
+        const mdSaveBtn = recSaveBtn;
         const mdSaveStatus = document.getElementById('md-save-status');
         const mdTabPreview = document.getElementById('md-tab-preview');
         const mdTabEdit = document.getElementById('md-tab-edit');
         const mdTabSplit = document.getElementById('md-tab-split');
         const mdInsertImgBtn = document.getElementById('md-insert-img-btn');
         const mdImgFileInput = document.getElementById('md-img-file-input');
+        const mdSettingsWrapper = document.getElementById('md-settings-wrapper');
+        const mdSettingsDivider = document.getElementById('md-settings-divider');
+        const mdSettingsBtn = document.getElementById('md-settings-btn');
+        const mdSettingsMenu = document.getElementById('md-settings-menu');
+        const mdSettingWrapCheckbox = document.getElementById('md-setting-wrap-checkbox');
+        const exportNoteModal = document.getElementById('export-note-modal');
+        const confirmExportNoteBtn = document.getElementById('confirm-export-note-btn');
+        const exportNoteTitleSpan = document.getElementById('export-note-title-span');
 
         const imageModal = document.getElementById('image-modal');
         const imageModalImg = document.getElementById('image-modal-img');
@@ -1065,6 +1195,122 @@
         let mdCache = {};
         let mdRenderTimeout = null;
         let mdCodeEditor = null;
+        let mdIsDirty = false;
+        let mdLastSavedContent = null;
+        let mdAutoSaveTimer = null;
+        let mdIsSaving = false;
+        let mdSaveStatusTimer = null;
+        let mdWrapCode = false;
+        try {
+          mdWrapCode = localStorage.getItem('ctlabs_md_wrap_code') === 'true';
+        } catch (e) {}
+
+        function updateMdWrapCodeUI() {
+          if (mdPreviewPane) {
+            if (mdWrapCode) {
+              mdPreviewPane.classList.add('wrap-code');
+            } else {
+              mdPreviewPane.classList.remove('wrap-code');
+            }
+          }
+          if (mdSettingWrapCheckbox) {
+            mdSettingWrapCheckbox.checked = mdWrapCode;
+          }
+          if (mdSettingsBtn) {
+            const icon = mdSettingsBtn.querySelector('i');
+            if (icon) {
+              icon.style.color = mdWrapCode ? '#38bdf8' : '#94a3b8';
+            }
+            mdSettingsBtn.title = mdWrapCode ? 'Editor settings (Code wrapping active)' : 'Editor settings';
+          }
+        }
+
+        let mdIsLoading = false;
+
+        function preprocessExtendedMarkdown(text) {
+          if (!text) return '';
+          // 0. Normalize relative images/ paths to /recordings/images/
+          text = text.replace(/!\[([^\]]*)\]\((?:\.?\/)?images\/([^)\s]+)(.*?)\)/g, '![$1](/recordings/images/$2$3)');
+
+          // 1. Equal syntax: ![alt](url =300x200), ![alt](url =300), ![alt](url =50%)
+          text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\s+=(\d+(?:%|px)?)(?:x(\d+(?:%|px)?))?\)/g, (match, alt, url, w, h) => {
+            const dim = h ? `${w}x${h}` : w;
+            const cleanAlt = alt ? `${alt}|${dim}` : dim;
+            return `![${cleanAlt}](${url})`;
+          });
+
+          // 2. Curly attribute syntax: ![alt](url){width=300 height=200}, ![alt](url){300x200}, ![alt](url){width="50%"}
+          text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)\{([^}]+)\}/g, (match, alt, url, attrs) => {
+            let w = '', h = '';
+            const dimMatch = attrs.match(/(\d+(?:%|px)?)\s*x\s*(\d+(?:%|px)?)/i);
+            if (dimMatch) {
+              w = dimMatch[1];
+              h = dimMatch[2];
+            } else {
+              const wMatch = attrs.match(/width\s*[:=]\s*["']?(\d+(?:%|px)?)["']?/i);
+              const hMatch = attrs.match(/height\s*[:=]\s*["']?(\d+(?:%|px)?)["']?/i);
+              if (wMatch) w = wMatch[1];
+              if (hMatch) h = hMatch[1];
+              if (!w && !h) {
+                const singleDim = attrs.match(/(\d+(?:%|px)?)/);
+                if (singleDim) w = singleDim[1];
+              }
+            }
+            const dim = (w && h) ? `${w}x${h}` : (w || h);
+            if (dim) {
+              const cleanAlt = alt ? `${alt}|${dim}` : dim;
+              return `![${cleanAlt}](${url})`;
+            }
+            return match;
+          });
+
+          return text;
+        }
+
+        function showMdStatus(state, msg) {
+          if (!mdSaveStatus) return;
+          clearTimeout(mdSaveStatusTimer);
+          mdSaveStatus.style.display = 'inline-flex';
+          if (state === 'dirty') {
+            mdSaveStatus.innerHTML = '<i class="fas fa-pencil-alt" style="color: #f59e0b; margin-right: 4px;"></i> <span style="color: #cbd5e1;">Unsaved edits...</span>';
+          } else if (state === 'saving') {
+            const text = msg || 'Saving...';
+            mdSaveStatus.innerHTML = `<i class="fas fa-spinner fa-spin" style="color: #38bdf8; margin-right: 4px;"></i> <span style="color: #94a3b8;">${text}</span>`;
+          } else if (state === 'saved') {
+            const text = msg || 'Saved';
+            mdSaveStatus.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> <span style="color: #10b981;">${text}</span>`;
+            mdSaveStatusTimer = setTimeout(() => {
+              if (!mdIsDirty) mdSaveStatus.style.display = 'none';
+            }, 2500);
+          } else if (state === 'error') {
+            const text = msg || 'Save failed';
+            mdSaveStatus.innerHTML = `<i class="fas fa-exclamation-triangle" style="color: #ef4444; margin-right: 4px;"></i> <span style="color: #ef4444;">${text}</span>`;
+          }
+        }
+
+        function onMarkdownContentChanged() {
+          if (mdIsLoading) return;
+          const current = mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '');
+          if (mdTextarea && mdCodeEditor) {
+            mdTextarea.value = current;
+          }
+          if (currentMdMode === 'split') {
+            clearTimeout(mdRenderTimeout);
+            mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
+          }
+
+          if (mdLastSavedContent !== null && current !== mdLastSavedContent) {
+            mdIsDirty = true;
+            showMdStatus('dirty');
+            clearTimeout(mdAutoSaveTimer);
+            mdAutoSaveTimer = setTimeout(() => {
+              saveMarkdownContent(true);
+            }, 1200);
+          } else if (current === mdLastSavedContent) {
+            mdIsDirty = false;
+            if (mdSaveStatus && !mdIsSaving) mdSaveStatus.style.display = 'none';
+          }
+        }
 
         function getMdEditor() {
           if (mdCodeEditor) return mdCodeEditor;
@@ -1099,8 +1345,8 @@
               lineWrapping: true,
               viewportMargin: Infinity,
               extraKeys: {
-                'Ctrl-S': () => saveMarkdownContent(),
-                'Cmd-S': () => saveMarkdownContent(),
+                'Ctrl-S': () => saveMarkdownContent(false),
+                'Cmd-S': () => saveMarkdownContent(false),
                 'Tab': (cm) => {
                   if (cm.somethingSelected()) {
                     cm.indentSelection('add');
@@ -1116,10 +1362,7 @@
             window.cmEditors['md-textarea'] = mdCodeEditor;
 
             mdCodeEditor.on('change', () => {
-              if (currentMdMode === 'split') {
-                clearTimeout(mdRenderTimeout);
-                mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
-              }
+              onMarkdownContentChanged();
             });
 
             mdCodeEditor.on('paste', (cm, e) => {
@@ -1129,19 +1372,61 @@
                 const item = clipboard.items[i];
                 if (item.kind === 'file' && item.type.startsWith('image/')) {
                   e.preventDefault();
+                  if (typeof e.stopPropagation === 'function') e.stopPropagation();
                   const file = item.getAsFile();
-                  if (file) uploadAndInsertImage(file);
+                  if (file) uploadAndInsertImage(file, cm.getCursor());
                   break;
+                }
+              }
+            });
+
+            mdCodeEditor.on('dragover', (cm, e) => {
+              const types = e.dataTransfer && e.dataTransfer.types;
+              if (types && (types.includes('Files') || Array.from(types).includes('Files'))) {
+                e.preventDefault();
+                const pos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+                if (pos) {
+                  cm.setCursor(pos);
                 }
               }
             });
 
             mdCodeEditor.on('drop', (cm, e) => {
               const files = e.dataTransfer && e.dataTransfer.files;
-              if (files && files.length > 0 && files[0].type.startsWith('image/')) {
-                e.preventDefault();
-                uploadAndInsertImage(files[0]);
+              if (files && files.length > 0) {
+                const file = files[0];
+                const isImg = (file.type && file.type.startsWith('image/')) ||
+                              (/\.(png|jpe?g|gif|svg|webp)$/i.test(file.name || ''));
+                if (isImg) {
+                  e.preventDefault();
+                  if (typeof e.stopPropagation === 'function') e.stopPropagation();
+                  e._ctlabsHandled = true;
+                  const mc = document.getElementById('md-editor-container');
+                  if (mc) mc.style.boxShadow = 'none';
+
+                  const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+                  if (dropPos) {
+                    cm.setCursor(dropPos);
+                  }
+                  uploadAndInsertImage(file, dropPos || cm.getCursor());
+                }
               }
+            });
+
+            // Automatically refresh CodeMirror when edit pane changes dimensions (sidebar collapse/expand, window resize, split mode)
+            if (window.ResizeObserver && mdEditPane) {
+              try {
+                const mdResizeObserver = new ResizeObserver(() => {
+                  if (mdCodeEditor && mdEditPane && mdEditPane.style.display !== 'none' && mdEditPane.offsetWidth > 0) {
+                    mdCodeEditor.refresh();
+                  }
+                });
+                mdResizeObserver.observe(mdEditPane);
+              } catch (e) {}
+            }
+
+            mdCodeEditor.on('focus', (cm) => {
+              cm.refresh();
             });
 
             return mdCodeEditor;
@@ -1161,6 +1446,70 @@
           marked.setOptions({
             gfm: true,
             breaks: true
+          });
+
+          marked.use({
+            renderer: {
+              image(arg0, arg1, arg2) {
+                let href = '', title = '', text = '';
+                if (typeof arg0 === 'object' && arg0 !== null) {
+                  href = arg0.href || '';
+                  title = arg0.title || '';
+                  text = arg0.text || '';
+                } else {
+                  href = arg0 || '';
+                  title = arg1 || '';
+                  text = arg2 || '';
+                }
+
+                if (href && (href.startsWith('images/') || href.startsWith('./images/'))) {
+                  href = '/recordings/images/' + href.replace(/^\.?\/?images\//, '');
+                }
+
+                let width = '';
+                let height = '';
+                let cleanAlt = text;
+
+                // Support Obsidian pipe syntax: alt|300x200, 300x200, alt|50%, alt|300
+                const pipeMatch = text.match(/^(.*?)(?:\|(.*))$/);
+                let dimCandidate = '';
+                if (pipeMatch) {
+                  cleanAlt = pipeMatch[1].trim();
+                  dimCandidate = pipeMatch[2].trim();
+                } else if (/^\d+(?:%|px)?(?:\s*x\s*\d+(?:%|px)?)?$/i.test(text.trim())) {
+                  cleanAlt = '';
+                  dimCandidate = text.trim();
+                }
+
+                if (dimCandidate) {
+                  const xMatch = dimCandidate.match(/^(\d+(?:%|px)?)\s*x\s*(\d+(?:%|px)?)$/i);
+                  if (xMatch) {
+                    width = xMatch[1];
+                    height = xMatch[2];
+                  } else {
+                    width = dimCandidate;
+                  }
+                }
+
+                let style = [];
+                if (width) {
+                  const wVal = /^\d+$/.test(width) ? `${width}px` : width;
+                  style.push(`width: ${wVal}`);
+                }
+                if (height) {
+                  const hVal = /^\d+$/.test(height) ? `${height}px` : height;
+                  style.push(`height: ${hVal}`);
+                }
+                style.push('max-width: 100%');
+
+                const styleAttr = style.length ? ` style="${style.join('; ')};"` : '';
+                const widthAttr = width && /^\d+$/.test(width) ? ` width="${width}"` : '';
+                const heightAttr = height && /^\d+$/.test(height) ? ` height="${height}"` : '';
+                const titleAttr = title ? ` title="${title}"` : '';
+
+                return `<img src="${href}" alt="${cleanAlt}"${titleAttr}${widthAttr}${heightAttr}${styleAttr} />`;
+              }
+            }
           });
         }
 
@@ -1183,6 +1532,16 @@
             activeTab.style.borderColor = '#38bdf8';
           }
 
+          const cm = getMdEditor();
+          if (cm && mdTextarea) {
+            mdTextarea.value = cm.getValue();
+          }
+
+          // If there are unsaved edits, trigger immediate autosave
+          if (mdIsDirty) {
+            saveMarkdownContent(true);
+          }
+
           if (mode === 'preview') {
             if (mdEditPane) mdEditPane.style.display = 'none';
             if (mdPreviewPane) {
@@ -1197,11 +1556,7 @@
               mdEditPane.style.borderRight = 'none';
             }
             if (mdPreviewPane) mdPreviewPane.style.display = 'none';
-            const cm = getMdEditor();
             if (cm) {
-              if (mdTextarea && mdTextarea.value && cm.getValue() !== mdTextarea.value) {
-                cm.setValue(mdTextarea.value);
-              }
               setTimeout(() => { cm.refresh(); cm.focus(); }, 40);
             } else if (mdTextarea) {
               mdTextarea.focus();
@@ -1217,11 +1572,7 @@
               mdPreviewPane.style.flex = '1';
             }
             renderMarkdownPreview();
-            const cm = getMdEditor();
             if (cm) {
-              if (mdTextarea && mdTextarea.value && cm.getValue() !== mdTextarea.value) {
-                cm.setValue(mdTextarea.value);
-              }
               setTimeout(() => { cm.refresh(); cm.focus(); }, 40);
             }
           }
@@ -1231,7 +1582,8 @@
           if (!mdPreviewPane) return;
           const raw = (mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '')) || '';
           if (typeof marked !== 'undefined') {
-            mdPreviewPane.innerHTML = marked.parse(raw);
+            const preprocessed = preprocessExtendedMarkdown(raw);
+            mdPreviewPane.innerHTML = marked.parse(preprocessed);
             if (typeof hljs !== 'undefined') {
               mdPreviewPane.querySelectorAll('pre code').forEach(block => {
                 try { hljs.highlightElement(block); } catch (e) {}
@@ -1245,6 +1597,7 @@
                 openImageModal(img.src, img.alt, img.title);
               });
             });
+            updateMdWrapCodeUI();
           } else {
             mdPreviewPane.textContent = raw;
           }
@@ -1286,19 +1639,29 @@
         }
 
         function loadMarkdownContent(id) {
+          clearTimeout(mdAutoSaveTimer);
+          mdIsDirty = false;
+          mdIsLoading = true;
+          if (mdSaveStatus) mdSaveStatus.style.display = 'none';
+
           if (mdCache[id] !== undefined) {
             const cached = mdCache[id];
+            mdLastSavedContent = cached;
             if (mdTextarea) mdTextarea.value = cached;
             if (mdCodeEditor) {
               mdCodeEditor.setValue(cached);
               mdCodeEditor.clearHistory();
             }
             renderMarkdownPreview();
+            mdIsLoading = false;
             return;
           }
 
-          if (mdTextarea) mdTextarea.value = 'Loading...';
-          if (mdCodeEditor) mdCodeEditor.setValue('Loading...');
+          if (mdTextarea) mdTextarea.value = '';
+          if (mdCodeEditor) {
+            mdCodeEditor.setValue('');
+            mdCodeEditor.clearHistory();
+          }
           if (mdPreviewPane) mdPreviewPane.innerHTML = '<div style="color: #94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading note...</div>';
 
           fetch('/recordings/' + encodeURIComponent(id) + '/content', { credentials: 'same-origin' })
@@ -1314,21 +1677,37 @@
                   mdCodeEditor.setValue(content);
                   mdCodeEditor.clearHistory();
                 }
+                mdLastSavedContent = content;
+                mdIsDirty = false;
                 renderMarkdownPreview();
               }
+              mdIsLoading = false;
             })
             .catch(err => {
               console.error('Failed to load markdown content:', err);
+              mdIsLoading = false;
               if (activeId === id && mdPreviewPane) {
                 mdPreviewPane.innerHTML = '<div style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load note content.</div>';
               }
             });
         }
 
-        function saveMarkdownContent() {
-          if (!activeId) return;
+        function saveMarkdownContent(isAutosave = false) {
+          if (!activeId || activeDataType !== 'markdown') return;
+          if (mdIsSaving || mdIsLoading) return;
+
           const content = mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '');
-          if (content === undefined || content === null) return;
+          if (content === undefined || content === null || content === 'Loading...') return;
+
+          if (!mdIsDirty && mdLastSavedContent === content) {
+            if (!isAutosave) showMdStatus('saved', 'Saved');
+            return;
+          }
+
+          clearTimeout(mdAutoSaveTimer);
+          mdIsSaving = true;
+          showMdStatus('saving', isAutosave ? 'Autosaving...' : 'Saving...');
+
           mdCache[activeId] = content;
           if (mdTextarea) mdTextarea.value = content;
 
@@ -1340,12 +1719,11 @@
           })
           .then(res => res.json())
           .then(data => {
+            mdIsSaving = false;
             if (data.ok) {
-              if (mdSaveStatus) {
-                mdSaveStatus.style.display = 'inline-flex';
-                setTimeout(() => { mdSaveStatus.style.display = 'none'; }, 2200);
-              }
-              renderMarkdownPreview();
+              mdLastSavedContent = content;
+              mdIsDirty = false;
+              showMdStatus('saved', isAutosave ? 'Autosaved' : 'Saved');
 
               if (data.title) {
                 const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
@@ -1361,17 +1739,24 @@
                 }
               }
             } else {
-              alert('Failed to save note: ' + (data.error || 'Unknown error'));
+              showMdStatus('error', 'Save failed');
+              if (!isAutosave) {
+                alert('Failed to save note: ' + (data.error || 'Unknown error'));
+              }
             }
           })
           .catch(err => {
+            mdIsSaving = false;
             console.error('Save error:', err);
-            alert('Failed to save note content.');
+            showMdStatus('error', 'Save error');
+            if (!isAutosave) {
+              alert('Failed to save note content.');
+            }
           });
         }
 
         // --- Picture Upload & Markdown Embedding ---
-        function uploadAndInsertImage(file) {
+        function uploadAndInsertImage(file, targetPos = null) {
           if (!file) return;
           const isImg = (file.type && file.type.startsWith('image/')) ||
                         (/\.(png|jpe?g|gif|svg|webp)$/i.test(file.name || ''));
@@ -1405,16 +1790,24 @@
               const cm = getMdEditor();
               if (cm) {
                 const doc = cm.getDoc();
-                const cursor = doc.getCursor();
-                const line = doc.getLine(cursor.line) || '';
-                const prefix = (line.trim().length > 0) ? '\n\n' : '';
-                const markdownImage = `${prefix}![${altText}](${data.url})\n\n`;
+                const cursor = targetPos || doc.getCursor();
+                const cmVal = cm.getValue();
+                const cmIndex = cm.indexFromPos(cursor);
+                const before = cmVal.substring(0, cmIndex);
+                const after = cmVal.substring(cmIndex);
+                const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+                const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+                const markdownImage = `${prefix}![${altText}](${data.url})${suffix}`;
+
                 doc.replaceRange(markdownImage, cursor);
+                const insertedLen = prefix.length + `![${altText}](${data.url})`.length;
+                const newPos = cm.posFromIndex(cmIndex + insertedLen);
+                cm.setCursor(newPos);
                 cm.focus();
                 if (mdTextarea) mdTextarea.value = cm.getValue();
               } else if (mdTextarea) {
-                const start = mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length;
-                const end = mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length;
+                const start = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length);
+                const end = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length);
                 const before = mdTextarea.value.substring(0, start);
                 const after = mdTextarea.value.substring(end);
                 const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
@@ -1426,14 +1819,8 @@
                 mdTextarea.selectionStart = mdTextarea.selectionEnd = newPos;
                 mdTextarea.focus();
               }
-              renderMarkdownPreview();
-              saveMarkdownContent();
-
-              if (mdSaveStatus) {
-                mdSaveStatus.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i> Picture inserted & saved';
-                mdSaveStatus.style.display = 'inline-flex';
-                setTimeout(() => { mdSaveStatus.style.display = 'none'; }, 2500);
-              }
+              onMarkdownContentChanged();
+              saveMarkdownContent(false);
             } else {
               alert('Failed to upload picture: ' + (data.error || 'Unknown error'));
               if (mdSaveStatus) mdSaveStatus.style.display = 'none';
@@ -1450,20 +1837,131 @@
         if (mdTabPreview) mdTabPreview.addEventListener('click', () => setMdMode('preview'));
         if (mdTabEdit) mdTabEdit.addEventListener('click', () => setMdMode('edit'));
         if (mdTabSplit) mdTabSplit.addEventListener('click', () => setMdMode('split'));
-        if (mdSaveBtn) mdSaveBtn.addEventListener('click', saveMarkdownContent);
 
-        // --- Picture Upload Button & Input ---
-        if (mdInsertImgBtn && mdImgFileInput) {
-          mdInsertImgBtn.addEventListener('click', () => {
-            mdImgFileInput.click();
+        // --- Metadata & Note Save Handler ---
+        if (metaForm) {
+          metaForm.addEventListener('submit', (e) => {
+            if (activeDataType === 'markdown') {
+              e.preventDefault();
+              const newTitle = editTitle ? editTitle.value.trim() : '';
+              if (newTitle) {
+                let curVal = mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '');
+                if (/^\s*#+\s*[^\n]+/.test(curVal)) {
+                  curVal = curVal.replace(/^(\s*#+\s*)([^\n]+)/, `$1${newTitle}`);
+                } else if (!curVal.trim().startsWith('#')) {
+                  curVal = `# ${newTitle}\n\n` + curVal;
+                }
+                if (mdCodeEditor) mdCodeEditor.setValue(curVal);
+                if (mdTextarea) mdTextarea.value = curVal;
+                onMarkdownContentChanged();
+              }
+              saveMarkdownContent(false);
+            }
           });
+        }
+
+        // --- Picture Upload / Import Button ---
+        if (mdInsertImgBtn) {
+          mdInsertImgBtn.addEventListener('click', () => {
+            if (activeDataType === 'markdown') {
+              if (mdImgFileInput) mdImgFileInput.click();
+            } else {
+              if (importFileInput) {
+                importFileInput.accept = '.zip,.cast,.md,.webm,.mp4';
+                importFileInput.click();
+              }
+            }
+          });
+        }
+        if (mdImgFileInput) {
           mdImgFileInput.addEventListener('change', () => {
             if (mdImgFileInput.files && mdImgFileInput.files[0]) {
-              uploadAndInsertImage(mdImgFileInput.files[0]);
+              const cm = getMdEditor();
+              uploadAndInsertImage(mdImgFileInput.files[0], cm ? cm.getCursor() : null);
               mdImgFileInput.value = '';
             }
           });
         }
+
+        // --- Markdown Editor Settings Menu & Wrap Code Toggle ---
+        if (mdSettingsBtn && mdSettingsMenu) {
+          mdSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = mdSettingsMenu.style.display === 'block';
+            mdSettingsMenu.style.display = isOpen ? 'none' : 'block';
+            mdSettingsBtn.style.background = isOpen ? '#1e293b' : '#334155';
+            mdSettingsBtn.style.borderColor = isOpen ? '#475569' : '#38bdf8';
+          });
+
+          if (mdSettingWrapCheckbox) {
+            mdSettingWrapCheckbox.addEventListener('change', () => {
+              mdWrapCode = !!mdSettingWrapCheckbox.checked;
+              try {
+                localStorage.setItem('ctlabs_md_wrap_code', mdWrapCode ? 'true' : 'false');
+              } catch (e) {}
+              updateMdWrapCodeUI();
+            });
+          }
+
+          window.addEventListener('click', (e) => {
+            if (mdSettingsMenu.style.display === 'block') {
+              if (!mdSettingsBtn.contains(e.target) && !mdSettingsMenu.contains(e.target)) {
+                mdSettingsMenu.style.display = 'none';
+                mdSettingsBtn.style.background = '#1e293b';
+                mdSettingsBtn.style.borderColor = '#475569';
+              }
+            }
+          });
+
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && mdSettingsMenu.style.display === 'block') {
+              mdSettingsMenu.style.display = 'none';
+              mdSettingsBtn.style.background = '#1e293b';
+              mdSettingsBtn.style.borderColor = '#475569';
+            }
+          });
+        }
+        updateMdWrapCodeUI();
+
+        // --- Note Export Modal & Actions ---
+        function openExportNoteModal() {
+          if (!activeId || activeDataType !== 'markdown') return;
+          if (exportNoteTitleSpan) {
+            const currentTitle = (editTitle && editTitle.value) ? editTitle.value : activeId;
+            exportNoteTitleSpan.textContent = `“${currentTitle}”`;
+          }
+          if (exportNoteModal) exportNoteModal.style.display = 'block';
+        }
+
+        if (confirmExportNoteBtn) {
+          confirmExportNoteBtn.addEventListener('click', () => {
+            if (!activeId) return;
+            const selectedFormat = document.querySelector('input[name="export-note-format"]:checked');
+            const isBundle = selectedFormat ? (selectedFormat.value === 'bundle') : true;
+            const url = '/recordings/' + encodeURIComponent(activeId) + '?download=1' + (isBundle ? '&bundle=1' : '');
+            window.location.href = url;
+            if (exportNoteModal) exportNoteModal.style.display = 'none';
+          });
+        }
+
+        if (downloadEl) {
+          downloadEl.addEventListener('click', (e) => {
+            if (activeDataType === 'markdown') {
+              e.preventDefault();
+              openExportNoteModal();
+            }
+          });
+        }
+
+        window.addEventListener('beforeunload', () => {
+          if (mdIsDirty && activeId && activeDataType === 'markdown') {
+            try {
+              const content = mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '');
+              const blob = new Blob([JSON.stringify({ content: content })], { type: 'application/json' });
+              navigator.sendBeacon('/recordings/' + encodeURIComponent(activeId) + '/content', blob);
+            } catch (e) {}
+          }
+        });
 
         // --- Textarea Tab Indentation, Auto-render, Paste & Shortcuts ---
         if (mdTextarea) {
@@ -1474,10 +1972,10 @@
               const end = mdTextarea.selectionEnd;
               mdTextarea.value = mdTextarea.value.substring(0, start) + '  ' + mdTextarea.value.substring(end);
               mdTextarea.selectionStart = mdTextarea.selectionEnd = start + 2;
-              if (currentMdMode === 'split') renderMarkdownPreview();
+              onMarkdownContentChanged();
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
               e.preventDefault();
-              saveMarkdownContent();
+              saveMarkdownContent(false);
             }
           });
 
@@ -1490,17 +1988,14 @@
               if (item.kind === 'file' && item.type.startsWith('image/')) {
                 e.preventDefault();
                 const file = item.getAsFile();
-                if (file) uploadAndInsertImage(file);
+                if (file) uploadAndInsertImage(file, { index: mdTextarea.selectionStart });
                 break;
               }
             }
           });
 
           mdTextarea.addEventListener('input', () => {
-            if (currentMdMode === 'split') {
-              clearTimeout(mdRenderTimeout);
-              mdRenderTimeout = setTimeout(renderMarkdownPreview, 120);
-            }
+            onMarkdownContentChanged();
           });
         }
 
@@ -1523,13 +2018,40 @@
           });
 
           mdContainer.addEventListener('drop', (e) => {
+            mdContainer.style.boxShadow = 'none';
+            if (e._ctlabsHandled || e.defaultPrevented) return;
+            if (e.target && e.target.closest && e.target.closest('.CodeMirror')) return;
+
             if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
               const droppedFiles = Array.from(e.dataTransfer.files);
               const imageFile = droppedFiles.find(f => (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|svg|webp)$/i.test(f.name || ''));
               if (imageFile) {
                 e.preventDefault();
                 e.stopPropagation();
-                uploadAndInsertImage(imageFile);
+                e._ctlabsHandled = true;
+
+                let targetPos = null;
+                const cm = getMdEditor();
+                if (cm) {
+                  const previewEl = document.getElementById('md-preview-pane');
+                  if (previewEl && previewEl.contains(e.target)) {
+                    const blockTarget = e.target.closest('h1, h2, h3, h4, h5, h6, p, blockquote, ul, ol, pre, table, img');
+                    if (blockTarget) {
+                      const textSnippet = (blockTarget.textContent || '').trim().slice(0, 50);
+                      if (textSnippet) {
+                        const fullVal = cm.getValue();
+                        const snippetIdx = fullVal.indexOf(textSnippet);
+                        if (snippetIdx !== -1) {
+                          targetPos = cm.posFromIndex(snippetIdx + textSnippet.length);
+                        }
+                      }
+                    }
+                    if (!targetPos) targetPos = { line: cm.lineCount(), ch: 0 };
+                  } else {
+                    targetPos = cm.getCursor();
+                  }
+                }
+                uploadAndInsertImage(imageFile, targetPos);
               }
             }
           });
@@ -1545,10 +2067,14 @@
           });
         }
 
+        let lastImportFiles = null;
+        let lastConflictInfo = null;
+
         // --- Upload & Import Helper (supports single and multiple .cast, .md, .zip) ---
-        function uploadImportFiles(fileList) {
+        function uploadImportFiles(fileList, options = {}) {
           const files = Array.from(fileList || []);
           if (files.length === 0) return;
+          lastImportFiles = files;
 
           const validExts = ['.cast', '.md', '.zip', '.webm', '.mp4', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'];
           const validFiles = files.filter(f => {
@@ -1584,6 +2110,16 @@
           }
           formData.append('walkthrough', activeWalkthrough);
 
+          if (options.conflict_action) {
+            formData.append('conflict_action', options.conflict_action);
+          }
+          if (options.custom_name) {
+            formData.append('custom_name', options.custom_name);
+          }
+          if (options.target_id) {
+            formData.append('target_id', options.target_id);
+          }
+
           fetch('/recordings/import', {
             method: 'POST',
             body: formData,
@@ -1591,6 +2127,24 @@
           })
           .then(res => res.json())
           .then(data => {
+            if (overlay) overlay.style.display = 'none';
+            if (idleBox) idleBox.style.display = 'flex';
+            if (busyBox) busyBox.style.display = 'none';
+
+            if (data.conflict) {
+              lastConflictInfo = data;
+              const dupModal = document.getElementById('duplicate-import-modal');
+              const dupNameSpan = document.getElementById('duplicate-existing-name-span');
+              const dupInput = document.getElementById('duplicate-rename-input');
+              if (dupNameSpan) dupNameSpan.textContent = `“${data.existing_title || data.filename}”`;
+              if (dupInput) {
+                dupInput.value = data.suggested_name || ((data.existing_title || data.filename) + ' (1)');
+                setTimeout(() => { dupInput.focus(); dupInput.select(); }, 80);
+              }
+              if (dupModal) dupModal.style.display = 'block';
+              return;
+            }
+
             if (data.ok) {
               const targetWk = data.walkthrough || activeWalkthrough;
               let url = '/demo?walkthrough=' + encodeURIComponent(targetWk);
@@ -1600,9 +2154,6 @@
               }
               window.location.href = url;
             } else {
-              if (overlay) overlay.style.display = 'none';
-              if (idleBox) idleBox.style.display = 'flex';
-              if (busyBox) busyBox.style.display = 'none';
               alert('Import failed: ' + (data.error || 'Unknown error'));
             }
           })
@@ -1614,6 +2165,46 @@
             alert('Failed to upload import file: ' + err.message);
           });
         }
+
+        const dupModal = document.getElementById('duplicate-import-modal');
+        const dupRenameBtn = document.getElementById('duplicate-rename-btn');
+        const dupOverwriteBtn = document.getElementById('duplicate-overwrite-btn');
+        const dupCancelBtn = document.getElementById('duplicate-cancel-btn');
+        const closeDupModalBtn = document.getElementById('close-duplicate-modal-btn');
+        const dupInput = document.getElementById('duplicate-rename-input');
+
+        if (dupRenameBtn) {
+          dupRenameBtn.addEventListener('click', () => {
+            if (!lastImportFiles || !lastConflictInfo) return;
+            const newName = dupInput ? dupInput.value.trim() : '';
+            if (dupModal) dupModal.style.display = 'none';
+            uploadImportFiles(lastImportFiles, {
+              conflict_action: 'rename',
+              custom_name: newName,
+              target_id: lastConflictInfo.existing_id
+            });
+          });
+        }
+
+        if (dupOverwriteBtn) {
+          dupOverwriteBtn.addEventListener('click', () => {
+            if (!lastImportFiles || !lastConflictInfo) return;
+            if (dupModal) dupModal.style.display = 'none';
+            uploadImportFiles(lastImportFiles, {
+              conflict_action: 'overwrite',
+              target_id: lastConflictInfo.existing_id
+            });
+          });
+        }
+
+        [dupCancelBtn, closeDupModalBtn].forEach(btn => {
+          if (btn) {
+            btn.addEventListener('click', () => {
+              if (dupModal) dupModal.style.display = 'none';
+              lastConflictInfo = null;
+            });
+          }
+        });
 
         // --- Import Walkthrough Handler ---
         if (importBtn && importFileInput) {
@@ -2511,6 +3102,9 @@
             if (videoContainer) videoContainer.style.display = 'none';
             if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
             if (mdContainer) mdContainer.style.display = 'flex';
+            if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'inline-block';
+            if (mdSettingsDivider) mdSettingsDivider.style.display = 'block';
+            if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload / insert picture into note (or drag & drop / paste)';
             if (titleIcon) {
               titleIcon.className = 'fab fa-markdown';
               titleIcon.style.color = '#38bdf8';
@@ -2521,6 +3115,9 @@
             if (demoContainer) demoContainer.style.display = 'none';
             if (mdContainer) mdContainer.style.display = 'none';
             if (videoContainer) videoContainer.style.display = 'flex';
+            if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'none';
+            if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
+            if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
             if (titleIcon) {
               titleIcon.className = 'fas fa-video';
               titleIcon.style.color = '#f43f5e';
@@ -2536,6 +3133,9 @@
             if (videoContainer) videoContainer.style.display = 'none';
             if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
             if (demoContainer) demoContainer.style.display = 'flex';
+            if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'none';
+            if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
+            if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
             if (titleIcon) {
               titleIcon.className = 'fas fa-play-circle w3-text-green';
               titleIcon.style.color = '';
@@ -2556,6 +3156,9 @@
 
         function selectRecording(btn, autoPlay = false) {
           if (!btn) return;
+          if (mdIsDirty && activeId && activeDataType === 'markdown') {
+            saveMarkdownContent(true);
+          }
           document.querySelectorAll('.rec-item').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           const src = btn.getAttribute('data-src');
@@ -2671,6 +3274,15 @@
             if (deleteModal && deleteModal.style.display === 'block') deleteModal.style.display = 'none';
             const exportModal = document.getElementById('export-modal');
             if (exportModal && exportModal.style.display === 'block') exportModal.style.display = 'none';
+            const exportNoteModalEl = document.getElementById('export-note-modal');
+            if (exportNoteModalEl && exportNoteModalEl.style.display === 'block') exportNoteModalEl.style.display = 'none';
+            if (mdSettingsMenu && mdSettingsMenu.style.display === 'block') {
+              mdSettingsMenu.style.display = 'none';
+              if (mdSettingsBtn) {
+                mdSettingsBtn.style.background = '#1e293b';
+                mdSettingsBtn.style.borderColor = '#475569';
+              }
+            }
             if (recordScreenModal && recordScreenModal.style.display === 'block') recordScreenModal.style.display = 'none';
           }
 
@@ -2745,6 +3357,13 @@
           }
           updateSidebarCompactState(initialW);
 
+          function refreshMdEditor() {
+            const cm = (typeof getMdEditor === 'function') ? getMdEditor() : mdCodeEditor;
+            if (cm && mdEditPane && mdEditPane.style.display !== 'none') {
+              cm.refresh();
+            }
+          }
+
           function setSidebarCollapsed(collapsed) {
             if (collapsed) {
               sidebarEl.style.display = 'none';
@@ -2759,6 +3378,10 @@
               const curW = sidebarEl.getBoundingClientRect().width || 340;
               updateSidebarCompactState(curW);
             }
+            refreshMdEditor();
+            requestAnimationFrame(() => refreshMdEditor());
+            setTimeout(refreshMdEditor, 40);
+            setTimeout(refreshMdEditor, 120);
           }
 
           if (localStorage.getItem('ctlabs_sidebar_collapsed') === 'true') {
@@ -2821,6 +3444,7 @@
             const newW = Math.min(maxW, Math.max(minW, targetW));
             sidebarEl.style.width = newW + 'px';
             updateSidebarCompactState(newW);
+            refreshMdEditor();
           });
 
           window.addEventListener('mouseup', () => {
@@ -2833,12 +3457,14 @@
               const finalWidth = sidebarEl.getBoundingClientRect().width;
               localStorage.setItem('ctlabs_sidebar_width', Math.round(finalWidth));
               updateSidebarCompactState(finalWidth);
-              if (mdCodeEditor) mdCodeEditor.refresh();
             }
+            refreshMdEditor();
+            requestAnimationFrame(() => refreshMdEditor());
+            setTimeout(refreshMdEditor, 40);
           });
 
           window.addEventListener('resize', () => {
-            if (mdCodeEditor) mdCodeEditor.refresh();
+            refreshMdEditor();
           });
         }
 
