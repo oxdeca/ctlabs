@@ -123,10 +123,19 @@ class RecordingsController < BaseController
         next unless File.file?(rec[:path])
         ext = File.extname(rec[:path])
         ext = RecordingService::EXT if ext.empty?
-        zipfile.add("#{rec[:id]}#{ext}", rec[:path])
-        if RecordingService::VIDEO_EXTS.include?(ext)
-          sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json")
-          zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
+        if ext == RecordingService::MD_EXT
+          content = File.read(rec[:path]) rescue ''
+          # Rewrite /recordings/images/... to relative images/... for portable ZIP export
+          rewritten_content = content.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
+          zipfile.get_output_stream("#{rec[:id]}#{ext}") do |io|
+            io.write(rewritten_content)
+          end
+        else
+          zipfile.add("#{rec[:id]}#{ext}", rec[:path])
+          if RecordingService::VIDEO_EXTS.include?(ext)
+            sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json")
+            zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
+          end
         end
       end
 
@@ -135,9 +144,9 @@ class RecordingsController < BaseController
       all_files.each do |rec|
         next unless File.file?(rec[:path]) && rec[:path].end_with?(RecordingService::MD_EXT)
         content = File.read(rec[:path]) rescue ''
-        content.scan(%r{(?:/recordings)?/images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
+        content.scan(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
           img_path = RecordingService.image_path(img_name)
-          images_to_add[img_name] = img_path if img_path
+          images_to_add[img_name] = img_path if img_path && File.file?(img_path)
         end
       end
 
@@ -328,8 +337,8 @@ class RecordingsController < BaseController
               old_id = clean_base
               data   = entry.get_input_stream.read
               data   = data.force_encoding('UTF-8') rescue data
-              # Update image paths from relative images/ to /recordings/images/
-              data   = data.gsub(%r{(?:\./)?images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+              # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
+              data   = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
 
               if conflict_action == 'rename' && !custom_name.empty?
                 if data =~ /\A(\s*#+\s*)([^\n]+)/
@@ -434,8 +443,8 @@ class RecordingsController < BaseController
       elsif filename.end_with?(RecordingService::MD_EXT)
         data = File.binread(f[:tempfile].path)
         data = data.force_encoding('UTF-8') rescue data
-        # Update image paths from relative images/ to /recordings/images/
-        data = data.gsub(%r{(?:\./)?images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+        # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
+        data = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
 
         if conflict_action == 'rename' && !custom_name.empty?
           if data =~ /\A(\s*#+\s*)([^\n]+)/
@@ -525,6 +534,10 @@ class RecordingsController < BaseController
     send_file path, type: mime, disposition: 'inline'
   end
 
+  get %r{/recordings(?:/recordings)+/images/(.+)} do |filename|
+    redirect "/recordings/images/#{filename}"
+  end
+
   get '/recordings/:id' do
     path = RecordingService.path_for(params[:id])
     halt 404, 'Recording not found' unless path
@@ -553,8 +566,21 @@ class RecordingsController < BaseController
 
     is_md = path.end_with?(RecordingService::MD_EXT)
     if is_md && (params[:bundle] == '1' || params[:format] == 'zip')
-      base_name = File.basename(path, RecordingService::MD_EXT)
-      zip_filename = "#{base_name}.zip"
+      custom_name = params[:filename].to_s.strip
+      custom_name = File.basename(custom_name)
+      custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+
+      base_name = if !custom_name.empty? && custom_name != '.zip'
+                    File.basename(custom_name, '.*')
+                  else
+                    File.basename(path, RecordingService::MD_EXT)
+                  end
+
+      zip_filename = if !custom_name.empty? && custom_name != '.zip'
+                       custom_name.downcase.end_with?('.zip') ? custom_name : "#{custom_name}.zip"
+                     else
+                       "#{base_name}.zip"
+                     end
 
       # Clean up older export note zip files (>1 hour old)
       Dir.glob(File.join(RecordingService::DIR, 'export_note_*_*.zip')).each do |old_zip|
@@ -564,10 +590,10 @@ class RecordingsController < BaseController
       zip_path = File.join(RecordingService::DIR, "export_note_#{SecureRandom.hex(4)}_#{zip_filename}")
 
       content = File.read(path) rescue ''
-      rewritten_content = content.gsub(%r{(?:/recordings)?/images/([a-zA-Z0-9_.-]+)}, 'images/\1')
+      rewritten_content = content.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
 
       images_to_add = {}
-      content.scan(%r{(?:(?:/recordings)?/images/|images/)([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
+      content.scan(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
         img_path = RecordingService.image_path(img_name)
         images_to_add[img_name] = img_path if img_path && File.file?(img_path)
       end
@@ -590,8 +616,19 @@ class RecordingsController < BaseController
     content_type_str = is_md ? 'text/markdown; charset=utf-8' : (params[:download] ? 'application/x-asciicast' : 'application/x-asciicast; charset=utf-8')
     disposition = params[:download] ? 'attachment' : 'inline'
 
+    download_filename = File.basename(path)
+    if params[:download] && !params[:filename].to_s.strip.empty?
+      custom_name = params[:filename].to_s.strip
+      custom_name = File.basename(custom_name)
+      custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+      if !custom_name.empty?
+        ext = is_md ? RecordingService::MD_EXT : RecordingService::EXT
+        download_filename = custom_name.downcase.end_with?(ext) ? custom_name : "#{custom_name}#{ext}"
+      end
+    end
+
     send_file path,
-              filename:    File.basename(path),
+              filename:    download_filename,
               type:        content_type_str,
               disposition: disposition
   end

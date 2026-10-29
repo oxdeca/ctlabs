@@ -771,9 +771,19 @@
           <span onclick="document.getElementById('export-note-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
         </header>
         <div style="padding: 18px 16px; margin: 0;">
-          <p id="export-note-name-label" style="color: #f8fafc; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; font-weight: 500;">
-            Export note <strong id="export-note-title-span"></strong>:
+          <p id="export-note-name-label" style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+            Export <strong id="export-note-title-span"></strong> as a portable package or standalone document:
           </p>
+
+          <div style="margin-bottom: 16px;">
+            <label for="export-note-filename" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+              Export File Name
+            </label>
+            <input type="text" id="export-note-filename" name="filename" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" placeholder="note.zip" required />
+            <span id="export-note-filename-hint" style="display: block; color: #94a3b8; font-size: 0.8em; margin-top: 5px;">
+              The <code>.zip</code> extension will be added automatically if omitted.
+            </span>
+          </div>
 
           <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px;">
             <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 12px;">
@@ -803,7 +813,7 @@
 
           <div style="display: flex; justify-content: flex-end; gap: 8px;">
             <button type="button" onclick="document.getElementById('export-note-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
-            <button type="button" id="confirm-export-note-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: gap: 6px;">
+            <button type="button" id="confirm-export-note-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
               <i class="fas fa-download"></i> Export
             </button>
           </div>
@@ -1133,6 +1143,8 @@
         const exportNoteModal = document.getElementById('export-note-modal');
         const confirmExportNoteBtn = document.getElementById('confirm-export-note-btn');
         const exportNoteTitleSpan = document.getElementById('export-note-title-span');
+        const exportNoteFilenameInput = document.getElementById('export-note-filename');
+        const exportNoteFilenameHint = document.getElementById('export-note-filename-hint');
 
         const imageModal = document.getElementById('image-modal');
         const imageModalImg = document.getElementById('image-modal-img');
@@ -1229,8 +1241,8 @@
 
         function preprocessExtendedMarkdown(text) {
           if (!text) return '';
-          // 0. Normalize relative images/ paths to /recordings/images/
-          text = text.replace(/!\[([^\]]*)\]\((?:\.?\/)?images\/([^)\s]+)(.*?)\)/g, '![$1](/recordings/images/$2$3)');
+          // 0. Normalize relative images/ paths to /recordings/images/ (and fix any duplicate /recordings/ prefixes)
+          text = text.replace(/!\[([^\]]*)\]\((?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)(?:images\/)([^)\s]+)(.*?)\)/g, '![$1](/recordings/images/$2$3)');
 
           // 1. Equal syntax: ![alt](url =300x200), ![alt](url =300), ![alt](url =50%)
           text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\s+=(\d+(?:%|px)?)(?:x(\d+(?:%|px)?))?\)/g, (match, alt, url, w, h) => {
@@ -1462,8 +1474,8 @@
                   text = arg2 || '';
                 }
 
-                if (href && (href.startsWith('images/') || href.startsWith('./images/'))) {
-                  href = '/recordings/images/' + href.replace(/^\.?\/?images\//, '');
+                if (href) {
+                  href = href.replace(/^(?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)images\//, '/recordings/images/');
                 }
 
                 let width = '';
@@ -1924,13 +1936,59 @@
         updateMdWrapCodeUI();
 
         // --- Note Export Modal & Actions ---
+        function updateExportNoteFilenameExtension(targetExt) {
+          if (!exportNoteFilenameInput) return;
+          let val = exportNoteFilenameInput.value.trim();
+          if (val) {
+            val = val.replace(/\.(zip|md)$/i, '');
+            exportNoteFilenameInput.value = `${val}.${targetExt}`;
+          }
+          if (exportNoteFilenameHint) {
+            exportNoteFilenameHint.innerHTML = `The <code>.${targetExt}</code> extension will be added automatically if omitted.`;
+          }
+        }
+
         function openExportNoteModal() {
           if (!activeId || activeDataType !== 'markdown') return;
+          const currentTitle = (editTitle && editTitle.value) ? editTitle.value : activeId;
           if (exportNoteTitleSpan) {
-            const currentTitle = (editTitle && editTitle.value) ? editTitle.value : activeId;
             exportNoteTitleSpan.textContent = `“${currentTitle}”`;
           }
-          if (exportNoteModal) exportNoteModal.style.display = 'block';
+          const defaultRadio = document.querySelector('input[name="export-note-format"][value="bundle"]');
+          if (defaultRadio) defaultRadio.checked = true;
+
+          if (exportNoteFilenameInput) {
+            const clean = currentTitle.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'note';
+            exportNoteFilenameInput.value = `${clean}.zip`;
+          }
+          if (exportNoteFilenameHint) {
+            exportNoteFilenameHint.innerHTML = 'The <code>.zip</code> extension will be added automatically if omitted.';
+          }
+          if (exportNoteModal) {
+            exportNoteModal.style.display = 'block';
+            if (exportNoteFilenameInput) {
+              setTimeout(() => {
+                exportNoteFilenameInput.focus();
+                exportNoteFilenameInput.select();
+              }, 50);
+            }
+          }
+        }
+
+        document.querySelectorAll('input[name="export-note-format"]').forEach(radio => {
+          radio.addEventListener('change', () => {
+            const ext = radio.value === 'raw' ? 'md' : 'zip';
+            updateExportNoteFilenameExtension(ext);
+          });
+        });
+
+        if (exportNoteFilenameInput) {
+          exportNoteFilenameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (confirmExportNoteBtn) confirmExportNoteBtn.click();
+            }
+          });
         }
 
         if (confirmExportNoteBtn) {
@@ -1938,7 +1996,20 @@
             if (!activeId) return;
             const selectedFormat = document.querySelector('input[name="export-note-format"]:checked');
             const isBundle = selectedFormat ? (selectedFormat.value === 'bundle') : true;
-            const url = '/recordings/' + encodeURIComponent(activeId) + '?download=1' + (isBundle ? '&bundle=1' : '');
+            let filename = exportNoteFilenameInput ? exportNoteFilenameInput.value.trim() : '';
+            if (filename) {
+              const expectedExt = isBundle ? '.zip' : '.md';
+              const wrongExt = isBundle ? '.md' : '.zip';
+              if (filename.toLowerCase().endsWith(wrongExt)) {
+                filename = filename.slice(0, -wrongExt.length) + expectedExt;
+              } else if (!filename.toLowerCase().endsWith(expectedExt)) {
+                filename += expectedExt;
+              }
+            }
+            let url = '/recordings/' + encodeURIComponent(activeId) + '?download=1' + (isBundle ? '&bundle=1' : '');
+            if (filename) {
+              url += '&filename=' + encodeURIComponent(filename);
+            }
             window.location.href = url;
             if (exportNoteModal) exportNoteModal.style.display = 'none';
           });
