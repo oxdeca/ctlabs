@@ -307,17 +307,17 @@
         <aside id="walkthrough-sidebar" style="width: 340px; min-width: 180px; max-width: 850px; display: flex; flex-direction: column; border-right: 1px solid #334155; background: #1e293b; position: relative; z-index: 50;">
           <!-- Drag & Drop Import Overlay for Sidebar -->
           <div id="sidebar-drop-overlay" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.93); z-index: 200; border: 2px dashed #38bdf8; border-radius: 4px; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; padding: 24px; box-sizing: border-box;">
-            <div id="sidebar-drop-idle" style="display: flex; flex-direction: column; align-items: center;">
+            <div id="sidebar-drop-idle" style="display: flex; flex-direction: column; align-items: center; pointer-events: none;">
               <i class="fas fa-file-import" style="font-size: 3em; color: #38bdf8; margin-bottom: 12px; animation: pulse 1.5s infinite;"></i>
               <div style="font-size: 1.1em; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">Drop files to import</div>
               <div style="color: #94a3b8; font-size: 0.85em; line-height: 1.4; max-width: 260px;">
-                Drop <strong style="color: #cbd5e1;">.cast</strong>, <strong style="color: #cbd5e1;">.webm</strong>, or <strong style="color: #cbd5e1;">.md</strong> files to import into this walkthrough
+                Drop <strong style="color: #cbd5e1;">.zip</strong>, <strong style="color: #cbd5e1;">.cast</strong>, <strong style="color: #cbd5e1;">.webm</strong>, or <strong style="color: #cbd5e1;">.md</strong> files to import into this walkthrough
               </div>
               <div id="sidebar-drop-target-hint" style="color: #38bdf8; font-size: 0.8em; margin-top: 10px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 3px 8px; border-radius: 4px;">
                 Adding to: <%= ERB::Util.html_escape(@walkthrough_name.to_s.empty? ? @active_walkthrough : @walkthrough_name) %>
               </div>
             </div>
-            <div id="sidebar-drop-busy" style="display: none; flex-direction: column; align-items: center;">
+            <div id="sidebar-drop-busy" style="display: none; flex-direction: column; align-items: center; pointer-events: none;">
               <i class="fas fa-spinner fa-spin" style="font-size: 3em; color: #38bdf8; margin-bottom: 12px;"></i>
               <div id="sidebar-drop-busy-title" style="font-size: 1.1em; font-weight: 600; color: #f8fafc; margin-bottom: 6px;">Importing files...</div>
               <div id="sidebar-drop-busy-desc" style="color: #94a3b8; font-size: 0.85em;">Please wait...</div>
@@ -656,11 +656,11 @@
                 </span>
               </form>
 
-              <!-- 3. Import (Picture Upload / Insert) -->
-              <button type="button" id="md-insert-img-btn" title="Upload / insert picture into note (or drag & drop / paste)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+              <!-- 3. Import (Picture Upload / Insert / Markdown Import) -->
+              <button type="button" id="md-insert-img-btn" title="Upload picture or import markdown / zip note (or drag & drop)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                 <i class="fas fa-upload" style="color: #38bdf8;"></i>
               </button>
-              <input type="file" id="md-img-file-input" accept="image/*" style="display: none;" />
+              <input type="file" id="md-img-file-input" accept=".zip,.md,image/*" multiple style="display: none;" />
 
               <!-- 4. Export (Download / Package) -->
               <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'" title="Export / Download">
@@ -1253,6 +1253,28 @@
         const exportNoteTitleSpan = document.getElementById('export-note-title-span');
         const exportNoteFilenameInput = document.getElementById('export-note-filename');
         const exportNoteFilenameHint = document.getElementById('export-note-filename-hint');
+
+        let draggedItem = null;
+        let draggedSource = null;
+
+        function getDroppedFiles(dt) {
+          if (!dt) return [];
+          if (dt.files && dt.files.length > 0) {
+            return Array.from(dt.files);
+          }
+          if (dt.items && dt.items.length > 0) {
+            const list = [];
+            for (let i = 0; i < dt.items.length; i++) {
+              const item = dt.items[i];
+              if (item.kind === 'file') {
+                const f = item.getAsFile();
+                if (f) list.push(f);
+              }
+            }
+            if (list.length > 0) return list;
+          }
+          return [];
+        }
         const mdEmojiBtn = document.getElementById('md-emoji-btn');
         const mdEmojiMenu = document.getElementById('md-emoji-menu');
         const mdEmojiSearch = document.getElementById('md-emoji-search');
@@ -1580,35 +1602,39 @@
             });
 
             mdCodeEditor.on('dragover', (cm, e) => {
-              const types = e.dataTransfer && e.dataTransfer.types;
-              if (types && (types.includes('Files') || Array.from(types).includes('Files'))) {
-                e.preventDefault();
-                const pos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
-                if (pos) {
-                  cm.setCursor(pos);
-                }
+              if (draggedItem) return;
+              e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+              const pos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+              if (pos) {
+                cm.setCursor(pos);
               }
             });
 
             mdCodeEditor.on('drop', (cm, e) => {
-              const files = e.dataTransfer && e.dataTransfer.files;
-              if (files && files.length > 0) {
-                const file = files[0];
-                const isImg = (file.type && file.type.startsWith('image/')) ||
-                              (/\.(png|jpe?g|gif|svg|webp)$/i.test(file.name || ''));
-                if (isImg) {
-                  e.preventDefault();
-                  if (typeof e.stopPropagation === 'function') e.stopPropagation();
-                  e._ctlabsHandled = true;
-                  const mc = document.getElementById('md-editor-container');
-                  if (mc) mc.style.boxShadow = 'none';
+              if (draggedItem) return;
+              e.preventDefault();
+              if (typeof e.stopPropagation === 'function') e.stopPropagation();
+              e._ctlabsHandled = true;
+              const mc = document.getElementById('md-editor-container');
+              if (mc) mc.style.boxShadow = 'none';
 
-                  const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
-                  if (dropPos) {
-                    cm.setCursor(dropPos);
-                  }
-                  uploadAndInsertImage(file, dropPos || cm.getCursor());
+              const files = getDroppedFiles(e.dataTransfer);
+              if (files.length === 0) return;
+
+              const isSingleImg = files.length === 1 && (
+                (files[0].type && files[0].type.startsWith('image/')) ||
+                (/\.(png|jpe?g|gif|svg|webp)$/i.test(files[0].name || ''))
+              );
+
+              if (isSingleImg) {
+                const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+                if (dropPos) {
+                  cm.setCursor(dropPos);
                 }
+                uploadAndInsertImage(files[0], dropPos || cm.getCursor());
+              } else {
+                uploadImportFiles(files);
               }
             });
 
@@ -1975,6 +2001,7 @@
 
           const formData = new FormData();
           formData.append('image', file);
+          formData.append('walkthrough', activeWalkthrough);
 
           fetch('/recordings/upload-image', {
             method: 'POST',
@@ -2074,11 +2101,27 @@
         }
         if (mdImgFileInput) {
           mdImgFileInput.addEventListener('change', () => {
-            if (mdImgFileInput.files && mdImgFileInput.files[0]) {
-              const cm = getMdEditor();
-              uploadAndInsertImage(mdImgFileInput.files[0], cm ? cm.getCursor() : null);
-              mdImgFileInput.value = '';
+            if (!mdImgFileInput.files || mdImgFileInput.files.length === 0) return;
+            const files = Array.from(mdImgFileInput.files);
+            const hasWalkthroughOrNote = files.some(f => {
+              const n = (f.name || '').toLowerCase();
+              return n.endsWith('.zip') || n.endsWith('.md') || n.endsWith('.cast') || n.endsWith('.webm') || n.endsWith('.mp4');
+            });
+
+            if (hasWalkthroughOrNote || files.length > 1) {
+              uploadImportFiles(files);
+            } else if (files[0]) {
+              const file = files[0];
+              const isImg = (file.type && file.type.startsWith('image/')) ||
+                            (/\.(png|jpe?g|gif|svg|webp)$/i.test(file.name || ''));
+              if (isImg) {
+                const cm = getMdEditor();
+                uploadAndInsertImage(file, cm ? cm.getCursor() : null);
+              } else {
+                uploadImportFiles([file]);
+              }
             }
+            mdImgFileInput.value = '';
           });
         }
 
@@ -2447,60 +2490,68 @@
           });
         }
 
-        // --- Drag & Drop Image onto Markdown Container ---
+        // --- Drag & Drop Image or Note onto Markdown Container ---
         if (mdContainer) {
           ['dragenter', 'dragover'].forEach(eventName => {
             mdContainer.addEventListener(eventName, (e) => {
-              if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
-                e.preventDefault();
-                e.stopPropagation();
-                mdContainer.style.boxShadow = 'inset 0 0 0 2px #38bdf8';
-              }
+              if (draggedItem) return;
+              e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+              mdContainer.style.boxShadow = 'inset 0 0 0 2px #38bdf8';
             });
           });
 
-          ['dragleave', 'dragend', 'drop'].forEach(eventName => {
+          ['dragleave', 'dragend'].forEach(eventName => {
             mdContainer.addEventListener(eventName, (e) => {
               mdContainer.style.boxShadow = 'none';
             });
           });
 
           mdContainer.addEventListener('drop', (e) => {
+            if (draggedItem) return;
+            e.preventDefault();
             mdContainer.style.boxShadow = 'none';
-            if (e._ctlabsHandled || e.defaultPrevented) return;
+            if (e._ctlabsHandled) return;
             if (e.target && e.target.closest && e.target.closest('.CodeMirror')) return;
 
-            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-              const droppedFiles = Array.from(e.dataTransfer.files);
-              const imageFile = droppedFiles.find(f => (f.type && f.type.startsWith('image/')) || /\.(png|jpe?g|gif|svg|webp)$/i.test(f.name || ''));
-              if (imageFile) {
-                e.preventDefault();
-                e.stopPropagation();
-                e._ctlabsHandled = true;
+            const files = getDroppedFiles(e.dataTransfer);
+            if (files.length === 0) return;
 
-                let targetPos = null;
-                const cm = getMdEditor();
-                if (cm) {
-                  const previewEl = document.getElementById('md-preview-pane');
-                  if (previewEl && previewEl.contains(e.target)) {
-                    const blockTarget = e.target.closest('h1, h2, h3, h4, h5, h6, p, blockquote, ul, ol, pre, table, img');
-                    if (blockTarget) {
-                      const textSnippet = (blockTarget.textContent || '').trim().slice(0, 50);
-                      if (textSnippet) {
-                        const fullVal = cm.getValue();
-                        const snippetIdx = fullVal.indexOf(textSnippet);
-                        if (snippetIdx !== -1) {
-                          targetPos = cm.posFromIndex(snippetIdx + textSnippet.length);
-                        }
+            e.stopPropagation();
+            e._ctlabsHandled = true;
+
+            const droppedFiles = files;
+            const isSingleImg = droppedFiles.length === 1 && (
+              (droppedFiles[0].type && droppedFiles[0].type.startsWith('image/')) ||
+              /\.(png|jpe?g|gif|svg|webp)$/i.test(droppedFiles[0].name || '')
+            );
+
+            if (isSingleImg) {
+              const imageFile = droppedFiles[0];
+              let targetPos = null;
+              const cm = getMdEditor();
+              if (cm) {
+                const previewEl = document.getElementById('md-preview-pane');
+                if (previewEl && previewEl.contains(e.target)) {
+                  const blockTarget = e.target.closest('h1, h2, h3, h4, h5, h6, p, blockquote, ul, ol, pre, table, img');
+                  if (blockTarget) {
+                    const textSnippet = (blockTarget.textContent || '').trim().slice(0, 50);
+                    if (textSnippet) {
+                      const fullVal = cm.getValue();
+                      const snippetIdx = fullVal.indexOf(textSnippet);
+                      if (snippetIdx !== -1) {
+                        targetPos = cm.posFromIndex(snippetIdx + textSnippet.length);
                       }
                     }
-                    if (!targetPos) targetPos = { line: cm.lineCount(), ch: 0 };
-                  } else {
-                    targetPos = cm.getCursor();
                   }
+                  if (!targetPos) targetPos = { line: cm.lineCount(), ch: 0 };
+                } else {
+                  targetPos = cm.getCursor();
                 }
-                uploadAndInsertImage(imageFile, targetPos);
               }
+              uploadAndInsertImage(imageFile, targetPos);
+            } else {
+              uploadImportFiles(droppedFiles);
             }
           });
         }
@@ -2668,78 +2719,118 @@
           });
         }
 
-        // --- Drag and Drop files onto Walkthrough Sidebar ---
+        // --- Drag and Drop files onto Walkthrough Sidebar & Global Page ---
         const sidebarElForDrop = document.getElementById('walkthrough-sidebar');
+        const sidebarDropOverlay = document.getElementById('sidebar-drop-overlay');
         let sidebarDragCounter = 0;
 
-        function isFileDragEvent(e) {
-          return !draggedItem && e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files');
-        }
-
-        if (sidebarElForDrop) {
+        if (sidebarElForDrop && sidebarDropOverlay) {
           sidebarElForDrop.addEventListener('dragenter', (e) => {
-            if (!isFileDragEvent(e)) return;
+            if (draggedItem) return;
             e.preventDefault();
             sidebarDragCounter++;
-            const overlay = document.getElementById('sidebar-drop-overlay');
-            const idleBox = document.getElementById('sidebar-drop-idle');
-            const busyBox = document.getElementById('sidebar-drop-busy');
-            if (overlay && (!busyBox || busyBox.style.display !== 'flex')) {
-              if (idleBox) idleBox.style.display = 'flex';
-              overlay.style.display = 'flex';
+            if (sidebarDragCounter === 1) {
+              const busyBox = document.getElementById('sidebar-drop-busy');
+              if (!busyBox || busyBox.style.display !== 'flex') {
+                const idleBox = document.getElementById('sidebar-drop-idle');
+                if (idleBox) idleBox.style.display = 'flex';
+                sidebarDropOverlay.style.display = 'flex';
+              }
             }
           });
 
           sidebarElForDrop.addEventListener('dragover', (e) => {
-            if (!isFileDragEvent(e)) return;
+            if (draggedItem) return;
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
           });
 
           sidebarElForDrop.addEventListener('dragleave', (e) => {
-            if (!isFileDragEvent(e)) return;
+            if (draggedItem) return;
             e.preventDefault();
-            sidebarDragCounter--;
-            if (sidebarDragCounter <= 0) {
-              sidebarDragCounter = 0;
-              const overlay = document.getElementById('sidebar-drop-overlay');
+            sidebarDragCounter = Math.max(0, sidebarDragCounter - 1);
+            if (sidebarDragCounter === 0) {
               const busyBox = document.getElementById('sidebar-drop-busy');
-              if (overlay && (!busyBox || busyBox.style.display !== 'flex')) {
-                overlay.style.display = 'none';
+              if (!busyBox || busyBox.style.display !== 'flex') {
+                sidebarDropOverlay.style.display = 'none';
               }
             }
           });
 
           sidebarElForDrop.addEventListener('drop', (e) => {
-            if (!isFileDragEvent(e)) return;
+            if (draggedItem) return;
             e.preventDefault();
+            e.stopPropagation();
             sidebarDragCounter = 0;
-            const overlay = document.getElementById('sidebar-drop-overlay');
+            if (e._ctlabsHandled) return;
+            e._ctlabsHandled = true;
+
             const idleBox = document.getElementById('sidebar-drop-idle');
             if (idleBox) idleBox.style.display = 'none';
 
-            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-              uploadImportFiles(e.dataTransfer.files);
-            } else if (overlay) {
-              overlay.style.display = 'none';
+            const files = getDroppedFiles(e.dataTransfer);
+            if (files.length > 0) {
+              uploadImportFiles(files);
+            } else {
+              sidebarDropOverlay.style.display = 'none';
             }
           });
         }
 
-        // Prevent browser from navigating away if files are dropped outside drop target
-        window.addEventListener('dragover', (e) => {
-          if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
-            e.preventDefault();
-          }
-        });
-        window.addEventListener('drop', (e) => {
-          if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
-            const sb = document.getElementById('walkthrough-sidebar');
-            if (!sb || !sb.contains(e.target)) {
+        // Prevent default navigation and indicate copy across BOTH window and document in capture phase
+        ['dragenter', 'dragover'].forEach(evt => {
+          window.addEventListener(evt, (e) => {
+            if (!draggedItem) {
               e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
             }
-          }
+          }, true);
+          document.addEventListener(evt, (e) => {
+            if (!draggedItem) {
+              e.preventDefault();
+              if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            }
+          }, true);
         });
+
+        // Global dragend to reset visual states if drag is cancelled
+        window.addEventListener('dragend', () => {
+          sidebarDragCounter = 0;
+          if (sidebarDropOverlay) sidebarDropOverlay.style.display = 'none';
+          if (mdContainer) mdContainer.style.boxShadow = 'none';
+        });
+
+        // Global drop handler across window/document (bubbling phase, element-specific handlers fire first)
+        const handleGlobalFileDrop = (e) => {
+          if (draggedItem) return;
+          // In Firefox, preventDefault() MUST be called unconditionally first to stop Firefox navigating to the dropped file
+          e.preventDefault();
+          if (e._ctlabsHandled) return;
+
+          const files = getDroppedFiles(e.dataTransfer);
+          if (files.length === 0) return;
+
+          e.stopPropagation();
+          e._ctlabsHandled = true;
+
+          sidebarDragCounter = 0;
+          if (sidebarDropOverlay) sidebarDropOverlay.style.display = 'none';
+
+          const isSingleImg = files.length === 1 && (
+            (files[0].type && files[0].type.startsWith('image/')) ||
+            (/\.(png|jpe?g|gif|svg|webp)$/i.test(files[0].name || ''))
+          );
+
+          if (isSingleImg && activeDataType === 'markdown') {
+            const cm = getMdEditor();
+            uploadAndInsertImage(files[0], cm ? cm.getCursor() : null);
+          } else {
+            uploadImportFiles(files);
+          }
+        };
+
+        window.addEventListener('drop', handleGlobalFileDrop, false);
+        document.addEventListener('drop', handleGlobalFileDrop, false);
 
         // --- Dedicated Recording Window Helpers & Focus Flash ---
         let recFlashTimeout = null;
@@ -3552,7 +3643,7 @@
             if (mdContainer) mdContainer.style.display = 'flex';
             if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'inline-block';
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'block';
-            if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload / insert picture into note (or drag & drop / paste)';
+            if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload picture or import markdown / zip note (or drag & drop)';
             if (titleIcon) {
               titleIcon.className = 'fab fa-markdown';
               titleIcon.style.color = '#38bdf8';
@@ -3967,8 +4058,7 @@
         }
 
         // --- Drag and Drop: reorder in the set, pull in from "Other", or move to "Other" ---
-        let draggedItem = null;
-        let draggedSource = null; // 'recs' or 'other'
+        // (draggedItem and draggedSource are declared above)
 
         function clearDragStyles() {
           document.querySelectorAll('.rec-item-wrapper').forEach(w => {
@@ -4055,9 +4145,9 @@
         }
 
         recsList.addEventListener('drop', (e) => {
+          if (!draggedItem) return;
           e.preventDefault();
           recsList.style.boxShadow = '';
-          if (!draggedItem) return;
 
           if (e.target.closest('.rec-item-wrapper') === draggedItem) {
             clearDragStyles();
@@ -4128,8 +4218,8 @@
           }
 
           otherList.addEventListener('drop', (e) => {
-            e.preventDefault();
             if (!draggedItem) return;
+            e.preventDefault();
 
             if (e.target.closest('.rec-item-wrapper') === draggedItem) {
               clearDragStyles();

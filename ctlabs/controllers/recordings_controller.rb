@@ -293,6 +293,7 @@ class RecordingsController < BaseController
     image_count = 0
     last_saved_image = nil
     selected_id = nil
+    extracted_images = []
 
     upload_files.each do |f|
       filename = f[:filename].to_s.downcase
@@ -374,8 +375,20 @@ class RecordingsController < BaseController
               pending_sidecars[old_id] = entry.get_input_stream.read
             elsif entry.name.start_with?('images/') || entry.name.include?('/images/') || RecordingService::IMAGE_EXTS.include?(ext)
               img_basename = base
+              img_data = entry.get_input_stream.read
               target = File.join(RecordingService.ensure_images_dir, img_basename)
-              File.binwrite(target, entry.get_input_stream.read)
+              File.binwrite(target, img_data)
+
+              wk_target = params[:walkthrough].to_s.strip
+              if !wk_target.empty?
+                begin
+                  scoped_img_dir = RecordingService.ensure_images_dir(wk_target)
+                  File.binwrite(File.join(scoped_img_dir, img_basename), img_data)
+                rescue StandardError
+                end
+              end
+
+              extracted_images << img_basename
               image_count += 1
               last_saved_image = img_basename
             end
@@ -428,6 +441,15 @@ class RecordingsController < BaseController
               sc = File.join(File.dirname(p), "#{rec_id}.json")
               FileUtils.mv(sc, File.join(target_dir, "#{rec_id}.json")) if File.file?(sc)
             end
+          end
+          begin
+            wk_img_dir = RecordingService.ensure_images_dir(walkthrough)
+            extracted_images.each do |img_name|
+              src_img = File.join(RecordingService.ensure_images_dir, img_name)
+              dst_img = File.join(wk_img_dir, img_name)
+              FileUtils.cp(src_img, dst_img) if File.file?(src_img) && !File.exist?(dst_img)
+            end
+          rescue StandardError
           end
           selected_id = ordered.first unless ordered.empty?
         end
@@ -504,6 +526,18 @@ class RecordingsController < BaseController
 
     if !imported.empty? && walkthrough.nil?
       walkthrough = RecordingService.add_to_walkthrough(params[:walkthrough].to_s, imported)
+    end
+
+    if !extracted_images.empty? && walkthrough
+      begin
+        wk_img_dir = RecordingService.ensure_images_dir(walkthrough)
+        extracted_images.each do |img_name|
+          src_img = File.join(RecordingService.ensure_images_dir, img_name)
+          dst_img = File.join(wk_img_dir, img_name)
+          FileUtils.cp(src_img, dst_img) if File.file?(src_img) && !File.exist?(dst_img)
+        end
+      rescue StandardError
+      end
     end
 
     { ok: true, count: imported.size, imported: imported, selected: (selected_id || imported.first), walkthrough: walkthrough }.to_json
@@ -624,9 +658,10 @@ class RecordingsController < BaseController
       content = File.read(path) rescue ''
       rewritten_content = content.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
 
+      walkthrough = RecordingService.walkthrough_for(id)
       images_to_add = {}
       content.scan(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
-        img_path = RecordingService.image_path(img_name)
+        img_path = RecordingService.image_path(img_name, walkthrough: walkthrough)
         images_to_add[img_name] = img_path if img_path && File.file?(img_path)
       end
 
