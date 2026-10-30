@@ -17,20 +17,22 @@
 require 'json'
 require 'time'
 require 'securerandom'
+require 'fileutils'
 
 class RecordingService
-  DIR        = '/srv/ctlabs-server/recordings'
-  IMAGES_DIR = File.join(DIR, 'images')
-  EXT        = '.cast'
-  MD_EXT     = '.md'
-  VIDEO_EXTS = ['.webm', '.mp4'].freeze
-  VIDEO_EXT  = '.webm'
-  IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
-  MANIFEST   = '_walkthrough.json'
-  ID_RE      = /\A[a-zA-Z0-9_.-]{1,120}\z/
-  NODE_MAX   = 40
-  NAME_MAX   = 80
-  TAIL_BYTES = 8192
+  DIR             = '/srv/ctlabs-server/recordings'
+  IMAGES_DIR      = File.join(DIR, 'images')
+  EXT             = '.cast'
+  MD_EXT          = '.md'
+  VIDEO_EXTS      = ['.webm', '.mp4'].freeze
+  VIDEO_EXT       = '.webm'
+  IMAGE_EXTS      = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
+  MANIFEST        = '_walkthrough.json'
+  LEGACY_MANIFEST = '_walkthroughs.json'
+  ID_RE           = /\A[a-zA-Z0-9_.-]{1,120}\z/
+  NODE_MAX        = 40
+  NAME_MAX        = 80
+  TAIL_BYTES      = 8192
 
   def self.ensure_dir
     Dir.mkdir(DIR, 0755) unless Dir.exist?(DIR)
@@ -39,16 +41,22 @@ class RecordingService
     DIR
   end
 
-  def self.ensure_images_dir
+  def self.walkthrough_dir(slug)
     ensure_dir
-    Dir.mkdir(IMAGES_DIR, 0755) unless Dir.exist?(IMAGES_DIR)
-    IMAGES_DIR
-  rescue SystemCallError
-    IMAGES_DIR
+    clean = slug_for(slug.to_s)
+    File.join(DIR, clean)
   end
 
-  def self.save_image(tempfile_or_path, original_filename)
-    ensure_images_dir
+  def self.ensure_images_dir(slug = nil)
+    ensure_dir
+    target = slug ? File.join(walkthrough_dir(slug), 'images') : IMAGES_DIR
+    FileUtils.mkdir_p(target) unless Dir.exist?(target)
+    target
+  rescue SystemCallError
+    target
+  end
+
+  def self.save_image(tempfile_or_path, original_filename, walkthrough: nil)
     ext = File.extname(original_filename.to_s).downcase
     ext = '.png' unless IMAGE_EXTS.include?(ext)
 
@@ -57,7 +65,18 @@ class RecordingService
     timestamp  = Time.now.strftime('%Y%m%d-%H%M%S')
     token      = SecureRandom.hex(3)
     filename   = "#{clean_base}_#{timestamp}_#{token}#{ext}"
-    target     = File.join(IMAGES_DIR, filename)
+
+    # Determine target images directory
+    target_dir = if walkthrough && !walkthrough.to_s.empty?
+                   ensure_images_dir(walkthrough)
+                 else
+                   wks = load_walkthroughs rescue {}
+                   first_slug = wks.keys.first
+                   first_slug ? ensure_images_dir(first_slug) : ensure_images_dir
+                 end
+
+    FileUtils.mkdir_p(target_dir)
+    target = File.join(target_dir, filename)
 
     if tempfile_or_path.respond_to?(:path)
       FileUtils.cp(tempfile_or_path.path, target)
@@ -65,16 +84,38 @@ class RecordingService
       FileUtils.cp(tempfile_or_path.to_s, target)
     end
     File.chmod(0644, target) rescue nil
+
+    # Keep a copy in global IMAGES_DIR for universal legacy fallback
+    begin
+      ensure_images_dir
+      legacy_target = File.join(IMAGES_DIR, filename)
+      FileUtils.cp(target, legacy_target) unless target == legacy_target
+    rescue StandardError
+    end
+
     filename
   end
 
-  def self.image_path(filename)
+  def self.image_path(filename, walkthrough: nil)
     clean = File.basename(filename.to_s)
     return nil if clean.empty? || clean.include?('..')
-    target = File.join(ensure_images_dir, clean)
-    return target if File.file?(target)
 
-    # Also check root DIR in case image is stored directly
+    # 1. Check scoped walkthrough's images/
+    if walkthrough && !walkthrough.to_s.empty?
+      target = File.join(walkthrough_dir(walkthrough), 'images', clean)
+      return target if File.file?(target)
+    end
+
+    # 2. Check all walkthrough images directories
+    Dir.glob(File.join(DIR, '*', 'images', clean)).each do |p|
+      return p if File.file?(p)
+    end
+
+    # 3. Check legacy/global images directory
+    legacy = File.join(ensure_images_dir, clean)
+    return legacy if File.file?(legacy)
+
+    # 4. Check root DIR directly
     direct = File.join(ensure_dir, clean)
     return direct if File.file?(direct)
 
@@ -88,27 +129,53 @@ class RecordingService
     !s.empty? && !s.include?('..') && !!(s =~ ID_RE)
   end
 
-  def self.path_for(id)
+  def self.path_for(id, walkthrough: nil)
     return nil unless valid_id?(id)
     base = id.to_s
+
+    candidate_dirs = []
+    if walkthrough && !walkthrough.to_s.empty?
+      candidate_dirs << walkthrough_dir(walkthrough)
+    end
+
+    all_set_dirs = begin
+      Dir.children(DIR).filter_map do |d|
+        p = File.join(DIR, d)
+        p if File.directory?(p) && !d.start_with?('.', '_') && d != 'images'
+      end
+    rescue StandardError
+      []
+    end
+
+    candidate_dirs.concat(all_set_dirs)
+    candidate_dirs << DIR
+    candidate_dirs.uniq!
+
     # Direct match if extension already provided
     if base.end_with?(EXT) || base.end_with?(MD_EXT) || VIDEO_EXTS.any? { |e| base.end_with?(e) } || IMAGE_EXTS.any? { |e| base.end_with?(e) }
-      p = File.join(ensure_dir, base)
-      return p if File.file?(p)
-      p_img = File.join(ensure_images_dir, base)
-      return p_img if File.file?(p_img)
+      candidate_dirs.each do |cdir|
+        p = File.join(cdir, base)
+        return p if File.file?(p)
+        p_img = File.join(cdir, 'images', base)
+        return p_img if File.file?(p_img)
+      end
+      p_root_img = File.join(ensure_images_dir, base)
+      return p_root_img if File.file?(p_root_img)
+      return nil
     end
-    # Check .cast then .md
-    cast_path = File.join(ensure_dir, "#{base}#{EXT}")
-    return cast_path if File.file?(cast_path)
 
-    md_path = File.join(ensure_dir, "#{base}#{MD_EXT}")
-    return md_path if File.file?(md_path)
+    # Check candidate dirs for .cast, .md, and video extensions
+    candidate_dirs.each do |cdir|
+      cast_p = File.join(cdir, "#{base}#{EXT}")
+      return cast_p if File.file?(cast_p)
 
-    # Check video extensions (.webm, .mp4)
-    VIDEO_EXTS.each do |vext|
-      v_path = File.join(ensure_dir, "#{base}#{vext}")
-      return v_path if File.file?(v_path)
+      md_p = File.join(cdir, "#{base}#{MD_EXT}")
+      return md_p if File.file?(md_p)
+
+      VIDEO_EXTS.each do |vext|
+        v_p = File.join(cdir, "#{base}#{vext}")
+        return v_p if File.file?(v_p)
+      end
     end
 
     nil
@@ -130,20 +197,35 @@ class RecordingService
     "vid_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
   end
 
-  def self.all_disk_files
+  def self.all_disk_files(slug = nil)
     ensure_dir
-    (Dir.glob(File.join(DIR, "*#{EXT}")) +
-     Dir.glob(File.join(DIR, "*#{MD_EXT}")) +
-     VIDEO_EXTS.flat_map { |ext| Dir.glob(File.join(DIR, "*#{ext}")) })
-      .reject { |p| File.basename(p).start_with?('_') }
+    patterns = if slug
+                 dir = walkthrough_dir(slug)
+                 [File.join(dir, "*#{EXT}"), File.join(dir, "*#{MD_EXT}")] +
+                   VIDEO_EXTS.map { |ext| File.join(dir, "*#{ext}") }
+               else
+                 [File.join(DIR, '*', "*#{EXT}"), File.join(DIR, '*', "*#{MD_EXT}"),
+                  File.join(DIR, "*#{EXT}"), File.join(DIR, "*#{MD_EXT}")] +
+                   VIDEO_EXTS.flat_map { |ext| [File.join(DIR, '*', "*#{ext}"), File.join(DIR, "*#{ext}")] }
+               end
+    patterns.flat_map { |pat| Dir.glob(pat) }
+            .reject { |p| File.basename(p).start_with?('_') }
+            .uniq
   end
 
   # Opens a recording, writes the asciicast v2 header and returns [id, io].
   # The caller owns the io and must close it when recording stops.
-  def self.open(node:, cols: nil, rows: nil, title: nil)
+  def self.open(node:, cols: nil, rows: nil, title: nil, walkthrough: nil)
     ensure_dir
-    id   = new_id(node)
-    path = File.join(DIR, "#{id}#{EXT}")
+    id         = new_id(node)
+    target_dir = if walkthrough && !walkthrough.to_s.empty?
+                   walkthrough_dir(walkthrough)
+                 else
+                   wks = load_walkthroughs rescue {}
+                   walkthrough_dir(wks.keys.first || 'walkthrough_1')
+                 end
+    FileUtils.mkdir_p(target_dir)
+    path = File.join(target_dir, "#{id}#{EXT}")
     io   = File.open(path, 'wb')
 
     header = {
@@ -214,7 +296,8 @@ class RecordingService
       ext  = File.extname(path)
       id   = File.basename(path, ext)
       size = File.size(path)
-      meta_file = File.join(DIR, "#{id}.json")
+      meta_file = File.join(File.dirname(path), "#{id}.json")
+      meta_file = File.join(DIR, "#{id}.json") unless File.file?(meta_file)
       meta_data = {}
       if File.file?(meta_file)
         begin
@@ -323,12 +406,15 @@ class RecordingService
   def self.delete(id)
     path = path_for(id)
     return false unless path
-    File.delete(path)
+    dir = File.dirname(path)
+    File.delete(path) rescue nil
 
     # Clean up sidecar metadata if present
     base_id = File.basename(path, File.extname(path))
-    sidecar = File.join(DIR, "#{base_id}.json")
+    sidecar = File.join(dir, "#{base_id}.json")
     File.delete(sidecar) if File.file?(sidecar)
+    root_sidecar = File.join(DIR, "#{base_id}.json")
+    File.delete(root_sidecar) if File.file?(root_sidecar)
 
     # Clean up references across all walkthrough sets
     wks = load_walkthroughs
@@ -414,7 +500,8 @@ class RecordingService
     if VIDEO_EXTS.any? { |e| path.end_with?(e) }
       ext = File.extname(path)
       id_clean = File.basename(path, ext)
-      meta_file = File.join(DIR, "#{id_clean}.json")
+      dir = File.dirname(path)
+      meta_file = File.join(dir, "#{id_clean}.json")
       meta_data = {}
       if File.file?(meta_file)
         begin
@@ -452,9 +539,10 @@ class RecordingService
   end
 
   def self.create_markdown_step(slug, title: 'Step Note', content: nil)
-    ensure_dir
     id = new_markdown_id('note')
-    path = File.join(DIR, "#{id}#{MD_EXT}")
+    target_dir = walkthrough_dir(slug)
+    FileUtils.mkdir_p(target_dir)
+    path = File.join(target_dir, "#{id}#{MD_EXT}")
     clean_title = title.to_s.strip
     clean_title = 'Step Note' if clean_title.empty?
     initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
@@ -519,96 +607,197 @@ class RecordingService
 
   # --- Walkthrough Collections Management ---
   #
-  # A walkthrough is a named set of recordings stored in _walkthroughs.json.
-  # Each set contains:
-  #   - `recording_ids`: recordings integrated as ordered steps in the walkthrough.
-  #   - `unintegrated_ids`: recordings belonging to this set, but not integrated as a step.
+  # Each walkthrough set lives in its own dedicated directory on disk:
+  #   DIR/<walkthrough_slug>/
   #
-  # Every recording belongs to a set — no recordings exist without a set.
+  # Inside each directory:
+  #   - `_walkthrough.json`: Manifest scoped to this set (name, step order, unintegrated ids).
+  #   - Media files (.cast, .md, .webm, .mp4, and .json sidecars) belonging to this set.
+  #   - `images/`: Directory for images attached to notes in this set.
 
   def self.walkthroughs_file
-    File.join(ensure_dir, '_walkthroughs.json')
+    File.join(ensure_dir, LEGACY_MANIFEST)
+  end
+
+  def self.migrate_to_folder_hierarchy!
+    legacy_file = File.join(ensure_dir, LEGACY_MANIFEST)
+    return unless File.file?(legacy_file)
+
+    data = begin
+      JSON.parse(File.read(legacy_file))
+    rescue StandardError
+      nil
+    end
+    return unless data.is_a?(Hash) && !data.empty?
+
+    data.each do |slug, entry|
+      wk_dir = File.join(DIR, slug)
+      wk_images_dir = File.join(wk_dir, 'images')
+      FileUtils.mkdir_p(wk_images_dir)
+
+      all_ids = (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).map(&:to_s).uniq
+      all_ids.each do |id|
+        [EXT, MD_EXT, *VIDEO_EXTS].each do |ext|
+          src = File.join(DIR, "#{id}#{ext}")
+          if File.file?(src)
+            dst = File.join(wk_dir, "#{id}#{ext}")
+            FileUtils.mv(src, dst) unless src == dst
+
+            # Move sidecar if exists
+            sidecar_src = File.join(DIR, "#{id}.json")
+            if File.file?(sidecar_src)
+              FileUtils.mv(sidecar_src, File.join(wk_dir, "#{id}.json"))
+            end
+
+            # If markdown, scan for images and copy them into set's images/
+            if ext == MD_EXT
+              content = File.read(dst) rescue ''
+              imgs = content.scan(%r{(?:(?:recordings?/+)+|/)?images/([a-zA-Z0-9_.-]+)}).flatten.uniq
+              imgs.each do |img|
+                img_src = File.join(DIR, 'images', img)
+                if File.file?(img_src)
+                  FileUtils.cp(img_src, File.join(wk_images_dir, img)) rescue nil
+                end
+              end
+            end
+            break
+          end
+        end
+      end
+
+      # Write per-set manifest
+      manifest = {
+        'name'             => entry['name'].to_s,
+        'created_at'       => entry['created_at'] || Time.now.to_f,
+        'recording_ids'    => Array(entry['recording_ids']).map(&:to_s),
+        'unintegrated_ids' => Array(entry['unintegrated_ids']).map(&:to_s)
+      }
+      File.write(File.join(wk_dir, MANIFEST), JSON.pretty_generate(manifest))
+    end
+
+    # Move any remaining orphan files in root DIR into the first walkthrough set
+    first_slug = data.keys.first
+    if first_slug
+      first_dir = File.join(DIR, first_slug)
+      first_manifest = File.join(first_dir, MANIFEST)
+      first_data = JSON.parse(File.read(first_manifest)) rescue nil
+
+      if first_data
+        orphan_files = (Dir.glob(File.join(DIR, "*#{EXT}")) +
+                        Dir.glob(File.join(DIR, "*#{MD_EXT}")) +
+                        VIDEO_EXTS.flat_map { |ext| Dir.glob(File.join(DIR, "*#{ext}")) })
+                       .reject { |p| File.basename(p).start_with?('_') }
+
+        orphan_ids = []
+        orphan_files.each do |p|
+          ext = File.extname(p)
+          oid = File.basename(p, ext)
+          dst = File.join(first_dir, "#{oid}#{ext}")
+          FileUtils.mv(p, dst) rescue nil
+          sidecar = File.join(DIR, "#{oid}.json")
+          FileUtils.mv(sidecar, File.join(first_dir, "#{oid}.json")) if File.file?(sidecar)
+          orphan_ids << oid
+        end
+
+        if orphan_ids.any?
+          first_data['unintegrated_ids'] = (Array(first_data['unintegrated_ids']).map(&:to_s) + orphan_ids).uniq
+          File.write(first_manifest, JSON.pretty_generate(first_data))
+        end
+      end
+    end
+
+    # Rename legacy index file to .migrated so migration only runs once
+    FileUtils.mv(legacy_file, "#{legacy_file}.migrated") rescue nil
   end
 
   def self.load_walkthroughs
-    file = walkthroughs_file
-    data = nil
-    if File.file?(file)
-      begin
-        parsed = JSON.parse(File.read(file))
-        data = parsed if parsed.is_a?(Hash) && !parsed.empty?
-      rescue StandardError
-        # Fall through
+    ensure_dir
+    migrate_to_folder_hierarchy! if File.file?(File.join(DIR, LEGACY_MANIFEST))
+
+    data = {}
+    # Scan subdirectories that contain _walkthrough.json
+    slug_dirs = begin
+      Dir.children(DIR).select do |entry|
+        p = File.join(DIR, entry)
+        File.directory?(p) && !entry.start_with?('.', '_') && entry != 'images'
+      end.sort
+    rescue StandardError
+      []
+    end
+
+    slug_dirs.each do |slug|
+      manifest_file = File.join(DIR, slug, MANIFEST)
+      if File.file?(manifest_file)
+        begin
+          parsed = JSON.parse(File.read(manifest_file))
+          if parsed.is_a?(Hash)
+            data[slug] = {
+              'name'             => parsed['name'].to_s,
+              'created_at'       => parsed['created_at'] || File.mtime(manifest_file).to_f,
+              'recording_ids'    => Array(parsed['recording_ids']).map(&:to_s),
+              'unintegrated_ids' => Array(parsed['unintegrated_ids']).map(&:to_s)
+            }
+          end
+        rescue StandardError
+        end
+      end
+
+      # Directory without manifest: discover or initialize
+      unless data.key?(slug)
+        manifest_data = {
+          'name'             => slug.tr('_-', ' ').capitalize,
+          'created_at'       => File.mtime(File.join(DIR, slug)).to_f,
+          'recording_ids'    => [],
+          'unintegrated_ids' => []
+        }
+        data[slug] = manifest_data
+        save_walkthrough(slug, manifest_data)
       end
     end
 
-    data ||= {
-      'walkthrough_1' => {
+    # Auto-adopt any files sitting in DIR/<slug> that aren't listed in recording_ids or unintegrated_ids
+    data.each do |slug, entry|
+      disk_ids = all_disk_files(slug).map { |f| File.basename(f, File.extname(f)) }
+      known = (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).map(&:to_s)
+      unclaimed = disk_ids - known
+      if unclaimed.any?
+        entry['unintegrated_ids'] = (Array(entry['unintegrated_ids']).map(&:to_s) + unclaimed).uniq
+        save_walkthrough(slug, entry)
+      end
+    end
+
+    # Fallback if no sets exist
+    if data.empty?
+      default_slug = 'walkthrough_1'
+      data[default_slug] = {
         'name'             => 'Walkthrough 1',
-        'recording_ids'    => all_disk_files
-                                 .map { |f| File.basename(f, File.extname(f)) }
-                                 .sort
-                                 .reverse,
+        'created_at'       => Time.now.to_f,
+        'recording_ids'    => [],
         'unintegrated_ids' => []
       }
-    }
-
-    # Ensure each recording belongs to only one set and steps take precedence
-    step_owners = {}
-    data.each do |slug, entry|
-      Array(entry['recording_ids']).each do |id|
-        step_owners[id.to_s] ||= slug
-      end
-    end
-
-    seen_unint = {}
-    data.each do |slug, entry|
-      entry['recording_ids'] = Array(entry['recording_ids']).map(&:to_s).select { |id| step_owners[id] == slug }
-
-      entry_unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
-      entry['unintegrated_ids'] = entry_unint.reject do |id|
-        step_owners[id] || seen_unint[id]
-      end
-      entry['unintegrated_ids'].each { |id| seen_unint[id] = true }
-      entry.delete('excluded_ids')
-    end
-
-    # Ensure no recordings exist that are not part of a set.
-    # Any recording or note on disk not yet in any set gets claimed into the first set.
-    existing_files = all_disk_files
-                        .map { |f| File.basename(f, File.extname(f)) }
-    known_members = {}
-    data.each_value do |entry|
-      (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).each do |id|
-        known_members[id.to_s] = true
-      end
-    end
-
-    orphans = existing_files.reject { |id| known_members[id] }
-    if orphans.any?
-      target_key = data.keys.first
-      if target_key && data[target_key]
-        current_unint = Array(data[target_key]['unintegrated_ids']).map(&:to_s)
-        data[target_key]['unintegrated_ids'] = (current_unint + orphans).uniq - Array(data[target_key]['recording_ids']).map(&:to_s)
-      end
+      save_walkthrough(default_slug, data[default_slug])
     end
 
     data
   end
 
+  def self.save_walkthrough(slug, entry)
+    dir = walkthrough_dir(slug)
+    FileUtils.mkdir_p(dir)
+    manifest_file = File.join(dir, MANIFEST)
+    cleaned = {
+      'name'             => entry['name'].to_s,
+      'created_at'       => entry['created_at'] || Time.now.to_f,
+      'recording_ids'    => Array(entry['recording_ids']).map(&:to_s),
+      'unintegrated_ids' => (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s).uniq - Array(entry['recording_ids']).map(&:to_s)
+    }
+    File.write(manifest_file, JSON.pretty_generate(cleaned))
+  end
+
   def self.save_walkthroughs(walkthroughs)
-    ensure_dir
-    cleaned = walkthroughs.each_with_object({}) do |(k, v), h|
-      entry = v.dup
-      entry.delete('sealed')
-      if entry['excluded_ids']
-        unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s).uniq
-        entry['unintegrated_ids'] = unint - Array(entry['recording_ids']).map(&:to_s)
-        entry.delete('excluded_ids')
-      end
-      h[k] = entry
+    walkthroughs.each do |slug, entry|
+      save_walkthrough(slug, entry)
     end
-    File.write(walkthroughs_file, JSON.pretty_generate(cleaned))
   end
 
   def self.slug_for(name)
@@ -642,7 +831,7 @@ class RecordingService
     key, entry, wks = walkthrough_entry(slug)
     clean = name.to_s.strip[0, NAME_MAX]
     entry['name'] = clean unless clean.empty?
-    save_walkthroughs(wks)
+    save_walkthrough(key, entry)
     [key, entry['name'].to_s]
   end
 
@@ -661,12 +850,10 @@ class RecordingService
 
     recs   = Array(recording_ids).map(&:to_s).uniq
     unints = (Array(unintegrated_ids).map(&:to_s) - recs).uniq
-    all_claimed = recs + unints
 
-    wks.each_value do |other_entry|
-      other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - all_claimed
-      other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - all_claimed
-    end
+    wk_dir = walkthrough_dir(base)
+    FileUtils.mkdir_p(wk_dir)
+    FileUtils.mkdir_p(File.join(wk_dir, 'images'))
 
     entry = {
       'name'             => clean,
@@ -674,22 +861,40 @@ class RecordingService
       'unintegrated_ids' => unints,
       'created_at'       => Time.now.to_f
     }
+    save_walkthrough(base, entry)
     wks[base] = entry
-    save_walkthroughs(wks)
     base
   end
 
   # Appends ids to a set's steps without duplicating membership.
-  # Removes them from unintegrated_ids and purges them from all other sets.
+  # Moves files into target walkthrough directory if they live elsewhere.
   def self.add_to_walkthrough(slug, recording_ids)
     key, entry, wks = walkthrough_entry(slug)
     wanted  = Array(recording_ids).map(&:to_s)
+    target_dir = walkthrough_dir(key)
+    FileUtils.mkdir_p(target_dir)
+
+    wanted.each do |id|
+      current_path = path_for(id)
+      if current_path && File.file?(current_path)
+        current_dir = File.dirname(current_path)
+        if current_dir != target_dir
+          ext = File.extname(current_path)
+          FileUtils.mv(current_path, File.join(target_dir, "#{id}#{ext}")) rescue nil
+          sidecar = File.join(current_dir, "#{id}.json")
+          if File.file?(sidecar)
+            FileUtils.mv(sidecar, File.join(target_dir, "#{id}.json")) rescue nil
+          end
+        end
+      end
+    end
 
     wks.each do |k, other_entry|
       next if k == key
       other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - wanted
       other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - wanted
       other_entry.delete('excluded_ids')
+      save_walkthrough(k, other_entry)
     end
 
     current = Array(entry['recording_ids']).map(&:to_s)
@@ -697,7 +902,7 @@ class RecordingService
     unint = (Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s)
     entry['unintegrated_ids'] = unint - wanted
     entry.delete('excluded_ids')
-    save_walkthroughs(wks)
+    save_walkthrough(key, entry)
     key
   end
 
@@ -706,16 +911,14 @@ class RecordingService
     key, wk, = walkthrough_entry(slug, wks)
     allowed_ids = Array(wk['recording_ids']).map(&:to_s)
 
-    all_recs = all_disk_files
+    all_recs = all_disk_files(key)
                   .filter_map { |path| meta(path) }
                   .sort_by { |m| [m[:created_at], m[:id]] }
                   .reverse
     recs_map = all_recs.map { |r| [r[:id], r] }.to_h
 
-    if allowed_ids.empty? && Array(wk['unintegrated_ids']).empty? && Array(wk['excluded_ids']).empty? && wks.size <= 1
-      all_recs
-    else
-      allowed_ids.filter_map { |id| recs_map[id] }
+    allowed_ids.filter_map do |id|
+      recs_map[id] || (path = path_for(id); path ? meta(path) : nil)
     end
   end
 
@@ -726,13 +929,15 @@ class RecordingService
     step_ids = Array(wk['recording_ids']).map(&:to_s)
     unint_ids = (Array(wk['unintegrated_ids']) + Array(wk['excluded_ids'])).map(&:to_s).uniq - step_ids
 
-    all_recs = all_disk_files
+    all_recs = all_disk_files(key)
                   .filter_map { |path| meta(path) }
                   .sort_by { |m| [m[:created_at], m[:id]] }
                   .reverse
     recs_map = all_recs.map { |r| [r[:id], r] }.to_h
 
-    unint_ids.filter_map { |id| recs_map[id] }
+    unint_ids.filter_map do |id|
+      recs_map[id] || (path = path_for(id); path ? meta(path) : nil)
+    end
   end
 
   class << self
@@ -752,34 +957,28 @@ class RecordingService
     member_ids
   end
 
-  # Deletes a complete walkthrough set. If delete_recordings is true, any
-  # recording file belonging to this set (step or unintegrated) that is not also
-  # referenced by another set will be permanently removed from disk.
+  # Deletes a complete walkthrough set directory. If delete_recordings is true,
+  # the directory and all contained files are permanently removed. If false,
+  # the directory is archived as _archived_<slug>_<timestamp>.
   def self.delete_walkthrough(slug, delete_recordings: false)
     wks = load_walkthroughs
     slug_str = slug.to_s
     return false unless wks.key?(slug_str)
 
-    entry = wks.delete(slug_str)
+    dir = walkthrough_dir(slug_str)
     if delete_recordings
-      ids = (Array(entry['recording_ids']) + Array(entry['unintegrated_ids']) + Array(entry['excluded_ids'])).map(&:to_s).uniq
-      remaining_members = all_set_member_ids(wks)
-      ids.each do |rec_id|
-        next if remaining_members[rec_id]
-        path = path_for(rec_id)
-        begin
-          File.delete(path) if path && File.file?(path)
-        rescue SystemCallError
-          # continue deleting others
-        end
+      FileUtils.rm_rf(dir) if File.directory?(dir)
+    else
+      if File.directory?(dir)
+        archived_dir = File.join(DIR, "_archived_#{slug_str}_#{Time.now.strftime('%Y%m%d_%H%M%S')}")
+        FileUtils.mv(dir, archived_dir) rescue nil
       end
     end
 
-    if wks.empty?
-      wks['walkthrough_1'] = { 'name' => 'Walkthrough 1', 'recording_ids' => [], 'unintegrated_ids' => [] }
+    if load_walkthroughs.empty?
+      create_walkthrough('Walkthrough 1')
     end
 
-    save_walkthroughs(wks)
     true
   end
 
@@ -792,6 +991,7 @@ class RecordingService
       other_entry['recording_ids'] = Array(other_entry['recording_ids']).map(&:to_s) - ordered
       other_entry['unintegrated_ids'] = (Array(other_entry['unintegrated_ids']) + Array(other_entry['excluded_ids'])).map(&:to_s) - ordered
       other_entry.delete('excluded_ids')
+      save_walkthrough(k, other_entry)
     end
 
     current = Array(entry['recording_ids']).map(&:to_s)
@@ -802,7 +1002,7 @@ class RecordingService
     entry['unintegrated_ids'] = (unint + removed).uniq - ordered
     entry.delete('excluded_ids')
 
-    save_walkthroughs(wks)
+    save_walkthrough(key, entry)
     key
   end
 
@@ -817,7 +1017,7 @@ class RecordingService
     entry['unintegrated_ids'] = (unint + [id]).uniq - remaining
     entry.delete('excluded_ids')
 
-    save_walkthroughs(wks)
+    save_walkthrough(key, entry)
     key
   end
 
@@ -834,7 +1034,8 @@ class RecordingService
       name:         entry['name'].to_s,
       sealed:       false,
       recordings:   list_for_walkthrough(key),
-      unintegrated: list_unintegrated_for_walkthrough(key)
+      unintegrated: list_unintegrated_for_walkthrough(key),
+      dir:          walkthrough_dir(key)
     }
   end
 end

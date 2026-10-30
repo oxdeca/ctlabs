@@ -4,15 +4,29 @@ The **Walkthroughs** view in CTLABS (`/demo`) provides an interactive documentat
 
 ---
 
-## 1. Walkthrough Sets & Step Management
+## 1. Walkthrough Sets & Folder Storage Layout
 
-- **Walkthrough Sets**: Named collections of steps stored in `_walkthroughs.json`. Each set has an independent sequence of active steps and unintegrated recordings/notes.
-- **Set Actions**:
+- **Dedicated Set Folders**: Each walkthrough set lives in its own directory on the server under `/srv/ctlabs-server/recordings/<walkthrough_slug>/`.
+- **Set Directory Structure**:
+  ```
+  /srv/ctlabs-server/recordings/<walkthrough_slug>/
+  ├── _walkthrough.json       # Scoped manifest (name, step sequence, unintegrated items)
+  ├── <recording_id>.cast     # Terminal sessions
+  ├── <video_id>.webm         # Video recordings
+  ├── <video_id>.json         # Video metadata sidecar
+  ├── <note_id>.md            # Markdown notes
+  └── images/                 # Scoped images and screenshot attachments for this set
+  ```
+- **Self-Contained & Resilient**:
+  - No monolithic global index file. If sets are moved, backed up, or copied individually, each set retains its own manifest (`_walkthrough.json`) and media.
+  - Exporting, importing, or deleting walkthrough sets operates directly on the set directory boundaries.
+  - Automatic migration cleanly transitions legacy flat storage into dedicated folders without downtime or data loss.
+- **Walkthrough Set Actions**:
   - Switch sets using the **Walkthrough Set** dropdown in the left sidebar.
   - Create new sets with the **+ New Set** button.
-  - Delete walkthrough sets with the red trash button (with an optional checkbox to also purge `.cast` files from disk).
+  - Delete walkthrough sets with the red trash button (with an optional checkbox to also purge media files from disk).
 - **Step Ordering & Navigation**:
-  - Drag and drop steps in the sidebar to reorder them; ordering is saved automatically.
+  - Drag and drop steps in the sidebar to reorder them; ordering is saved automatically to the set's `_walkthrough.json`.
   - Navigate sequentially using the **Previous Step** / **Next Step** buttons or keyboard shortcuts (`Alt+Left` / `Alt+Right`, `PageUp` / `PageDown`).
   - Terminal sessions and videos automatically begin playback when advancing through steps.
 
@@ -55,10 +69,14 @@ When enabled in the Editor Settings menu:
   - <span style="color: #ef4444; font-weight: bold;">-- REPLACE --</span>: Overwrite text (`R`).
 - **Status Bar Indicator**:
   A compact status bar appears at the bottom of the editor displaying the current mode and active key sequences.
-- **Ex Commands**:
+- **Ex Commands & Search**:
   - Type `:w` followed by `Enter` in Normal mode to save the note.
   - Type `:wq` followed by `Enter` to save the note.
-  - Type `/` to open CodeMirror's in-editor search dialog.
+  - Type `/pattern` followed by `Enter` to search forward.
+  - Type `?pattern` followed by `Enter` to search backward.
+  - Press `n` to jump to the next search match, or `N` to jump to the previous match.
+  - Use `*` or `#` to instantly search for the word under the cursor forward or backward.
+  - Full substitute support: `:%s/old/new/g` or `:s/old/new/g`.
 
 ---
 

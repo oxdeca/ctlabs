@@ -32,8 +32,9 @@ class RecordingsController < BaseController
     end
 
     id = RecordingService.new_id(node.empty? ? 'terminal' : node)
-    path = File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}")
-    FileUtils.mkdir_p(File.dirname(path))
+    target_dir = RecordingService.walkthrough_dir(target_slug)
+    FileUtils.mkdir_p(target_dir)
+    path = File.join(target_dir, "#{id}#{RecordingService::EXT}")
     FileUtils.cp(f[:tempfile].path, path)
 
     RecordingService.add_to_walkthrough(target_slug, [id])
@@ -64,8 +65,9 @@ class RecordingsController < BaseController
     ext = RecordingService::VIDEO_EXT unless RecordingService::VIDEO_EXTS.include?(ext)
 
     id = RecordingService.new_video_id('screen')
-    path = File.join(RecordingService::DIR, "#{id}#{ext}")
-    FileUtils.mkdir_p(File.dirname(path))
+    target_dir = RecordingService.walkthrough_dir(target_slug)
+    FileUtils.mkdir_p(target_dir)
+    path = File.join(target_dir, "#{id}#{ext}")
     FileUtils.cp(f[:tempfile].path, path)
 
     clean_title = params[:title].to_s.strip
@@ -78,7 +80,7 @@ class RecordingsController < BaseController
       'created_at' => Time.now.to_i,
       'type'       => 'video'
     }
-    File.write(File.join(RecordingService::DIR, "#{id}.json"), JSON.pretty_generate(meta))
+    File.write(File.join(target_dir, "#{id}.json"), JSON.pretty_generate(meta))
 
     RecordingService.add_to_walkthrough(target_slug, [id])
 
@@ -133,7 +135,8 @@ class RecordingsController < BaseController
         else
           zipfile.add("#{rec[:id]}#{ext}", rec[:path])
           if RecordingService::VIDEO_EXTS.include?(ext)
-            sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json")
+            sidecar = File.join(File.dirname(rec[:path]), "#{rec[:id]}.json")
+            sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json") unless File.file?(sidecar)
             zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
           end
         end
@@ -145,7 +148,7 @@ class RecordingsController < BaseController
         next unless File.file?(rec[:path]) && rec[:path].end_with?(RecordingService::MD_EXT)
         content = File.read(rec[:path]) rescue ''
         content.scan(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
-          img_path = RecordingService.image_path(img_name)
+          img_path = RecordingService.image_path(img_name, walkthrough: bundle[:slug])
           images_to_add[img_name] = img_path if img_path && File.file?(img_path)
         end
       end
@@ -416,6 +419,16 @@ class RecordingsController < BaseController
             unintegrated_ids: unint_ordered,
             unique: true
           )
+          target_dir = RecordingService.walkthrough_dir(walkthrough)
+          (ordered + unint_ordered).each do |rec_id|
+            p = RecordingService.path_for(rec_id)
+            if p && File.file?(p) && File.dirname(p) != target_dir
+              ext = File.extname(p)
+              FileUtils.mv(p, File.join(target_dir, "#{rec_id}#{ext}")) rescue nil
+              sc = File.join(File.dirname(p), "#{rec_id}.json")
+              FileUtils.mv(sc, File.join(target_dir, "#{rec_id}.json")) if File.file?(sc)
+            end
+          end
           selected_id = ordered.first unless ordered.empty?
         end
       elsif filename.end_with?(RecordingService::EXT)
@@ -476,7 +489,7 @@ class RecordingsController < BaseController
         File.write(File.join(RecordingService::DIR, "#{id}.json"), JSON.pretty_generate(meta))
         imported << id
       elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
-        last_saved_image = RecordingService.save_image(f[:tempfile], filename)
+        last_saved_image = RecordingService.save_image(f[:tempfile], filename, walkthrough: params[:walkthrough].to_s)
         image_count += 1
       end
     end
@@ -510,7 +523,9 @@ class RecordingsController < BaseController
       halt 400, { ok: false, error: "Unsupported image format #{ext}" }.to_json
     end
 
-    filename = RecordingService.save_image(file[:tempfile], orig_name)
+    wk_slug = params[:walkthrough].to_s.strip
+    wk_slug = session[:walkthrough].to_s.strip if wk_slug.empty?
+    filename = RecordingService.save_image(file[:tempfile], orig_name, walkthrough: wk_slug)
     { ok: true, filename: filename, url: "/recordings/images/#{filename}" }.to_json
   rescue StandardError => e
     status 500
@@ -519,6 +534,23 @@ class RecordingsController < BaseController
 
   get '/recordings/images/:filename' do
     path = RecordingService.image_path(params[:filename])
+    halt 404, 'Image not found' unless path
+
+    ext = File.extname(path).downcase
+    mime = case ext
+           when '.png'          then 'image/png'
+           when '.jpg', '.jpeg' then 'image/jpeg'
+           when '.gif'          then 'image/gif'
+           when '.svg'          then 'image/svg+xml'
+           when '.webp'         then 'image/webp'
+           else 'application/octet-stream'
+           end
+
+    send_file path, type: mime, disposition: 'inline'
+  end
+
+  get '/recordings/:walkthrough/images/:filename' do
+    path = RecordingService.image_path(params[:filename], walkthrough: params[:walkthrough])
     halt 404, 'Image not found' unless path
 
     ext = File.extname(path).downcase

@@ -12,13 +12,14 @@
   /* CodeMirror Vim dialog & fat cursor styling */
   .CodeMirror-dialog {
     background: #0f172a !important;
-    border-top: 1px solid #334155 !important;
+    border-top: 1px solid #38bdf8 !important;
     border-bottom: 1px solid #334155 !important;
     color: #f8fafc !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-    font-size: 0.82em !important;
-    padding: 4px 10px !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+    font-size: 0.84em !important;
+    padding: 5px 12px !important;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.6) !important;
+    z-index: 20 !important;
   }
   .CodeMirror-dialog input {
     color: #38bdf8 !important;
@@ -27,10 +28,18 @@
     background: transparent !important;
     border: none !important;
     outline: none !important;
+    width: calc(100% - 4em) !important;
+    max-width: 45em !important;
+    margin-left: 4px !important;
   }
   .cm-fat-cursor .CodeMirror-cursor {
     background: #38bdf8 !important;
     opacity: 0.65;
+  }
+  .cm-searching {
+    background: rgba(245, 158, 11, 0.35) !important;
+    outline: 1px solid rgba(245, 158, 11, 0.7) !important;
+    border-radius: 2px;
   }
 
   #step-prev-btn:hover:not(:disabled), #step-next-btn:hover:not(:disabled) {
@@ -447,7 +456,7 @@
                          else
                            RecordingService::EXT
                          end
-                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
+                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
@@ -545,7 +554,7 @@
                          else
                            RecordingService::EXT
                          end
-                  fpath = r[:path] || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
+                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
@@ -1191,6 +1200,8 @@
     <script src="/js/code_editor.js"></script>
     <script src="/js/markdown_emojis.js"></script>
     <script src="/js/codemirror-dialog.min.js"></script>
+    <script src="/js/codemirror-searchcursor.min.js"></script>
+    <script src="/js/codemirror-search.min.js"></script>
     <script src="/js/codemirror-vim.min.js"></script>
     <script src="/js/asciinema-player.min.js"></script>
     <script src="/js/terminal.js"></script>
