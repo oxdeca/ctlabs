@@ -50,6 +50,9 @@ class RecordingsController < BaseController
     f = params[:video] || params[:file]
     halt 400, { ok: false, error: 'No video file uploaded' }.to_json unless f && f[:tempfile]
 
+    max_video_bytes = 500 * 1024 * 1024
+    halt 413, { ok: false, error: 'Uploaded video exceeds maximum allowed size of 500MB' }.to_json if f[:tempfile].size > max_video_bytes
+
     wks = RecordingService.load_walkthroughs
     target_slug = params[:walkthrough].to_s
     target_slug = session[:walkthrough].to_s if target_slug.empty? || !wks.key?(target_slug)

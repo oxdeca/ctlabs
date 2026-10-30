@@ -1086,6 +1086,50 @@
             </select>
           </div>
 
+          <!-- Recording Limits (Max Length & Max Size) -->
+          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
+            <div style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+              <i class="fas fa-stopwatch" style="color: #f59e0b;"></i> Recording Limits
+            </div>
+            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
+              Automatically stops recording when the chosen duration or file size limit is reached.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <!-- Max Duration -->
+              <div>
+                <label for="rec-screen-max-len" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
+                  <i class="fas fa-clock" style="color: #38bdf8; margin-right: 3px;"></i> Max Length
+                </label>
+                <select id="rec-screen-max-len" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em; width: 100%;">
+                  <option value="0">No limit (Manual stop)</option>
+                  <option value="60">1 minute</option>
+                  <option value="120">2 minutes</option>
+                  <option value="180">3 minutes</option>
+                  <option value="300" selected>5 minutes (Default)</option>
+                  <option value="600">10 minutes</option>
+                  <option value="900">15 minutes</option>
+                  <option value="1800">30 minutes</option>
+                  <option value="3600">60 minutes</option>
+                </select>
+              </div>
+              <!-- Max Size -->
+              <div>
+                <label for="rec-screen-max-size" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
+                  <i class="fas fa-hdd" style="color: #10b981; margin-right: 3px;"></i> Max File Size
+                </label>
+                <select id="rec-screen-max-size" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em; width: 100%;">
+                  <option value="0">No limit</option>
+                  <option value="10">10 MB</option>
+                  <option value="25">25 MB</option>
+                  <option value="50" selected>50 MB (Default)</option>
+                  <option value="100">100 MB</option>
+                  <option value="250">250 MB</option>
+                  <option value="500">500 MB</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
             <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: #f8fafc; font-size: 0.9em; user-select: none;">
               <input type="checkbox" id="rec-screen-mic" style="margin-top: 3px; accent-color: #f43f5e; width: 16px; height: 16px;" />
@@ -1121,8 +1165,13 @@
         <span style="display: inline-block; width: 12px; height: 12px; background: #e11d48; border-radius: 50%; animation: pulse 1.2s infinite;"></span>
         <span style="font-size: 0.82em; font-weight: 700; color: #f43f5e; letter-spacing: 0.06em;">REC</span>
       </div>
-      <div id="screen-rec-timer" style="font-family: ui-monospace, monospace; font-size: 1.05em; font-weight: 700; color: #f8fafc; min-width: 52px; text-align: center;">
-        00:00
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 80px;">
+        <div id="screen-rec-timer" style="font-family: ui-monospace, monospace; font-size: 1.0em; font-weight: 700; color: #f8fafc; text-align: center; white-space: nowrap;">
+          00:00
+        </div>
+        <div id="screen-rec-size" style="font-family: ui-monospace, monospace; font-size: 0.72em; color: #94a3b8; text-align: center; white-space: nowrap;">
+          0 B
+        </div>
       </div>
       <div style="width: 1px; height: 20px; background: #334155;"></div>
       <button type="button" id="screen-rec-focus-btn" style="display: none; background: #1e293b; color: #38bdf8; border: 1px solid #0284c7; padding: 5px 12px; border-radius: 20px; font-size: 0.82em; font-weight: 600; cursor: pointer; align-items: center; gap: 6px;">
@@ -1145,9 +1194,14 @@
           </h3>
         </header>
         <div style="padding: 20px 18px;">
-          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
+          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 12px; line-height: 1.5;">
             Recording captured! <span id="save-screen-duration" style="color: #38bdf8; font-weight: 600;"></span>
           </p>
+
+          <div id="save-screen-limit-notice" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; border-radius: 6px; padding: 8px 12px; font-size: 0.84em; margin-bottom: 14px; align-items: center; gap: 8px;">
+            <i class="fas fa-exclamation-triangle" style="flex-shrink: 0;"></i>
+            <span id="save-screen-limit-msg"></span>
+          </div>
 
           <div style="margin-bottom: 18px;">
             <label for="save-screen-title" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
@@ -1312,6 +1366,7 @@
 
         const screenRecBar = document.getElementById('screen-rec-bar');
         const screenRecTimer = document.getElementById('screen-rec-timer');
+        const screenRecSize = document.getElementById('screen-rec-size');
         const screenRecStopBtn = document.getElementById('screen-rec-stop-btn');
         const screenRecCancelBtn = document.getElementById('screen-rec-cancel-btn');
         const screenRecFocusBtn = document.getElementById('screen-rec-focus-btn');
@@ -1331,6 +1386,8 @@
 
         const saveScreenModal = document.getElementById('save-screen-modal');
         const saveScreenDuration = document.getElementById('save-screen-duration');
+        const saveScreenLimitNotice = document.getElementById('save-screen-limit-notice');
+        const saveScreenLimitMsg = document.getElementById('save-screen-limit-msg');
         const saveScreenTitle = document.getElementById('save-screen-title');
         const confirmScreenSaveBtn = document.getElementById('confirm-screen-save-btn');
         const discardScreenSaveBtn = document.getElementById('discard-screen-save-btn');
@@ -3016,6 +3073,13 @@
           return `${val.toFixed(1)} ${units[idx]}`;
         }
 
+        function formatDuration(sec) {
+          const s = Math.max(0, Math.round(Number(sec) || 0));
+          const mins = String(Math.floor(s / 60)).padStart(2, '0');
+          const secs = String(s % 60).padStart(2, '0');
+          return `${mins}:${secs}`;
+        }
+
         function detectSupportedVideoCodec() {
           if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return 'WebM';
           if (MediaRecorder.isTypeSupported('video/webm;codecs=av01.0.08M.10,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=av1')) return 'AV1';
@@ -3038,16 +3102,53 @@
             this.timerInterval = null;
             this.startTime = 0;
             this.durationSec = 0;
+            this.currentSizeBytes = 0;
+            this.maxDurationSec = 0;
+            this.maxSizeBytes = 0;
+            this.stopReason = null;
             this.isRecording = false;
             this.isStopping = false;
+          }
+
+          updateBarUI() {
+            if (screenRecTimer) {
+              const curTimeStr = formatDuration(this.durationSec);
+              if (this.maxDurationSec > 0) {
+                const maxTimeStr = formatDuration(this.maxDurationSec);
+                screenRecTimer.textContent = `${curTimeStr} / ${maxTimeStr}`;
+                screenRecTimer.style.color = (this.durationSec >= this.maxDurationSec * 0.9) ? '#f59e0b' : '#f8fafc';
+              } else {
+                screenRecTimer.textContent = curTimeStr;
+                screenRecTimer.style.color = '#f8fafc';
+              }
+            }
+            if (screenRecSize) {
+              const curSizeStr = formatFileSize(this.currentSizeBytes);
+              if (this.maxSizeBytes > 0) {
+                const maxSizeStr = formatFileSize(this.maxSizeBytes);
+                screenRecSize.textContent = `${curSizeStr} / ${maxSizeStr}`;
+                screenRecSize.style.color = (this.currentSizeBytes >= this.maxSizeBytes * 0.9) ? '#f59e0b' : '#94a3b8';
+              } else {
+                screenRecSize.textContent = curSizeStr;
+                screenRecSize.style.color = '#94a3b8';
+              }
+            }
           }
 
           async start(enableMic = false) {
             this.cleanup();
             this.recordedChunks = [];
             this.durationSec = 0;
+            this.currentSizeBytes = 0;
             this.isRecording = false;
             this.isStopping = false;
+            this.stopReason = null;
+
+            const maxLenSelect = document.getElementById('rec-screen-max-len');
+            const maxSizeSelect = document.getElementById('rec-screen-max-size');
+            this.maxDurationSec = maxLenSelect ? parseInt(maxLenSelect.value, 10) || 0 : 0;
+            const maxSizeMB = maxSizeSelect ? parseInt(maxSizeSelect.value, 10) || 0 : 0;
+            this.maxSizeBytes = maxSizeMB > 0 ? maxSizeMB * 1024 * 1024 : 0;
 
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
               throw new Error('Screen capture API (getDisplayMedia) is not supported in this browser.');
@@ -3232,6 +3333,15 @@
             this.mediaRecorder.ondataavailable = (event) => {
               if (event.data && event.data.size > 0) {
                 this.recordedChunks.push(event.data);
+                this.currentSizeBytes += event.data.size;
+                this.updateBarUI();
+
+                if (this.maxSizeBytes > 0 && this.currentSizeBytes >= this.maxSizeBytes) {
+                  if (this.isRecording && !this.isStopping) {
+                    this.stopReason = 'max_size';
+                    handleStopRecording('max_size');
+                  }
+                }
               }
             };
 
@@ -3254,7 +3364,7 @@
             this.mediaRecorder.start(1000);
             this.startTime = Date.now();
 
-            if (screenRecTimer) screenRecTimer.textContent = '00:00';
+            this.updateBarUI();
             if (screenRecBar) screenRecBar.style.display = 'flex';
             if (screenRecFocusBtn) {
               screenRecFocusBtn.style.display = (activeRecWindow && !activeRecWindow.closed) ? 'inline-flex' : 'none';
@@ -3262,9 +3372,13 @@
 
             this.timerInterval = setInterval(() => {
               this.durationSec = Math.round((Date.now() - this.startTime) / 1000);
-              const mins = String(Math.floor(this.durationSec / 60)).padStart(2, '0');
-              const secs = String(this.durationSec % 60).padStart(2, '0');
-              if (screenRecTimer) screenRecTimer.textContent = `${mins}:${secs}`;
+              this.updateBarUI();
+              if (this.maxDurationSec > 0 && this.durationSec >= this.maxDurationSec) {
+                if (this.isRecording && !this.isStopping) {
+                  this.stopReason = 'max_len';
+                  handleStopRecording('max_len');
+                }
+              }
             }, 500);
           }
 
@@ -3283,10 +3397,11 @@
               const finish = () => {
                 const mimeType = (this.mediaRecorder && this.mediaRecorder.mimeType) || 'video/webm';
                 const blob = this.recordedChunks.length > 0 ? new Blob(this.recordedChunks, { type: mimeType }) : null;
+                const reason = this.stopReason;
                 this.cleanupTracks();
                 this.isRecording = false;
                 this.isStopping = false;
-                resolve({ blob, duration: this.durationSec });
+                resolve({ blob, duration: this.durationSec, stopReason: reason });
               };
 
               if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
@@ -3339,6 +3454,19 @@
             this.recordedChunks = [];
             this.isRecording = false;
             this.isStopping = false;
+            this.durationSec = 0;
+            this.currentSizeBytes = 0;
+            this.maxDurationSec = 0;
+            this.maxSizeBytes = 0;
+            this.stopReason = null;
+            if (screenRecTimer) {
+              screenRecTimer.textContent = '00:00';
+              screenRecTimer.style.color = '#f8fafc';
+            }
+            if (screenRecSize) {
+              screenRecSize.textContent = '0 B';
+              screenRecSize.style.color = '#94a3b8';
+            }
             if (screenRecBar) screenRecBar.style.display = 'none';
           }
         }
@@ -3347,9 +3475,10 @@
         let currentRecordingBlob = null;
         let currentRecordingDuration = 0;
 
-        async function handleStopRecording() {
+        async function handleStopRecording(reason) {
           if (!screenRecorder.isRecording || screenRecorder.isStopping) return;
           screenRecorder.isStopping = true;
+          if (reason) screenRecorder.stopReason = reason;
 
           if (screenRecBar) screenRecBar.style.display = 'none';
           const result = await screenRecorder.stop();
@@ -3361,13 +3490,26 @@
           currentRecordingBlob = result.blob;
           currentRecordingDuration = result.duration;
 
-          const mins = Math.floor(currentRecordingDuration / 60);
-          const secs = currentRecordingDuration % 60;
-          const durStr = `${mins}:${String(secs).padStart(2, '0')}`;
+          const durStr = formatDuration(currentRecordingDuration);
           const sizeStr = formatFileSize(result.blob.size);
 
           if (saveScreenDuration) {
             saveScreenDuration.textContent = `(${durStr}, ${sizeStr})`;
+          }
+
+          const stopReason = result.stopReason || screenRecorder.stopReason || reason;
+          if (saveScreenLimitNotice && saveScreenLimitMsg) {
+            if (stopReason === 'max_len') {
+              const maxLenStr = formatDuration(screenRecorder.maxDurationSec || currentRecordingDuration);
+              saveScreenLimitMsg.textContent = `Recording reached the maximum length limit (${maxLenStr}) and was stopped automatically.`;
+              saveScreenLimitNotice.style.display = 'flex';
+            } else if (stopReason === 'max_size') {
+              const maxSizeStr = formatFileSize(screenRecorder.maxSizeBytes || result.blob.size);
+              saveScreenLimitMsg.textContent = `Recording reached the maximum file size limit (${maxSizeStr}) and was stopped automatically.`;
+              saveScreenLimitNotice.style.display = 'flex';
+            } else {
+              saveScreenLimitNotice.style.display = 'none';
+            }
           }
 
           const nextStepNum = recsList ? recsList.querySelectorAll('.rec-item-wrapper').length + 1 : 1;
@@ -3446,6 +3588,41 @@
           });
         }
 
+        const recScreenQualitySelect = document.getElementById('rec-screen-quality');
+        const recScreenMaxLenSelect = document.getElementById('rec-screen-max-len');
+        const recScreenMaxSizeSelect = document.getElementById('rec-screen-max-size');
+
+        try {
+          const savedQuality = localStorage.getItem('ctlabs_screen_rec_quality');
+          if (savedQuality && recScreenQualitySelect) {
+            recScreenQualitySelect.value = savedQuality;
+          }
+          const savedMaxLen = localStorage.getItem('ctlabs_screen_rec_max_len');
+          if (savedMaxLen !== null && recScreenMaxLenSelect) {
+            recScreenMaxLenSelect.value = savedMaxLen;
+          }
+          const savedMaxSize = localStorage.getItem('ctlabs_screen_rec_max_size');
+          if (savedMaxSize !== null && recScreenMaxSizeSelect) {
+            recScreenMaxSizeSelect.value = savedMaxSize;
+          }
+        } catch (e) {}
+
+        if (recScreenQualitySelect) {
+          recScreenQualitySelect.addEventListener('change', () => {
+            try { localStorage.setItem('ctlabs_screen_rec_quality', recScreenQualitySelect.value); } catch (e) {}
+          });
+        }
+        if (recScreenMaxLenSelect) {
+          recScreenMaxLenSelect.addEventListener('change', () => {
+            try { localStorage.setItem('ctlabs_screen_rec_max_len', recScreenMaxLenSelect.value); } catch (e) {}
+          });
+        }
+        if (recScreenMaxSizeSelect) {
+          recScreenMaxSizeSelect.addEventListener('change', () => {
+            try { localStorage.setItem('ctlabs_screen_rec_max_size', recScreenMaxSizeSelect.value); } catch (e) {}
+          });
+        }
+
         if (recordScreenBtn) {
           recordScreenBtn.addEventListener('click', () => {
             if (recordDropdownMenu) recordDropdownMenu.style.display = 'none';
@@ -3467,6 +3644,11 @@
         if (confirmRecordScreenBtn) {
           confirmRecordScreenBtn.addEventListener('click', async () => {
             if (recordScreenModal) recordScreenModal.style.display = 'none';
+            try {
+              if (recScreenQualitySelect) localStorage.setItem('ctlabs_screen_rec_quality', recScreenQualitySelect.value);
+              if (recScreenMaxLenSelect) localStorage.setItem('ctlabs_screen_rec_max_len', recScreenMaxLenSelect.value);
+              if (recScreenMaxSizeSelect) localStorage.setItem('ctlabs_screen_rec_max_size', recScreenMaxSizeSelect.value);
+            } catch (e) {}
             const enableMic = recScreenMic ? recScreenMic.checked : false;
             try {
               await screenRecorder.start(enableMic);
