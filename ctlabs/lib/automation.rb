@@ -22,6 +22,7 @@ require 'json'
 require 'open3'
 require 'set'
 require 'yaml'
+require 'psych'
 require 'fileutils'
 require 'time'
 require 'cgi'
@@ -631,6 +632,89 @@ module Automation
     Automation.resolve_nested_vars(vars)
   end
 
+  # Walk Psych AST to find duplicate scalar keys among siblings of any mapping.
+  # Merge keys ('<<') and non-scalar keys are ignored.
+  def self.find_duplicate_yaml_keys(node, prefix = [], &block)
+    return unless node
+
+    if node.is_a?(Psych::Nodes::Mapping)
+      seen = {}
+      node.children.each_slice(2) do |key_node, val_node|
+        if key_node.is_a?(Psych::Nodes::Scalar) && key_node.value != '<<'
+          key_str = key_node.value
+          current_path = (prefix + [key_str]).join('.')
+          if seen.key?(key_str)
+            first_line = seen[key_str].start_line + 1
+            dup_line   = key_node.start_line + 1
+            yield(current_path, dup_line, first_line)
+          else
+            seen[key_str] = key_node
+          end
+          find_duplicate_yaml_keys(val_node, prefix + [key_str], &block)
+        else
+          find_duplicate_yaml_keys(val_node, prefix, &block)
+        end
+      end
+    elsif node.is_a?(Psych::Nodes::Sequence)
+      node.children.each_with_index do |child, idx|
+        find_duplicate_yaml_keys(child, prefix + [idx.to_s], &block)
+      end
+    elsif node.is_a?(Psych::Nodes::Document) || node.is_a?(Psych::Nodes::Stream)
+      node.children.each do |child|
+        find_duplicate_yaml_keys(child, prefix, &block)
+      end
+    end
+  end
+
+  # Loads profile YAML, warns on duplicate mapping keys via log, and returns parsed Hash.
+  def self.load_profiles(path, log: nil)
+    return {} unless File.file?(path)
+
+    if log.respond_to?(:write)
+      log.write("load_profiles(#{path}): loaded profile mapping", "debug")
+    elsif log.respond_to?(:debug)
+      log.debug("load_profiles(#{path}): loaded profile mapping")
+    end
+
+    begin
+      doc = Psych.parse_file(path)
+      if doc
+        find_duplicate_yaml_keys(doc) do |key_path, dup_line, first_line|
+          msg = "load_profiles(#{path}): duplicate key \"#{key_path}\" at line #{dup_line} " \
+                "(first defined at line #{first_line}); last definition wins"
+          if log.respond_to?(:write)
+            log.write(msg, "warn")
+          elsif log.respond_to?(:warn)
+            log.warn(msg)
+          else
+            warn(msg)
+          end
+        end
+      end
+    rescue Psych::SyntaxError => e
+      msg = "load_profiles(#{path}): YAML syntax error: #{e.message}"
+      if log.respond_to?(:write)
+        log.write(msg, "warn")
+      elsif log.respond_to?(:warn)
+        log.warn(msg)
+      end
+    rescue => e
+      msg = "load_profiles(#{path}): error checking duplicate keys: #{e.message}"
+      if log.respond_to?(:write)
+        log.write(msg, "warn")
+      elsif log.respond_to?(:warn)
+        log.warn(msg)
+      end
+    end
+
+    raw = YAML.load_file(path) || {}
+    raw.is_a?(Hash) ? raw : {}
+  end
+
+  def load_profiles(path)
+    Automation.load_profiles(path, log: @log)
+  end
+
   def load_automation_profiles(play_cfg)
     if @standalone
       sp_path = Automation.setup_profiles_ctl_path
@@ -639,8 +723,8 @@ module Automation
       sp_path = Automation.setup_profiles_path
       pp_path = Automation.play_profiles_path
     end
-    sp_raw = File.file?(sp_path) ? (YAML.load_file(sp_path) || {}) : {}
-    pp_raw = File.file?(pp_path) ? (YAML.load_file(pp_path) || {}) : {}
+    sp_raw = load_profiles(sp_path)
+    pp_raw = load_profiles(pp_path)
 
     sp_raw = {} unless sp_raw.is_a?(Hash)
     pp_raw = {} unless pp_raw.is_a?(Hash)
