@@ -1361,8 +1361,16 @@
 
         function updateVimModeIndicator(e) {
           if (!mdVimStatusMode) return;
-          const mode = e ? e.mode : 'normal';
-          const subMode = e ? e.subMode : '';
+          let mode = e ? e.mode : null;
+          let subMode = e ? e.subMode : '';
+          if (!mode && mdCodeEditor && mdCodeEditor.state && mdCodeEditor.state.vim) {
+            const vState = mdCodeEditor.state.vim;
+            if (vState.insertMode) mode = 'insert';
+            else if (vState.visualMode) mode = 'visual';
+            else mode = 'normal';
+          }
+          if (!mode) mode = 'normal';
+
           if (mode === 'insert') {
             mdVimStatusMode.textContent = '-- INSERT --';
             mdVimStatusMode.style.color = '#22c55e';
@@ -1385,29 +1393,7 @@
           if (mdVimStatusKey) mdVimStatusKey.textContent = '';
         }
 
-        function updateMdSettingsUI() {
-          if (mdPreviewPane) {
-            if (mdWrapCode) {
-              mdPreviewPane.classList.add('wrap-code');
-            } else {
-              mdPreviewPane.classList.remove('wrap-code');
-            }
-          }
-          if (mdSettingWrapCheckbox) {
-            mdSettingWrapCheckbox.checked = mdWrapCode;
-          }
-          if (mdSettingVimCheckbox) {
-            mdSettingVimCheckbox.checked = mdVimMode;
-          }
-          if (mdVimStatusBar) {
-            mdVimStatusBar.style.display = mdVimMode ? 'flex' : 'none';
-          }
-          if (mdCodeEditor) {
-            mdCodeEditor.setOption('keyMap', mdVimMode ? 'vim' : 'default');
-            if (mdVimMode) {
-              updateVimModeIndicator({ mode: 'normal' });
-            }
-          }
+        function updateMdSettingsBtnUI() {
           if (mdSettingsBtn) {
             const icon = mdSettingsBtn.querySelector('i');
             const isCustom = mdWrapCode || mdVimMode;
@@ -1420,8 +1406,48 @@
             mdSettingsBtn.title = hints.length > 0 ? `Editor settings (${hints.join(', ')})` : 'Editor settings';
           }
         }
-        function updateMdWrapCodeUI() { updateMdSettingsUI(); }
-        function updateMdVimModeUI() { updateMdSettingsUI(); }
+
+        function updateMdWrapCodeUI() {
+          if (mdPreviewPane) {
+            if (mdWrapCode) {
+              mdPreviewPane.classList.add('wrap-code');
+            } else {
+              mdPreviewPane.classList.remove('wrap-code');
+            }
+          }
+          if (mdSettingWrapCheckbox) {
+            mdSettingWrapCheckbox.checked = mdWrapCode;
+          }
+          updateMdSettingsBtnUI();
+        }
+
+        function updateMdVimModeUI() {
+          if (mdSettingVimCheckbox) {
+            mdSettingVimCheckbox.checked = mdVimMode;
+          }
+          if (mdVimStatusBar) {
+            mdVimStatusBar.style.display = mdVimMode ? 'flex' : 'none';
+          }
+          if (mdCodeEditor) {
+            const currentKeyMap = mdCodeEditor.getOption('keyMap') || 'default';
+            if (mdVimMode) {
+              if (!currentKeyMap.startsWith('vim')) {
+                mdCodeEditor.setOption('keyMap', 'vim');
+                updateVimModeIndicator({ mode: 'normal' });
+              }
+            } else {
+              if (currentKeyMap.startsWith('vim')) {
+                mdCodeEditor.setOption('keyMap', 'default');
+              }
+            }
+          }
+          updateMdSettingsBtnUI();
+        }
+
+        function updateMdSettingsUI() {
+          updateMdWrapCodeUI();
+          updateMdVimModeUI();
+        }
 
         let mdIsLoading = false;
 
@@ -2141,7 +2167,7 @@
               try {
                 localStorage.setItem('ctlabs_md_wrap_code', mdWrapCode ? 'true' : 'false');
               } catch (e) {}
-              updateMdSettingsUI();
+              updateMdWrapCodeUI();
             });
           }
 
@@ -2151,7 +2177,7 @@
               try {
                 localStorage.setItem('ctlabs_md_vim_mode', mdVimMode ? 'true' : 'false');
               } catch (e) {}
-              updateMdSettingsUI();
+              updateMdVimModeUI();
             });
           }
 
