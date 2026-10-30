@@ -24,6 +24,7 @@ require 'set'
 require 'yaml'
 require 'fileutils'
 require 'time'
+require 'cgi'
 require_relative '../services/lab_repository'
 
 module Automation
@@ -306,8 +307,8 @@ module Automation
     `#{engine} exec #{container_name} ps aux | grep -v grep | grep terraform`.strip != ""
   end
 
-  EXACT_VAR_REGEX    = /\A(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+)\s*(?:\}\}|\})\z/.freeze
-  EMBEDDED_VAR_REGEX = /(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+)\s*(?:\}\}|\})/.freeze
+  EXACT_VAR_REGEX    = /\A(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+(?:\s*\|[^\}]+)?)\s*(?:\}\}|\})\z/.freeze
+  EMBEDDED_VAR_REGEX = /(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+(?:\s*\|[^\}]+)?)\s*(?:\}\}|\})/.freeze
 
   def self.clean_env_val(val)
     return val unless val.is_a?(String)
@@ -399,6 +400,121 @@ module Automation
     [false, nil]
   end
 
+  def self.parse_filter_args(args_str)
+    return [] if args_str.nil? || args_str.strip.empty?
+    args = []
+    tokens = args_str.scan(/(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^,]+)/).map(&:strip)
+    tokens.each do |tok|
+      if (tok.start_with?('"') && tok.end_with?('"')) || (tok.start_with?("'") && tok.end_with?("'"))
+        args << tok[1..-2]
+      elsif tok =~ /\A-?\d+\z/
+        args << tok.to_i
+      elsif tok =~ /\A-?\d+\.\d+\z/
+        args << tok.to_f
+      elsif tok.casecmp('true').zero?
+        args << true
+      elsif tok.casecmp('false').zero?
+        args << false
+      elsif tok.casecmp('null').zero? || tok.casecmp('nil').zero?
+        args << nil
+      else
+        args << tok
+      end
+    end
+    args
+  end
+
+  def self.apply_filter(val, filter_name, args)
+    case filter_name.downcase
+    when 'upper'
+      val.to_s.upcase
+    when 'lower'
+      val.to_s.downcase
+    when 'capitalize'
+      val.to_s.capitalize
+    when 'title'
+      val.to_s.split.map(&:capitalize).join(' ')
+    when 'trim', 'strip'
+      val.to_s.strip
+    when 'replace'
+      old_s = args[0].to_s
+      new_s = (args[1] || '').to_s
+      val.to_s.gsub(old_s, new_s)
+    when 'default', 'd'
+      fallback = args[0]
+      bool_override = args[1] == true
+      if val.nil? || (bool_override ? !val : (val == '' || val == false))
+        fallback
+      else
+        val
+      end
+    when 'int', 'integer'
+      val.to_s.to_i
+    when 'float'
+      val.to_s.to_f
+    when 'bool'
+      return false if val.nil? || val == false || val == 0 || val == '0' || val.to_s.downcase == 'false'
+      true
+    when 'string'
+      val.to_s
+    when 'first'
+      val.is_a?(Array) ? val.first : val.to_s[0]
+    when 'last'
+      val.is_a?(Array) ? val.last : val.to_s[-1]
+    when 'join'
+      sep = (args[0] || '').to_s
+      val.is_a?(Array) ? val.join(sep) : val.to_s
+    when 'split'
+      sep = args[0] ? args[0].to_s : ' '
+      val.to_s.split(sep)
+    when 'length', 'count'
+      val.respond_to?(:size) ? val.size : val.to_s.length
+    when 'reverse'
+      val.is_a?(Array) ? val.reverse : val.to_s.reverse
+    when 'sort'
+      val.is_a?(Array) ? val.sort : val
+    when 'unique'
+      val.is_a?(Array) ? val.uniq : val
+    when 'abs'
+      val.respond_to?(:abs) ? val.abs : val.to_i.abs
+    when 'round'
+      val.to_f.round(args[0] ? args[0].to_i : 0)
+    when 'urlencode'
+      CGI.escape(val.to_s)
+    else
+      :filter_not_supported
+    end
+  end
+
+  def self.eval_expression(expr, vars_map)
+    parts = expr.split('|').map(&:strip)
+    var_token = parts.shift
+    
+    found, val = lookup_var(var_token, vars_map)
+
+    parts.each do |f_str|
+      if f_str =~ /\A([a-zA-Z0-9_]+)(?:\((.*)\))?\z/
+        f_name = $1
+        args = parse_filter_args($2)
+        if f_name.downcase == 'default' || f_name.downcase == 'd'
+          val = found ? apply_filter(val, f_name, args) : args[0]
+          found = true
+        elsif found
+          new_val = apply_filter(val, f_name, args)
+          return [false, nil] if new_val == :filter_not_supported
+          val = new_val
+        else
+          return [false, nil]
+        end
+      else
+        return [false, nil]
+      end
+    end
+
+    return [false, nil] unless found
+    [true, val]
+  end
+
   def self.interpolate_profile_value(val, vars_map)
     case val
     when Hash
@@ -410,15 +526,15 @@ module Automation
       val.map { |item| interpolate_profile_value(item, vars_map) }
     when String
       if (m = val.match(EXACT_VAR_REGEX))
-        found, resolved = lookup_var(m[1], vars_map)
+        found, resolved = eval_expression(m[1], vars_map)
         return resolved if found
         return val
       end
 
       if val =~ EMBEDDED_VAR_REGEX
         val.gsub(EMBEDDED_VAR_REGEX) do |match|
-          token = $1
-          found, resolved = lookup_var(token, vars_map)
+          expr = $1
+          found, resolved = eval_expression(expr, vars_map)
           found ? resolved.to_s : match
         end
       else

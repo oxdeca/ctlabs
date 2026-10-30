@@ -448,3 +448,41 @@ Generated `ctlabs.yml`:
 4. Add an entry to `setup_profiles.yml` with sensible defaults (if the role has facts)
 5. Add the tag to the relevant lab's `play.tags`
 6. Add a `play.setup.<name>` entry in the lab YAML only if the lab needs non-default config
+
+---
+
+## 12. Variable Interpolation in Profiles (`setup_profiles.yml` & `play_profiles.yml`)
+
+To avoid repeating configuration values (e.g. hostnames, domain names, service ports) across multiple profiles, profile files support **centralized variable definitions and template interpolation**.
+
+### Variable Sources
+
+Variables are collected and resolved in the following priority order:
+
+1. **Profile `vars:` dictionary**: Defined at the top level of `setup_profiles.yml` or `play_profiles.yml`.
+   ```yaml
+   vars:
+     domain: example.com
+     http_port: 8080
+     rundeck_host: "{{ CTLABS_HOST }}"
+   ```
+2. **Built-in Lab Variables**:
+   - `CTLABS_HOST`: Resolves to the active DNAT host/IP (or `127.0.0.1` fallback).
+   - `LAB_NAME`: The active lab name identifier.
+   - `LAB_PATH`: The filesystem path to the lab directory.
+3. **WebUI Environment Variables**: Key-value environment variables configured in the Automation WebUI tab (`lab.play_env_vars` / `lab.ctl_play_env_vars`).
+4. **System Environment Variables**: Fallback to `ENV['KEY']`.
+
+### Usage & Syntax
+
+- **Embedded Strings**:
+  ```yaml
+  server_url: "http://{{ CTLABS_HOST }}:4440"
+  admin_email: "admin@{{ domain }}"
+  ```
+- **Type Preservation on Exact Match**:
+  If a value is solely `{{ port }}`, its native YAML type (e.g. integer `4440` or boolean `true`) is preserved rather than converted to a string.
+- **Nested & Dotted References**:
+  Dotted lookups such as `{{ network.gateway }}` access nested keys within `vars:`.
+- **Jinja Filter Passthrough**:
+  Expressions containing Jinja filters or operators (e.g. `{{ __ad_domain | upper }}` or `{{ hostvars[inventory_hostname].ip }}`) are automatically recognized as Ansible runtime expressions and preserved verbatim without being mangled during `.play_setup_lab.json` generation.

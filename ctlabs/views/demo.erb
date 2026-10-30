@@ -6,7 +6,33 @@
 # -----------------------------------------------------------------------------
 -->
 
+<link rel="stylesheet" href="/css/codemirror-dialog.min.css">
+
 <style>
+  /* CodeMirror Vim dialog & fat cursor styling */
+  .CodeMirror-dialog {
+    background: #0f172a !important;
+    border-top: 1px solid #334155 !important;
+    border-bottom: 1px solid #334155 !important;
+    color: #f8fafc !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-size: 0.82em !important;
+    padding: 4px 10px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5) !important;
+  }
+  .CodeMirror-dialog input {
+    color: #38bdf8 !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-size: 1em !important;
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+  }
+  .cm-fat-cursor .CodeMirror-cursor {
+    background: #38bdf8 !important;
+    opacity: 0.65;
+  }
+
   #step-prev-btn:hover:not(:disabled), #step-next-btn:hover:not(:disabled) {
     background: #0284c7 !important;
     border-color: #38bdf8 !important;
@@ -658,6 +684,12 @@
                     </span>
                     <input type="checkbox" id="md-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
                   </label>
+                  <label id="md-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
+                    </span>
+                    <input type="checkbox" id="md-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
+                  </label>
                 </div>
               </div>
             </div>
@@ -687,11 +719,69 @@
                   <i class="fas fa-columns" style="margin-right: 4px;"></i> Split
                 </button>
               </div>
+
+              <!-- Emoji Helper Dropdown -->
+              <div style="position: relative; display: flex; align-items: center; gap: 6px;">
+                <button type="button" id="md-emoji-btn" title="Insert Emoji (:shortcode: or character, Ctrl+E)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <span style="font-size: 1.1em; line-height: 1;">😃</span>
+                  <span style="font-weight: 500;">Emoji</span>
+                </button>
+
+                <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 340px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: hidden;">
+                  <div style="padding: 8px 10px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; padding: 3px 8px;">
+                      <i class="fas fa-search" style="color: #94a3b8; font-size: 0.8em;"></i>
+                      <input type="text" id="md-emoji-search" placeholder="Search emojis (e.g. rocket, warn, check)..." style="background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.82em; width: 100%;" autocomplete="off" />
+                      <button type="button" id="md-emoji-search-clear" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85em; display: none; padding: 0 4px;" title="Clear">&times;</button>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                      <div id="md-emoji-cat-tabs" style="display: flex; align-items: center; gap: 2px;">
+                        <button type="button" class="md-emoji-cat-btn active" data-cat="all" title="Popular & Common" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: #0284c7; color: #fff; border: none; cursor: pointer;">⚡</button>
+                        <button type="button" class="md-emoji-cat-btn" data-cat="status" title="Status & Alerts" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⚠️</button>
+                        <button type="button" class="md-emoji-cat-btn" data-cat="tech" title="Tech & DevOps" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">🚀</button>
+                        <button type="button" class="md-emoji-cat-btn" data-cat="people" title="People & Reactions" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">👍</button>
+                        <button type="button" class="md-emoji-cat-btn" data-cat="symbols" title="Symbols & Objects" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⭐</button>
+                      </div>
+
+                      <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72em; color: #94a3b8; background: #090d16; padding: 2px 6px; border-radius: 4px; border: 1px solid #334155;">
+                        <span>Insert:</span>
+                        <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as :shortcode:">
+                          <input type="radio" name="md-emoji-insert-mode" value="code" checked style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> :code:
+                        </label>
+                        <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as unicode character">
+                          <input type="radio" name="md-emoji-insert-mode" value="char" style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> Char
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="md-emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 8px; max-height: 220px; overflow-y: auto; background: #131d31;">
+                  </div>
+
+                  <div style="padding: 6px 10px; background: #0f172a; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.74em; color: #94a3b8;">
+                    <div id="md-emoji-footer-preview" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
+                      Hover emoji for code
+                    </div>
+                    <span style="color: #64748b;">Ctrl+E</span>
+                  </div>
+                </div>
+              </div>
             </div>
             <div id="md-content-area" style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
               <!-- Edit Pane -->
               <div id="md-edit-pane" style="flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; border-right: 1px solid #334155;">
-                <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, monospace !important; font-size: 0.8em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
+                <div style="flex: 1; min-height: 0; position: relative;">
+                  <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, monospace !important; font-size: 0.8em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
+                </div>
+                <!-- Vim Mode Status Bar -->
+                <div id="md-vim-status-bar" style="display: none; padding: 4px 12px; background: #0f172a; border-top: 1px solid #334155; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none;">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span id="md-vim-status-mode" style="font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">-- NORMAL --</span>
+                    <span id="md-vim-status-key" style="color: #cbd5e1;"></span>
+                  </div>
+                  <span style="color: #64748b; font-size: 0.9em;">:w save &bull; Esc normal mode</span>
+                </div>
               </div>
               <!-- Preview Pane -->
               <div id="md-preview-pane" class="markdown-body" style="flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding: 24px 32px; color: #e2e8f0; line-height: 1.65; box-sizing: border-box;">
@@ -1099,6 +1189,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/markdown/markdown.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/gfm/gfm.min.js"></script>
     <script src="/js/code_editor.js"></script>
+    <script src="/js/markdown_emojis.js"></script>
+    <script src="/js/codemirror-dialog.min.js"></script>
+    <script src="/js/codemirror-vim.min.js"></script>
     <script src="/js/asciinema-player.min.js"></script>
     <script src="/js/terminal.js"></script>
     <script>
@@ -1140,11 +1233,22 @@
         const mdSettingsBtn = document.getElementById('md-settings-btn');
         const mdSettingsMenu = document.getElementById('md-settings-menu');
         const mdSettingWrapCheckbox = document.getElementById('md-setting-wrap-checkbox');
+        const mdSettingVimCheckbox = document.getElementById('md-setting-vim-checkbox');
+        const mdVimStatusBar = document.getElementById('md-vim-status-bar');
+        const mdVimStatusMode = document.getElementById('md-vim-status-mode');
+        const mdVimStatusKey = document.getElementById('md-vim-status-key');
         const exportNoteModal = document.getElementById('export-note-modal');
         const confirmExportNoteBtn = document.getElementById('confirm-export-note-btn');
         const exportNoteTitleSpan = document.getElementById('export-note-title-span');
         const exportNoteFilenameInput = document.getElementById('export-note-filename');
         const exportNoteFilenameHint = document.getElementById('export-note-filename-hint');
+        const mdEmojiBtn = document.getElementById('md-emoji-btn');
+        const mdEmojiMenu = document.getElementById('md-emoji-menu');
+        const mdEmojiSearch = document.getElementById('md-emoji-search');
+        const mdEmojiSearchClear = document.getElementById('md-emoji-search-clear');
+        const mdEmojiGrid = document.getElementById('md-emoji-grid');
+        const mdEmojiFooterPreview = document.getElementById('md-emoji-footer-preview');
+        const mdEmojiCatBtns = document.querySelectorAll('.md-emoji-cat-btn');
 
         const imageModal = document.getElementById('image-modal');
         const imageModalImg = document.getElementById('image-modal-img');
@@ -1217,7 +1321,38 @@
           mdWrapCode = localStorage.getItem('ctlabs_md_wrap_code') === 'true';
         } catch (e) {}
 
-        function updateMdWrapCodeUI() {
+        let mdVimMode = false;
+        try {
+          mdVimMode = localStorage.getItem('ctlabs_md_vim_mode') === 'true';
+        } catch (e) {}
+
+        function updateVimModeIndicator(e) {
+          if (!mdVimStatusMode) return;
+          const mode = e ? e.mode : 'normal';
+          const subMode = e ? e.subMode : '';
+          if (mode === 'insert') {
+            mdVimStatusMode.textContent = '-- INSERT --';
+            mdVimStatusMode.style.color = '#22c55e';
+          } else if (mode === 'visual') {
+            if (subMode === 'linewise') {
+              mdVimStatusMode.textContent = '-- VISUAL LINE --';
+            } else if (subMode === 'block') {
+              mdVimStatusMode.textContent = '-- VISUAL BLOCK --';
+            } else {
+              mdVimStatusMode.textContent = '-- VISUAL --';
+            }
+            mdVimStatusMode.style.color = '#f59e0b';
+          } else if (mode === 'replace') {
+            mdVimStatusMode.textContent = '-- REPLACE --';
+            mdVimStatusMode.style.color = '#ef4444';
+          } else {
+            mdVimStatusMode.textContent = '-- NORMAL --';
+            mdVimStatusMode.style.color = '#38bdf8';
+          }
+          if (mdVimStatusKey) mdVimStatusKey.textContent = '';
+        }
+
+        function updateMdSettingsUI() {
           if (mdPreviewPane) {
             if (mdWrapCode) {
               mdPreviewPane.classList.add('wrap-code');
@@ -1228,14 +1363,32 @@
           if (mdSettingWrapCheckbox) {
             mdSettingWrapCheckbox.checked = mdWrapCode;
           }
+          if (mdSettingVimCheckbox) {
+            mdSettingVimCheckbox.checked = mdVimMode;
+          }
+          if (mdVimStatusBar) {
+            mdVimStatusBar.style.display = mdVimMode ? 'flex' : 'none';
+          }
+          if (mdCodeEditor) {
+            mdCodeEditor.setOption('keyMap', mdVimMode ? 'vim' : 'default');
+            if (mdVimMode) {
+              updateVimModeIndicator({ mode: 'normal' });
+            }
+          }
           if (mdSettingsBtn) {
             const icon = mdSettingsBtn.querySelector('i');
+            const isCustom = mdWrapCode || mdVimMode;
             if (icon) {
-              icon.style.color = mdWrapCode ? '#38bdf8' : '#94a3b8';
+              icon.style.color = isCustom ? '#38bdf8' : '#94a3b8';
             }
-            mdSettingsBtn.title = mdWrapCode ? 'Editor settings (Code wrapping active)' : 'Editor settings';
+            const hints = [];
+            if (mdWrapCode) hints.push('Wrap code');
+            if (mdVimMode) hints.push('Vi mode');
+            mdSettingsBtn.title = hints.length > 0 ? `Editor settings (${hints.join(', ')})` : 'Editor settings';
           }
         }
+        function updateMdWrapCodeUI() { updateMdSettingsUI(); }
+        function updateMdVimModeUI() { updateMdSettingsUI(); }
 
         let mdIsLoading = false;
 
@@ -1275,6 +1428,11 @@
             }
             return match;
           });
+
+          // 3. Emoji shortcodes replacement (:rocket: -> 🚀, :warning: -> ⚠️, etc.)
+          if (typeof replaceEmojiShortcodes === 'function') {
+            text = replaceEmojiShortcodes(text);
+          }
 
           return text;
         }
@@ -1352,6 +1510,7 @@
             mdCodeEditor = CodeMirror.fromTextArea(ta, {
               mode: modeConfig,
               theme: 'material-ocean',
+              keyMap: mdVimMode ? 'vim' : 'default',
               lineNumbers: true,
               tabSize: 2,
               lineWrapping: true,
@@ -1359,6 +1518,8 @@
               extraKeys: {
                 'Ctrl-S': () => saveMarkdownContent(false),
                 'Cmd-S': () => saveMarkdownContent(false),
+                'Ctrl-E': () => toggleMdEmojiMenu(),
+                'Cmd-E': () => toggleMdEmojiMenu(),
                 'Tab': (cm) => {
                   if (cm.somethingSelected()) {
                     cm.indentSelection('add');
@@ -1366,6 +1527,21 @@
                     cm.replaceSelection('  ', 'end');
                   }
                 }
+              }
+            });
+
+            if (typeof CodeMirror !== 'undefined' && CodeMirror.Vim) {
+              CodeMirror.Vim.defineEx('write', 'w', () => saveMarkdownContent(false));
+              CodeMirror.Vim.defineEx('wq', 'wq', () => saveMarkdownContent(false));
+            }
+
+            mdCodeEditor.on('vim-mode-change', (arg) => {
+              updateVimModeIndicator(arg);
+            });
+
+            mdCodeEditor.on('vim-keypress', (key) => {
+              if (mdVimStatusKey) {
+                mdVimStatusKey.textContent = key || '';
               }
             });
 
@@ -1911,7 +2087,17 @@
               try {
                 localStorage.setItem('ctlabs_md_wrap_code', mdWrapCode ? 'true' : 'false');
               } catch (e) {}
-              updateMdWrapCodeUI();
+              updateMdSettingsUI();
+            });
+          }
+
+          if (mdSettingVimCheckbox) {
+            mdSettingVimCheckbox.addEventListener('change', () => {
+              mdVimMode = !!mdSettingVimCheckbox.checked;
+              try {
+                localStorage.setItem('ctlabs_md_vim_mode', mdVimMode ? 'true' : 'false');
+              } catch (e) {}
+              updateMdSettingsUI();
             });
           }
 
@@ -1933,7 +2119,187 @@
             }
           });
         }
-        updateMdWrapCodeUI();
+        updateMdSettingsUI();
+
+        // --- Markdown Emoji Picker Helper ---
+        let activeEmojiCat = 'all';
+
+        function toggleMdEmojiMenu(show) {
+          if (!mdEmojiMenu) return;
+          const isVisible = mdEmojiMenu.style.display === 'flex';
+          const nextState = (typeof show === 'boolean') ? show : !isVisible;
+          if (nextState) {
+            mdEmojiMenu.style.display = 'flex';
+            if (mdEmojiBtn) {
+              mdEmojiBtn.style.background = '#334155';
+              mdEmojiBtn.style.borderColor = '#38bdf8';
+            }
+            renderEmojiGrid();
+            if (mdEmojiSearch) {
+              setTimeout(() => {
+                mdEmojiSearch.focus();
+                mdEmojiSearch.select();
+              }, 40);
+            }
+          } else {
+            mdEmojiMenu.style.display = 'none';
+            if (mdEmojiBtn) {
+              mdEmojiBtn.style.background = '#1e293b';
+              mdEmojiBtn.style.borderColor = '#475569';
+            }
+          }
+        }
+
+        function renderEmojiGrid() {
+          if (!mdEmojiGrid || typeof MD_EMOJI_MAP === 'undefined') return;
+          const query = (mdEmojiSearch ? mdEmojiSearch.value.trim().toLowerCase() : '');
+          if (mdEmojiSearchClear) {
+            mdEmojiSearchClear.style.display = query ? 'inline-block' : 'none';
+          }
+
+          let items = [];
+          if (query) {
+            items = Object.keys(MD_EMOJI_MAP).filter(code => code.includes(query) || (MD_EMOJI_MAP[code] && MD_EMOJI_MAP[code].includes(query)));
+          } else if (activeEmojiCat === 'all') {
+            const catObj = (typeof MD_EMOJI_CATEGORIES !== 'undefined') ? MD_EMOJI_CATEGORIES.find(c => c.id === 'all') : null;
+            items = catObj ? catObj.items : Object.keys(MD_EMOJI_MAP).slice(0, 48);
+          } else {
+            const catObj = (typeof MD_EMOJI_CATEGORIES !== 'undefined') ? MD_EMOJI_CATEGORIES.find(c => c.id === activeEmojiCat) : null;
+            items = catObj ? catObj.items : [];
+          }
+
+          if (items.length === 0) {
+            mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #94a3b8; padding: 24px 0; font-size: 0.85em;">No matching emojis</div>';
+            return;
+          }
+
+          let html = '';
+          items.forEach(code => {
+            const ch = MD_EMOJI_MAP[code];
+            if (!ch) return;
+            html += `<button type="button" class="md-emoji-grid-btn" data-code="${code}" data-char="${ch}" title=":${code}: (Click to insert)" style="width: 36px; height: 36px; font-size: 1.25em; border: none; background: transparent; cursor: pointer; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; transition: background 0.12s; user-select: none;">${ch}</button>`;
+          });
+          mdEmojiGrid.innerHTML = html;
+
+          mdEmojiGrid.querySelectorAll('.md-emoji-grid-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+              btn.style.background = '#334155';
+              const code = btn.getAttribute('data-code');
+              const ch = btn.getAttribute('data-char');
+              if (mdEmojiFooterPreview) {
+                mdEmojiFooterPreview.textContent = `${ch} :${code}:`;
+              }
+            });
+            btn.addEventListener('mouseleave', () => {
+              btn.style.background = 'transparent';
+              if (mdEmojiFooterPreview) {
+                mdEmojiFooterPreview.textContent = 'Hover emoji for code';
+              }
+            });
+            btn.addEventListener('click', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const code = btn.getAttribute('data-code');
+              const ch = btn.getAttribute('data-char');
+              insertEmojiIntoEditor(code, ch);
+            });
+          });
+        }
+
+        function insertEmojiIntoEditor(code, ch) {
+          if (!code || !ch) return;
+          let mode = 'code';
+          const modeInput = document.querySelector('input[name="md-emoji-insert-mode"]:checked');
+          if (modeInput && modeInput.value === 'char') mode = 'char';
+
+          const textToInsert = (mode === 'char') ? ch : `:${code}: `;
+
+          if (currentMdMode === 'preview') {
+            setMdMode('split');
+          }
+
+          const cm = getMdEditor();
+          if (cm) {
+            cm.replaceSelection(textToInsert, 'end');
+            cm.focus();
+          } else if (mdTextarea) {
+            const start = mdTextarea.selectionStart || 0;
+            const end = mdTextarea.selectionEnd || 0;
+            const val = mdTextarea.value;
+            mdTextarea.value = val.substring(0, start) + textToInsert + val.substring(end);
+            mdTextarea.selectionStart = mdTextarea.selectionEnd = start + textToInsert.length;
+            mdTextarea.focus();
+          }
+
+          onMarkdownContentChanged();
+          toggleMdEmojiMenu(false);
+        }
+
+        if (mdEmojiBtn && mdEmojiMenu) {
+          mdEmojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleMdEmojiMenu();
+          });
+
+          if (mdEmojiSearch) {
+            mdEmojiSearch.addEventListener('input', () => {
+              renderEmojiGrid();
+            });
+            mdEmojiSearch.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                const firstBtn = mdEmojiGrid?.querySelector('.md-emoji-grid-btn');
+                if (firstBtn) firstBtn.click();
+              } else if (e.key === 'Escape') {
+                toggleMdEmojiMenu(false);
+              }
+            });
+          }
+
+          if (mdEmojiSearchClear) {
+            mdEmojiSearchClear.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (mdEmojiSearch) {
+                mdEmojiSearch.value = '';
+                mdEmojiSearch.focus();
+              }
+              renderEmojiGrid();
+            });
+          }
+
+          if (mdEmojiCatBtns) {
+            mdEmojiCatBtns.forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mdEmojiCatBtns.forEach(b => {
+                  b.classList.remove('active');
+                  b.style.background = 'transparent';
+                  b.style.color = '#94a3b8';
+                });
+                btn.classList.add('active');
+                btn.style.background = '#0284c7';
+                btn.style.color = '#ffffff';
+                activeEmojiCat = btn.getAttribute('data-cat') || 'all';
+                if (mdEmojiSearch) mdEmojiSearch.value = '';
+                renderEmojiGrid();
+              });
+            });
+          }
+
+          window.addEventListener('click', (e) => {
+            if (mdEmojiMenu.style.display === 'flex') {
+              if (!mdEmojiBtn.contains(e.target) && !mdEmojiMenu.contains(e.target)) {
+                toggleMdEmojiMenu(false);
+              }
+            }
+          });
+
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && mdEmojiMenu.style.display === 'flex') {
+              toggleMdEmojiMenu(false);
+            }
+          });
+        }
 
         // --- Note Export Modal & Actions ---
         function updateExportNoteFilenameExtension(targetExt) {
@@ -3353,6 +3719,9 @@
                 mdSettingsBtn.style.background = '#1e293b';
                 mdSettingsBtn.style.borderColor = '#475569';
               }
+            }
+            if (mdEmojiMenu && mdEmojiMenu.style.display === 'flex') {
+              toggleMdEmojiMenu(false);
             }
             if (recordScreenModal && recordScreenModal.style.display === 'block') recordScreenModal.style.display = 'none';
           }

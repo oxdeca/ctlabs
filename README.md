@@ -19,6 +19,7 @@ Key Features
 * **Dynamic Topology Mapping:** Automated SVG generation for both Data and Management network planes.
 * **Ad-hoc DNAT Management:** Runtime port forwarding with a full audit trail visible in operational logs.
 * **Concurrency Protection:** Playbook execution lock prevents dangerous concurrent runs between CLI and web interfaces.
+* **Interactive Walkthroughs & Documentation:** Built-in step-by-step player and rich Markdown editor for terminal sessions (`.cast`), screen videos (`.webm`/`.mp4`), and Markdown notes with custom image sizing, emoji picker, Vi mode, and bundle export/import.
 * **CLI and WebUI** Can be used via cli and WebUI
 
 Installation
@@ -104,6 +105,18 @@ The Lab Details view is the central hub for managing a specific lab environment.
 
 * **Container Images:**
   * View and manage the local container images available for use within the lab.
+
+### Walkthroughs & Documentation View
+
+The **Walkthroughs** view provides an integrated authoring and playback environment for lab guides:
+
+* **Interactive Steps**: Combine terminal session casts (`.cast`), screen videos (`.webm`/`.mp4`), and rich Markdown notes into ordered sequences.
+* **Markdown Note Editor**: CodeMirror editor with live preview, custom image resizing (`=300x200`, `=50%`, `{width=300}`), clipboard paste, drag & drop attachments, and code block line wrapping.
+* **Emoji Support**: Built-in GitHub emoji shortcodes (`:rocket:`, `:warning:`) with an interactive emoji picker (`Ctrl+E`).
+* **Vi / Vim Modal Editing**: Optional Vi mode with modal navigation, status bar indicator, and `:w` saving.
+* **Bundle Export / Import**: Export complete walkthrough sets or standalone notes as packaged zip archives with customizable file names and automatic asset path resolution.
+
+For detailed documentation, see [Walkthroughs & Markdown Guide](docs/ctlabs.docs.walkthroughs.md).
 
 
 
@@ -304,5 +317,3 @@ To start the lab, we click the `Start` button which redirects us to the Logstrea
 If we return to the main page (`CTLABS` menu item), we see the message that a lab was already started. We can stop the lab by clicking the `Stop` button.
 
 ![screenshot](docs/pics/screenshot-20260419-195523.png)
-
-
