@@ -306,27 +306,250 @@ module Automation
     `#{engine} exec #{container_name} ps aux | grep -v grep | grep terraform`.strip != ""
   end
 
-  def build_play_setup(play_cfg)
+  EXACT_VAR_REGEX    = /\A(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+)\s*(?:\}\}|\})\z/.freeze
+  EMBEDDED_VAR_REGEX = /(?:\{\{|\$\{)\s*([a-zA-Z0-9_.-]+)\s*(?:\}\}|\})/.freeze
+
+  def self.clean_env_val(val)
+    return val unless val.is_a?(String)
+    val = val.strip
+    if (val.start_with?('"') && val.end_with?('"')) || (val.start_with?("'") && val.end_with?("'"))
+      val = val[1..-2]
+    end
+    if val =~ /\A-?\d+\z/
+      val.to_i
+    elsif val =~ /\A-?\d+\.\d+\z/
+      val.to_f
+    elsif val.casecmp('true').zero?
+      true
+    elsif val.casecmp('false').zero?
+      false
+    elsif val.casecmp('null').zero? || val.casecmp('nil').zero?
+      nil
+    else
+      val
+    end
+  end
+
+  def self.parse_env_vars(env_input)
+    result = {}
+    return result if env_input.nil?
+
+    if env_input.is_a?(Hash)
+      env_input.each { |k, v| result[k.to_s] = clean_env_val(v) }
+      return result
+    end
+
+    items = if env_input.is_a?(Array)
+      env_input
+    elsif env_input.is_a?(String)
+      env_input.split(/\r?\n/)
+    else
+      Array(env_input)
+    end
+
+    items.each do |item|
+      next if item.nil?
+      str = item.to_s.strip
+      next if str.empty? || str.start_with?('#')
+      if str =~ /\A([a-zA-Z0-9_.-]+)\s*[:=]\s*(.*)\z/
+        k = $1.strip
+        v = $2.strip
+        result[k] = clean_env_val(v)
+      end
+    end
+    result
+  end
+
+  def self.lookup_var(token, vars_map)
+    return [false, nil] if vars_map.nil?
+    key = token.to_s.strip
+    return [true, vars_map[key]] if vars_map.key?(key)
+    return [true, vars_map[key.to_sym]] if vars_map.key?(key.to_sym)
+
+    if key.include?('.')
+      parts = key.split('.')
+      current = vars_map
+      found = true
+      parts.each do |part|
+        if current.is_a?(Hash)
+          if current.key?(part)
+            current = current[part]
+          elsif current.key?(part.to_sym)
+            current = current[part.to_sym]
+          else
+            found = false
+            break
+          end
+        elsif current.is_a?(Array) && part =~ /\A\d+\z/
+          idx = part.to_i
+          if idx >= 0 && idx < current.size
+            current = current[idx]
+          else
+            found = false
+            break
+          end
+        else
+          found = false
+          break
+        end
+      end
+      return [true, current] if found
+    end
+
+    [false, nil]
+  end
+
+  def self.interpolate_profile_value(val, vars_map)
+    case val
+    when Hash
+      val.each_with_object({}) do |(k, v), h|
+        new_k = k.is_a?(String) ? interpolate_profile_value(k, vars_map) : k
+        h[new_k] = interpolate_profile_value(v, vars_map)
+      end
+    when Array
+      val.map { |item| interpolate_profile_value(item, vars_map) }
+    when String
+      if (m = val.match(EXACT_VAR_REGEX))
+        found, resolved = lookup_var(m[1], vars_map)
+        return resolved if found
+        return val
+      end
+
+      if val =~ EMBEDDED_VAR_REGEX
+        val.gsub(EMBEDDED_VAR_REGEX) do |match|
+          token = $1
+          found, resolved = lookup_var(token, vars_map)
+          found ? resolved.to_s : match
+        end
+      else
+        val
+      end
+    else
+      val
+    end
+  end
+
+  def self.resolve_nested_vars(vars_map)
+    return {} unless vars_map.is_a?(Hash)
+    resolved = vars_map.dup
+    10.times do
+      changed = false
+      resolved.each do |k, v|
+        new_v = interpolate_profile_value(v, resolved)
+        if new_v != v
+          resolved[k] = new_v
+          changed = true
+        end
+      end
+      break unless changed
+    end
+    resolved
+  end
+
+  def build_automation_vars(play_cfg, sp_raw = {}, pp_raw = {})
+    vars = {}
+
+    # 1. vars from play_profiles.yml
+    vars.merge!(pp_raw['vars']) if pp_raw.is_a?(Hash) && pp_raw['vars'].is_a?(Hash)
+
+    # 2. vars from setup_profiles.yml
+    vars.merge!(sp_raw['vars']) if sp_raw.is_a?(Hash) && sp_raw['vars'].is_a?(Hash)
+
+    # 3. Built-in lab facts
+    server_ip = @server_ip
+    server_ip ||= (Socket.ip_address_list.find { |ai| ai.ipv4? && !ai.ipv4_loopback? }&.ip_address || '127.0.0.1') if defined?(Socket)
+    server_ip ||= '127.0.0.1'
+
+    lab_domain = (@cfg.is_a?(Hash) ? @cfg['domain'] : nil) || @domain || 'ctlabs.internal'
+    lab_name   = @name.to_s
+
+    vars['CTLABS_HOST']   = server_ip
+    vars['ctlabs_host']   = server_ip
+    vars['CTLABS_DOMAIN'] = lab_domain
+    vars['ctlabs_domain'] = lab_domain
+    vars['domain']        = lab_domain
+    vars['lab_name']      = lab_name
+    vars['LAB_NAME']      = lab_name
+
+    nodes_info = {}
+    Array(@nodes).each do |node|
+      next unless node.respond_to?(:name)
+      node_name = node.name.to_s
+      ip        = node.respond_to?(:ipv4) && node.ipv4 ? node.ipv4.to_s.split('/').first : ''
+      fqdn      = node.respond_to?(:fqdn) ? node.fqdn.to_s : ''
+      ipv4_cidr = node.respond_to?(:ipv4) ? node.ipv4.to_s : ''
+
+      vars["#{node_name}_ip"] = ip unless ip.empty?
+      nodes_info[node_name] = {
+        'ip'   => ip,
+        'ipv4' => ipv4_cidr,
+        'fqdn' => fqdn
+      }
+    end
+    vars['nodes'] = nodes_info
+
+    # 4. Lab YAML play.vars / play_cfg['vars']
+    vars.merge!(play_cfg['vars']) if play_cfg.is_a?(Hash) && play_cfg['vars'].is_a?(Hash)
+
+    # 5. Lab YAML play.setup.vars
+    vars.merge!(play_cfg['setup']['vars']) if play_cfg.is_a?(Hash) && play_cfg.dig('setup', 'vars').is_a?(Hash)
+
+    # 6. WebUI Environment variables / play_cfg['env']
+    if play_cfg.is_a?(Hash) && play_cfg['env']
+      env_vars = Automation.parse_env_vars(play_cfg['env'])
+      vars.merge!(env_vars)
+      if env_vars.key?('CTLABS_HOST')
+        vars['ctlabs_host'] = env_vars['CTLABS_HOST']
+      elsif env_vars.key?('ctlabs_host')
+        vars['CTLABS_HOST'] = env_vars['ctlabs_host']
+      end
+      if env_vars.key?('CTLABS_DOMAIN')
+        vars['ctlabs_domain'] = env_vars['CTLABS_DOMAIN']
+        vars['domain']        = env_vars['CTLABS_DOMAIN']
+      elsif env_vars.key?('domain')
+        vars['CTLABS_DOMAIN'] = env_vars['domain']
+        vars['ctlabs_domain'] = env_vars['domain']
+      end
+    end
+
+    Automation.resolve_nested_vars(vars)
+  end
+
+  def load_automation_profiles(play_cfg)
     if @standalone
       sp_path = Automation.setup_profiles_ctl_path
       pp_path = Automation.play_profiles_ctl_path
-      out_file = Automation::PLAY_SETUP_FILE_CTL
     else
       sp_path = Automation.setup_profiles_path
       pp_path = Automation.play_profiles_path
-      out_file = Automation::PLAY_SETUP_FILE
     end
-    setup_profiles = File.file?(sp_path) ?
-      (YAML.load_file(sp_path)['profiles'] || {}) : {}
-    play_profiles  = File.file?(pp_path) ?
-      (YAML.load_file(pp_path)['profiles'] || {}) : {}
+    sp_raw = File.file?(sp_path) ? (YAML.load_file(sp_path) || {}) : {}
+    pp_raw = File.file?(pp_path) ? (YAML.load_file(pp_path) || {}) : {}
+
+    sp_raw = {} unless sp_raw.is_a?(Hash)
+    pp_raw = {} unless pp_raw.is_a?(Hash)
+
+    vars_map = build_automation_vars(play_cfg, sp_raw, pp_raw)
+
+    setup_profiles = Automation.interpolate_profile_value(sp_raw['profiles'] || {}, vars_map)
+    play_profiles  = Automation.interpolate_profile_value(pp_raw['profiles'] || {}, vars_map)
+
+    raw_setup = (play_cfg.is_a?(Hash) && play_cfg['setup'].is_a?(Hash)) ? play_cfg['setup'].reject { |k, _| k == 'vars' } : {}
+    setup_cfg = Automation.interpolate_profile_value(raw_setup, vars_map)
+
+    [setup_profiles, play_profiles, setup_cfg, vars_map]
+  end
+
+  def build_play_setup(play_cfg)
+    out_file = @standalone ? Automation::PLAY_SETUP_FILE_CTL : Automation::PLAY_SETUP_FILE
+    setup_profiles, play_profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
     play_tags     = Array(play_cfg['tags'] || []).map(&:to_s)
     result        = {}
     activated_by  = {}
 
     # process explicit play.setup entries (profile + per-host overrides)
-    (play_cfg['setup'] || {}).each do |role, cfg|
+    setup_cfg.each do |role, cfg|
       cfg        = cfg || {}
       named_prof = cfg['profile'] && setup_profiles[cfg['profile']]
       base_prof  = named_prof || setup_profiles[role]
@@ -366,7 +589,7 @@ module Automation
     # never silently order-dependent. A profile writes facts for its own
     # `hosts:` entries only (baked setup data may carry sibling hosts), and
     # only for roles that ship tasks/facts.yml.
-    node_names = @nodes.map(&:name).to_set
+    node_names = (@nodes || []).map(&:name).to_set
     writers = Hash.new { |h, k| h[k] = [] }
     result.each_key do |profile_name|
       profile_cfg = play_profiles[profile_name]
@@ -455,19 +678,11 @@ module Automation
   PLACEHOLDER_RE = /^[ \t]*\{\{PLAYS\}\}[ \t]*$/.freeze
 
   def generate_setup_yml(play_cfg)
-    if @standalone
-      play_profiles_path = Automation.play_profiles_ctl_path
-      out_path = "#{ANSIBLE_DIR}/playbooks/setup_ctl.yml"
-    else
-      play_profiles_path = Automation.play_profiles_path
-      out_path = "#{ANSIBLE_DIR}/playbooks/setup.yml"
-    end
-    profiles  = File.file?(play_profiles_path) ?
-      (YAML.load_file(play_profiles_path)['profiles'] || {}) : {}
+    out_path = @standalone ? "#{ANSIBLE_DIR}/playbooks/setup_ctl.yml" : "#{ANSIBLE_DIR}/playbooks/setup.yml"
+    _, profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
-    existing  = @nodes.map(&:name)
+    existing  = (@nodes || []).map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
-    setup_cfg = play_cfg['setup'] || {}
 
     plays = profiles.map do |profile_name, cfg|
       next unless cfg['role']
@@ -538,12 +753,10 @@ module Automation
   TPL
 
   def generate_ctlabs_yml(play_cfg)
-    play_profiles_path = @standalone ? Automation.play_profiles_ctl_path : Automation.play_profiles_path
     out_dir = "#{ANSIBLE_DIR}/playbooks"
-    profiles = File.file?(play_profiles_path) ?
-      (YAML.load_file(play_profiles_path)['profiles'] || {}) : {}
+    _, profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
-    existing  = @nodes.map(&:name)
+    existing  = (@nodes || []).map(&:name)
     play_tags = Array(play_cfg['tags'] || []).map(&:to_s)
 
     book = play_cfg['book'] || (@standalone ? 'ctlabs-ctl.yml' : 'ctlabs.yml')
@@ -555,8 +768,8 @@ module Automation
       role_tags = (Array(cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next [] unless (role_tags & play_tags).any?
 
-      setup_cfg   = (play_cfg['setup'] || {})[profile_name]
-      setup_hosts = setup_cfg && setup_cfg['hosts']
+      role_setup  = setup_cfg[profile_name]
+      setup_hosts = role_setup && role_setup['hosts']
 
       hosts_pattern = if setup_hosts.is_a?(String)
         setup_hosts
@@ -614,7 +827,6 @@ module Automation
       ctrl = find_node('ansible') || @nodes.find { |n| n.type.to_s == 'controller' }
       raise "No 'ansible' controller node found in topology" if ctrl.nil?
 
-      domain   = (@cfg['domain'] || @domain)
       play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
 
       # generate ansible artifacts from lab topology + profiles
@@ -622,11 +834,15 @@ module Automation
       generate_setup_yml(play_cfg)
       generate_ctlabs_yml(play_cfg)
 
+      vars_map = build_automation_vars(play_cfg)
+      domain   = vars_map['CTLABS_DOMAIN'] || (@cfg['domain'] || @domain)
+      host_ip  = vars_map['CTLABS_HOST'] || @server_ip
+
       # Determine playbook command
       if play.is_a?(String) && !play.strip.empty?
-        play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+        play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
       elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
-        play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+        play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
       elsif play_cfg['book'].is_a?(String)
         if @standalone
           inv_file = play_cfg['inv'] || 'controller.ini'
@@ -638,7 +854,7 @@ module Automation
         # Always use a .ini inventory filename so -i ./inventories/<inv> resolves.
         inv_file += '.ini' if inv_file && !inv_file.include?('/') && !inv_file.end_with?('.ini')
         play_inv  = " -i ./inventories/#{inv_file}"
-        play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{@server_ip}"
+        play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
         play_env += " -e @#{@standalone ? PLAY_SETUP_FILE_CTL_INNER : PLAY_SETUP_FILE_INNER}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_book = " #{play_book_path}"

@@ -74,28 +74,28 @@
         </div>
 
         <div class="w3-margin-bottom">
-            <label>Environment Variables (One per line)</label>
-            <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
+            <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
+            <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
           </div>
       </div>
 
       <div id="AnsPlaySetup" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Per-lab <code>play.setup</code> overrides (from <code>play:</code> in this lab's YAML) — merges over role/setup profiles per-role. Applied on next playbook run.
+          <i class="fas fa-info-circle"></i> Per-lab <code>play.setup</code> overrides (from <code>play:</code> in this lab's YAML) — merges over role/setup profiles per-role. Supports <code>vars:</code> and <code>{{ VAR }}</code> expansions. Applied on next playbook run.
         </div>
         <textarea id="editor-AnsPlaySetup"></textarea>
       </div>
 
       <div id="AnsSetupProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.setup_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.setup_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.setup_profiles_path) %></code> — default fact config. Separate from lab profiles.
+          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.setup_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.setup_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.setup_profiles_path) %></code> — default fact config. Supports top-level <code>vars:</code> and <code>{{ VAR }}</code> placeholders. Separate from lab profiles.
         </div>
         <textarea id="editor-AnsSetupProfiles"></textarea>
       </div>
 
       <div id="AnsPlayProfiles" class="ans-tab" style="display: none;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.play_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.play_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.play_profiles_path) %></code> — play mappings. Separate from lab profiles.
+          <i class="fas fa-info-circle"></i> File: <code data-lab-label="<%= automation_file_label.call(Automation.play_profiles_path) %>" data-ctl-label="<%= automation_file_label.call(Automation.play_profiles_ctl_path) %>"><%= automation_file_label.call(Automation.play_profiles_path) %></code> — play mappings. Supports top-level <code>vars:</code> and <code>{{ VAR }}</code> placeholders. Separate from lab profiles.
         </div>
         <textarea id="editor-AnsPlayProfiles"></textarea>
       </div>
