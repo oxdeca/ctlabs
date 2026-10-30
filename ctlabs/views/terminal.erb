@@ -27,8 +27,9 @@
       flex-shrink:   0; font-size: 0.85em;
       position:      relative;
     }
-    .status { color: #10b981; font-size: 0.85em; }
-    .status.disconnected { color: #ef4444; }
+    .status { color: #10b981; font-size: 0.85em; display: inline-flex; align-items: center; gap: 5px; user-select: none; }
+    .status.disconnected { color: #ef4444; cursor: pointer; }
+    .status.disconnected:hover { text-decoration: underline; color: #f87171; }
     
     /* Settings Popover Menu */
     #settings-menu {
@@ -40,10 +41,52 @@
       border: 1px solid #334155;
       border-radius: 6px;
       padding: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       z-index: 1000;
       font-size: 0.9em;
-      width: 220px;
+      width: 295px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .settings-tab-btn {
+      padding: 4px 6px;
+      font-size: 0.76em;
+      border-radius: 4px;
+      border: 1px solid #475569;
+      background: #0f172a;
+      color: #94a3b8;
+      cursor: pointer;
+      text-align: center;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .settings-tab-btn:hover {
+      background: #334155;
+      color: #f8fafc;
+    }
+    .settings-tab-btn.active {
+      background: #1e3a8a !important;
+      border-color: #38bdf8 !important;
+      color: #ffffff !important;
+      font-weight: 600;
+    }
+    .settings-section-title {
+      font-size: 0.74em;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .settings-section.no-divider {
+      border-top: none !important;
+      padding-top: 0 !important;
     }
     .setting-group {
       margin-bottom: 10px;
@@ -52,7 +95,7 @@
       display: block;
       margin-bottom: 4px;
       color: #94a3b8;
-      font-size: 0.85em;
+      font-size: 0.84em;
     }
     .setting-group select {
       width: 100%;
@@ -61,7 +104,11 @@
       border: 1px solid #475569;
       padding: 4px 8px;
       border-radius: 4px;
-      font-size: 0.9em;
+      font-size: 0.88em;
+      outline: none;
+    }
+    .setting-group select:focus {
+      border-color: #38bdf8;
     }
 
     /* --- UNIFIED SLIM SCROLLBARS --- */
@@ -151,52 +198,134 @@
   
   <div id="header">
     <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
-    <div style="display: flex; align-items: center; gap: 10px; position: relative;">
+    <div style="display: flex; align-items: center; gap: 8px; position: relative;">
       
-      <!-- Files Button for Any Terminal -->
-      <button id="files-btn" title="File Transfer (Upload / Download)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
-        <i class="fas fa-folder-open" style="color: #38bdf8;"></i>
-        <span>Files</span>
+      <!-- File Transfer Buttons (Upload / Download) -->
+      <button type="button" id="upload-btn" title="Upload to Node" style="background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-upload" style="color: #38bdf8;"></i>
       </button>
 
-      <% if @is_controller %>
-      <!-- Env Files Button for Controller -->
-      <button id="env-files-btn" title="Controller Environment Files (GCP credentials, Kubeconfig, etc.)" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
-        <i class="fas fa-key" style="color: #38bdf8;"></i>
-        <span>Env Files</span>
-        <span id="env-badge" style="display: none; background: #0284c7; color: #fff; font-size: 0.75em; font-weight: bold; padding: 1px 6px; border-radius: 10px;">0</span>
+      <button type="button" id="download-btn" title="Download from Node" style="background: transparent; border: 1px solid #475569; color: #cbd5e1; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-download" style="color: #38bdf8;"></i>
       </button>
-      <% end %>
 
       <!-- Settings Gear Button -->
-      <button id="settings-btn" title="Recording Settings" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: flex; align-items: center;">
+      <button type="button" id="settings-btn" title="Terminal Settings" style="background: transparent; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.9em; display: inline-flex; align-items: center; justify-content: center; height: 26px; position: relative; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-cog"></i>
+        <span id="settings-env-dot" style="display: none; position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; background: #38bdf8; border-radius: 50%;"></span>
       </button>
 
       <!-- Settings Dropdown Menu -->
       <div id="settings-menu">
-        <div style="font-weight: 600; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-          <span>Recording Settings</span>
-          <span id="settings-close" style="cursor: pointer; color: #94a3b8; font-size: 1.1em;">&times;</span>
+        <div style="font-weight: 600; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="display: flex; align-items: center; gap: 6px; color: #f8fafc; font-size: 0.95em;">
+            <i class="fas fa-sliders-h" style="color: #38bdf8;"></i>
+            <span>Terminal Settings</span>
+          </span>
+          <span id="settings-close" style="cursor: pointer; color: #94a3b8; font-size: 1.1em; line-height: 1; padding: 0 3px;" title="Close settings">&times;</span>
         </div>
-        <div class="setting-group">
-          <label for="max-len-select">Max Length:</label>
-          <select id="max-len-select">
-            <option value="60">1 Minute</option>
-            <option value="300" selected>5 Minutes</option>
-            <option value="600">10 Minutes</option>
-            <option value="1800">30 Minutes</option>
-            <option value="0">Unlimited</option>
-          </select>
+
+        <!-- Section Navigation Pills / Tabs -->
+        <div class="settings-tabs" style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+          <button type="button" class="settings-tab-btn active" data-section="all" style="flex: 1;" title="View all sections">
+            All
+          </button>
+          <button type="button" class="settings-tab-btn" data-section="env" style="flex: 1.1;" title="Environment settings">
+            <i class="fas fa-key" style="font-size: 0.85em;"></i>
+            <span>Env</span>
+            <span id="settings-tab-env-badge" style="display: none; background: #0284c7; color: #fff; font-size: 0.7em; font-weight: bold; padding: 0 4px; border-radius: 8px; line-height: 14px;">0</span>
+          </button>
+          <button type="button" class="settings-tab-btn" data-section="recording" style="flex: 1.3;" title="Recording settings">
+            <i class="fas fa-video" style="font-size: 0.85em;"></i>
+            <span>Recording</span>
+            <span id="settings-tab-rec-dot" style="display: none; width: 6px; height: 6px; background: #ef4444; border-radius: 50%;"></span>
+          </button>
+          <button type="button" class="settings-tab-btn" data-section="terminal" style="flex: 1.2;" title="Terminal display settings">
+            <i class="fas fa-terminal" style="font-size: 0.85em;"></i>
+            <span>Terminal</span>
+          </button>
         </div>
-        <div class="setting-group" style="margin-bottom: 0;">
-          <label for="idle-timeout-select">Idle Timeout:</label>
-          <select id="idle-timeout-select">
-            <option value="60">1 Minute</option>
-            <option value="120" selected>2 Minutes</option>
-            <option value="300">5 Minutes</option>
-            <option value="0">Disabled</option>
-          </select>
+
+        <!-- Section 1: Environment -->
+        <div class="settings-section" id="settings-sec-env" style="margin-bottom: 12px;">
+          <div class="settings-section-title" style="color: #38bdf8;">
+            <i class="fas fa-key"></i> Environment
+          </div>
+          <% if @is_controller %>
+          <div style="font-size: 0.78em; color: #94a3b8; margin-bottom: 8px; line-height: 1.3;">
+            Stage credentials and configs into <code>/etc/ctlabs/env/</code>.
+          </div>
+          <button type="button" id="env-files-btn" title="Controller Environment Files (GCP credentials, Kubeconfig, etc.)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.borderColor='#38bdf8'" onmouseout="this.style.background='#0f172a'; this.style.borderColor='#475569'">
+            <span style="display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-file-code" style="color: #38bdf8;"></i>
+              <span>Configure Env Files</span>
+            </span>
+            <span id="env-badge" style="display: none; background: #0284c7; color: #fff; font-size: 0.75em; font-weight: bold; padding: 1px 6px; border-radius: 10px;">0</span>
+          </button>
+          <div id="env-quick-summary" style="display: none; margin-top: 6px; font-size: 0.74em; color: #cbd5e1; background: #0f172a; padding: 5px 8px; border-radius: 4px; border: 1px dashed #334155; font-family: monospace; word-break: break-all;"></div>
+          <% else %>
+          <div style="font-size: 0.8em; color: #64748b; font-style: italic; background: #0f172a; padding: 6px 8px; border-radius: 4px; border: 1px solid #1e293b;">
+            <i class="fas fa-info-circle"></i> Environment file staging is only available on controller nodes.
+          </div>
+          <% end %>
+        </div>
+
+        <!-- Section 2: Recording -->
+        <div class="settings-section" id="settings-sec-recording" style="margin-bottom: 12px; border-top: 1px solid #334155; padding-top: 10px;">
+          <div class="settings-section-title" style="color: #f87171;">
+            <i class="fas fa-video"></i> Session Recording
+          </div>
+          <div class="setting-group" style="margin-bottom: 8px;">
+            <label for="max-len-select">Max Length:</label>
+            <select id="max-len-select">
+              <option value="60">1 Minute</option>
+              <option value="300" selected>5 Minutes</option>
+              <option value="600">10 Minutes</option>
+              <option value="1800">30 Minutes</option>
+              <option value="0">Unlimited</option>
+            </select>
+          </div>
+          <div class="setting-group" style="margin-bottom: 0;">
+            <label for="idle-timeout-select">Idle Timeout:</label>
+            <select id="idle-timeout-select">
+              <option value="60">1 Minute</option>
+              <option value="120" selected>2 Minutes</option>
+              <option value="300">5 Minutes</option>
+              <option value="0">Disabled</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Section 3: Terminal Display -->
+        <div class="settings-section" id="settings-sec-terminal" style="margin-bottom: 0; border-top: 1px solid #334155; padding-top: 10px;">
+          <div class="settings-section-title" style="color: #34d399;">
+            <i class="fas fa-terminal"></i> Terminal Display
+          </div>
+          <div class="setting-group" style="margin-bottom: 8px;">
+            <label for="font-size-select">Font Size:</label>
+            <select id="font-size-select">
+              <option value="12">12px (Compact)</option>
+              <option value="13">13px</option>
+              <option value="14" selected>14px (Default)</option>
+              <option value="16">16px (Large)</option>
+              <option value="18">18px (Extra Large)</option>
+            </select>
+          </div>
+          <div class="setting-group" style="margin-bottom: 8px;">
+            <label for="cursor-style-select">Cursor Style:</label>
+            <select id="cursor-style-select">
+              <option value="block" selected>Block █</option>
+              <option value="underline">Underline _</option>
+              <option value="bar">Bar |</option>
+            </select>
+          </div>
+          <div class="setting-group" style="margin-bottom: 0;">
+            <label for="cursor-blink-select">Cursor Blink:</label>
+            <select id="cursor-blink-select">
+              <option value="true" selected>Blinking</option>
+              <option value="false">Steady</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -205,7 +334,13 @@
         <span id="rec-label">REC</span>
         <span id="rec-timer" style="font-variant-numeric: tabular-nums; display: none; margin-left: 2px;">00:00</span>
       </button>
-      <span id="status" class="status"><i class="fas fa-circle"></i> Connecting...</span>
+
+      <!-- Connect Button (visible when disconnected) -->
+      <button type="button" id="connect-btn" title="Reconnect terminal session" style="display: none; background: #0284c7; border: 1px solid #38bdf8; color: #ffffff; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; align-items: center; gap: 5px; height: 24px; transition: background 0.15s;" onmouseover="this.style.background='#0369a1'" onmouseout="this.style.background='#0284c7'">
+        <i class="fas fa-plug"></i> <span>Connect</span>
+      </button>
+
+      <span id="status" class="status" title=""><i class="fas fa-circle"></i> Connecting...</span>
     </div>
   </div>
 
@@ -512,6 +647,32 @@
           }
         }
 
+        const envDot = document.getElementById('settings-env-dot');
+        if (envDot) {
+          envDot.style.display = configuredFiles.length > 0 ? 'block' : 'none';
+        }
+
+        const tabEnvBadge = document.getElementById('settings-tab-env-badge');
+        if (tabEnvBadge) {
+          if (configuredFiles.length > 0) {
+            tabEnvBadge.textContent = configuredFiles.length;
+            tabEnvBadge.style.display = 'inline-block';
+          } else {
+            tabEnvBadge.style.display = 'none';
+          }
+        }
+
+        const envSummary = document.getElementById('env-quick-summary');
+        if (envSummary) {
+          if (configuredFiles.length > 0) {
+            const names = configuredFiles.map(f => f.env_var).join(', ');
+            envSummary.innerHTML = `<span style="color: #38bdf8;"><i class="fas fa-check-circle"></i> Active:</span> ${names}`;
+            envSummary.style.display = 'block';
+          } else {
+            envSummary.style.display = 'none';
+          }
+        }
+
         listEl.innerHTML = '';
         if (configuredFiles.length === 0) {
           const emptyMsg = document.createElement('div');
@@ -602,6 +763,7 @@
         const feedbackEl = document.getElementById('env-feedback');
 
         const showModal = () => {
+          if (settingsMenu) settingsMenu.style.display = 'none';
           modalBackdrop.style.display = 'flex';
           feedbackEl.style.display = 'none';
         };
@@ -739,6 +901,8 @@
       // =========================================================================
       // General File Transfer (Upload & Download)
       // =========================================================================
+      const uploadBtn = document.getElementById('upload-btn');
+      const downloadBtn = document.getElementById('download-btn');
       const filesBtn = document.getElementById('files-btn');
       const filesModalBackdrop = document.getElementById('files-modal-backdrop');
       const filesModalClose = document.getElementById('files-modal-close');
@@ -989,7 +1153,9 @@
           setupDirectoryShortcuts('/root');
         });
 
-      // Files button and modal open/close
+      // Files buttons (Upload / Download) and modal open/close
+      if (uploadBtn) uploadBtn.addEventListener('click', () => openFilesModal('upload'));
+      if (downloadBtn) downloadBtn.addEventListener('click', () => openFilesModal('download'));
       if (filesBtn) filesBtn.addEventListener('click', () => openFilesModal('upload'));
       if (filesModalClose) filesModalClose.addEventListener('click', closeFilesModal);
       if (filesModalCancel) filesModalCancel.addEventListener('click', closeFilesModal);
@@ -1418,6 +1584,53 @@
         }
       });
 
+      // --- Modular Settings Sections & Tabs ---
+      function switchSettingsTab(section) {
+        document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+          if (btn.dataset.section === section) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+
+        const sections = document.querySelectorAll('.settings-section');
+        sections.forEach(sec => {
+          if (section === 'all') {
+            sec.style.display = 'block';
+            sec.classList.remove('no-divider');
+          } else {
+            const match = sec.id === `settings-sec-${section}`;
+            sec.style.display = match ? 'block' : 'none';
+            if (match) sec.classList.add('no-divider');
+          }
+        });
+        localStorage.setItem('ctlabs_term_settings_tab', section);
+      }
+
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          switchSettingsTab(btn.dataset.section);
+        });
+      });
+
+      const initialSettingsTab = localStorage.getItem('ctlabs_term_settings_tab') || 'all';
+      switchSettingsTab(initialSettingsTab);
+
+      // --- Terminal Display Preferences ---
+      const fontSizeSelect = document.getElementById('font-size-select');
+      const cursorStyleSelect = document.getElementById('cursor-style-select');
+      const cursorBlinkSelect = document.getElementById('cursor-blink-select');
+
+      const savedFontSize = parseInt(localStorage.getItem('ctlabs_term_font_size'), 10) || 14;
+      const savedCursorStyle = localStorage.getItem('ctlabs_term_cursor_style') || 'block';
+      const savedCursorBlink = localStorage.getItem('ctlabs_term_cursor_blink') !== 'false';
+
+      if (fontSizeSelect) fontSizeSelect.value = String(savedFontSize);
+      if (cursorStyleSelect) cursorStyleSelect.value = savedCursorStyle;
+      if (cursorBlinkSelect) cursorBlinkSelect.value = String(savedCursorBlink);
+
       const initialCols = 130;
       const initialRows = 40;
 
@@ -1427,7 +1640,9 @@
         lineHeight: 1,
         theme: { background: '#300a24', foreground: '#ffffff', cursor: '#ffffff', selectionBackground: 'rgba(56, 189, 248, 0.3)' },
         fontFamily: '"Courier New", Courier, monospace',
-        cursorBlink: true, fontSize: 14
+        cursorBlink: savedCursorBlink,
+        cursorStyle: savedCursorStyle,
+        fontSize: savedFontSize
       });
 
       term.onSelectionChange(() => {
@@ -1442,6 +1657,31 @@
       term.loadAddon(serializeAddon);
 
       term.open(container);
+
+      // Apply dynamic terminal display options
+      if (fontSizeSelect) {
+        fontSizeSelect.addEventListener('change', () => {
+          const sz = parseInt(fontSizeSelect.value, 10);
+          term.options.fontSize = sz;
+          fitAddon.fit();
+          localStorage.setItem('ctlabs_term_font_size', sz);
+        });
+      }
+
+      if (cursorStyleSelect) {
+        cursorStyleSelect.addEventListener('change', () => {
+          term.options.cursorStyle = cursorStyleSelect.value;
+          localStorage.setItem('ctlabs_term_cursor_style', cursorStyleSelect.value);
+        });
+      }
+
+      if (cursorBlinkSelect) {
+        cursorBlinkSelect.addEventListener('change', () => {
+          const blink = cursorBlinkSelect.value === 'true';
+          term.options.cursorBlink = blink;
+          localStorage.setItem('ctlabs_term_cursor_blink', blink);
+        });
+      }
 
       const cellSize = () => {
         const d = term._core && term._core._renderService && term._core._renderService.dimensions;
@@ -1499,6 +1739,9 @@
         recBtn.firstElementChild.className = 'fas fa-circle';
         if (recTimer) recTimer.style.display = 'none';
 
+        const tabRecDot = document.getElementById('settings-tab-rec-dot');
+        if (tabRecDot) tabRecDot.style.display = 'none';
+
         const cast = recLines.join('\n') + '\n';
         const blob = new Blob([cast], { type: 'application/x-asciicast' });
         const form = new FormData();
@@ -1555,6 +1798,8 @@
             }
 
             recording = true;
+            const tabRecDot = document.getElementById('settings-tab-rec-dot');
+            if (tabRecDot) tabRecDot.style.display = 'inline-block';
             recBtn.style.borderColor = '#ef4444';
             recBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.18)';
             recLabel.textContent = 'STOP';
@@ -1603,6 +1848,22 @@
         return origWrite(data);
       };
 
+      term.attachCustomKeyEventHandler((e) => {
+        // Intercept Shift+Enter to send ESC + CR (\x1b\r) instead of plain \r
+        // This is the standard sequence for multiline prompts in Claude Code, IPython, etc.
+        if (e.key === 'Enter' && e.shiftKey) {
+          if (e.type === 'keydown') {
+            e.preventDefault();
+            if (recording) resetIdleTimer();
+            if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+              activeWs.send(JSON.stringify({ type: 'input', data: '\x1b\r' }));
+            }
+          }
+          return false;
+        }
+        return true;
+      });
+
       term.onData(data => {
         if (recording) resetIdleTimer();
         if (activeWs && activeWs.readyState === WebSocket.OPEN) {
@@ -1624,6 +1885,36 @@
 
       window.addEventListener('resize', () => fitAddon.fit());
 
+      const connectBtn = document.getElementById('connect-btn');
+      const statusEl = document.getElementById('status');
+
+      const setDisconnectedState = () => {
+        if (connectBtn) connectBtn.style.display = 'inline-flex';
+        if (statusEl) {
+          statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+          statusEl.classList.add('disconnected');
+          statusEl.title = 'Click to reconnect';
+        }
+      };
+
+      const setConnectedState = () => {
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (statusEl) {
+          statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+          statusEl.classList.remove('disconnected');
+          statusEl.title = '';
+        }
+      };
+
+      const setConnectingState = () => {
+        if (connectBtn) connectBtn.style.display = 'none';
+        if (statusEl) {
+          statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Connecting...';
+          statusEl.classList.remove('disconnected');
+          statusEl.title = '';
+        }
+      };
+
       const openSocket = (token = null) => {
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         let wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
@@ -1633,11 +1924,9 @@
         }
         const ws = new WebSocket(wsUrl);
         activeWs = ws;
-        const statusEl = document.getElementById('status');
 
         ws.onopen = () => {
-          statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
-          statusEl.classList.remove('disconnected');
+          setConnectedState();
           term.focus();
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
           if (token && configuredFiles.length > 0) {
@@ -1657,8 +1946,7 @@
 
         ws.onclose = () => {
           if (intentionalReconnect) return;
-          statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
-          statusEl.classList.add('disconnected');
+          setDisconnectedState();
           term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
 
           if (recording) {
@@ -1672,21 +1960,51 @@
             recBtn.style.backgroundColor = 'transparent';
           }
         };
+
+        ws.onerror = () => {
+          if (intentionalReconnect) return;
+          setDisconnectedState();
+        };
       };
 
-      const start = () => {
-        pinToGrid();
-        requestAnimationFrame(async () => {
-          fitAddon.fit();
-          let initialToken = null;
+      const connectTerminal = async () => {
+        setConnectingState();
+        try {
+          if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
+            intentionalReconnect = true;
+            activeWs.close();
+            intentionalReconnect = false;
+          }
+          let token = null;
           if (isController && configuredFiles.length > 0) {
             try {
-              initialToken = await stageEnvFiles(configuredFiles);
+              token = await stageEnvFiles(configuredFiles);
             } catch (err) {
               term.write(`\r\n\x1b[31m[Failed to stage saved environment files: ${err.message}]\x1b[0m\r\n`);
             }
           }
-          openSocket(initialToken);
+          openSocket(token);
+        } catch (err) {
+          setDisconnectedState();
+        }
+      };
+
+      if (connectBtn) {
+        connectBtn.addEventListener('click', () => connectTerminal());
+      }
+      if (statusEl) {
+        statusEl.addEventListener('click', () => {
+          if (statusEl.classList.contains('disconnected')) {
+            connectTerminal();
+          }
+        });
+      }
+
+      const start = () => {
+        pinToGrid();
+        requestAnimationFrame(() => {
+          fitAddon.fit();
+          connectTerminal();
         });
       };
 
