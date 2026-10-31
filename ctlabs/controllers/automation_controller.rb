@@ -455,4 +455,66 @@ class AutomationController < BaseController
     content_type :json
     { success: true }.to_json
   end
+
+  # ---------------------------------------------------------------------------
+  # Lab SSH Agent Endpoints
+  # ---------------------------------------------------------------------------
+  get '/labs/*/ssh_agent' do
+    content_type :json
+    lab_name = params['splat'].first
+    ctrl_name = 'ansible'
+    begin
+      vm_cfg = YAML.load_file(Lab.get_file_path(lab_name))
+      c_name, c_node, = Automation.find_automation_controller(vm_cfg)
+      ctrl_name = c_name if c_name
+    rescue => e
+      # fallback
+    end
+    user = (ctrl_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
+    Automation.ssh_agent_status(ctrl_name, user).to_json
+  end
+
+  post '/labs/*/ssh_agent/add' do
+    content_type :json
+    lab_name = params['splat'].first
+    ctrl_name = 'ansible'
+    begin
+      vm_cfg = YAML.load_file(Lab.get_file_path(lab_name))
+      c_name, c_node, = Automation.find_automation_controller(vm_cfg)
+      ctrl_name = c_name if c_name
+    rescue => e
+      # fallback
+    end
+    user = (ctrl_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
+
+    payload = (JSON.parse(request.body.read) rescue {}) || {}
+    key_path = (payload['key_path'] || params['key_path']).to_s.strip
+    passphrase = (payload['passphrase'] || params['passphrase']).to_s
+
+    if key_path.empty?
+      halt 400, { success: false, error: 'Key path is required' }.to_json
+    end
+
+    result = Automation.ssh_agent_add_key(ctrl_name, key_path, passphrase, user)
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
+
+  post '/labs/*/ssh_agent/clear' do
+    content_type :json
+    lab_name = params['splat'].first
+    ctrl_name = 'ansible'
+    begin
+      vm_cfg = YAML.load_file(Lab.get_file_path(lab_name))
+      c_name, c_node, = Automation.find_automation_controller(vm_cfg)
+      ctrl_name = c_name if c_name
+    rescue => e
+      # fallback
+    end
+    user = (ctrl_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
+
+    result = Automation.ssh_agent_clear(ctrl_name, user)
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
 end

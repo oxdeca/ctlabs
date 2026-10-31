@@ -1454,3 +1454,264 @@ window.destroyControllerTerraform = function(event) {
     window.automationBase = '/controller';
     return window.destroyTerraform(event, '');
 };
+
+// ----------------------------------------------------------------------------
+// --- SSH AGENT MANAGEMENT ---
+// In-memory ssh-agent key management for Controller and Lab automation nodes.
+// ----------------------------------------------------------------------------
+window.sshAgentContext = { scope: 'controller', labName: '' };
+
+window.openSshAgentModal = function(scope, labName) {
+  window.sshAgentContext = {
+    scope: scope || 'controller',
+    labName: labName || ''
+  };
+
+  const badge = document.getElementById('ssh-agent-target-badge');
+  if (badge) {
+    if (window.sshAgentContext.scope === 'controller') {
+      badge.textContent = 'ctl-ctrl (root)';
+      badge.className = 'w3-badge w3-small w3-round w3-indigo';
+    } else {
+      badge.textContent = labName || 'Lab Controller';
+      badge.className = 'w3-badge w3-small w3-round w3-teal';
+    }
+  }
+
+  const alertEl = document.getElementById('ssh-agent-alert');
+  if (alertEl) {
+    alertEl.style.display = 'none';
+    alertEl.innerHTML = '';
+  }
+
+  const passInput = document.getElementById('ssh-agent-passphrase');
+  if (passInput) {
+    passInput.value = '';
+    passInput.type = 'password';
+  }
+  const passIcon = document.getElementById('ssh-agent-pass-icon');
+  if (passIcon && passIcon.parentElement) {
+    passIcon.parentElement.innerHTML = '<i id="ssh-agent-pass-icon" class="fas fa-eye"></i> Show';
+  }
+
+  const modal = document.getElementById('ssh-agent-modal');
+  if (modal) {
+    modal.style.display = 'block';
+  }
+
+  window.loadSshAgentStatus();
+};
+
+window.getSshAgentEndpoint = function(subpath) {
+  const base = (window.sshAgentContext.scope === 'controller')
+    ? '/controller'
+    : window.ansScope(window.sshAgentContext.labName);
+  return `${base}/ssh_agent${subpath || ''}`;
+};
+
+window.loadSshAgentStatus = async function() {
+  const loadingEl = document.getElementById('ssh-agent-loading-identities');
+  const emptyEl = document.getElementById('ssh-agent-empty-msg');
+  const tableEl = document.getElementById('ssh-agent-identities-table');
+  const tbodyEl = document.getElementById('ssh-agent-identities-tbody');
+  const clearBtn = document.getElementById('ssh-agent-clear-btn');
+  const datalist = document.getElementById('ssh-agent-candidate-keys');
+  const keyInput = document.getElementById('ssh-agent-key-path');
+
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+  if (tableEl) tableEl.style.display = 'none';
+  if (clearBtn) clearBtn.style.display = 'none';
+
+  try {
+    const url = window.getSshAgentEndpoint(`?t=${Date.now()}`);
+    const res = await fetch(url);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+
+    if (loadingEl) loadingEl.style.display = 'none';
+
+    const identities = Array.isArray(data.identities) ? data.identities : [];
+    if (identities.length > 0) {
+      if (tbodyEl) {
+        tbodyEl.innerHTML = '';
+        identities.forEach(id => {
+          const tr = document.createElement('tr');
+          tr.style.borderBottom = '1px solid #334155';
+
+          const tdType = document.createElement('td');
+          tdType.style.padding = '6px';
+          tdType.innerHTML = `<span class="w3-badge w3-tiny w3-round w3-dark-grey" style="font-family: monospace;">${window.escapeHtml(id.type || 'RSA')}</span>`;
+
+          const tdFp = document.createElement('td');
+          tdFp.style.padding = '6px';
+          tdFp.innerHTML = `<code style="color: #38bdf8; font-size: 11px;">${window.escapeHtml(id.fingerprint || '')}</code>`;
+
+          const tdComment = document.createElement('td');
+          tdComment.style.padding = '6px';
+          tdComment.style.color = '#e2e8f0';
+          tdComment.style.fontFamily = 'monospace';
+          tdComment.textContent = id.comment || id.raw || '';
+
+          tr.appendChild(tdType);
+          tr.appendChild(tdFp);
+          tr.appendChild(tdComment);
+          tbodyEl.appendChild(tr);
+        });
+      }
+      if (tableEl) tableEl.style.display = 'table';
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+    } else {
+      if (emptyEl) emptyEl.style.display = 'block';
+    }
+
+    if (datalist && Array.isArray(data.candidate_keys)) {
+      datalist.innerHTML = data.candidate_keys.map(k => `<option value="${window.escapeHtml(k)}"></option>`).join('');
+      if (keyInput && !keyInput.value && data.candidate_keys.length > 0) {
+        keyInput.value = data.candidate_keys[0];
+      }
+    }
+  } catch (err) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    const alertEl = document.getElementById('ssh-agent-alert');
+    if (alertEl) {
+      alertEl.className = 'w3-panel w3-round w3-red';
+      alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Error checking SSH Agent: ${window.escapeHtml(err.message)}`;
+      alertEl.style.display = 'block';
+    }
+  }
+};
+
+window.submitSshAgentAddKey = async function(event) {
+  if (event) event.preventDefault();
+  const keyInput = document.getElementById('ssh-agent-key-path');
+  const passInput = document.getElementById('ssh-agent-passphrase');
+  const submitBtn = document.getElementById('ssh-agent-submit-btn');
+  const alertEl = document.getElementById('ssh-agent-alert');
+
+  const keyPath = (keyInput ? keyInput.value : '').trim();
+  const passphrase = passInput ? passInput.value : '';
+
+  if (!keyPath) {
+    if (alertEl) {
+      alertEl.className = 'w3-panel w3-round w3-red';
+      alertEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please provide a key path.';
+      alertEl.style.display = 'block';
+    }
+    return;
+  }
+
+  let originalHtml = '';
+  if (submitBtn) {
+    originalHtml = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding Key...';
+  }
+
+  try {
+    const url = window.getSshAgentEndpoint('/add');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key_path: keyPath, passphrase: passphrase })
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-green';
+        alertEl.innerHTML = `<i class="fas fa-check-circle"></i> ${window.escapeHtml(data.message || 'Key successfully added to SSH Agent.')}`;
+        alertEl.style.display = 'block';
+      }
+      if (passInput) passInput.value = '';
+      window.loadSshAgentStatus();
+    } else {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-red';
+        alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${window.escapeHtml(data.error || 'Failed to add key.')}`;
+        alertEl.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (alertEl) {
+      alertEl.className = 'w3-panel w3-round w3-red';
+      alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Network error: ${window.escapeHtml(err.message)}`;
+      alertEl.style.display = 'block';
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalHtml;
+    }
+  }
+};
+
+window.clearSshAgentKeys = async function() {
+  if (!confirm('Are you sure you want to remove all keys from the SSH Agent?')) {
+    return;
+  }
+
+  const clearBtn = document.getElementById('ssh-agent-clear-btn');
+  const alertEl = document.getElementById('ssh-agent-alert');
+  let origText = '';
+  if (clearBtn) {
+    origText = clearBtn.innerHTML;
+    clearBtn.disabled = true;
+    clearBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Clearing...';
+  }
+
+  try {
+    const url = window.getSshAgentEndpoint('/clear');
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-blue';
+        alertEl.innerHTML = `<i class="fas fa-info-circle"></i> ${window.escapeHtml(data.message || 'All identities removed from agent.')}`;
+        alertEl.style.display = 'block';
+      }
+      window.loadSshAgentStatus();
+    } else {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-red';
+        alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${window.escapeHtml(data.error || 'Failed to clear identities.')}`;
+        alertEl.style.display = 'block';
+      }
+    }
+  } catch (err) {
+    if (alertEl) {
+      alertEl.className = 'w3-panel w3-round w3-red';
+      alertEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Network error: ${window.escapeHtml(err.message)}`;
+      alertEl.style.display = 'block';
+    }
+  } finally {
+    if (clearBtn) {
+      clearBtn.disabled = false;
+      clearBtn.innerHTML = origText;
+    }
+  }
+};
+
+window.toggleSshAgentPassVisibility = function() {
+  const passInput = document.getElementById('ssh-agent-passphrase');
+  const passIcon = document.getElementById('ssh-agent-pass-icon');
+  if (!passInput) return;
+  if (passInput.type === 'password') {
+    passInput.type = 'text';
+    if (passIcon && passIcon.parentElement) {
+      passIcon.parentElement.innerHTML = '<i id="ssh-agent-pass-icon" class="fas fa-eye-slash"></i> Hide';
+    }
+  } else {
+    passInput.type = 'password';
+    if (passIcon && passIcon.parentElement) {
+      passIcon.parentElement.innerHTML = '<i id="ssh-agent-pass-icon" class="fas fa-eye"></i> Show';
+    }
+  }
+};

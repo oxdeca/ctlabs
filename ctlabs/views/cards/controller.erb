@@ -259,6 +259,7 @@
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-cubes w3-text-purple"></i> Controller Terraform</span>
     <div>
+      <button type="button" onclick="window.openSshAgentModal('controller')" class="w3-button w3-round w3-teal" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;" title="Manage SSH Agent &amp; Keys"><i class="fas fa-key"></i> SSH Agent</button>
       <button type="button" onclick="window.openControllerTerraformEditor()" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       <% if controller_up && !ctrl_tf_workdir.empty? %>
         <button type="button" onclick="window.destroyControllerTerraform(event)" class="w3-button w3-round w3-red w3-hover-dark-red" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;" title="Destroy Terraform Resources">

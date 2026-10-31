@@ -477,6 +477,16 @@ class TerminalService
         end
       end
 
+      # Ensure SSH Agent is active for controller containers and inject SSH_AUTH_SOCK
+      if is_controller_container
+        begin
+          agent_sock = Automation.ensure_ssh_agent(exec_name, node_user || 'root')
+          cmd.push('-e', "SSH_AUTH_SOCK=#{agent_sock}") if agent_sock
+        rescue => e
+          puts "[Terminal SSH Agent Error] #{e.message}"
+        end
+      end
+
       cmd.push(exec_name, 'bash')
     end
     cmd

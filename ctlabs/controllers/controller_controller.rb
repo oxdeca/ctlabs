@@ -388,6 +388,39 @@ class ControllerController < BaseController
     { success: true, log_url: "/logs?id=#{register_log(log_path)}" }.to_json
   end
 
+  # ---------------------------------------------------------------------------
+  # SSH Agent Endpoints
+  # ---------------------------------------------------------------------------
+  get '/controller/ssh_agent' do
+    content_type :json
+    ctl_name = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
+    Automation.ssh_agent_status(ctl_name, 'root').to_json
+  end
+
+  post '/controller/ssh_agent/add' do
+    content_type :json
+    ctl_name = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
+    payload = (JSON.parse(request.body.read) rescue {}) || {}
+    key_path = (payload['key_path'] || params['key_path']).to_s.strip
+    passphrase = (payload['passphrase'] || params['passphrase']).to_s
+
+    if key_path.empty?
+      halt 400, { success: false, error: 'Key path is required' }.to_json
+    end
+
+    result = Automation.ssh_agent_add_key(ctl_name, key_path, passphrase, 'root')
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
+
+  post '/controller/ssh_agent/clear' do
+    content_type :json
+    ctl_name = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
+    result = Automation.ssh_agent_clear(ctl_name, 'root')
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
+
   helpers do
     # Identity used for the controller's playbook run-state / lock files. Must
     # match what Automation.run_playbook records for the standalone Lab, whose

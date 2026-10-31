@@ -178,6 +178,147 @@ module Automation
   end
 
   # ---------------------------------------------------------------------------
+  # SSH Agent Helpers
+  # ---------------------------------------------------------------------------
+  def self.ssh_agent_sock(user = 'root')
+    u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    "/tmp/ssh-agent-#{u}.sock"
+  end
+
+  def self.ensure_ssh_agent(container, user = 'root')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    target_user = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    sock = ssh_agent_sock(target_user)
+
+    # Check if agent is currently reachable on this socket
+    # Exit codes for `ssh-add -l`:
+    # 0 = has keys, 1 = no keys (agent is running), 2 = cannot connect (not running)
+    check_cmd = "#{engine} exec -u #{target_user} -e SSH_AUTH_SOCK='#{sock}' #{container} ssh-add -l >/dev/null 2>&1"
+    system(check_cmd)
+    exit_code = $?.exitstatus
+
+    if exit_code != 0 && exit_code != 1
+      system("#{engine} exec #{container} rm -f '#{sock}' >/dev/null 2>&1")
+      start_cmd = "#{engine} exec -u #{target_user} #{container} ssh-agent -a '#{sock}' >/dev/null 2>&1"
+      system(start_cmd)
+      system("#{engine} exec #{container} chmod 600 '#{sock}' >/dev/null 2>&1")
+    end
+
+    # Ensure /etc/profile.d/ctlabs-ssh-agent.sh is present so interactive shells get SSH_AUTH_SOCK
+    profile_script = <<~'SH'
+      if [ -z "$SSH_AUTH_SOCK" ] && [ -S "/tmp/ssh-agent-${USER:-$(id -un)}.sock" ]; then
+        export SSH_AUTH_SOCK="/tmp/ssh-agent-${USER:-$(id -un)}.sock"
+      elif [ -z "$SSH_AUTH_SOCK" ] && [ -S "/tmp/ssh-agent-root.sock" ] && [ "$(id -u)" -eq 0 ]; then
+        export SSH_AUTH_SOCK="/tmp/ssh-agent-root.sock"
+      fi
+    SH
+    system("printf '%s' #{Shellwords.shellescape(profile_script)} | #{engine} exec -i #{container} sh -c 'cat > /etc/profile.d/ctlabs-ssh-agent.sh && chmod 644 /etc/profile.d/ctlabs-ssh-agent.sh' >/dev/null 2>&1")
+
+    sock
+  end
+
+  def self.ssh_agent_status(container, user = 'root')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    target_user = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    sock = ensure_ssh_agent(container, target_user)
+
+    out = `#{engine} exec -u #{target_user} -e SSH_AUTH_SOCK='#{sock}' #{container} ssh-add -l 2>&1`.strip
+    identities = []
+    if $?.exitstatus == 0
+      out.lines.each do |l|
+        parts = l.strip.split(/\s+/, 4)
+        next unless parts.size >= 3
+        identities << {
+          bits: parts[0],
+          fingerprint: parts[1],
+          comment: (parts[2] || '').sub(/\A\(/, '').sub(/\)\z/, ''),
+          type: (parts[3] || '').tr('()', ''),
+          raw: l.strip
+        }
+      end
+    end
+
+    # Discover candidate key files in container ~/.ssh/
+    home = GcpAuth.resolve_home_for(target_container: container, target_user: target_user)
+    keys_out = `#{engine} exec -u #{target_user} #{container} bash -c 'find "#{home}/.ssh" -type f ! -name "*.pub" ! -name "known_hosts*" ! -name "config" ! -name "authorized_keys*" ! -name "*.sock" 2>/dev/null'`.strip
+    candidate_keys = keys_out.lines.map(&:strip).reject(&:empty?)
+
+    {
+      running: true,
+      socket: sock,
+      identities: identities,
+      candidate_keys: candidate_keys
+    }
+  rescue => e
+    { running: false, error: e.message, identities: [], candidate_keys: [] }
+  end
+
+  def self.ssh_agent_add_key(container, key_path, passphrase = nil, user = 'root')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    sock = ensure_ssh_agent(container, u)
+
+    home = GcpAuth.resolve_home_for(target_container: container, target_user: u)
+    expanded_path = key_path.to_s.sub(%r{\A~/}, "#{home}/")
+
+    # If missing in container, check if host has it and copy
+    unless system("#{engine} exec #{container} test -f '#{expanded_path}' >/dev/null 2>&1")
+      host_cand = key_path.to_s.sub(%r{\A~/}, '/root/')
+      if File.file?(host_cand)
+        dir = File.dirname(expanded_path)
+        system("#{engine} exec #{container} mkdir -p -m 700 '#{dir}' >/dev/null 2>&1")
+        system("cat '#{host_cand}' | #{engine} exec -i #{container} sh -c 'cat > \"#{expanded_path}\" && chmod 600 \"#{expanded_path}\"' >/dev/null 2>&1")
+      end
+    end
+
+    unless system("#{engine} exec #{container} test -f '#{expanded_path}' >/dev/null 2>&1")
+      return { success: false, error: "Private key file not found: #{expanded_path}" }
+    end
+
+    # Validate passphrase first via ssh-keygen -y (instant, fails safely without hanging or spinning)
+    clean_pass = passphrase.to_s
+    val_out = `#{engine} exec -u #{u} #{container} ssh-keygen -y -P #{Shellwords.shellescape(clean_pass)} -f '#{expanded_path}' 2>&1`.strip
+    unless $?.exitstatus == 0
+      err = val_out.empty? ? "Incorrect passphrase supplied for #{File.basename(expanded_path)}" : val_out
+      return { success: false, error: err }
+    end
+
+    # Passphrase is confirmed valid -> execute ssh-add with SSH_ASKPASS
+    tmp_askpass = "/tmp/.ctlabs_askpass_#{Process.pid}_#{rand(100000)}.sh"
+    askpass_script = <<~SH
+      #!/bin/sh
+      cat << 'CTL_EOF'
+      #{clean_pass.gsub("'", "'\\\\''")}
+      CTL_EOF
+    SH
+
+    begin
+      system("printf '%s' #{Shellwords.shellescape(askpass_script)} | #{engine} exec -i #{container} sh -c 'cat > #{tmp_askpass} && chmod 700 #{tmp_askpass} && chown #{u}:#{u} #{tmp_askpass} 2>/dev/null || true' >/dev/null 2>&1")
+      add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add '#{expanded_path}' < /dev/null 2>&1"
+      out = `#{add_cmd}`.strip
+      exit_code = $?.exitstatus
+
+      if exit_code == 0
+        { success: true, message: out.empty? ? "Key #{File.basename(expanded_path)} added to agent." : out }
+      else
+        { success: false, error: out.empty? ? "Failed to add key to agent (exit code #{exit_code})" : out }
+      end
+    ensure
+      system("#{engine} exec #{container} rm -f '#{tmp_askpass}' >/dev/null 2>&1")
+    end
+  end
+
+  def self.ssh_agent_clear(container, user = 'root')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    sock = ensure_ssh_agent(container, u)
+    out = `#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' #{container} ssh-add -D 2>&1`.strip
+    { success: true, message: out }
+  rescue => e
+    { success: false, error: e.message }
+  end
+
+  # ---------------------------------------------------------------------------
   # Cancel a running playbook
   # ---------------------------------------------------------------------------
   # Where the run's identity lives. Kept separate from the .lock file on
@@ -1251,6 +1392,16 @@ module Automation
       FileUtils.mkdir_p(host_ssh_dir, mode: 0o700)
       host_ssh_cfg = File.join(host_ssh_dir, 'config')
 
+      # Sync from host /root/.ssh if host has files not yet present in host_ssh_dir
+      if File.file?('/root/.ssh/config') && !File.file?(host_ssh_cfg)
+        FileUtils.cp('/root/.ssh/config', host_ssh_cfg)
+        FileUtils.chmod(0o600, host_ssh_cfg)
+      end
+      if File.directory?('/root/.ssh/keys') && !File.directory?(File.join(host_ssh_dir, 'keys'))
+        FileUtils.cp_r('/root/.ssh/keys', host_ssh_dir)
+        system("chmod -R 700 '#{host_ssh_dir}/keys' && find '#{host_ssh_dir}/keys' -type f -exec chmod 600 {} + 2>/dev/null || true")
+      end
+
       ctr_has_cfg = system("#{engine} exec #{exec_ctrl} test -f '#{ssh_cfg}' >/dev/null 2>&1")
       if File.file?(host_ssh_cfg) && !ctr_has_cfg
         system("#{engine} exec #{exec_ctrl} mkdir -p -m 700 '#{ssh_dir}' >/dev/null 2>&1")
@@ -1261,10 +1412,18 @@ module Automation
       end
     end
 
-    # Fix permissions on SSH files inside container (OpenSSH ignores keys with open perms)
-    system("#{engine} exec #{exec_ctrl} bash -c 'if [ -d \"#{ssh_dir}\" ]; then chmod 700 \"#{ssh_dir}\" && find \"#{ssh_dir}\" -type f -exec chmod 600 {} + 2>/dev/null && chmod 644 \"#{ssh_dir}\"/*.pub 2>/dev/null || true; fi' >/dev/null 2>&1")
+    # Fix permissions on SSH files and subdirectories inside container
+    system("#{engine} exec #{exec_ctrl} bash -c 'if [ -d \"#{ssh_dir}\" ]; then chmod 700 \"#{ssh_dir}\" && find \"#{ssh_dir}\" -type d -exec chmod 700 {} + 2>/dev/null && find \"#{ssh_dir}\" -type f -exec chmod 600 {} + 2>/dev/null && chmod 644 \"#{ssh_dir}\"/*.pub 2>/dev/null || true; fi' >/dev/null 2>&1")
     if exec_user && exec_user != 'root'
       system("#{engine} exec #{exec_ctrl} bash -c 'if [ -d \"#{ssh_dir}\" ]; then chown -R #{exec_user}:#{exec_user} \"#{ssh_dir}\"; fi' >/dev/null 2>&1")
+    end
+
+    # Ensure SSH Agent is active for target controller and inject SSH_AUTH_SOCK
+    begin
+      agent_sock = Automation.ensure_ssh_agent(exec_ctrl, exec_user)
+      exec_env += "-e SSH_AUTH_SOCK='#{agent_sock}' " if agent_sock
+    rescue => e
+      @log&.write "SSH Agent ensure warning: #{e.message}", "debug"
     end
 
     # Configure GIT_SSH_COMMAND so Git/Terraform uses non-interactive SSH with ~/.ssh/config
@@ -1408,9 +1567,12 @@ module Automation
     # same ones ANSIBLE_DIR_CTL/TF_DIR_CTL already assume.
     ans_ctl = ansible_dir_ctl || ANSIBLE_DIR_CTL
     tf_ctl  = terraform_dir_ctl || TF_DIR_CTL
+    user_for_agent = (container_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
+    agent_sock = (Automation.ensure_ssh_agent(container_name, user_for_agent) rescue Automation.ssh_agent_sock(user_for_agent))
     repo_env = "CTLABS_ANSIBLE_REPO_DIR=#{ans_ctl} " \
                "CTLABS_TERRAFORM_REPO_DIR=#{tf_ctl} " \
-               "CTLABS_TOOLS_REPO_DIR=/srv/ctlabs/ctlabs-tools"
+               "CTLABS_TOOLS_REPO_DIR=/srv/ctlabs/ctlabs-tools " \
+               "SSH_AUTH_SOCK=#{agent_sock}"
     inner_command = "cd #{ans_ctl} && #{repo_env} ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
   
