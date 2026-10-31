@@ -74,7 +74,13 @@
     <div class="w3-container w3-padding slim-scroll" id="tf-editors-container" style="flex: 1; overflow-y: auto; min-height: 400px;">
       
       <div id="TfSettings" class="tf-tab">
-        <label style="font-size: 0.85em; color: #94a3b8;">Working Directory (Relative to ctlabs-terraform)</label>
+        <div class="w3-margin-bottom">
+          <label style="font-size: 0.85em; color: #94a3b8;">Repository / Root Directory</label>
+          <input type="text" id="edit-terraform-root-dir" list="available-terraform-repos" class="w3-input w3-small w3-round" placeholder="/root/ctlabs-terraform" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+          <datalist id="available-terraform-repos"></datalist>
+        </div>
+
+        <label style="font-size: 0.85em; color: #94a3b8;">Working Directory (Relative to repository root)</label>
         
         <div style="display: flex; gap: 8px; margin-bottom: 16px;">
           <input type="text" id="edit-terraform-workdir" class="w3-input w3-small w3-round" placeholder="(root directory)" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; flex: 1;">

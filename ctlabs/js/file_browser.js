@@ -18,7 +18,13 @@
       document.getElementById('unified-file-browser-modal').style.display = 'block';
 
       try {
-          const res = await fetch(`${window.ansScope()}/${mode}/tree?t=${Date.now()}`);
+          const rootDirInput = mode === 'ansible'
+              ? document.getElementById('edit-ansible-root-dir')
+              : document.getElementById('edit-terraform-root-dir');
+          const rootDir = (rootDirInput?.value || '').trim();
+          let url = `${window.ansScope()}/${mode}/tree?t=${Date.now()}`;
+          if (rootDir) url += `&root_dir=${encodeURIComponent(rootDir)}`;
+          const res = await fetch(url);
           if (res.ok) {
               const files = await res.json();
               listDiv.innerHTML = '';
@@ -74,4 +80,3 @@
           window.fetchTerraformFile(path);
       }
   };
-  

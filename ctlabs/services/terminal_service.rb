@@ -439,13 +439,16 @@ class TerminalService
       is_ctl_controller = defined?(Controller) && exec_name == (Controller::NAME rescue 'ctl-ctrl')
       is_controller_container = (node_type == 'controller') || is_ctl_controller
 
-      if session[:vault_token] && session[:vault_addr] && is_controller_container && tf_cfg
-        begin
-          gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
-                                     scope: is_ctl_controller ? 'ctl' : 'lab')
-          gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
-        rescue => e
-          puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
+      if is_controller_container && tf_cfg
+        auth_method = (tf_cfg['auth'] && tf_cfg['auth']['method']) rescue nil
+        if auth_method == 'env' || (session[:vault_token] && session[:vault_addr])
+          begin
+            gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
+                                       scope: is_ctl_controller ? 'ctl' : 'lab')
+            gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
+          rescue => e
+            puts "[Terminal GCP Auto-Fetch Error] #{e.message}"
+          end
         end
       end
 

@@ -35,7 +35,7 @@ class GcpAuth
   #
   # Returns the env vars to inject into the container, or {} when this node
   # has no GCP auth configured at all.
-  def self.env_vars(tf_cfg, vault_ctx, scope: 'lab')
+  def self.env_vars(tf_cfg, vault_ctx = nil, scope: 'lab', repo_dir_ctl: nil)
     auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
     return {} unless auth_cfg
 
@@ -44,8 +44,29 @@ class GcpAuth
       vars = {}
       cred_file = auth_cfg['credentials_file'].to_s.strip
       unless cred_file.empty?
-        # Resolve relative paths against standard in-container repo mount
-        resolved_path = cred_file.start_with?('/') ? cred_file : "/srv/ctlabs/ctlabs-terraform/#{cred_file}"
+        # Determine in-container terraform root dir
+        tf_repo = repo_dir_ctl || tf_cfg['root_dir_ctl']
+        if tf_repo.to_s.empty?
+          tf_repo_host = tf_cfg['root_dir'].to_s.strip
+          tf_repo = if tf_repo_host.empty?
+                      '/srv/ctlabs/ctlabs-terraform'
+                    elsif tf_repo_host.start_with?('/srv/ctlabs/')
+                      tf_repo_host
+                    else
+                      tf_repo_host.sub(%r{\A/root/}, '/srv/ctlabs/')
+                    end
+        end
+
+        # Resolve path: ~/ points to in-container user's home (/home/ansible or /root),
+        # absolute paths stay absolute, relative paths resolve against repo root
+        if cred_file.start_with?('~/')
+          user_home = '/home/ansible'
+          resolved_path = cred_file.sub(%r{\A~/}, "#{user_home}/")
+        elsif cred_file.start_with?('/')
+          resolved_path = cred_file
+        else
+          resolved_path = "#{tf_repo}/#{cred_file}"
+        end
         vars['GOOGLE_APPLICATION_CREDENTIALS'] = resolved_path
       end
 

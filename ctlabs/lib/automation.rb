@@ -740,8 +740,9 @@ module Automation
     [setup_profiles, play_profiles, setup_cfg, vars_map]
   end
 
-  def build_play_setup(play_cfg)
-    out_file = @standalone ? Automation::PLAY_SETUP_FILE_CTL : Automation::PLAY_SETUP_FILE
+  def build_play_setup(play_cfg, base_dir: nil)
+    ans_base = base_dir || (play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip)
+    out_file = @standalone ? "#{ans_base}/playbooks/.play_setup_ctl.json" : "#{ans_base}/playbooks/.play_setup_lab.json"
     setup_profiles, play_profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
     play_tags     = Array(play_cfg['tags'] || []).map(&:to_s)
@@ -796,7 +797,7 @@ module Automation
       next unless profile_cfg && profile_cfg['role']
       role = profile_cfg['role'].to_s
       next if role.empty?
-      next unless File.file?("#{ANSIBLE_DIR}/roles/#{role}/tasks/facts.yml")
+      next unless File.file?("#{ans_base}/roles/#{role}/tasks/facts.yml")
       Array(profile_cfg['hosts']).uniq.each do |host|
         next unless node_names.include?(host)
         writers[[host, role]] << "#{profile_name} [setup: #{activated_by[profile_name]}]"
@@ -877,8 +878,9 @@ module Automation
   # placeholder is never mistaken for it.
   PLACEHOLDER_RE = /^[ \t]*\{\{PLAYS\}\}[ \t]*$/.freeze
 
-  def generate_setup_yml(play_cfg)
-    out_path = @standalone ? "#{ANSIBLE_DIR}/playbooks/setup_ctl.yml" : "#{ANSIBLE_DIR}/playbooks/setup.yml"
+  def generate_setup_yml(play_cfg, base_dir: nil)
+    ans_base = base_dir || (play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip)
+    out_path = @standalone ? "#{ans_base}/playbooks/setup_ctl.yml" : "#{ans_base}/playbooks/setup.yml"
     _, profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
     existing  = (@nodes || []).map(&:name)
@@ -886,7 +888,7 @@ module Automation
 
     plays = profiles.map do |profile_name, cfg|
       next unless cfg['role']
-      next unless File.file?("#{ANSIBLE_DIR}/roles/#{cfg['role']}/tasks/facts.yml")
+      next unless File.file?("#{ans_base}/roles/#{cfg['role']}/tasks/facts.yml")
 
       role_tags = (Array(cfg['tags'] || []).map(&:to_s) + [profile_name.to_s]).uniq
       next unless (role_tags & play_tags).any?
@@ -952,8 +954,9 @@ module Automation
     {{PLAYS}}
   TPL
 
-  def generate_ctlabs_yml(play_cfg)
-    out_dir = "#{ANSIBLE_DIR}/playbooks"
+  def generate_ctlabs_yml(play_cfg, base_dir: nil)
+    ans_base = base_dir || (play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip)
+    out_dir = "#{ans_base}/playbooks"
     _, profiles, setup_cfg, _ = load_automation_profiles(play_cfg)
 
     existing  = (@nodes || []).map(&:name)
@@ -1029,10 +1032,13 @@ module Automation
 
       play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
 
+      ans_base_host = play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip
+      ans_base_ctl  = play_cfg['root_dir_ctl'] || (ans_base_host.start_with?('/srv/ctlabs/') ? ans_base_host : ans_base_host.sub(%r{\A/root/}, '/srv/ctlabs/'))
+
       # generate ansible artifacts from lab topology + profiles
-      build_play_setup(play_cfg)
-      generate_setup_yml(play_cfg)
-      generate_ctlabs_yml(play_cfg)
+      build_play_setup(play_cfg, base_dir: ans_base_host)
+      generate_setup_yml(play_cfg, base_dir: ans_base_host)
+      generate_ctlabs_yml(play_cfg, base_dir: ans_base_host)
 
       vars_map = build_automation_vars(play_cfg)
       domain   = vars_map['CTLABS_DOMAIN'] || (@cfg['domain'] || @domain)
@@ -1055,7 +1061,8 @@ module Automation
         inv_file += '.ini' if inv_file && !inv_file.include?('/') && !inv_file.end_with?('.ini')
         play_inv  = " -i ./inventories/#{inv_file}"
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
-        play_env += " -e @#{@standalone ? PLAY_SETUP_FILE_CTL_INNER : PLAY_SETUP_FILE_INNER}"
+        inner_setup_file = @standalone ? "#{ans_base_ctl}/playbooks/.play_setup_ctl.json" : "#{ans_base_ctl}/playbooks/.play_setup_lab.json"
+        play_env += " -e @#{inner_setup_file}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_book = " #{play_book_path}"
         play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
@@ -1072,7 +1079,8 @@ module Automation
       # fallback was dead code (every caller passes a log path) that only
       # duplicated the command string and diverged in error handling.
       status = stream_docker_exec(controller_exec_name, play_cmd, log_file_path,
-                                  pid_file: log_file_path ? Automation.playbook_run_state_path(@relative_path) : nil)
+                                  pid_file: log_file_path ? Automation.playbook_run_state_path(@relative_path) : nil,
+                                  ansible_dir_ctl: ans_base_ctl)
 
       # Reaching this point does NOT mean the playbook succeeded: it may have
       # been stopped by the user (SIGTERM/143) or failed outright. Say which.
@@ -1122,8 +1130,11 @@ module Automation
     vars      = tf_cfg['vars'] || []
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
+    tf_base_host = tf_cfg['root_dir'].to_s.strip.empty? ? TF_DIR : tf_cfg['root_dir'].to_s.strip
+    tf_base_ctl  = tf_cfg['root_dir_ctl'] || (tf_base_host.start_with?('/srv/ctlabs/') ? tf_base_host : tf_base_host.sub(%r{\A/root/}, '/srv/ctlabs/'))
+
     tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
-    work_dir = "#{TF_DIR_CTL}/#{tf_work_dir}"
+    work_dir = "#{tf_base_ctl}/#{tf_work_dir}"
     
     custom_script = tf_cfg['commands'].to_s.strip
 
@@ -1161,7 +1172,8 @@ module Automation
     # --- Fetch GCP credentials in Ruby, dispatched on terraform.auth.method ---
     begin
       gcp_env = GcpAuth.env_vars(tf_cfg, { addr: web_v_addr, token: web_v_token },
-                                 scope: (@standalone ? 'ctl' : 'lab'))
+                                 scope: (@standalone ? 'ctl' : 'lab'),
+                                 repo_dir_ctl: tf_base_ctl)
       gcp_env.each { |key, value| exec_env += "-e #{key}='#{value}' " }
     rescue => e
       error_msg = "\n❌ ERROR: Could not generate GCP credentials: #{e.message}\n👉 Please use the Vault Login button in the UI.\n"
@@ -1219,7 +1231,8 @@ module Automation
           @log.info "Harvesting provisioned IPs from terraform.tfstate..."
           
           # Handle Workspace paths correctly
-          state_file = workspace == 'default' ? "#{work_dir}/terraform.tfstate" : "#{work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+          host_work_dir = "#{tf_base_host}/#{tf_work_dir}"
+          state_file = workspace == 'default' ? "#{host_work_dir}/terraform.tfstate" : "#{host_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
 
           if File.exist?(state_file)
             state_data = JSON.parse(File.read(state_file))
@@ -1296,7 +1309,7 @@ module Automation
   #
   # Returns the child's status as a String: '0', '143', 'terminated by SIG15',
   # or 'unknown' if the status could not be determined.
-  def stream_docker_exec(container_name, play_cmd, log_file_path = nil, pid_file: nil)
+  def stream_docker_exec(container_name, play_cmd, log_file_path = nil, pid_file: nil, ansible_dir_ctl: nil, terraform_dir_ctl: nil)
     # Export the repo dirs the ctlabs-ansible group_vars expect
     # (inventories/group_vars/all/ctlabs.yml: ctg_ansible_repo_dir et al. resolve
     # from these env vars). They must be exported, not left to the group_vars
@@ -1306,10 +1319,12 @@ module Automation
     # output) then lands in the container's ephemeral "/" and is lost on the next
     # controller recreate, breaking vault unseal. The mounted paths below are the
     # same ones ANSIBLE_DIR_CTL/TF_DIR_CTL already assume.
-    repo_env = "CTLABS_ANSIBLE_REPO_DIR=#{ANSIBLE_DIR_CTL} " \
-               "CTLABS_TERRAFORM_REPO_DIR=#{TF_DIR_CTL} " \
+    ans_ctl = ansible_dir_ctl || ANSIBLE_DIR_CTL
+    tf_ctl  = terraform_dir_ctl || TF_DIR_CTL
+    repo_env = "CTLABS_ANSIBLE_REPO_DIR=#{ans_ctl} " \
+               "CTLABS_TERRAFORM_REPO_DIR=#{tf_ctl} " \
                "CTLABS_TOOLS_REPO_DIR=/srv/ctlabs/ctlabs-tools"
-    inner_command = "cd #{ANSIBLE_DIR_CTL} && #{repo_env} ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
+    inner_command = "cd #{ans_ctl} && #{repo_env} ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
   
     # Open log file ONCE before streaming (critical for web UI visibility)

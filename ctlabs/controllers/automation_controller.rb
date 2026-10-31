@@ -37,8 +37,9 @@ class AutomationController < BaseController
     filepath = params[:path].to_s.strip
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
+    root_dir = params[:root_dir].to_s.strip
     begin
-      content = AutomationService.read_ansible_file(filepath)
+      content = AutomationService.read_ansible_file(filepath, root_dir.empty? ? nil : root_dir)
       { content: content }.to_json
     rescue => e
       status 400
@@ -49,8 +50,9 @@ class AutomationController < BaseController
   # Scan the directory to populate the File Browser Dropdown
   get '/labs/*/ansible/tree' do
     content_type :json
+    root_dir = params[:root_dir].to_s.strip
     begin
-      AutomationService.ansible_tree.to_json
+      AutomationService.ansible_tree(root_dir.empty? ? nil : root_dir).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -102,6 +104,7 @@ class AutomationController < BaseController
       play_cfg = {} if play_cfg.is_a?(String)
       old_play = Marshal.load(Marshal.dump(play_cfg))
 
+      params[:root_dir].to_s.strip.empty? ? play_cfg.delete('root_dir') : play_cfg['root_dir'] = params[:root_dir].strip
       params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
       params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
 
@@ -140,7 +143,7 @@ class AutomationController < BaseController
       LabRepository.update_ansible_play(lab_path, old_play, play_cfg, { 'setup' => params[:setup].to_s })
 
       ans_files = JSON.parse(params[:ans_files] || '{}')
-      AutomationService.write_ansible_files(ans_files)
+      AutomationService.write_ansible_files(ans_files, play_cfg['root_dir'])
 
       profile_files = {}
       profile_files['play_profiles.yml']  = params[:play_profiles]  if params[:play_profiles]  && !params[:play_profiles].to_s.strip.empty?
@@ -162,8 +165,9 @@ class AutomationController < BaseController
     filepath = params[:filepath].to_s.strip
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
+    root_dir = params[:root_dir].to_s.strip
     begin
-      AutomationService.delete_ansible_file(filepath)
+      AutomationService.delete_ansible_file(filepath, root_dir.empty? ? nil : root_dir)
       { success: true }.to_json
     rescue => e
       status 400
@@ -250,8 +254,9 @@ class AutomationController < BaseController
 
   get '/labs/*/terraform/tree' do
     content_type :json
+    root_dir = params[:root_dir].to_s.strip
     begin
-      AutomationService.terraform_tree.to_json
+      AutomationService.terraform_tree(root_dir.empty? ? nil : root_dir).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -263,8 +268,9 @@ class AutomationController < BaseController
     filepath = params[:path].to_s.strip
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
+    root_dir = params[:root_dir].to_s.strip
     begin
-      content = AutomationService.read_terraform_file(filepath)
+      content = AutomationService.read_terraform_file(filepath, root_dir.empty? ? nil : root_dir)
       { content: content }.to_json
     rescue => e
       status 400
@@ -277,8 +283,9 @@ class AutomationController < BaseController
     work_dir = params[:work_dir].to_s.strip
     halt 400, { error: "Invalid working directory" }.to_json if work_dir.empty? || work_dir.include?('..')
 
+    root_dir = params[:root_dir].to_s.strip
     begin
-      AutomationService.read_terraform_workdir_files(work_dir).to_json
+      AutomationService.read_terraform_workdir_files(work_dir, root_dir.empty? ? nil : root_dir).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -298,6 +305,7 @@ class AutomationController < BaseController
 
       tf_cfg = base_data['terraform'] || {}
 
+      params[:root_dir].to_s.strip.empty? ? tf_cfg.delete('root_dir') : tf_cfg['root_dir'] = params[:root_dir].strip
       params[:work_dir].to_s.strip.empty? ? tf_cfg.delete('work_dir') : tf_cfg['work_dir'] = params[:work_dir].strip
       params[:workspace].to_s.strip.empty? ? tf_cfg.delete('workspace') : tf_cfg['workspace'] = params[:workspace].strip
 
@@ -384,7 +392,7 @@ class AutomationController < BaseController
       LabRepository.write_formatted_yaml(lab_path, full_yaml)
 
       tf_files = JSON.parse(params[:tf_files] || '{}')
-      AutomationService.write_terraform_files(tf_files)
+      AutomationService.write_terraform_files(tf_files, tf_cfg['root_dir'])
 
       content_type :json
       { success: true, message: "Configuration and all files saved successfully." }.to_json
@@ -400,9 +408,20 @@ class AutomationController < BaseController
     filepath = params[:filepath].to_s.strip
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
+    root_dir = params[:root_dir].to_s.strip
     begin
-      AutomationService.delete_terraform_file(filepath)
+      AutomationService.delete_terraform_file(filepath, root_dir.empty? ? nil : root_dir)
       { success: true }.to_json
+    rescue => e
+      status 400
+      { error: e.message }.to_json
+    end
+  end
+
+  get '/automation/repositories' do
+    content_type :json
+    begin
+      AutomationService.available_repositories.to_json
     rescue => e
       status 400
       { error: e.message }.to_json

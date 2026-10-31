@@ -42,6 +42,24 @@ window.setProfileFileLabel = function(containerSelector, isController) {
   if (label) code.textContent = label;
 };
 
+window.loadAvailableRepositories = async function() {
+  try {
+    const res = await fetch('/automation/repositories');
+    if (!res.ok) return;
+    const repos = await res.json();
+    const ansList = document.getElementById('available-ansible-repos');
+    if (ansList && repos.ansible) {
+      ansList.innerHTML = repos.ansible.map(r => `<option value="${r}"></option>`).join('');
+    }
+    const tfList = document.getElementById('available-terraform-repos');
+    if (tfList && repos.terraform) {
+      tfList.innerHTML = repos.terraform.map(r => `<option value="${r}"></option>`).join('');
+    }
+  } catch (e) {
+    console.warn("Could not load available repositories", e);
+  }
+};
+
 // ----------------------------------------------------------------------------
 // --- ANSIBLE ---
 // ----------------------------------------------------------------------------
@@ -109,8 +127,10 @@ window.openAnsTab = function(tabId) {
   window.fetchAnsibleFile = async function(filepath) {
       const resultDiv = document.getElementById('ansible-editor-result');
       try {
-          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`${window.ansScope()}/ansible/file?path=${encodeURIComponent(filepath)}`);
+          const rootDir = (document.getElementById('edit-ansible-root-dir')?.value || '').trim();
+          let url = `${window.ansScope()}/ansible/file?path=${encodeURIComponent(filepath)}`;
+          if (rootDir) url += `&root_dir=${encodeURIComponent(rootDir)}`;
+          const res = await fetch(url);
           if (!res.ok) throw new Error((await res.json()).error);
           
           const data = await res.json();
@@ -265,6 +285,10 @@ window.loadAnsProfiles = async function() {
         }
         const customInv = play.custom_inv || '';
         document.getElementById('edit-ansible-book').value = book;
+        if (document.getElementById('edit-ansible-root-dir')) {
+            document.getElementById('edit-ansible-root-dir').value = play.root_dir || '';
+        }
+        window.loadAvailableRepositories && window.loadAvailableRepositories();
         document.getElementById('edit-ansible-inv').value = defaultInv;
         document.getElementById('edit-ansible-custom-inv').value = customInv;
         document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
@@ -327,6 +351,7 @@ window.loadAnsProfiles = async function() {
       const playSetup = window.cmEditors['editor-AnsPlaySetup']     ? window.cmEditors['editor-AnsPlaySetup'].getValue()     : '';
 
       const formData = new URLSearchParams({
+          root_dir: (document.getElementById('edit-ansible-root-dir')?.value || '').trim(),
           book: document.getElementById('edit-ansible-book').value,
           inv: document.getElementById('edit-ansible-inv').value,
           custom_inv: document.getElementById('edit-ansible-custom-inv').value,
@@ -410,10 +435,13 @@ window.loadAnsProfiles = async function() {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
+          const rootDir = (document.getElementById('edit-ansible-root-dir')?.value || '').trim();
+          const bodyData = { filepath: filepath };
+          if (rootDir) bodyData.root_dir = rootDir;
           const res = await fetch(`${window.ansScope()}/ansible/file/delete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ filepath: filepath }).toString()
+              body: new URLSearchParams(bodyData).toString()
           });
           
           if (res.ok) {
@@ -712,6 +740,10 @@ window.openTfTab = function(tabId) {
           let tf = data.json.tf || {};
           
           document.getElementById('edit-terraform-workdir').value = tf.work_dir || '';
+          if (document.getElementById('edit-terraform-root-dir')) {
+              document.getElementById('edit-terraform-root-dir').value = tf.root_dir || '';
+          }
+          window.loadAvailableRepositories && window.loadAvailableRepositories();
           document.getElementById('edit-terraform-workspace').value = tf.workspace || '';
           document.getElementById('edit-terraform-vars').value = (tf.vars || []).join('\n');
 
@@ -786,8 +818,10 @@ window.openTfTab = function(tabId) {
       resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering and loading files...';
 
       try {
-          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`${window.ansScope()}/terraform/files?work_dir=${encodeURIComponent(workDir)}`);
+          const rootDir = (document.getElementById('edit-terraform-root-dir')?.value || '').trim();
+          let url = `${window.ansScope()}/terraform/files?work_dir=${encodeURIComponent(workDir)}`;
+          if (rootDir) url += `&root_dir=${encodeURIComponent(rootDir)}`;
+          const res = await fetch(url);
           if (!res.ok) throw new Error((await res.json()).error);
           const data = await res.json();
 
@@ -851,6 +885,7 @@ window.openTfTab = function(tabId) {
       const customCommands = window.cmEditors['edit-terraform-commands'] ? window.cmEditors['edit-terraform-commands'].getValue() : '';
 
       const formData = new URLSearchParams({
+          root_dir: (document.getElementById('edit-terraform-root-dir')?.value || '').trim(),
           work_dir: workDir,
           workspace: document.getElementById('edit-terraform-workspace').value,
           vars: document.getElementById('edit-terraform-vars').value,
@@ -934,8 +969,10 @@ window.openTfTab = function(tabId) {
   window.fetchTerraformFile = async function(filepath) {
       const resultDiv = document.getElementById('terraform-editor-result');
       try {
-          const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-          const res = await fetch(`${window.ansScope()}/terraform/file?path=${encodeURIComponent(filepath)}`);
+          const rootDir = (document.getElementById('edit-terraform-root-dir')?.value || '').trim();
+          let url = `${window.ansScope()}/terraform/file?path=${encodeURIComponent(filepath)}`;
+          if (rootDir) url += `&root_dir=${encodeURIComponent(rootDir)}`;
+          const res = await fetch(url);
           if (!res.ok) throw new Error((await res.json()).error);
           
           const data = await res.json();
@@ -958,10 +995,13 @@ window.openTfTab = function(tabId) {
 
       const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
       try {
+          const rootDir = (document.getElementById('edit-terraform-root-dir')?.value || '').trim();
+          const bodyData = { filepath: filepath };
+          if (rootDir) bodyData.root_dir = rootDir;
           const res = await fetch(`${window.ansScope()}/terraform/file/delete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({ filepath: filepath }).toString()
+              body: new URLSearchParams(bodyData).toString()
           });
           
           if (res.ok) {
@@ -1092,7 +1132,10 @@ window.openTfTab = function(tabId) {
       document.getElementById('tf-dir-browser-modal').style.display = 'block';
 
       try {
-          const res = await fetch(`${window.ansScope()}/terraform/tree?t=${Date.now()}`);
+          const rootDir = (document.getElementById('edit-terraform-root-dir')?.value || '').trim();
+          let url = `${window.ansScope()}/terraform/tree?t=${Date.now()}`;
+          if (rootDir) url += `&root_dir=${encodeURIComponent(rootDir)}`;
+          const res = await fetch(url);
           if (res.ok) {
               window.tfBrowserTree = await res.json();
           } else {

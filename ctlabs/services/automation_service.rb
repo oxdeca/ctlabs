@@ -12,32 +12,47 @@ class AutomationService
   ANS_BASE_DIR = '/root/ctlabs-ansible'.freeze
   TF_BASE_DIR = '/root/ctlabs-terraform'.freeze
 
+  def self.resolve_ansible_dir(dir = nil)
+    d = dir.to_s.strip
+    return ANS_BASE_DIR if d.empty?
+    d.start_with?('/') ? d : File.join(ANS_BASE_DIR, d)
+  end
 
-  def self.ansible_tree
-    return [] unless Dir.exist?(ANS_BASE_DIR)
-    Dir.glob(File.join(ANS_BASE_DIR, "**", "*"))
+  def self.resolve_terraform_dir(dir = nil)
+    d = dir.to_s.strip
+    return TF_BASE_DIR if d.empty?
+    d.start_with?('/') ? d : File.join(TF_BASE_DIR, d)
+  end
+
+  def self.ansible_tree(root_dir = nil)
+    base = resolve_ansible_dir(root_dir)
+    return [] unless Dir.exist?(base)
+    Dir.glob(File.join(base, "**", "*"))
        .reject { |f| File.directory?(f) || f.include?('/.git/') || f.include?('/__pycache__/') || f.include?('/.idea/') }
-       .map { |f| f.sub(ANS_BASE_DIR + '/', '') }
+       .map { |f| f.sub(base + '/', '') }
        .sort
   end
 
-  def self.read_ansible_file(filepath)
-    full_path = File.join(ANS_BASE_DIR, filepath)
+  def self.read_ansible_file(filepath, root_dir = nil)
+    base = resolve_ansible_dir(root_dir)
+    full_path = File.join(base, filepath)
     File.file?(full_path) ? File.read(full_path) : "# New file: #{filepath}\n"
   end
 
-  def self.write_ansible_files(files_hash)
+  def self.write_ansible_files(files_hash, root_dir = nil)
+    base = resolve_ansible_dir(root_dir)
     files_hash.each do |filepath, content|
       next if filepath.include?('..') || filepath.start_with?('/')
-      full_path = File.join(ANS_BASE_DIR, filepath)
+      full_path = File.join(base, filepath)
       FileUtils.mkdir_p(File.dirname(full_path))
       File.write(full_path, content)
       FileUtils.chmod("+x", full_path) if filepath.end_with?('.py') || filepath.end_with?('.sh')
     end
   end
 
-  def self.delete_ansible_file(filepath)
-    full_path = File.join(ANS_BASE_DIR, filepath)
+  def self.delete_ansible_file(filepath, root_dir = nil)
+    base = resolve_ansible_dir(root_dir)
+    full_path = File.join(base, filepath)
     File.delete(full_path) if File.exist?(full_path)
   end
 
@@ -76,21 +91,24 @@ class AutomationService
     end
   end
 
-  def self.terraform_tree
-    return [] unless Dir.exist?(TF_BASE_DIR)
-    Dir.glob(File.join(TF_BASE_DIR, "**", "*"))
+  def self.terraform_tree(root_dir = nil)
+    base = resolve_terraform_dir(root_dir)
+    return [] unless Dir.exist?(base)
+    Dir.glob(File.join(base, "**", "*"))
        .reject { |f| f.include?('/.terraform/') || f.include?('/.git/') || f.end_with?('.tfstate') || f.end_with?('.tfstate.backup') }
-       .map { |f| File.directory?(f) ? "#{f.sub(TF_BASE_DIR + '/', '')}/" : f.sub(TF_BASE_DIR + '/', '') }
+       .map { |f| File.directory?(f) ? "#{f.sub(base + '/', '')}/" : f.sub(base + '/', '') }
        .sort
   end
 
-  def self.read_terraform_file(filepath)
-    full_path = File.join(TF_BASE_DIR, filepath)
+  def self.read_terraform_file(filepath, root_dir = nil)
+    base = resolve_terraform_dir(root_dir)
+    full_path = File.join(base, filepath)
     File.file?(full_path) ? File.read(full_path) : "# New file: #{filepath}\n"
   end
 
-  def self.read_terraform_workdir_files(work_dir)
-    target_dir = File.join(TF_BASE_DIR, work_dir)
+  def self.read_terraform_workdir_files(work_dir, root_dir = nil)
+    base = resolve_terraform_dir(root_dir)
+    target_dir = File.join(base, work_dir)
     response = {'config.yml' => "", 'main.tf' => "", 'provider.tf' => ""}
     
     if Dir.exist?(target_dir)
@@ -105,17 +123,31 @@ class AutomationService
     response
   end
 
-  def self.write_terraform_files(files_hash)
+  def self.write_terraform_files(files_hash, root_dir = nil)
+    base = resolve_terraform_dir(root_dir)
     files_hash.each do |filepath, content|
       next if filepath.include?('..') || filepath.start_with?('/')
-      full_path = File.join(TF_BASE_DIR, filepath)
+      full_path = File.join(base, filepath)
       FileUtils.mkdir_p(File.dirname(full_path))
       File.write(full_path, content)
     end
   end
 
-  def self.delete_terraform_file(filepath)
-    full_path = File.join(TF_BASE_DIR, filepath)
+  def self.delete_terraform_file(filepath, root_dir = nil)
+    base = resolve_terraform_dir(root_dir)
+    full_path = File.join(base, filepath)
     File.delete(full_path) if File.exist?(full_path)
+  end
+
+  def self.available_repositories
+    repos = { ansible: [ANS_BASE_DIR], terraform: [TF_BASE_DIR] }
+    Dir.glob('/root/*').each do |p|
+      next unless File.directory?(p)
+      repos[:ansible] << p if File.file?(File.join(p, 'ansible.cfg')) || Dir.exist?(File.join(p, 'playbooks')) || Dir.exist?(File.join(p, 'roles'))
+      repos[:terraform] << p if Dir.glob(File.join(p, '*.tf')).any? || Dir.glob(File.join(p, '**', '*.tf')).any?
+    end
+    repos[:ansible].uniq!
+    repos[:terraform].uniq!
+    repos
   end
 end
