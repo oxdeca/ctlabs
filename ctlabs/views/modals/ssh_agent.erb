@@ -9,14 +9,12 @@
 <div id="ssh-agent-modal" class="w3-modal" style="z-index: 9999;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 650px;">
     
-    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <h4 style="margin: 0; font-size: 1.15rem; font-weight: 600;">
-          <i class="fas fa-key w3-text-teal" style="margin-right: 8px;"></i>SSH Agent Manager
-          <span id="ssh-agent-target-badge" class="w3-badge w3-small w3-round w3-indigo" style="margin-left: 8px; font-size: 11px; padding: 2px 8px; vertical-align: middle;">ctl-ctrl</span>
-        </h4>
-      </div>
-      <span onclick="document.getElementById('ssh-agent-modal').style.display='none'" class="w3-button w3-hover-red w3-round" style="color: #cbd5e1; font-size: 1.2rem; padding: 2px 10px;">&times;</span>
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; position: relative;">
+      <span onclick="document.getElementById('ssh-agent-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1; font-size: 1.25rem; padding: 6px 14px;">&times;</span>
+      <h4 style="margin: 0; font-size: 1.15rem; font-weight: 600;">
+        <i class="fas fa-key w3-text-teal" style="margin-right: 8px;"></i>SSH Agent Manager
+        <span id="ssh-agent-target-badge" class="w3-badge w3-small w3-round w3-indigo" style="margin-left: 8px; font-size: 11px; padding: 2px 8px; vertical-align: middle;">ctl-ctrl</span>
+      </h4>
     </header>
 
     <div class="w3-container w3-padding" style="max-height: 75vh; overflow-y: auto;">
@@ -129,6 +127,9 @@
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+            <button type="button" onclick="document.getElementById('ssh-agent-modal').style.display='none'" class="w3-button w3-round" style="background-color: #334155; color: #cbd5e1; font-size: 13px; font-weight: 500; padding: 6px 16px;">
+              Cancel
+            </button>
             <button type="submit" id="ssh-agent-submit-btn" class="w3-button w3-round w3-teal" style="font-size: 13px; font-weight: 600; padding: 6px 16px;">
               <i class="fas fa-unlock-alt"></i> Load Key into Agent
             </button>
@@ -144,5 +145,11 @@
       </div>
 
     </div>
+
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; align-items: center;">
+      <button type="button" onclick="document.getElementById('ssh-agent-modal').style.display='none'" class="w3-button w3-round" style="background-color: #334155; color: #cbd5e1; font-size: 13px; padding: 6px 16px;">
+        <i class="fas fa-times" style="margin-right: 6px;"></i>Close
+      </button>
+    </footer>
   </div>
 </div>
