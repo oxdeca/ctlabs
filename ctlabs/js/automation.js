@@ -1460,6 +1460,124 @@ window.destroyControllerTerraform = function(event) {
 // In-memory ssh-agent key management for Controller and Lab automation nodes.
 // ----------------------------------------------------------------------------
 window.sshAgentContext = { scope: 'controller', labName: '' };
+window.sshAgentMode = 'local';
+window.uploadedSshKeyContent = '';
+
+window.switchSshAgentMode = function(mode) {
+  window.sshAgentMode = mode;
+  const btnLocal = document.getElementById('ssh-mode-btn-local');
+  const btnRemote = document.getElementById('ssh-mode-btn-remote');
+  const paneLocal = document.getElementById('ssh-agent-pane-local');
+  const paneRemote = document.getElementById('ssh-agent-pane-remote');
+
+  if (mode === 'local') {
+    if (btnLocal) {
+      btnLocal.classList.add('w3-text-teal');
+      btnLocal.style.fontWeight = '600';
+      btnLocal.style.borderBottom = '2px solid #14b8a6';
+      btnLocal.style.color = '';
+    }
+    if (btnRemote) {
+      btnRemote.classList.remove('w3-text-teal');
+      btnRemote.style.fontWeight = '500';
+      btnRemote.style.borderBottom = 'none';
+      btnRemote.style.color = '#94a3b8';
+    }
+    if (paneLocal) paneLocal.style.display = 'block';
+    if (paneRemote) paneRemote.style.display = 'none';
+  } else {
+    if (btnRemote) {
+      btnRemote.classList.add('w3-text-teal');
+      btnRemote.style.fontWeight = '600';
+      btnRemote.style.borderBottom = '2px solid #14b8a6';
+      btnRemote.style.color = '';
+    }
+    if (btnLocal) {
+      btnLocal.classList.remove('w3-text-teal');
+      btnLocal.style.fontWeight = '500';
+      btnLocal.style.borderBottom = 'none';
+      btnLocal.style.color = '#94a3b8';
+    }
+    if (paneLocal) paneLocal.style.display = 'none';
+    if (paneRemote) paneRemote.style.display = 'block';
+  }
+};
+
+window.handleSshKeyFileSelect = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    window.uploadedSshKeyContent = e.target.result;
+    const nameInput = document.getElementById('ssh-agent-key-name');
+    if (nameInput) {
+      nameInput.value = file.name.replace(/\.(pem|key)$/i, '');
+    }
+    const label = document.getElementById('ssh-agent-selected-file-label');
+    if (label) {
+      label.textContent = `Selected: ${file.name} (${file.size} bytes)`;
+      label.style.display = 'inline-block';
+    }
+    const pasteBox = document.getElementById('ssh-agent-paste-box');
+    if (pasteBox) pasteBox.style.display = 'none';
+  };
+  reader.readAsText(file);
+};
+
+window.toggleSshPasteMode = function() {
+  const pasteBox = document.getElementById('ssh-agent-paste-box');
+  const toggleLink = document.getElementById('ssh-agent-paste-toggle-link');
+  if (!pasteBox) return;
+
+  if (pasteBox.style.display === 'none' || !pasteBox.style.display) {
+    pasteBox.style.display = 'block';
+    if (toggleLink) toggleLink.innerHTML = '<i class="fas fa-file-upload"></i> Switch to file upload';
+  } else {
+    pasteBox.style.display = 'none';
+    if (toggleLink) toggleLink.innerHTML = '<i class="fas fa-keyboard"></i> Or paste key text directly';
+  }
+};
+
+window.handleSshPasteInput = function() {
+  const pasteContent = document.getElementById('ssh-agent-paste-content');
+  if (pasteContent && pasteContent.value.trim().length > 0) {
+    window.uploadedSshKeyContent = '';
+    const label = document.getElementById('ssh-agent-selected-file-label');
+    if (label) label.style.display = 'none';
+
+    const nameInput = document.getElementById('ssh-agent-key-name');
+    if (nameInput && !nameInput.value) {
+      nameInput.value = 'id_rsa';
+    }
+  }
+};
+
+window.initSshDropzone = function() {
+  const dropzone = document.getElementById('ssh-agent-dropzone');
+  if (!dropzone || dropzone.dataset.initialized) return;
+  dropzone.dataset.initialized = 'true';
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = '#14b8a6';
+    dropzone.style.backgroundColor = '#132338';
+  });
+  dropzone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = '#475569';
+    dropzone.style.backgroundColor = '#0b1120';
+  });
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = '#475569';
+    dropzone.style.backgroundColor = '#0b1120';
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const file = e.dataTransfer.files[0];
+      window.handleSshKeyFileSelect({ target: { files: [file] } });
+    }
+  });
+};
 
 window.openSshAgentModal = function(scope, labName) {
   window.sshAgentContext = {
@@ -1484,6 +1602,25 @@ window.openSshAgentModal = function(scope, labName) {
     alertEl.innerHTML = '';
   }
 
+  // Reset inputs
+  window.uploadedSshKeyContent = '';
+  const filePicker = document.getElementById('ssh-agent-file-picker');
+  if (filePicker) filePicker.value = '';
+  const label = document.getElementById('ssh-agent-selected-file-label');
+  if (label) {
+    label.textContent = '';
+    label.style.display = 'none';
+  }
+  const pasteBox = document.getElementById('ssh-agent-paste-box');
+  if (pasteBox) pasteBox.style.display = 'none';
+  const pasteContent = document.getElementById('ssh-agent-paste-content');
+  if (pasteContent) pasteContent.value = '';
+  const toggleLink = document.getElementById('ssh-agent-paste-toggle-link');
+  if (toggleLink) toggleLink.innerHTML = '<i class="fas fa-keyboard"></i> Or paste key text directly';
+
+  const nameInput = document.getElementById('ssh-agent-key-name');
+  if (nameInput) nameInput.value = '';
+
   const passInput = document.getElementById('ssh-agent-passphrase');
   if (passInput) {
     passInput.value = '';
@@ -1494,11 +1631,14 @@ window.openSshAgentModal = function(scope, labName) {
     passIcon.parentElement.innerHTML = '<i id="ssh-agent-pass-icon" class="fas fa-eye"></i> Show';
   }
 
+  window.switchSshAgentMode('local');
+
   const modal = document.getElementById('ssh-agent-modal');
   if (modal) {
     modal.style.display = 'block';
   }
 
+  window.initSshDropzone();
   window.loadSshAgentStatus();
 };
 
@@ -1507,6 +1647,57 @@ window.getSshAgentEndpoint = function(subpath) {
     ? '/controller'
     : window.ansScope(window.sshAgentContext.labName);
   return `${base}/ssh_agent${subpath || ''}`;
+};
+
+window.renderIdentitiesHtml = function(identities) {
+  if (!identities || identities.length === 0) {
+    return '';
+  }
+  let html = `
+    <table class="w3-table w3-small" style="background-color: #0b1120; border-radius: 6px; border: 1px solid #1e293b;">
+      <thead>
+        <tr style="border-bottom: 1px solid #334155; color: #94a3b8; font-size: 11px;">
+          <th style="padding: 4px 6px;">Type</th>
+          <th style="padding: 4px 6px;">Fingerprint</th>
+          <th style="padding: 4px 6px;">Identifier / Comment</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  identities.forEach(id => {
+    html += `
+      <tr style="border-bottom: 1px solid #1e293b;">
+        <td style="padding: 4px 6px;"><span class="w3-badge w3-tiny w3-round w3-dark-grey" style="font-family: monospace;">${window.escapeHtml(id.type || 'RSA')}</span></td>
+        <td style="padding: 4px 6px;"><code style="color: #38bdf8; font-size: 11px;">${window.escapeHtml(id.fingerprint || '')}</code></td>
+        <td style="padding: 4px 6px; color: #e2e8f0; font-family: monospace;">${window.escapeHtml(id.comment || id.raw || '')}</td>
+      </tr>
+    `;
+  });
+  html += `</tbody></table>`;
+  return html;
+};
+
+window.updateCardIdentities = function(scope, identities) {
+  const cardScope = (scope === 'controller') ? 'controller' : 'lab';
+  const container = document.getElementById(`card-identities-container-${cardScope}-ssh-agent`);
+  const countEl = document.getElementById(`card-count-${cardScope}-ssh-agent`);
+
+  if (countEl) {
+    const size = (identities || []).length;
+    countEl.textContent = `${size} ${size === 1 ? 'identity' : 'identities'} loaded`;
+  }
+
+  if (container) {
+    if (!identities || identities.length === 0) {
+      container.innerHTML = `
+        <div style="color: #64748b; font-style: italic; padding: 4px 0;">
+          No keys currently loaded in agent. Click <a href="javascript:void(0)" onclick="window.openSshAgentModal('${cardScope}')" style="color: #38bdf8; font-weight: 600; text-decoration: underline;">Load Key</a> to add a key from your computer or container.
+        </div>
+      `;
+    } else {
+      container.innerHTML = window.renderIdentitiesHtml(identities);
+    }
+  }
 };
 
 window.loadSshAgentStatus = async function() {
@@ -1574,6 +1765,10 @@ window.loadSshAgentStatus = async function() {
         keyInput.value = data.candidate_keys[0];
       }
     }
+
+    // Synchronize card identities view
+    window.updateCardIdentities(window.sshAgentContext.scope, identities);
+
   } catch (err) {
     if (loadingEl) loadingEl.style.display = 'none';
     const alertEl = document.getElementById('ssh-agent-alert');
@@ -1587,28 +1782,60 @@ window.loadSshAgentStatus = async function() {
 
 window.submitSshAgentAddKey = async function(event) {
   if (event) event.preventDefault();
-  const keyInput = document.getElementById('ssh-agent-key-path');
-  const passInput = document.getElementById('ssh-agent-passphrase');
   const submitBtn = document.getElementById('ssh-agent-submit-btn');
   const alertEl = document.getElementById('ssh-agent-alert');
-
-  const keyPath = (keyInput ? keyInput.value : '').trim();
+  const passInput = document.getElementById('ssh-agent-passphrase');
   const passphrase = passInput ? passInput.value : '';
 
-  if (!keyPath) {
-    if (alertEl) {
-      alertEl.className = 'w3-panel w3-round w3-red';
-      alertEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please provide a key path.';
-      alertEl.style.display = 'block';
+  let payload = {};
+
+  if (window.sshAgentMode === 'local') {
+    const pasteBox = document.getElementById('ssh-agent-paste-content');
+    const keyContent = window.uploadedSshKeyContent || (pasteBox ? pasteBox.value : '');
+    const nameInput = document.getElementById('ssh-agent-key-name');
+    const keyName = nameInput ? nameInput.value.trim() : '';
+    const saveCheck = document.getElementById('ssh-agent-save-disk');
+    const saveToDisk = saveCheck ? saveCheck.checked : true;
+
+    if (!keyContent.trim()) {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-red';
+        alertEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please select a private key file or paste key content.';
+        alertEl.style.display = 'block';
+      }
+      return;
     }
-    return;
+
+    payload = {
+      key_content: keyContent,
+      key_name: keyName,
+      passphrase: passphrase,
+      save_to_disk: saveToDisk
+    };
+  } else {
+    const keyInput = document.getElementById('ssh-agent-key-path');
+    const keyPath = (keyInput ? keyInput.value : '').trim();
+
+    if (!keyPath) {
+      if (alertEl) {
+        alertEl.className = 'w3-panel w3-round w3-red';
+        alertEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Please provide a key path.';
+        alertEl.style.display = 'block';
+      }
+      return;
+    }
+
+    payload = {
+      key_path: keyPath,
+      passphrase: passphrase
+    };
   }
 
   let originalHtml = '';
   if (submitBtn) {
     originalHtml = submitBtn.innerHTML;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding Key...';
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating & Loading...';
   }
 
   try {
@@ -1616,17 +1843,25 @@ window.submitSshAgentAddKey = async function(event) {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key_path: keyPath, passphrase: passphrase })
+      body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.success) {
       if (alertEl) {
         alertEl.className = 'w3-panel w3-round w3-green';
-        alertEl.innerHTML = `<i class="fas fa-check-circle"></i> ${window.escapeHtml(data.message || 'Key successfully added to SSH Agent.')}`;
+        alertEl.innerHTML = `<i class="fas fa-check-circle"></i> ${window.escapeHtml(data.message || 'Key successfully loaded into SSH Agent.')}`;
         alertEl.style.display = 'block';
       }
       if (passInput) passInput.value = '';
+      window.uploadedSshKeyContent = '';
+      const picker = document.getElementById('ssh-agent-file-picker');
+      if (picker) picker.value = '';
+      const pasteBox = document.getElementById('ssh-agent-paste-content');
+      if (pasteBox) pasteBox.value = '';
+      const label = document.getElementById('ssh-agent-selected-file-label');
+      if (label) label.style.display = 'none';
+
       window.loadSshAgentStatus();
     } else {
       if (alertEl) {
@@ -1649,7 +1884,14 @@ window.submitSshAgentAddKey = async function(event) {
   }
 };
 
-window.clearSshAgentKeys = async function() {
+window.clearSshAgentKeys = async function(scope, labName) {
+  if (scope) {
+    window.sshAgentContext = {
+      scope: scope,
+      labName: labName || ''
+    };
+  }
+
   if (!confirm('Are you sure you want to remove all keys from the SSH Agent?')) {
     return;
   }

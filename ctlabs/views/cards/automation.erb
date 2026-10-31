@@ -40,11 +40,105 @@
   </div>
 </div>
 
+<%
+  lab_is_running = defined?(get_running_lab) && get_running_lab == info_hash[:lab_path]
+  lab_ctrl_name = 'ansible'
+  lab_agent_info = {}
+  lab_identities = []
+  if lab_is_running
+    begin
+      c_name, c_node = Automation.find_automation_controller(yaml_data) if defined?(Automation) && defined?(yaml_data) && yaml_data
+      lab_ctrl_name = c_name if c_name
+      c_user = (lab_ctrl_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
+      lab_agent_info = Automation.ssh_agent_status(lab_ctrl_name, c_user) rescue {}
+      lab_identities = lab_agent_info[:identities] || []
+    rescue => e
+    end
+  end
+%>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;" id="card-lab-ssh-agent">
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
+    <span>
+      <i class="fas fa-key w3-text-teal"></i> SSH Agent
+      <span id="card-badge-lab-ssh-agent" class="w3-badge w3-small w3-round <%= lab_is_running ? 'w3-teal' : 'w3-dark-grey' %>" style="margin-left: 8px; font-size: 11px; padding: 2px 8px;">
+        <%= lab_is_running ? lab_ctrl_name : 'Lab Offline' %>
+      </span>
+    </span>
+    <div>
+      <% if lab_is_running %>
+        <button type="button" onclick="window.openSshAgentModal('lab', '<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-teal" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;" title="Load private key into SSH agent">
+          <i class="fas fa-plus-circle"></i> Load Key
+        </button>
+        <button type="button" id="card-clear-btn-lab-ssh-agent" onclick="window.clearSshAgentKeys('lab', '<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-hover-red" style="background-color: #475569; color: #f87171; padding: 3px 10px; font-size: 13px; font-weight: 600;" title="Clear all identities from agent">
+          <i class="fas fa-trash-alt"></i> Clear
+        </button>
+      <% else %>
+        <span style="color: #64748b; font-size: 12px;"><i class="fas fa-info-circle"></i> Start lab to manage</span>
+      <% end %>
+    </div>
+  </div>
+  <div class="w3-padding w3-small" id="card-body-lab-ssh-agent">
+    <table class="w3-table" style="margin-bottom: 6px;">
+      <tr>
+        <td style="color: #94a3b8; width: 120px;">Socket:</td>
+        <td><code id="card-socket-lab-ssh-agent" style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= lab_agent_info[:socket] || "/tmp/ssh-agent-ansible.sock" %></code></td>
+      </tr>
+      <tr>
+        <td style="color: #94a3b8;">Status:</td>
+        <td id="card-status-lab-ssh-agent">
+          <% if lab_is_running %>
+            <span class="w3-badge w3-tiny w3-round w3-green"><i class="fas fa-check"></i> Active</span>
+            <span id="card-count-lab-ssh-agent" style="color: #94a3b8; margin-left: 8px;"><%= lab_identities.size %> <%= lab_identities.size == 1 ? 'identity' : 'identities' %> loaded</span>
+          <% else %>
+            <span class="w3-badge w3-tiny w3-round w3-red"><i class="fas fa-times"></i> Lab Offline</span>
+          <% end %>
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin-top: 8px; border-top: 1px solid #1e293b; padding-top: 8px;">
+      <div style="font-weight: 600; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+        Loaded Identities
+      </div>
+      <div id="card-identities-container-lab-ssh-agent">
+        <% if !lab_is_running %>
+          <div style="color: #64748b; font-style: italic; padding: 4px 0;">
+            Lab is currently offline. Start the lab to access its SSH agent.
+          </div>
+        <% elsif lab_identities.empty? %>
+          <div style="color: #64748b; font-style: italic; padding: 4px 0;">
+            No keys currently loaded in agent. Click <a href="javascript:void(0)" onclick="window.openSshAgentModal('lab', '<%= info_hash[:lab_path] %>')" style="color: #38bdf8; font-weight: 600; text-decoration: underline;">Load Key</a> to add a key from your computer or container.
+          </div>
+        <% else %>
+          <table class="w3-table w3-small" style="background-color: #0b1120; border-radius: 6px; border: 1px solid #1e293b;">
+            <thead>
+              <tr style="border-bottom: 1px solid #334155; color: #94a3b8; font-size: 11px;">
+                <th style="padding: 4px 6px;">Type</th>
+                <th style="padding: 4px 6px;">Fingerprint</th>
+                <th style="padding: 4px 6px;">Identifier / Comment</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% lab_identities.each do |id| %>
+                <tr style="border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 4px 6px;"><span class="w3-badge w3-tiny w3-round w3-dark-grey" style="font-family: monospace;"><%= ERB::Util.h(id[:type] || 'RSA') %></span></td>
+                  <td style="padding: 4px 6px;"><code style="color: #38bdf8; font-size: 11px;"><%= ERB::Util.h(id[:fingerprint]) %></code></td>
+                  <td style="padding: 4px 6px; color: #e2e8f0; font-family: monospace;"><%= ERB::Util.h(id[:comment] || id[:raw]) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-cubes w3-text-purple"></i> Terraform</span>
     <div>
-      <button type="button" onclick="window.openSshAgentModal('lab', '<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-teal" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;" title="Manage SSH Agent &amp; Keys"><i class="fas fa-key"></i> SSH Agent</button>
       <button type="button" onclick="window.openTerraformEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
       
       <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] %>

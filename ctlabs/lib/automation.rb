@@ -308,6 +308,106 @@ module Automation
     end
   end
 
+  def self.ssh_agent_load_raw_key(container, key_content, key_name: nil, passphrase: nil, save_to_disk: true, user: 'root')
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
+    sock = ensure_ssh_agent(container, u)
+    home = GcpAuth.resolve_home_for(target_container: container, target_user: u)
+
+    raw_key = key_content.to_s.gsub("\r\n", "\n").strip
+    if raw_key.empty?
+      return { success: false, error: "Private key content is empty" }
+    end
+    raw_key += "\n"
+
+    # Derive clean key name (filename)
+    base_name = key_name.to_s.strip
+    base_name = File.basename(base_name.empty? ? 'id_rsa' : base_name)
+    base_name = base_name.gsub(/[^a-zA-Z0-9_\.-]/, '_')
+    base_name = 'id_rsa' if base_name.empty?
+
+    # Write key to a secure temporary file inside container
+    tmp_key_file = "/tmp/.ctlabs_key_#{Process.pid}_#{rand(100000)}"
+    begin
+      system("printf '%s' #{Shellwords.shellescape(raw_key)} | #{engine} exec -i #{container} sh -c 'cat > #{tmp_key_file} && chmod 600 #{tmp_key_file} && chown #{u}:#{u} #{tmp_key_file} 2>/dev/null || true' >/dev/null 2>&1")
+
+      # Safe pre-validation using ssh-keygen -y with passphrase
+      clean_pass = passphrase.to_s
+      val_out = `#{engine} exec -u #{u} #{container} ssh-keygen -y -P #{Shellwords.shellescape(clean_pass)} -f '#{tmp_key_file}' 2>&1`.strip
+      unless $?.exitstatus == 0
+        err = val_out.empty? ? "Incorrect passphrase supplied or invalid private key format" : val_out
+        return { success: false, error: err }
+      end
+      pub_key = val_out
+
+      target_path = tmp_key_file
+      saved_info = ""
+
+      if save_to_disk
+        keys_dir = "#{home}/.ssh/keys"
+        system("#{engine} exec #{container} mkdir -p -m 700 '#{keys_dir}' >/dev/null 2>&1")
+        system("#{engine} exec #{container} chown #{u}:#{u} '#{keys_dir}' >/dev/null 2>&1") if u != 'root'
+
+        target_file = "#{keys_dir}/#{base_name}"
+        system("#{engine} exec #{container} cp '#{tmp_key_file}' '#{target_file}' >/dev/null 2>&1")
+        system("#{engine} exec #{container} chmod 600 '#{target_file}' >/dev/null 2>&1")
+        system("#{engine} exec #{container} chown #{u}:#{u} '#{target_file}' >/dev/null 2>&1") if u != 'root'
+
+        # Write matching .pub file
+        if pub_key && !pub_key.empty?
+          pub_content = "#{pub_key} #{base_name}\n"
+          system("printf '%s' #{Shellwords.shellescape(pub_content)} | #{engine} exec -i #{container} sh -c 'cat > \"#{target_file}.pub\" && chmod 644 \"#{target_file}.pub\"' >/dev/null 2>&1")
+          system("#{engine} exec #{container} chown #{u}:#{u} '#{target_file}.pub' >/dev/null 2>&1") if u != 'root'
+        end
+
+        # If controller container, also mirror to host /var/lib/ctlabs/controller/ssh/keys/
+        ctl_ident = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
+        if container == ctl_ident
+          host_ssh_keys = File.join(defined?(Controller::DATA_DIR) ? Controller::DATA_DIR : '/var/lib/ctlabs/controller', 'ssh', 'keys')
+          FileUtils.mkdir_p(host_ssh_keys, mode: 0o700)
+          File.write(File.join(host_ssh_keys, base_name), raw_key)
+          FileUtils.chmod(0o600, File.join(host_ssh_keys, base_name))
+          if pub_key && !pub_key.empty?
+            File.write(File.join(host_ssh_keys, "#{base_name}.pub"), "#{pub_key} #{base_name}\n")
+            FileUtils.chmod(0o644, File.join(host_ssh_keys, "#{base_name}.pub"))
+          end
+        end
+
+        target_path = target_file
+        saved_info = " and saved to ~/.ssh/keys/#{base_name}"
+      end
+
+      # Load key into ssh-agent
+      tmp_askpass = "/tmp/.ctlabs_askpass_#{Process.pid}_#{rand(100000)}.sh"
+      askpass_script = <<~SH
+        #!/bin/sh
+        cat << 'CTL_EOF'
+        #{clean_pass.gsub("'", "'\\\\''")}
+        CTL_EOF
+      SH
+
+      begin
+        system("printf '%s' #{Shellwords.shellescape(askpass_script)} | #{engine} exec -i #{container} sh -c 'cat > #{tmp_askpass} && chmod 700 #{tmp_askpass} && chown #{u}:#{u} #{tmp_askpass} 2>/dev/null || true' >/dev/null 2>&1")
+        add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add '#{target_path}' < /dev/null 2>&1"
+        out = `#{add_cmd}`.strip
+        exit_code = $?.exitstatus
+
+        if exit_code == 0
+          msg = "Key #{base_name} added to agent#{saved_info}."
+          { success: true, message: msg, key_name: base_name, target_path: target_path }
+        else
+          { success: false, error: out.empty? ? "Failed to add key to agent (exit code #{exit_code})" : out }
+        end
+      ensure
+        system("#{engine} exec #{container} rm -f '#{tmp_askpass}' >/dev/null 2>&1")
+      end
+    ensure
+      system("#{engine} exec #{container} rm -f '#{tmp_key_file}' >/dev/null 2>&1")
+    end
+  rescue => e
+    { success: false, error: e.message }
+  end
+
   def self.ssh_agent_clear(container, user = 'root')
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     u = user.to_s.strip.empty? ? 'root' : user.to_s.strip

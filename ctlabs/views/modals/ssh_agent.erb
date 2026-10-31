@@ -57,17 +57,67 @@
 
       <!-- Add Key Form -->
       <div class="w3-margin-top" style="border-top: 1px solid #334155; padding-top: 14px;">
-        <label style="font-size: 0.85em; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 10px;">
+        <label style="font-size: 0.85em; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">
           <i class="fas fa-plus-circle w3-text-green"></i> Load Key into Agent
         </label>
 
+        <!-- Mode Toggle Tabs -->
+        <div class="w3-bar w3-margin-bottom" style="border-bottom: 1px solid #334155;">
+          <button type="button" class="w3-bar-item w3-button ssh-agent-mode-btn w3-text-teal" id="ssh-mode-btn-local" onclick="window.switchSshAgentMode('local')" style="font-weight: 600; border-bottom: 2px solid #14b8a6; padding: 6px 14px; font-size: 13px;">
+            <i class="fas fa-laptop" style="margin-right: 6px;"></i> From My Computer
+          </button>
+          <button type="button" class="w3-bar-item w3-button ssh-agent-mode-btn" id="ssh-mode-btn-remote" onclick="window.switchSshAgentMode('remote')" style="font-weight: 500; color: #94a3b8; padding: 6px 14px; font-size: 13px;">
+            <i class="fas fa-server" style="margin-right: 6px;"></i> From Container Path
+          </button>
+        </div>
+
         <form id="ssh-agent-add-form" onsubmit="event.preventDefault(); window.submitSshAgentAddKey(event);">
-          <div class="w3-margin-bottom">
-            <label style="font-size: 0.85em; color: #94a3b8;">Private Key Path (in container)</label>
-            <input type="text" id="ssh-agent-key-path" list="ssh-agent-candidate-keys" placeholder="e.g. ~/.ssh/keys/git_oanda or /root/.ssh/id_ed25519" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;" required>
-            <datalist id="ssh-agent-candidate-keys"></datalist>
+          
+          <!-- Mode 1: From My Computer (File Upload or Direct Paste) -->
+          <div id="ssh-agent-pane-local">
+            <input type="file" id="ssh-agent-file-picker" style="display: none;" onchange="window.handleSshKeyFileSelect(event)">
+            
+            <div id="ssh-agent-dropzone" onclick="document.getElementById('ssh-agent-file-picker').click()" class="w3-center w3-round" style="border: 2px dashed #475569; padding: 16px; cursor: pointer; background-color: #0b1120; margin-bottom: 8px; transition: border-color 0.2s;">
+              <i class="fas fa-cloud-upload-alt fa-2x w3-text-teal" style="margin-bottom: 4px;"></i>
+              <div style="font-size: 13px; color: #e2e8f0; font-weight: 500;">Click to select private key file from your computer</div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 2px;">(e.g. ~/.ssh/id_rsa, git_oanda, id_ed25519)</div>
+              <div id="ssh-agent-selected-file-label" class="w3-badge w3-small w3-round w3-teal" style="display: none; margin-top: 8px; font-family: monospace; font-size: 12px; padding: 4px 10px;"></div>
+            </div>
+
+            <div style="text-align: right; margin-bottom: 10px;">
+              <a href="javascript:void(0)" onclick="window.toggleSshPasteMode()" id="ssh-agent-paste-toggle-link" style="font-size: 11px; color: #38bdf8; text-decoration: none;">
+                <i class="fas fa-keyboard"></i> Or paste key text directly
+              </a>
+            </div>
+
+            <div id="ssh-agent-paste-box" style="display: none; margin-bottom: 12px;">
+              <label style="font-size: 0.85em; color: #94a3b8;">Paste Private Key Content</label>
+              <textarea id="ssh-agent-paste-content" class="w3-input w3-small w3-round" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; font-size: 11px; resize: vertical;" oninput="window.handleSshPasteInput()"></textarea>
+            </div>
+
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Key Name / Identifier</label>
+              <input type="text" id="ssh-agent-key-name" placeholder="e.g. git_oanda or id_rsa" class="w3-input w3-small w3-round" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;">
+            </div>
+
+            <div class="w3-margin-bottom">
+              <label style="font-size: 12px; color: #cbd5e1; cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
+                <input type="checkbox" id="ssh-agent-save-disk" class="w3-check" checked style="accent-color: #14b8a6; margin-top: 2px;">
+                <span>Save copy to <code style="color: #38bdf8; background: #0b1120; padding: 1px 5px; border-radius: 4px;">~/.ssh/keys/&lt;name&gt;</code> on container (recommended so <code style="color: #a78bfa;">IdentityFile</code> in <code style="color: #a78bfa;">~/.ssh/config</code> works)</span>
+              </label>
+            </div>
           </div>
 
+          <!-- Mode 2: From Container Path -->
+          <div id="ssh-agent-pane-remote" style="display: none;">
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">Private Key Path (in container)</label>
+              <input type="text" id="ssh-agent-key-path" list="ssh-agent-candidate-keys" placeholder="e.g. ~/.ssh/keys/git_oanda or /root/.ssh/id_ed25519" class="w3-input w3-small w3-round" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;">
+              <datalist id="ssh-agent-candidate-keys"></datalist>
+            </div>
+          </div>
+
+          <!-- Common Passphrase Input -->
           <div class="w3-margin-bottom">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2px;">
               <label style="font-size: 0.85em; color: #94a3b8;">Passphrase (leave blank if unencrypted)</label>
@@ -75,12 +125,12 @@
                 <i id="ssh-agent-pass-icon" class="fas fa-eye"></i> Show
               </a>
             </div>
-            <input type="password" id="ssh-agent-passphrase" placeholder="Key Passphrase" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;">
+            <input type="password" id="ssh-agent-passphrase" placeholder="Key Passphrase" class="w3-input w3-small w3-round" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;">
           </div>
 
           <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
-            <button type="submit" id="ssh-agent-submit-btn" class="w3-button w3-round w3-teal" style="font-size: 13px; font-weight: 600; padding: 6px 14px;">
-              <i class="fas fa-unlock-alt"></i> Add Key to Agent
+            <button type="submit" id="ssh-agent-submit-btn" class="w3-button w3-round w3-teal" style="font-size: 13px; font-weight: 600; padding: 6px 16px;">
+              <i class="fas fa-unlock-alt"></i> Load Key into Agent
             </button>
           </div>
         </form>

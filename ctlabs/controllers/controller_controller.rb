@@ -401,14 +401,20 @@ class ControllerController < BaseController
     content_type :json
     ctl_name = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
     payload = (JSON.parse(request.body.read) rescue {}) || {}
-    key_path = (payload['key_path'] || params['key_path']).to_s.strip
-    passphrase = (payload['passphrase'] || params['passphrase']).to_s
+    key_content  = (payload['key_content'] || params['key_content']).to_s
+    key_name     = (payload['key_name'] || params['key_name']).to_s
+    key_path     = (payload['key_path'] || params['key_path']).to_s.strip
+    passphrase   = (payload['passphrase'] || params['passphrase']).to_s
+    save_to_disk = payload.key?('save_to_disk') ? !!payload['save_to_disk'] : true
 
-    if key_path.empty?
-      halt 400, { success: false, error: 'Key path is required' }.to_json
+    result = if !key_content.strip.empty?
+      Automation.ssh_agent_load_raw_key(ctl_name, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: 'root')
+    elsif !key_path.empty?
+      Automation.ssh_agent_add_key(ctl_name, key_path, passphrase, 'root')
+    else
+      { success: false, error: 'Key file/content or key path is required' }
     end
 
-    result = Automation.ssh_agent_add_key(ctl_name, key_path, passphrase, 'root')
     status(result[:success] ? 200 : 400)
     result.to_json
   end
