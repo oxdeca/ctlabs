@@ -1734,7 +1734,8 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
             v_env += "-e VAULT_SKIP_VERIFY=true "       if web_v_token &&  web_v_addr
 
             begin
-              gcp_env = GcpAuth.env_vars(node_cfg['terraform'], { addr: web_v_addr, token: web_v_token })
+              gcp_env = GcpAuth.env_vars(node_cfg['terraform'], { addr: web_v_addr, token: web_v_token },
+                                         target_container: ctrl_name)
               gcp_env.each { |key, value| v_env += "-e #{key}='#{value}' " }
             rescue => e
               @log.write("[BG-TASK] Could not generate GCP credentials: #{e.message}", "error")

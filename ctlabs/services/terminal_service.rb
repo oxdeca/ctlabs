@@ -16,6 +16,16 @@ require 'fileutils'
 require_relative 'recording_service'
 
 class TerminalService
+  ENV_DIR_NAME = (ENV['CTLABS_ENV_DIR'] || ENV['CTLABS_ENV_DIR_NAME'] || '.ctlabs_env').to_s.sub(%r{\A/+}, '')
+
+  def self.env_dir_name
+    ENV_DIR_NAME
+  end
+
+  def self.env_dir_for_user(base_dir)
+    "#{base_dir}/#{ENV_DIR_NAME}"
+  end
+
   DISCONNECT_GRACE_PERIOD = 45 # seconds
   MAX_REPLAY_BUFFER = 128 * 1024 # 128 KB
   @@pty_sessions = {}
@@ -244,9 +254,11 @@ class TerminalService
     return {} unless staged && staged[:files] && !staged[:files].empty?
 
     base_dir = resolve_home_dir(engine, exec_name, node_user || 'root') || (node_user ? "/home/#{node_user}" : "/root")
-    target_dir = "#{base_dir}/.ctlabs_env/#{env_token}"
+    target_dir = env_dir_for_user(base_dir)
 
     system("#{engine} exec #{exec_name} mkdir -p -m 700 #{target_dir} >/dev/null 2>&1")
+    # Clean up any legacy random-named subdirectories inside the env directory
+    system("#{engine} exec #{exec_name} sh -c 'find #{target_dir} -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +' >/dev/null 2>&1")
 
     env_map = {}
     staged[:files].each do |f|
@@ -267,6 +279,12 @@ class TerminalService
       system("#{engine} exec #{exec_name} chown -R #{node_user}:#{node_user} #{target_dir} >/dev/null 2>&1")
     end
 
+    # Also sync to /root/<env_dir> if base_dir is /home/<user> so root processes (like ctl-ctrl or root-based automation) can access it
+    if base_dir != '/root'
+      root_env_dir = env_dir_for_user('/root')
+      system("#{engine} exec #{exec_name} sh -c 'mkdir -p -m 700 #{root_env_dir} && cp -f #{target_dir}/* #{root_env_dir}/ 2>/dev/null' >/dev/null 2>&1")
+    end
+
     @@env_mutex.synchronize do
       if @@staged_env[env_token]
         @@staged_env[env_token][:engine] = engine
@@ -280,15 +298,10 @@ class TerminalService
 
   def self.cleanup_env_files(env_token)
     return if env_token.to_s.empty?
-    staged = nil
     @@env_mutex.synchronize do
-      staged = @@staged_env.delete(env_token)
+      @@staged_env.delete(env_token)
     end
-    return unless staged
-
-    if staged[:engine] && staged[:exec_name] && staged[:target_dir]
-      system("#{staged[:engine]} exec #{staged[:exec_name]} rm -rf #{staged[:target_dir]} >/dev/null 2>&1")
-    end
+    # Keep the user's environment files preserved in ~/.ctlabs_env/ as requested.
   end
 
   # Login names come from lab/profile YAML, so they are interpolated into a
@@ -444,7 +457,9 @@ class TerminalService
         if auth_method == 'env' || (session[:vault_token] && session[:vault_addr])
           begin
             gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
-                                       scope: is_ctl_controller ? 'ctl' : 'lab')
+                                       scope: is_ctl_controller ? 'ctl' : 'lab',
+                                       target_container: exec_name,
+                                       target_user: node_user)
             gcp_env.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
           rescue => e
             puts "[Terminal GCP Auto-Fetch Error] #{e.message}"

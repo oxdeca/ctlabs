@@ -1112,7 +1112,15 @@ module Automation
   def run_terraform(target_node_name = nil, log_path = nil, web_v_token = nil, web_v_addr = nil, action = 'apply')
     @log.write "#{__method__}(): target=#{target_node_name.inspect}", "debug"
 
-    ctrl = target_node_name ? find_node(target_node_name) : @nodes.find { |n| n.type == 'controller' }
+    ctl_ctrl_name = defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl'
+
+    ctrl = if target_node_name
+             find_node(target_node_name)
+           elsif @standalone
+             find_node(ctl_ctrl_name) || @nodes.find { |n| n.type.to_s == 'controller' }
+           else
+             find_node('ansible') || @nodes.find { |n| n.type.to_s == 'controller' }
+           end
     raise "No controller node found in topology to run Terraform." unless ctrl
 
     # The node's own parsed config covers both schemas (top-level `nodes` for a
@@ -1164,6 +1172,13 @@ module Automation
       CMD
     end
 
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+
+    # Cloud/terraform runs on the standalone controller (ctl-ctrl) for controller scope (@standalone),
+    # or on the lab's in-lab controller node (ansible) for lab scope.
+    exec_ctrl = @standalone ? ctl_ctrl_name : ctrl.name
+    exec_user = (exec_ctrl == ctl_ctrl_name) ? 'root' : (ctrl.respond_to?(:user) && ctrl.user ? ctrl.user : 'ansible')
+
     exec_env  = ""
     exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
     exec_env += "-e VAULT_ADDR='#{web_v_addr}' "   if web_v_addr  && !web_v_addr.empty?
@@ -1173,7 +1188,9 @@ module Automation
     begin
       gcp_env = GcpAuth.env_vars(tf_cfg, { addr: web_v_addr, token: web_v_token },
                                  scope: (@standalone ? 'ctl' : 'lab'),
-                                 repo_dir_ctl: tf_base_ctl)
+                                 repo_dir_ctl: tf_base_ctl,
+                                 target_container: exec_ctrl,
+                                 target_user: exec_user)
       gcp_env.each { |key, value| exec_env += "-e #{key}='#{value}' " }
     rescue => e
       error_msg = "\n❌ ERROR: Could not generate GCP credentials: #{e.message}\n👉 Please use the Vault Login button in the UI.\n"
@@ -1181,15 +1198,49 @@ module Automation
       raise e
     end
 
+    # Auto-verify / sync environment credential file into target container if needed
+    if gcp_env && (cred_path = gcp_env['GOOGLE_APPLICATION_CREDENTIALS'])
+      unless system("#{engine} exec #{exec_ctrl} test -f '#{cred_path}' >/dev/null 2>&1")
+        cred_filename = File.basename(cred_path)
+        env_dir = File.dirname(cred_path)
+        synced = false
+
+        # 1. Try peer container
+        peer_ctrl = (exec_ctrl == ctl_ctrl_name) ? 'ansible' : ctl_ctrl_name
+        peer_user = (peer_ctrl == ctl_ctrl_name) ? 'root' : 'ansible'
+        peer_home = GcpAuth.resolve_home_for(target_container: peer_ctrl, target_user: peer_user)
+        peer_path = "#{peer_home}/#{GcpAuth.env_dir_name}/#{cred_filename}"
+
+        if system("#{engine} exec #{peer_ctrl} test -f '#{peer_path}' >/dev/null 2>&1")
+          system("#{engine} exec #{peer_ctrl} cat '#{peer_path}' | #{engine} exec -i #{exec_ctrl} sh -c 'mkdir -p -m 700 \"#{env_dir}\" && cat > \"#{cred_path}\" && chmod 600 \"#{cred_path}\"' >/dev/null 2>&1")
+          synced = system("#{engine} exec #{exec_ctrl} test -f '#{cred_path}' >/dev/null 2>&1")
+        end
+
+        # 2. Try host path if still not synced
+        unless synced
+          host_candidates = [
+            "/root/#{GcpAuth.env_dir_name}/#{cred_filename}",
+            (ENV['HOME'] ? "#{ENV['HOME']}/#{GcpAuth.env_dir_name}/#{cred_filename}" : nil)
+          ].compact.uniq
+          host_candidates.each do |h_path|
+            if File.file?(h_path)
+              system("cat '#{h_path}' | #{engine} exec -i #{exec_ctrl} sh -c 'mkdir -p -m 700 \"#{env_dir}\" && cat > \"#{cred_path}\" && chmod 600 \"#{cred_path}\"' >/dev/null 2>&1")
+              if system("#{engine} exec #{exec_ctrl} test -f '#{cred_path}' >/dev/null 2>&1")
+                synced = true
+                break
+              end
+            end
+          end
+        end
+
+        if synced && exec_user && exec_user != 'root'
+          system("#{engine} exec #{exec_ctrl} chown -R #{exec_user}:#{exec_user} \"#{env_dir}\" >/dev/null 2>&1")
+        end
+      end
+    end
+
     # No more Python wrappers! Just pure Terraform.
     tf_command = base_tf_cmd
-
-    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-
-    # Cloud/terraform runs on the persistent controller (ctl-ctrl) when it is
-    # up -- it holds the persistent terraform state/workspace and reaches the
-    # cloud without a lab. Otherwise it runs on the lab's own in-lab controller.
-    exec_ctrl = (ctrl.type.to_s == 'controller' && persistent_controller_up?) ? Controller::NAME : ctrl.name
 
     full_cmd = "#{engine} exec #{exec_env}#{exec_ctrl} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 

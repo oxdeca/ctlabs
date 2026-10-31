@@ -672,7 +672,8 @@ window.openTfTab = function(tabId) {
       const fn = window.lastFoundTerminalCreds.filename;
       const credInput = document.getElementById('edit-terraform-env-credentials');
       if (credInput) {
-          credInput.value = `credentials/${fn}`;
+          const envDir = window.CTLABS_ENV_DIR_NAME || '.ctlabs_env';
+          credInput.value = `~/${envDir}/${fn}`;
       }
   };
 

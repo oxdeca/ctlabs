@@ -26,6 +26,32 @@ require_relative 'vault_auth'
 class GcpAuth
   DEFAULT_VAULT_ROLESET = 'terraform-runner'
   GCP_SCOPE             = 'https://www.googleapis.com/auth/cloud-platform'
+  ENV_DIR_NAME          = (ENV['CTLABS_ENV_DIR'] || ENV['CTLABS_ENV_DIR_NAME'] || '.ctlabs_env').to_s.sub(%r{\A/+}, '')
+
+  def self.env_dir_name
+    ENV_DIR_NAME
+  end
+
+  def self.resolve_home_for(target_container: nil, target_user: nil)
+    if target_user && !target_user.to_s.strip.empty?
+      u = target_user.to_s.strip
+      return u == 'root' ? '/root' : "/home/#{u}"
+    end
+
+    if target_container && !target_container.to_s.strip.empty?
+      ctr = target_container.to_s.strip
+      return '/root' if ctr == 'ctl-ctrl'
+
+      engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+      begin
+        out = `#{engine} exec #{ctr} sh -c 'echo -n "$HOME"' 2>/dev/null`.to_s.strip
+        return out if out.start_with?('/') && !out.include?(' ')
+      rescue
+      end
+    end
+
+    '/home/ansible'
+  end
 
   # tf_cfg    : the node's `terraform` config hash (reads tf_cfg['auth'], with
   #             a fallback to the legacy tf_cfg['vault'] shape).
@@ -35,7 +61,7 @@ class GcpAuth
   #
   # Returns the env vars to inject into the container, or {} when this node
   # has no GCP auth configured at all.
-  def self.env_vars(tf_cfg, vault_ctx = nil, scope: 'lab', repo_dir_ctl: nil)
+  def self.env_vars(tf_cfg, vault_ctx = nil, scope: 'lab', repo_dir_ctl: nil, target_container: nil, target_user: nil)
     auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
     return {} unless auth_cfg
 
@@ -60,7 +86,7 @@ class GcpAuth
         # Resolve path: ~/ points to in-container user's home (/home/ansible or /root),
         # absolute paths stay absolute, relative paths resolve against repo root
         if cred_file.start_with?('~/')
-          user_home = '/home/ansible'
+          user_home = resolve_home_for(target_container: target_container, target_user: target_user)
           resolved_path = cred_file.sub(%r{\A~/}, "#{user_home}/")
         elsif cred_file.start_with?('/')
           resolved_path = cred_file
