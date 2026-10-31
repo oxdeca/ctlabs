@@ -35,6 +35,7 @@ class Controller
   # repo bind-mounts in the controller profile.)
   DATA_DIR   = '/var/lib/ctlabs/controller'
   VAULT_DATA = File.join(DATA_DIR, 'vault')
+  SSH_DATA   = File.join(DATA_DIR, 'ssh')
 
   # Host-backed overlay for WebUI edits to the (otherwise code-generated) control
   # plane: extra exposed services, extra control-plane nodes, and the
@@ -460,6 +461,7 @@ class Controller
   def write_topology
     FileUtils.mkdir_p(STATE_DIR)
     FileUtils.mkdir_p(VAULT_DATA, mode: 0o700)
+    FileUtils.mkdir_p(SSH_DATA, mode: 0o700)
     File.write(TOPOLOGY, self.class.effective_topology.to_yaml)
   end
 
@@ -524,11 +526,11 @@ class Controller
                 type: controller
                 persistent: true
                 gw: 192.168.98.1
-                # Host-backed Vault storage (persists across controller
-                # recreate). Ansible (ctlabs_vault) chowns this dir to the
-                # vault service user at provisioning time.
+                # Host-backed Vault storage and SSH directory (persists across
+                # controller recreate).
                 vols:
                 - "#{VAULT_DATA}:/opt/vault/data"
+                - "#{SSH_DATA}:/root/.ssh"
                 nics:
                   eth0: 192.168.98.5/24
                 # Controller-owned host port forwards (host binds 8400-8499,

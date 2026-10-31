@@ -1180,6 +1180,8 @@ module Automation
     exec_user = (exec_ctrl == ctl_ctrl_name) ? 'root' : (ctrl.respond_to?(:user) && ctrl.user ? ctrl.user : 'ansible')
 
     exec_env  = ""
+    exec_home = GcpAuth.resolve_home_for(target_container: exec_ctrl, target_user: exec_user)
+    exec_env += "-e HOME='#{exec_home}' -e USER='#{exec_user}' "
     exec_env += "-e VAULT_TOKEN='#{web_v_token}' " if web_v_token && !web_v_token.empty?
     exec_env += "-e VAULT_ADDR='#{web_v_addr}' "   if web_v_addr  && !web_v_addr.empty?
     exec_env += "-e VAULT_SKIP_VERIFY=true "       if web_v_token &&  web_v_addr
@@ -1239,10 +1241,44 @@ module Automation
       end
     end
 
+    # Ensure SSH configuration & permissions are set for target container
+    ssh_dir = "#{exec_home}/.ssh"
+    ssh_cfg = "#{ssh_dir}/config"
+
+    # For standalone controller, ensure SSH data is synced between host and container
+    if exec_ctrl == ctl_ctrl_name
+      host_ssh_dir = defined?(Controller::SSH_DATA) ? Controller::SSH_DATA : '/var/lib/ctlabs/controller/ssh'
+      FileUtils.mkdir_p(host_ssh_dir, mode: 0o700)
+      host_ssh_cfg = File.join(host_ssh_dir, 'config')
+
+      ctr_has_cfg = system("#{engine} exec #{exec_ctrl} test -f '#{ssh_cfg}' >/dev/null 2>&1")
+      if File.file?(host_ssh_cfg) && !ctr_has_cfg
+        system("#{engine} exec #{exec_ctrl} mkdir -p -m 700 '#{ssh_dir}' >/dev/null 2>&1")
+        system("cat '#{host_ssh_cfg}' | #{engine} exec -i #{exec_ctrl} sh -c 'cat > \"#{ssh_cfg}\" && chmod 600 \"#{ssh_cfg}\"' >/dev/null 2>&1")
+      elsif ctr_has_cfg && !File.file?(host_ssh_cfg)
+        system("#{engine} exec #{exec_ctrl} cat '#{ssh_cfg}' > '#{host_ssh_cfg}' 2>/dev/null")
+        FileUtils.chmod(0o600, host_ssh_cfg) if File.file?(host_ssh_cfg)
+      end
+    end
+
+    # Fix permissions on SSH files inside container (OpenSSH ignores keys with open perms)
+    system("#{engine} exec #{exec_ctrl} bash -c 'if [ -d \"#{ssh_dir}\" ]; then chmod 700 \"#{ssh_dir}\" && find \"#{ssh_dir}\" -type f -exec chmod 600 {} + 2>/dev/null && chmod 644 \"#{ssh_dir}\"/*.pub 2>/dev/null || true; fi' >/dev/null 2>&1")
+    if exec_user && exec_user != 'root'
+      system("#{engine} exec #{exec_ctrl} bash -c 'if [ -d \"#{ssh_dir}\" ]; then chown -R #{exec_user}:#{exec_user} \"#{ssh_dir}\"; fi' >/dev/null 2>&1")
+    end
+
+    # Configure GIT_SSH_COMMAND so Git/Terraform uses non-interactive SSH with ~/.ssh/config
+    git_ssh_cmd = "ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes"
+    if system("#{engine} exec #{exec_ctrl} test -f '#{ssh_cfg}' >/dev/null 2>&1")
+      git_ssh_cmd += " -F #{ssh_cfg}"
+    end
+    exec_env += "-e GIT_SSH_COMMAND='#{git_ssh_cmd}' "
+
     # No more Python wrappers! Just pure Terraform.
     tf_command = base_tf_cmd
 
-    full_cmd = "#{engine} exec #{exec_env}#{exec_ctrl} bash -c '#{tf_command.gsub("'", "'\\''")}'"
+    user_flag = exec_user ? "-u #{exec_user} " : ""
+    full_cmd = "#{engine} exec #{user_flag}#{exec_env}#{exec_ctrl} bash -c '#{tf_command.gsub("'", "'\\''")}'"
 
     @log.info "Executing Terraform on #{exec_ctrl}: #{tf_command}" 
 
