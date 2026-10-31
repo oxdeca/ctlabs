@@ -79,8 +79,8 @@ class AutomationService
   def self.terraform_tree
     return [] unless Dir.exist?(TF_BASE_DIR)
     Dir.glob(File.join(TF_BASE_DIR, "**", "*"))
-       .reject { |f| File.directory?(f) || f.include?('/.terraform/') || f.include?('/.git/') || f.end_with?('.tfstate') || f.end_with?('.tfstate.backup') }
-       .map { |f| f.sub(TF_BASE_DIR + '/', '') }
+       .reject { |f| f.include?('/.terraform/') || f.include?('/.git/') || f.end_with?('.tfstate') || f.end_with?('.tfstate.backup') }
+       .map { |f| File.directory?(f) ? "#{f.sub(TF_BASE_DIR + '/', '')}/" : f.sub(TF_BASE_DIR + '/', '') }
        .sort
   end
 

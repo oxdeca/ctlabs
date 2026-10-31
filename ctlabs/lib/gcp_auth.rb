@@ -36,6 +36,43 @@ class GcpAuth
   # Returns the env vars to inject into the container, or {} when this node
   # has no GCP auth configured at all.
   def self.env_vars(tf_cfg, vault_ctx, scope: 'lab')
+    auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
+    return {} unless auth_cfg
+
+    # Method: env (Environment variables, e.g. GOOGLE_APPLICATION_CREDENTIALS)
+    if auth_cfg['method'] == 'env'
+      vars = {}
+      cred_file = auth_cfg['credentials_file'].to_s.strip
+      unless cred_file.empty?
+        # Resolve relative paths against standard in-container repo mount
+        resolved_path = cred_file.start_with?('/') ? cred_file : "/srv/ctlabs/ctlabs-terraform/#{cred_file}"
+        vars['GOOGLE_APPLICATION_CREDENTIALS'] = resolved_path
+      end
+
+      project = auth_cfg['project'].to_s.strip
+      unless project.empty?
+        vars['GOOGLE_CLOUD_PROJECT'] = project
+        vars['CLOUDSDK_CORE_PROJECT'] = project
+      end
+
+      extra = auth_cfg['extra_vars']
+      if extra.is_a?(Array)
+        extra.each do |line|
+          k, v = line.to_s.split('=', 2)
+          vars[k.strip] = v.to_s.strip if k && !k.strip.empty?
+        end
+      elsif extra.is_a?(Hash)
+        extra.each { |k, v| vars[k.to_s.strip] = v.to_s.strip unless k.to_s.strip.empty? }
+      elsif extra.is_a?(String)
+        extra.split(/\r?\n/).each do |line|
+          k, v = line.to_s.split('=', 2)
+          vars[k.strip] = v.to_s.strip if k && !k.strip.empty?
+        end
+      end
+
+      return vars
+    end
+
     token = fetch_token(tf_cfg, vault_ctx, scope: scope)
     return {} unless token
     { 'GOOGLE_OAUTH_ACCESS_TOKEN' => token, 'CLOUDSDK_AUTH_ACCESS_TOKEN' => token }
@@ -44,6 +81,7 @@ class GcpAuth
   def self.fetch_token(tf_cfg, vault_ctx, scope: 'lab')
     auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
     return nil unless auth_cfg
+    return nil if auth_cfg['method'] == 'env'
 
     vault_ctx ||= {}
     raise "Missing Vault Token for GCP Authentication." if vault_ctx[:token].to_s.empty?

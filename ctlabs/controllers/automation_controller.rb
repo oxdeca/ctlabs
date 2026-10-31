@@ -323,6 +323,19 @@ class AutomationController < BaseController
       tf_cfg.delete('profile')
 
       case auth_method
+      when 'env'
+        cred_file = params[:env_credentials].to_s.strip
+        project   = params[:env_project].to_s.strip
+        extra_raw = params[:env_extra].to_s.split(/\r?\n/).map(&:strip).reject(&:empty?)
+
+        unless cred_file.empty? && project.empty? && extra_raw.empty?
+          tf_cfg['auth'] = {
+            'method'           => 'env',
+            'credentials_file' => cred_file,
+            'project'          => project
+          }
+          tf_cfg['auth']['extra_vars'] = extra_raw unless extra_raw.empty?
+        end
       when 'vault'
         v_project = params[:vault_project].to_s.strip
         v_roleset = params[:vault_roleset].to_s.strip

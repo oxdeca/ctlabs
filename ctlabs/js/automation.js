@@ -578,9 +578,95 @@ window.openTfTab = function(tabId) {
 
   window.updateTfAuthMethodUI = function() {
       const method = document.getElementById('edit-terraform-auth-method').value;
+      const envFields = document.getElementById('tf-auth-env-fields');
+      if (envFields) envFields.style.display = (method === 'env') ? 'block' : 'none';
       document.getElementById('tf-auth-vault-fields').style.display = (method === 'vault') ? 'block' : 'none';
       document.getElementById('tf-auth-wif-fields').style.display = (method === 'wif') ? 'block' : 'none';
       document.getElementById('tf-auth-profile-fields').style.display = (method === 'profile') ? 'block' : 'none';
+      if (method === 'env') {
+          window.checkTerminalStagedCreds();
+      }
+  };
+
+  window.checkTerminalStagedCreds = function() {
+      const hintDiv = document.getElementById('tf-auth-terminal-env-hint');
+      if (!hintDiv) return;
+
+      let foundCreds = null;
+      let foundNode = null;
+
+      for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('ctlabs_env_files_')) {
+              try {
+                  const files = JSON.parse(localStorage.getItem(key));
+                  if (Array.isArray(files)) {
+                      const match = files.find(f => f.env_var === 'GOOGLE_APPLICATION_CREDENTIALS');
+                      if (match) {
+                          foundCreds = match;
+                          foundNode = key.replace('ctlabs_env_files_', '');
+                          break;
+                      }
+                  }
+              } catch (e) {}
+          }
+      }
+
+      if (foundCreds) {
+          window.lastFoundTerminalCreds = foundCreds;
+          hintDiv.style.display = 'block';
+          const escNode = (foundNode || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const escFn = (foundCreds.filename || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          hintDiv.innerHTML = `
+              <div style="background: rgba(14, 165, 233, 0.1); border: 1px solid #0284c7; border-radius: 6px; padding: 8px 12px; margin-top: 8px; font-size: 0.85em; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                  <div>
+                      <i class="fas fa-magic" style="color: #38bdf8;"></i>
+                      <span style="color: #e2e8f0;"> Terminal Environment File detected on <b>${escNode}</b>:</span>
+                      <code style="color: #f59e0b; background: #0f172a; padding: 1px 6px; border-radius: 3px; margin-left: 4px;">${escFn}</code>
+                  </div>
+                  <div style="display: flex; gap: 6px;">
+                      <button type="button" class="w3-button w3-tiny w3-teal w3-round" onclick="window.useTerminalStagedCreds()">
+                          <i class="fas fa-check"></i> Use Path
+                      </button>
+                      <button type="button" class="w3-button w3-tiny w3-blue w3-round" onclick="window.importTerminalStagedCredsToRepo()">
+                          <i class="fas fa-file-import"></i> Stage in Workspace
+                      </button>
+                  </div>
+              </div>
+          `;
+      } else {
+          hintDiv.style.display = 'none';
+      }
+  };
+
+  window.useTerminalStagedCreds = function() {
+      if (!window.lastFoundTerminalCreds) return;
+      const fn = window.lastFoundTerminalCreds.filename;
+      const credInput = document.getElementById('edit-terraform-env-credentials');
+      if (credInput) {
+          credInput.value = `credentials/${fn}`;
+      }
+  };
+
+  window.importTerminalStagedCredsToRepo = async function() {
+      if (!window.lastFoundTerminalCreds) return;
+      const creds = window.lastFoundTerminalCreds;
+      const filePath = `credentials/${creds.filename}`;
+      let content = '';
+      try {
+          const rawB64 = (creds.content_base64 || '').replace(/^data:[^;]+;base64,/, '');
+          content = atob(rawB64);
+      } catch (e) {
+          alert("Could not decode credentials content: " + e.message);
+          return;
+      }
+
+      window.createTerraformFileTab(filePath, content);
+      const credInput = document.getElementById('edit-terraform-env-credentials');
+      if (credInput) {
+          credInput.value = filePath;
+      }
+      alert(`Staged ${filePath} into Terraform editor! Click 'Save All Files' to persist to repository.`);
   };
 
   window.loadTfAuthProfiles = async function() {
@@ -640,6 +726,12 @@ window.openTfTab = function(tabId) {
           const authMethod = tf.profile ? 'profile' : (auth.method || '');
 
           document.getElementById('edit-terraform-auth-method').value = authMethod;
+          const envCredsEl = document.getElementById('edit-terraform-env-credentials');
+          if (envCredsEl) envCredsEl.value = auth.credentials_file || '';
+          const envProjEl = document.getElementById('edit-terraform-env-project');
+          if (envProjEl) envProjEl.value = auth.project || '';
+          const envExtraEl = document.getElementById('edit-terraform-env-extra');
+          if (envExtraEl) envExtraEl.value = (Array.isArray(auth.extra_vars) ? auth.extra_vars.join('\n') : (auth.extra_vars || ''));
           document.getElementById('edit-terraform-vault-project').value = auth.project || '';
           document.getElementById('edit-terraform-vault-roleset').value = auth.roleset || '';
           document.getElementById('edit-terraform-wif-vault-role').value = auth.vault_role || '';
@@ -745,6 +837,9 @@ window.openTfTab = function(tabId) {
 
       // --- EXTRACT GCP AUTH CONFIG ---
       const authMethod     = document.getElementById('edit-terraform-auth-method').value;
+      const envCreds       = (document.getElementById('edit-terraform-env-credentials')?.value || '').trim();
+      const envProject     = (document.getElementById('edit-terraform-env-project')?.value || '').trim();
+      const envExtra       = document.getElementById('edit-terraform-env-extra')?.value || '';
       const vProject       = document.getElementById('edit-terraform-vault-project').value.trim();
       const vRoleset       = document.getElementById('edit-terraform-vault-roleset').value.trim();
       const wifVaultRole   = document.getElementById('edit-terraform-wif-vault-role').value.trim();
@@ -761,6 +856,9 @@ window.openTfTab = function(tabId) {
           vars: document.getElementById('edit-terraform-vars').value,
           commands: customCommands, // <-- Add it to the form payload!
           auth_method: authMethod,
+          env_credentials: envCreds,
+          env_project: envProject,
+          env_extra: envExtra,
           vault_project: vProject,
           vault_roleset: vProject ? (vRoleset || 'terraform-runner') : '',
           wif_vault_role: wifVaultRole,
@@ -938,59 +1036,332 @@ window.openTfTab = function(tabId) {
   };
 
 // --- DIRECTORY BROWSER ---
-  window.openTerraformDirBrowser = async function(targetInputId = 'edit-terraform-workdir') {
-      // 1. Save which input field requested the browser
-      window.currentTfDirTarget = targetInputId;
+  window.tfBrowserTree = [];
+  window.tfBrowserCurrentDir = '';
+  window.tfBrowserSelectedPath = '';
+  window.tfBrowserTargetInputId = 'edit-terraform-workdir';
+  window.tfBrowserMode = 'folder'; // 'folder' | 'file' | 'any'
 
-      const safeLab = window.currentEditLab.replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
+  window.escapeHtml = window.escapeHtml || function(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  };
+
+  window.openTerraformDirBrowser = async function(targetInputId = 'edit-terraform-workdir', options = {}) {
+      window.tfBrowserTargetInputId = targetInputId;
+      window.tfBrowserMode = options.mode || (targetInputId === 'edit-terraform-env-credentials' ? 'file' : 'folder');
+
+      const modalTitle = document.getElementById('tf-dir-browser-title');
+      if (modalTitle) {
+          modalTitle.textContent = options.title || (window.tfBrowserMode === 'file' ? 'Select Credentials File' : 'Select Terraform Folder');
+      }
+
+      const confirmLabel = document.getElementById('tf-dir-confirm-label');
+      if (confirmLabel) {
+          confirmLabel.textContent = window.tfBrowserMode === 'file' ? 'Select File' : (targetInputId === 'edit-terraform-workdir' ? 'Select & Load' : 'Select Folder');
+      }
+
+      const selectCurrFolderBtn = document.getElementById('tf-dir-select-curr-folder-btn');
+      if (selectCurrFolderBtn) {
+          selectCurrFolderBtn.style.display = (window.tfBrowserMode === 'file') ? 'none' : 'inline-block';
+      }
+
+      // Initial browsed path from current input value if present
+      const currVal = (document.getElementById(targetInputId)?.value || '').trim();
+      let initDir = '';
+      if (currVal && currVal !== '(root)' && currVal !== '.') {
+          if (window.tfBrowserMode === 'file' && currVal.includes('/')) {
+              const p = currVal.split('/');
+              p.pop();
+              initDir = p.join('/');
+          } else if (window.tfBrowserMode !== 'file') {
+              initDir = currVal;
+          }
+      }
+      window.tfBrowserCurrentDir = initDir;
+      window.tfBrowserSelectedPath = currVal;
+
+      const searchInput = document.getElementById('tf-dir-search-input');
+      if (searchInput) searchInput.value = '';
+
+      const container = document.getElementById('tf-dir-items-container');
+      if (container) {
+          container.innerHTML = '<div style="color: #64748b; font-style: italic; font-size: 0.85em; text-align: center; padding: 24px;"><i class="fas fa-spinner fa-spin"></i> Loading workspace tree...</div>';
+      }
+
+      document.getElementById('tf-dir-browser-modal').style.display = 'block';
+
       try {
           const res = await fetch(`${window.ansScope()}/terraform/tree?t=${Date.now()}`);
           if (res.ok) {
-              const files = await res.json();
-
-              // Extract unique directories from the file paths
-              const dirs = new Set();
-              dirs.add('.'); // Always include the root directory as an option
-
-              files.forEach(f => {
-                  if (f.includes('/')) {
-                      const parts = f.split('/');
-                      parts.pop(); // Remove the filename to get just the path
-                      dirs.add(parts.join('/'));
-                  }
-              });
-
-              // Populate the datalist
-              const datalist = document.getElementById('tf-dirs-datalist');
-              datalist.innerHTML = '';
-
-              // Sort directories alphabetically and inject them
-              Array.from(dirs).sort().forEach(d => {
-                  const opt = document.createElement('option');
-                  opt.value = d === '.' ? '(root)' : d; // Make root look pretty
-                  datalist.appendChild(opt);
-              });
+              window.tfBrowserTree = await res.json();
+          } else {
+              window.tfBrowserTree = [];
           }
       } catch (e) {
           console.error("Failed to load Terraform directory tree", e);
+          window.tfBrowserTree = [];
       }
 
-      document.getElementById('tf-dir-browser-input').value = '';
-      document.getElementById('tf-dir-browser-modal').style.display = 'block';
+      window.renderTerraformDirBrowser();
+  };
+
+  window.navigateToTfDir = function(dir) {
+      window.tfBrowserCurrentDir = (dir || '').trim().replace(/^\/+|\/+$/g, '');
+      if (window.tfBrowserMode === 'folder') {
+          window.tfBrowserSelectedPath = window.tfBrowserCurrentDir;
+      }
+      const searchInput = document.getElementById('tf-dir-search-input');
+      if (searchInput) searchInput.value = '';
+      window.renderTerraformDirBrowser();
+  };
+
+  window.selectTfBrowserItem = function(path, type, autoConfirm = false) {
+      window.tfBrowserSelectedPath = path;
+      const selCode = document.getElementById('tf-dir-browser-selected');
+      if (selCode) {
+          selCode.textContent = path ? path : '(root)';
+      }
+
+      // Update selection styling
+      document.querySelectorAll('.tf-browser-row').forEach(row => {
+          if (row.getAttribute('data-path') === path) {
+              row.classList.add('selected');
+          } else {
+              row.classList.remove('selected');
+          }
+      });
+
+      if (autoConfirm) {
+          window.confirmTerraformDirBrowser();
+      }
+  };
+
+  window.selectCurrentTfBrowserFolder = function() {
+      window.tfBrowserSelectedPath = window.tfBrowserCurrentDir;
+      window.confirmTerraformDirBrowser();
+  };
+
+  window.filterTerraformBrowserItems = function() {
+      window.renderTerraformDirBrowser();
+  };
+
+  window.getTfContentsAtDir = function(files, dir) {
+      const normDir = dir ? dir.replace(/^\/+|\/+$/g, '') : '';
+      const prefix = normDir ? normDir + '/' : '';
+      const folders = new Map();
+      const fileItems = [];
+
+      files.forEach(f => {
+          const isExplicitDir = f.endsWith('/');
+          const cleanPath = isExplicitDir ? f.slice(0, -1) : f;
+          if (normDir && !cleanPath.startsWith(prefix)) return;
+          const rel = normDir ? cleanPath.slice(prefix.length) : cleanPath;
+          if (!rel) return;
+          const parts = rel.split('/');
+          if (parts.length === 1) {
+              if (isExplicitDir) {
+                  if (!folders.has(parts[0])) folders.set(parts[0], 0);
+              } else {
+                  fileItems.push({ name: parts[0], path: cleanPath });
+              }
+          } else {
+              const folderName = parts[0];
+              folders.set(folderName, (folders.get(folderName) || 0) + (isExplicitDir ? 0 : 1));
+          }
+      });
+
+      const folderItems = Array.from(folders.entries()).map(([name, count]) => ({
+          name,
+          path: normDir ? `${normDir}/${name}` : name,
+          count
+      })).sort((a, b) => a.name.localeCompare(b.name));
+
+      fileItems.sort((a, b) => a.name.localeCompare(b.name));
+      return { folders: folderItems, files: fileItems };
+  };
+
+  window.renderTerraformDirBrowser = function() {
+      const container = document.getElementById('tf-dir-items-container');
+      const breadcrumbs = document.getElementById('tf-dir-breadcrumbs');
+      const selCode = document.getElementById('tf-dir-browser-selected');
+      const searchInput = document.getElementById('tf-dir-search-input');
+      const filterQuery = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+      if (selCode) {
+          selCode.textContent = window.tfBrowserSelectedPath ? window.tfBrowserSelectedPath : '(root)';
+      }
+
+      const currDir = window.tfBrowserCurrentDir;
+
+      // 1. Render Breadcrumbs
+      if (breadcrumbs) {
+          breadcrumbs.innerHTML = '';
+          const rootBtn = document.createElement('button');
+          rootBtn.type = 'button';
+          rootBtn.className = 'tf-crumb-btn' + (currDir === '' ? ' active' : '');
+          rootBtn.innerHTML = '<i class="fas fa-hdd"></i> root';
+          rootBtn.onclick = () => window.navigateToTfDir('');
+          breadcrumbs.appendChild(rootBtn);
+
+          if (currDir !== '') {
+              const parts = currDir.split('/');
+              let acc = '';
+              parts.forEach((p, idx) => {
+                  acc = acc ? `${acc}/${p}` : p;
+                  const sep = document.createElement('span');
+                  sep.style.cssText = 'color: #64748b; font-size: 0.85em; user-select: none;';
+                  sep.textContent = '/';
+                  breadcrumbs.appendChild(sep);
+
+                  const crumbBtn = document.createElement('button');
+                  crumbBtn.type = 'button';
+                  crumbBtn.className = 'tf-crumb-btn' + (idx === parts.length - 1 ? ' active' : '');
+                  crumbBtn.textContent = p;
+                  const targetDir = acc;
+                  crumbBtn.onclick = () => window.navigateToTfDir(targetDir);
+                  breadcrumbs.appendChild(crumbBtn);
+              });
+          }
+      }
+
+      // 2. Extract contents at current directory
+      if (!container) return;
+      container.innerHTML = '';
+
+      const { folders, files } = window.getTfContentsAtDir(window.tfBrowserTree || [], currDir);
+
+      // Parent Directory row (..)
+      if (currDir !== '') {
+          const parentDir = currDir.includes('/') ? currDir.replace(/\/[^\/]+$/, '') : '';
+          const parentRow = document.createElement('div');
+          parentRow.className = 'tf-browser-row';
+          parentRow.style.color = '#94a3b8';
+          parentRow.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-level-up-alt" style="color: #94a3b8; font-size: 0.9em; width: 18px; text-align: center;"></i>
+                  <span style="font-family: monospace; font-weight: 500;">.. (parent directory)</span>
+              </div>
+          `;
+          parentRow.onclick = () => window.navigateToTfDir(parentDir);
+          container.appendChild(parentRow);
+      }
+
+      const filteredFolders = folders.filter(f => !filterQuery || f.name.toLowerCase().includes(filterQuery));
+      const filteredFiles = files.filter(f => !filterQuery || f.name.toLowerCase().includes(filterQuery));
+
+      if (filteredFolders.length === 0 && filteredFiles.length === 0) {
+          const empty = document.createElement('div');
+          empty.style.cssText = 'color: #64748b; font-style: italic; font-size: 0.85em; text-align: center; padding: 20px;';
+          empty.textContent = filterQuery ? `No items match "${filterQuery}"` : 'Directory is empty';
+          container.appendChild(empty);
+          return;
+      }
+
+      // Render Folders
+      filteredFolders.forEach(folder => {
+          const row = document.createElement('div');
+          row.className = 'tf-browser-row' + (window.tfBrowserSelectedPath === folder.path ? ' selected' : '');
+          row.setAttribute('data-path', folder.path);
+
+          row.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden;">
+                  <i class="fas fa-folder" style="color: #f59e0b; font-size: 1em; width: 18px; text-align: center; flex-shrink: 0;"></i>
+                  <span style="font-family: monospace; color: #f8fafc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${window.escapeHtml(folder.name)}/</span>
+                  <span style="color: #64748b; font-size: 0.78em; margin-left: 4px; white-space: nowrap;">(${folder.count} ${folder.count === 1 ? 'item' : 'items'})</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px; flex-shrink: 0;">
+                  <button type="button" class="w3-button w3-tiny w3-round" style="background: #334155; color: #cbd5e1; padding: 2px 8px;" title="Open folder">
+                      <i class="fas fa-folder-open"></i> Open
+                  </button>
+                  <button type="button" class="w3-button w3-tiny w3-blue w3-round" style="padding: 2px 8px;" title="Select folder">
+                      <i class="fas fa-check"></i> Select
+                  </button>
+              </div>
+          `;
+
+          // Single-click selects row
+          row.onclick = () => window.selectTfBrowserItem(folder.path, 'folder', false);
+
+          // Double-click navigates into folder
+          row.ondblclick = (e) => {
+              e.preventDefault();
+              window.navigateToTfDir(folder.path);
+          };
+
+          // "Open" button navigates into folder
+          const openBtn = row.querySelectorAll('button')[0];
+          if (openBtn) {
+              openBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  window.navigateToTfDir(folder.path);
+              };
+          }
+
+          // "Select" button selects and confirms
+          const selectBtn = row.querySelectorAll('button')[1];
+          if (selectBtn) {
+              selectBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  window.selectTfBrowserItem(folder.path, 'folder', true);
+              };
+          }
+
+          container.appendChild(row);
+      });
+
+      // Render Files
+      filteredFiles.forEach(file => {
+          const row = document.createElement('div');
+          row.className = 'tf-browser-row' + (window.tfBrowserSelectedPath === file.path ? ' selected' : '');
+          row.setAttribute('data-path', file.path);
+
+          let iconHtml = '<i class="fas fa-file-alt" style="color: #94a3b8; width: 18px; text-align: center; flex-shrink: 0;"></i>';
+          if (file.name.endsWith('.tf') || file.name.endsWith('.tfvars')) {
+              iconHtml = '<i class="fas fa-cubes" style="color: #a855f7; width: 18px; text-align: center; flex-shrink: 0;"></i>';
+          } else if (/\.(json|ya?ml|conf|cfg|ini)$/i.test(file.name)) {
+              iconHtml = '<i class="fas fa-file-code" style="color: #38bdf8; width: 18px; text-align: center; flex-shrink: 0;"></i>';
+          } else if (/\.(sh|bash)$/i.test(file.name)) {
+              iconHtml = '<i class="fas fa-terminal" style="color: #2dd4bf; width: 18px; text-align: center; flex-shrink: 0;"></i>';
+          } else if (/\.(key|pem|pub)$/i.test(file.name) || file.name.startsWith('id_')) {
+              iconHtml = '<i class="fas fa-key" style="color: #eab308; width: 18px; text-align: center; flex-shrink: 0;"></i>';
+          }
+
+          row.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; overflow: hidden;">
+                  ${iconHtml}
+                  <span style="font-family: monospace; color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${window.escapeHtml(file.name)}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px; flex-shrink: 0;">
+                  <button type="button" class="w3-button w3-tiny w3-teal w3-round" style="padding: 2px 8px;" title="Select file">
+                      <i class="fas fa-check"></i> Select
+                  </button>
+              </div>
+          `;
+
+          row.onclick = () => window.selectTfBrowserItem(file.path, 'file', false);
+          row.ondblclick = (e) => {
+              e.preventDefault();
+              window.selectTfBrowserItem(file.path, 'file', true);
+          };
+
+          const selectBtn = row.querySelector('button');
+          if (selectBtn) {
+              selectBtn.onclick = (e) => {
+                  e.stopPropagation();
+                  window.selectTfBrowserItem(file.path, 'file', true);
+              };
+          }
+
+          container.appendChild(row);
+      });
   };
 
   window.confirmTerraformDirBrowser = function() {
-      const inputEl = document.getElementById('tf-dir-browser-input');
-      if (!inputEl) return;
-      
-      let val = inputEl.value.trim();
-      
-      // Clean up the pretty '(root)' string back into a blank path for the backend
+      let val = (window.tfBrowserSelectedPath || '').trim();
       if (val === '(root)' || val === '.') val = '';
 
-      // 2. Retrieve the saved target ID (Defaults to global editor if missing)
-      const targetId = window.currentTfDirTarget || 'edit-terraform-workdir';
-      
+      const targetId = window.tfBrowserTargetInputId || 'edit-terraform-workdir';
       const targetField = document.getElementById(targetId);
       if (targetField) {
           targetField.value = val;
@@ -998,7 +1369,7 @@ window.openTfTab = function(tabId) {
 
       document.getElementById('tf-dir-browser-modal').style.display = 'none';
 
-      // 3. CRITICAL: Only auto-load files if the GLOBAL Terraform editor called this!
+      // Auto-load files only if the working directory input called this
       if (targetId === 'edit-terraform-workdir' && typeof window.loadTerraformFiles === 'function') {
           window.loadTerraformFiles();
       }

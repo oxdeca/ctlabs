@@ -118,6 +118,14 @@
       <tr><td style="color: #94a3b8;">GCP Auth:</td><td>
         <% if auth_error %>
           <span style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> <%= auth_error %></span>
+        <% elsif auth_cfg['method'] == 'env' %>
+          <span class="w3-badge w3-tiny w3-round w3-teal" style="margin-right: 4px;"><i class="fas fa-file-invoice"></i> Environment Variables</span>
+          <% if auth_cfg['credentials_file'] && !auth_cfg['credentials_file'].empty? %>
+            <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= auth_cfg['credentials_file'] %></code>
+          <% end %>
+          <% if auth_cfg['project'] && !auth_cfg['project'].empty? %>
+            <span style="color: #64748b; font-size: 0.85em; margin-left: 4px;">(<%= auth_cfg['project'] %>)</span>
+          <% end %>
         <% elsif auth_cfg['method'] == 'vault' %>
           <span class="w3-badge w3-tiny w3-round w3-green" style="margin-right: 4px;"><i class="fas fa-lock"></i> Vault GCP JIT</span>
           <code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= auth_cfg['project'] %> : <%= auth_cfg['roleset'] || 'terraform-runner' %></code>
