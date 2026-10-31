@@ -740,6 +740,22 @@ class TerminalService
     }
   end
 
+  def self.sanitize_relative_path(path)
+    return '' if path.to_s.strip.empty?
+    str = path.to_s.sub(/^[a-zA-Z]:/, '')
+    stack = []
+    str.tr('\\', '/').split('/').each do |p|
+      next if p.empty? || p == '.'
+      if p == '..'
+        stack.pop
+      else
+        clean = p.gsub(/[^a-zA-Z0-9_.-]/, '_')
+        stack.push(clean) unless clean.empty? || clean == '.' || clean == '..'
+      end
+    end
+    stack.join('/')
+  end
+
   def self.resolve_target_path(target, input_path, default_filename: nil)
     raw = input_path.to_s.strip
     raw = target[:default_dir] if raw.empty?
@@ -763,10 +779,10 @@ class TerminalService
     clean_path = File.expand_path(raw, '/')
 
     if default_filename
-      fname = File.basename(default_filename.to_s.strip).gsub(/[^a-zA-Z0-9_.-]/, '_')
-      fname = 'file.dat' if fname.empty? || fname == '.' || fname == '..'
-      if raw.end_with?('/') || is_target_directory?(target, clean_path)
-        clean_path = File.join(clean_path, fname)
+      clean_rel = sanitize_relative_path(default_filename)
+      clean_rel = 'file.dat' if clean_rel.empty?
+      if raw.end_with?('/') || clean_rel.include?('/') || is_target_directory?(target, clean_path)
+        clean_path = File.join(clean_path, clean_rel)
       end
     end
 
@@ -794,12 +810,14 @@ class TerminalService
     target = resolve_node_target(node_name)
     raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
 
-    fname = (custom_filename && !custom_filename.strip.empty?) ? custom_filename.strip : original_filename.to_s.strip
-    fname = File.basename(fname).gsub(/[^a-zA-Z0-9_.-]/, '_')
-    fname = "uploaded_file.dat" if fname.empty? || fname == '.' || fname == '..'
+    raw_name = (custom_filename && !custom_filename.strip.empty?) ? custom_filename.strip : original_filename.to_s.strip
+    clean_rel = sanitize_relative_path(raw_name)
+    clean_rel = "uploaded_file.dat" if clean_rel.empty?
 
-    target_path = resolve_target_path(target, dest_dir, default_filename: fname)
+    target_path = resolve_target_path(target, dest_dir, default_filename: clean_rel)
     parent_dir = File.dirname(target_path)
+    base_name = File.basename(target_path)
+    fname = base_name
 
     case target[:type]
     when :container
@@ -834,12 +852,12 @@ class TerminalService
         system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{escaped_path} >/dev/null 2>&1")
       end
 
-      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
         '0600'
-      elsif fname.end_with?('.pub')
+      elsif base_name.end_with?('.pub')
         '0644'
-      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
         '0755'
       end
       if mode
@@ -849,7 +867,7 @@ class TerminalService
       size_out, _ = Open3.capture2("#{engine} exec #{container} sh -c \"wc -c < #{escaped_path}\" 2>/dev/null")
       file_size = size_out.to_s.strip.to_i
 
-      { ok: true, filename: fname, path: target_path, size: file_size }
+      { ok: true, filename: base_name, relative_path: clean_rel, path: target_path, size: file_size }
 
     when :host
       FileUtils.mkdir_p(parent_dir)
@@ -862,17 +880,17 @@ class TerminalService
       if parent_dir.end_with?('/.ssh')
         File.chmod(0700, parent_dir) rescue nil
       end
-      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
         0600
-      elsif fname.end_with?('.pub')
+      elsif base_name.end_with?('.pub')
         0644
-      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
         0755
       end
       File.chmod(mode, target_path) if mode rescue nil
 
-      { ok: true, filename: fname, path: target_path, size: File.size(target_path) }
+      { ok: true, filename: base_name, relative_path: clean_rel, path: target_path, size: File.size(target_path) }
 
     when :ssh
       require 'tempfile'
@@ -904,12 +922,12 @@ class TerminalService
       success = system(*scp_cmd)
       raise "SCP transfer failed" unless success
 
-      is_private_key = (fname =~ /^id_[a-z0-9_]+$/i) || fname.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !fname.end_with?('.pub'))
+      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
+      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
         '0600'
-      elsif fname.end_with?('.pub')
+      elsif base_name.end_with?('.pub')
         '0644'
-      elsif fname.end_with?('.sh', '.py', '.rb', '.bash')
+      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
         '0755'
       end
       if mode
@@ -919,8 +937,80 @@ class TerminalService
         system(*chmod_file_cmd)
       end
 
-      { ok: true, filename: fname, path: target_path, size: File.size(local_src) }
+      { ok: true, filename: base_name, relative_path: clean_rel, path: target_path, size: File.size(local_src) }
     end
+  end
+
+  def self.create_directory(node_name, relative_dir, dest_dir: nil)
+    target = resolve_node_target(node_name)
+    raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
+
+    clean_rel = sanitize_relative_path(relative_dir)
+    return { ok: true } if clean_rel.empty?
+
+    base_dir = resolve_target_path(target, dest_dir)
+    target_path = File.join(base_dir, clean_rel)
+    escaped_path = Shellwords.escape(target_path)
+
+    case target[:type]
+    when :container
+      engine = target[:engine]
+      container = target[:container]
+      system("#{engine} exec #{container} mkdir -p #{escaped_path} >/dev/null 2>&1")
+      if target[:user] && !target[:user].empty?
+        system("#{engine} exec #{container} chown -R #{target[:user]}:#{target[:user]} #{escaped_path} >/dev/null 2>&1")
+      end
+    when :host
+      FileUtils.mkdir_p(target_path)
+    when :ssh
+      ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+      ssh_cmd.push("-i", target[:key]) if target[:key]
+      ssh_cmd.push("#{target[:user]}@#{target[:host]}", "mkdir -p #{escaped_path}")
+      system(*ssh_cmd)
+    end
+
+    { ok: true, path: target_path }
+  end
+
+  def self.upload_files(node_name, files_with_paths, dest_dir: nil, empty_dirs: [])
+    target = resolve_node_target(node_name)
+    raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
+
+    base_dir = resolve_target_path(target, dest_dir)
+
+    Array(empty_dirs).each do |edir|
+      create_directory(node_name, edir, dest_dir: base_dir) rescue nil
+    end
+
+    uploaded = []
+    errors = []
+    total_bytes = 0
+
+    files_with_paths.each do |item|
+      tempfile = item[:tempfile] || item[:io]
+      rel_path = item[:path] || item[:filename]
+      next unless tempfile && rel_path
+
+      begin
+        res = upload_file(node_name, tempfile, rel_path, dest_dir: "#{base_dir}/")
+        if res[:ok]
+          uploaded << res
+          total_bytes += (res[:size] || 0)
+        else
+          errors << { filename: rel_path, error: res[:error] || 'Upload failed' }
+        end
+      rescue => e
+        errors << { filename: rel_path, error: e.message }
+      end
+    end
+
+    {
+      ok: errors.empty?,
+      count: uploaded.size,
+      total_size: total_bytes,
+      files: uploaded,
+      errors: errors
+    }
   end
 
   def self.list_node_files(node_name, remote_dir = nil)

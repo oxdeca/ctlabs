@@ -319,11 +319,18 @@
               <option value="bar">Bar |</option>
             </select>
           </div>
-          <div class="setting-group" style="margin-bottom: 0;">
+          <div class="setting-group" style="margin-bottom: 8px;">
             <label for="cursor-blink-select">Cursor Blink:</label>
             <select id="cursor-blink-select">
               <option value="true" selected>Blinking</option>
               <option value="false">Steady</option>
+            </select>
+          </div>
+          <div class="setting-group" style="margin-bottom: 0;">
+            <label for="reload-protect-select">Reload Guard:</label>
+            <select id="reload-protect-select">
+              <option value="true" selected>Prompt on Reload (Safe)</option>
+              <option value="false">Allow Instant Reload</option>
             </select>
           </div>
         </div>
@@ -467,7 +474,7 @@
         <!-- UPLOAD TAB PANE -->
         <div id="pane-upload">
           <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 0.85em;">
-            Upload files directly from your computer to <code><%= ERB::Util.html_escape(@node_name) %></code>.
+            Upload files or entire folders directly from your computer to <code><%= ERB::Util.html_escape(@node_name) %></code>.
           </p>
 
           <!-- Destination directory -->
@@ -482,29 +489,65 @@
 
           <!-- Drag and drop zone -->
           <div style="margin-bottom: 12px;">
-            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Select File:</label>
-            <div id="upload-dropzone" style="border: 2px dashed #475569; border-radius: 6px; padding: 22px 14px; text-align: center; cursor: pointer; background: #0f172a; transition: all 0.2s ease;">
+            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Select Files or Folder:</label>
+            <div id="upload-dropzone" style="border: 2px dashed #475569; border-radius: 6px; padding: 18px 14px; text-align: center; cursor: pointer; background: #0f172a; transition: all 0.2s ease;">
               <i class="fas fa-cloud-upload-alt" style="font-size: 2.2em; color: #38bdf8; margin-bottom: 8px;"></i>
-              <div style="color: #cbd5e1; font-weight: 500;">Drop file here or <span style="color: #38bdf8; text-decoration: underline;">click to browse</span></div>
-              <div style="color: #64748b; font-size: 0.8em; margin-top: 4px;">Streams directly to container / remote filesystem</div>
-              <input type="file" id="upload-file-input" style="display: none;" />
+              <div style="color: #cbd5e1; font-weight: 500; font-size: 0.95em;">Drop files or folders here</div>
+              <div style="display: flex; justify-content: center; gap: 8px; margin-top: 8px;">
+                <button type="button" id="upload-browse-files-btn" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 5px 12px; border-radius: 4px; font-size: 0.82em; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-file"></i> Choose Files
+                </button>
+                <button type="button" id="upload-browse-folder-btn" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 5px 12px; border-radius: 4px; font-size: 0.82em; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-folder-open"></i> Choose Folder
+                </button>
+              </div>
+              <div style="color: #64748b; font-size: 0.78em; margin-top: 8px;">Streams directly to container / remote filesystem &bull; Preserves directory structure</div>
+              <input type="file" id="upload-file-input" multiple style="display: none;" />
+              <input type="file" id="upload-folder-input" webkitdirectory directory multiple style="display: none;" />
             </div>
           </div>
 
-          <!-- Selected file preview -->
-          <div id="upload-file-preview" style="display: none; margin-bottom: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 8px 12px; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
-              <i class="fas fa-file-alt" style="color: #38bdf8; font-size: 1.1em;"></i>
-              <span id="upload-preview-name" style="color: #f8fafc; font-size: 0.9em; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;"></span>
-              <span id="upload-preview-size" style="color: #64748b; font-size: 0.8em;"></span>
+          <!-- Selected file / folder preview -->
+          <div id="upload-file-preview" style="display: none; margin-bottom: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px; overflow: hidden; flex: 1;">
+                <i id="upload-preview-icon" class="fas fa-file-alt" style="color: #38bdf8; font-size: 1.3em;"></i>
+                <div style="overflow: hidden; min-width: 0;">
+                  <div id="upload-preview-name" style="color: #f8fafc; font-size: 0.9em; font-weight: 600; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                  <div id="upload-preview-details" style="color: #94a3b8; font-size: 0.78em;"></div>
+                </div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <button type="button" id="upload-toggle-list-btn" style="display: none; background: #334155; border: 1px solid #475569; color: #93c5fd; padding: 3px 8px; border-radius: 4px; font-size: 0.78em; cursor: pointer;" title="Show / hide file list">
+                  <i class="fas fa-list"></i> Details
+                </button>
+                <button type="button" id="upload-file-clear" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 1.2em; line-height: 1; padding: 0 4px;" title="Clear selection">&times;</button>
+              </div>
             </div>
-            <button type="button" id="upload-file-clear" style="background: transparent; border: none; color: #ef4444; cursor: pointer; font-size: 1.2em; line-height: 1; padding: 0 4px;" title="Remove file">&times;</button>
+
+            <!-- Expandable items list -->
+            <div id="upload-items-list" style="display: none; max-height: 150px; overflow-y: auto; background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 4px; font-size: 0.8em; font-family: monospace; flex-direction: column; gap: 2px;"></div>
           </div>
 
-          <!-- Optional custom filename -->
+          <!-- Optional custom filename / subfolder -->
           <div style="margin-bottom: 8px;">
-            <label style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Rename on Node (Optional):</label>
+            <label id="upload-custom-label" style="display: block; color: #cbd5e1; font-weight: 600; font-size: 0.82em; margin-bottom: 4px;">Rename on Node (Optional):</label>
             <input type="text" id="upload-custom-name" placeholder="Leave empty to keep original filename" style="width: 100%; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; padding: 6px 10px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+          </div>
+
+          <!-- Upload Progress Bar -->
+          <div id="upload-progress-container" style="display: none; margin-top: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.82em;">
+              <span id="upload-progress-label" style="color: #cbd5e1; font-weight: 500;">Uploading...</span>
+              <span id="upload-progress-percent" style="color: #38bdf8; font-weight: 600; font-family: monospace;">0%</span>
+            </div>
+            <div style="background: #1e293b; border-radius: 4px; height: 8px; overflow: hidden; width: 100%;">
+              <div id="upload-progress-bar" style="background: linear-gradient(90deg, #38bdf8, #2563eb); height: 100%; width: 0%; transition: width 0.15s ease;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.78em; color: #64748b;">
+              <span id="upload-progress-bytes">0 B / 0 B</span>
+              <span id="upload-progress-batch"></span>
+            </div>
           </div>
 
           <div style="margin-top: 10px; padding: 8px 10px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 4px; color: #94a3b8; font-size: 0.8em; display: flex; align-items: flex-start; gap: 8px;">
@@ -584,7 +627,7 @@
     <!-- Drag & Drop Overlay on Terminal -->
     <div id="term-drop-overlay" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 1500; border: 3px dashed #38bdf8; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;">
       <i class="fas fa-cloud-upload-alt" style="font-size: 3.5em; color: #38bdf8; margin-bottom: 12px;"></i>
-      <div style="font-size: 1.2em; font-weight: 600; color: #f8fafc;">Drop file to upload to <%= ERB::Util.html_escape(@node_name) %></div>
+      <div style="font-size: 1.2em; font-weight: 600; color: #f8fafc;">Drop files or folder to upload to <%= ERB::Util.html_escape(@node_name) %></div>
       <div id="term-drop-dest-hint" style="color: #94a3b8; font-size: 0.9em; margin-top: 6px;"></div>
     </div>
   </div>
@@ -916,12 +959,25 @@
       const uploadDirInput = document.getElementById('upload-dir-input');
       const uploadDirShortcuts = document.getElementById('upload-dir-shortcuts');
       const uploadDropzone = document.getElementById('upload-dropzone');
+      const uploadBrowseFilesBtn = document.getElementById('upload-browse-files-btn');
+      const uploadBrowseFolderBtn = document.getElementById('upload-browse-folder-btn');
       const uploadFileInput = document.getElementById('upload-file-input');
+      const uploadFolderInput = document.getElementById('upload-folder-input');
       const uploadFilePreview = document.getElementById('upload-file-preview');
+      const uploadPreviewIcon = document.getElementById('upload-preview-icon');
       const uploadPreviewName = document.getElementById('upload-preview-name');
-      const uploadPreviewSize = document.getElementById('upload-preview-size');
+      const uploadPreviewDetails = document.getElementById('upload-preview-details');
+      const uploadToggleListBtn = document.getElementById('upload-toggle-list-btn');
+      const uploadItemsList = document.getElementById('upload-items-list');
       const uploadFileClear = document.getElementById('upload-file-clear');
+      const uploadCustomLabel = document.getElementById('upload-custom-label');
       const uploadCustomName = document.getElementById('upload-custom-name');
+      const uploadProgressContainer = document.getElementById('upload-progress-container');
+      const uploadProgressLabel = document.getElementById('upload-progress-label');
+      const uploadProgressPercent = document.getElementById('upload-progress-percent');
+      const uploadProgressBar = document.getElementById('upload-progress-bar');
+      const uploadProgressBytes = document.getElementById('upload-progress-bytes');
+      const uploadProgressBatch = document.getElementById('upload-progress-batch');
       const uploadFeedback = document.getElementById('upload-feedback');
       const uploadSubmitBtn = document.getElementById('upload-submit-btn');
 
@@ -941,7 +997,8 @@
       const termToastIcon = document.getElementById('term-toast-icon');
       const termToastMsg = document.getElementById('term-toast-msg');
 
-      let currentUploadFile = null;
+      let stagedUploadFiles = [];
+      let stagedUploadDirs = [];
       let activeTransferTab = 'upload';
       let nodeTargetInfo = { default_dir: '/root' };
       let currentBrowsedDir = '~';
@@ -1065,29 +1122,211 @@
         if (downloadFeedback) downloadFeedback.style.display = 'none';
       }
 
-      function handleSelectedUploadFile(file) {
-        if (!file) return;
-        currentUploadFile = file;
-        uploadPreviewName.textContent = file.name;
-        uploadPreviewSize.textContent = `(${formatBytes(file.size)})`;
+      async function getFilesFromDataTransfer(dataTransfer) {
+        const files = [];
+        const emptyDirs = [];
+        if (!dataTransfer) return { files, emptyDirs };
+
+        const items = dataTransfer.items;
+        if (items && items.length > 0 && (items[0].webkitGetAsEntry || items[0].getAsEntry)) {
+          const queue = [];
+          for (let i = 0; i < items.length; i++) {
+            const entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : (items[i].getAsEntry ? items[i].getAsEntry() : null);
+            if (entry) queue.push({ entry, path: '' });
+          }
+
+          while (queue.length > 0) {
+            const { entry, path } = queue.shift();
+            if (entry.isFile) {
+              const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+              const relPath = path ? `${path}/${file.name}` : file.name;
+              files.push({ file, relPath });
+            } else if (entry.isDirectory) {
+              const dirPath = path ? `${path}/${entry.name}` : entry.name;
+              const dirReader = entry.createReader();
+              let dirEntries = [];
+              let batch;
+              do {
+                batch = await new Promise((resolve, reject) => dirReader.readEntries(resolve, reject));
+                if (batch && batch.length > 0) {
+                  dirEntries.push(...batch);
+                }
+              } while (batch && batch.length > 0);
+
+              if (dirEntries.length === 0) {
+                emptyDirs.push(dirPath);
+              } else {
+                for (const child of dirEntries) {
+                  queue.push({ entry: child, path: dirPath });
+                }
+              }
+            }
+          }
+          return { files, emptyDirs };
+        }
+
+        if (dataTransfer.files && dataTransfer.files.length > 0) {
+          for (let i = 0; i < dataTransfer.files.length; i++) {
+            const file = dataTransfer.files[i];
+            const relPath = file.webkitRelativePath || file.name;
+            files.push({ file, relPath });
+          }
+        }
+        return { files, emptyDirs };
+      }
+
+      function stageUploadItems(newFiles, newDirs = [], append = false) {
+        if (!append) {
+          stagedUploadFiles = [];
+          stagedUploadDirs = [];
+        }
+
+        newFiles.forEach(item => {
+          if (!stagedUploadFiles.some(existing => existing.relPath === item.relPath)) {
+            stagedUploadFiles.push(item);
+          }
+        });
+
+        newDirs.forEach(dir => {
+          if (!stagedUploadDirs.includes(dir)) {
+            stagedUploadDirs.push(dir);
+          }
+        });
+
+        renderUploadPreview();
+      }
+
+      function renderUploadPreview() {
+        if (!uploadFilePreview) return;
+
+        const totalItems = stagedUploadFiles.length + stagedUploadDirs.length;
+        if (totalItems === 0) {
+          clearSelectedUploadFile();
+          return;
+        }
+
+        const totalBytes = stagedUploadFiles.reduce((acc, item) => acc + item.file.size, 0);
+
+        if (stagedUploadFiles.length === 1 && stagedUploadDirs.length === 0 && !stagedUploadFiles[0].relPath.includes('/')) {
+          const item = stagedUploadFiles[0];
+          if (uploadPreviewIcon) {
+            uploadPreviewIcon.className = 'fas fa-file-alt';
+            uploadPreviewIcon.style.color = '#38bdf8';
+          }
+          if (uploadPreviewName) uploadPreviewName.textContent = item.file.name;
+          if (uploadPreviewDetails) uploadPreviewDetails.textContent = formatBytes(item.file.size);
+          if (uploadToggleListBtn) uploadToggleListBtn.style.display = 'none';
+          if (uploadItemsList) uploadItemsList.style.display = 'none';
+          if (uploadCustomLabel) uploadCustomLabel.textContent = 'Rename on Node (Optional):';
+          if (uploadCustomName) uploadCustomName.placeholder = 'Leave empty to keep original filename';
+          if (uploadSubmitBtn) {
+            uploadSubmitBtn.disabled = false;
+            uploadSubmitBtn.style.opacity = '1';
+            uploadSubmitBtn.style.cursor = 'pointer';
+            const labelSpan = uploadSubmitBtn.querySelector('span');
+            if (labelSpan) labelSpan.textContent = 'Upload File';
+          }
+        } else {
+          const allPaths = stagedUploadFiles.map(f => f.relPath).concat(stagedUploadDirs);
+          const firstRoot = allPaths[0] ? allPaths[0].split('/')[0] : '';
+          const hasCommonRoot = allPaths.length > 0 && allPaths.every(p => p.startsWith(firstRoot + '/') || p === firstRoot);
+
+          if (uploadPreviewIcon) {
+            uploadPreviewIcon.className = hasCommonRoot ? 'fas fa-folder-open' : 'fas fa-layer-group';
+            uploadPreviewIcon.style.color = '#f59e0b';
+          }
+          if (uploadPreviewName) uploadPreviewName.textContent = hasCommonRoot ? firstRoot : `${totalItems} items selected`;
+          if (uploadPreviewDetails) {
+            uploadPreviewDetails.textContent = `${stagedUploadFiles.length} file${stagedUploadFiles.length === 1 ? '' : 's'}${stagedUploadDirs.length > 0 ? `, ${stagedUploadDirs.length} empty dir${stagedUploadDirs.length === 1 ? '' : 's'}` : ''} • Total: ${formatBytes(totalBytes)}`;
+          }
+
+          if (uploadToggleListBtn) uploadToggleListBtn.style.display = 'inline-flex';
+          if (uploadCustomLabel) uploadCustomLabel.textContent = 'Subfolder on Node (Optional):';
+          if (uploadCustomName) uploadCustomName.placeholder = 'e.g. my-folder (places files inside this folder)';
+
+          if (uploadSubmitBtn) {
+            uploadSubmitBtn.disabled = false;
+            uploadSubmitBtn.style.opacity = '1';
+            uploadSubmitBtn.style.cursor = 'pointer';
+            const labelSpan = uploadSubmitBtn.querySelector('span');
+            if (labelSpan) labelSpan.textContent = `Upload ${stagedUploadFiles.length} File${stagedUploadFiles.length === 1 ? '' : 's'}`;
+          }
+
+          if (uploadItemsList) {
+            uploadItemsList.innerHTML = '';
+            stagedUploadFiles.forEach((item, idx) => {
+              const row = document.createElement('div');
+              row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 3px 6px; border-radius: 3px; background: rgba(255,255,255,0.03);';
+              row.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; min-width: 0;">
+                  <i class="fas fa-file-alt" style="color: #94a3b8; font-size: 0.85em;"></i>
+                  <span style="color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(item.relPath)}">${escapeHtml(item.relPath)}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                  <span style="color: #64748b; font-size: 0.85em;">${formatBytes(item.file.size)}</span>
+                  <button type="button" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 0 2px; font-size: 1.1em; line-height: 1;" title="Remove this file">&times;</button>
+                </div>
+              `;
+              const rmBtn = row.querySelector('button');
+              rmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                stagedUploadFiles.splice(idx, 1);
+                renderUploadPreview();
+              });
+              uploadItemsList.appendChild(row);
+            });
+
+            stagedUploadDirs.forEach((dir, idx) => {
+              const row = document.createElement('div');
+              row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 3px 6px; border-radius: 3px; background: rgba(255,255,255,0.03);';
+              row.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; min-width: 0;">
+                  <i class="fas fa-folder" style="color: #f59e0b; font-size: 0.85em;"></i>
+                  <span style="color: #cbd5e1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(dir)}/">${escapeHtml(dir)}/ (empty dir)</span>
+                </div>
+                <button type="button" style="background: transparent; border: none; color: #ef4444; cursor: pointer; padding: 0 2px; font-size: 1.1em; line-height: 1;" title="Remove this directory">&times;</button>
+              `;
+              const rmBtn = row.querySelector('button');
+              rmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                stagedUploadDirs.splice(idx, 1);
+                renderUploadPreview();
+              });
+              uploadItemsList.appendChild(row);
+            });
+          }
+        }
+
         uploadFilePreview.style.display = 'flex';
-        uploadSubmitBtn.disabled = false;
-        uploadSubmitBtn.style.opacity = '1';
-        uploadSubmitBtn.style.cursor = 'pointer';
         if (uploadFeedback) uploadFeedback.style.display = 'none';
+        if (uploadProgressContainer) uploadProgressContainer.style.display = 'none';
       }
 
       function clearSelectedUploadFile() {
-        currentUploadFile = null;
+        stagedUploadFiles = [];
+        stagedUploadDirs = [];
         if (uploadFileInput) uploadFileInput.value = '';
+        if (uploadFolderInput) uploadFolderInput.value = '';
         if (uploadPreviewName) uploadPreviewName.textContent = '';
-        if (uploadPreviewSize) uploadPreviewSize.textContent = '';
+        if (uploadPreviewDetails) uploadPreviewDetails.textContent = '';
         if (uploadFilePreview) uploadFilePreview.style.display = 'none';
+        if (uploadItemsList) {
+          uploadItemsList.innerHTML = '';
+          uploadItemsList.style.display = 'none';
+        }
+        if (uploadToggleListBtn) {
+          uploadToggleListBtn.style.display = 'none';
+          uploadToggleListBtn.innerHTML = '<i class="fas fa-list"></i> Details';
+        }
         if (uploadCustomName) uploadCustomName.value = '';
+        if (uploadCustomLabel) uploadCustomLabel.textContent = 'Rename on Node (Optional):';
+        if (uploadProgressContainer) uploadProgressContainer.style.display = 'none';
         if (uploadSubmitBtn) {
           uploadSubmitBtn.disabled = true;
           uploadSubmitBtn.style.opacity = '0.6';
           uploadSubmitBtn.style.cursor = 'not-allowed';
+          const labelSpan = uploadSubmitBtn.querySelector('span');
+          if (labelSpan) labelSpan.textContent = 'Upload File';
         }
       }
 
@@ -1169,13 +1408,55 @@
       if (tabBtnUpload) tabBtnUpload.addEventListener('click', () => switchTransferTab('upload'));
       if (tabBtnDownload) tabBtnDownload.addEventListener('click', () => switchTransferTab('download'));
 
-      // Dropzone and file picking
-      if (uploadDropzone && uploadFileInput) {
-        uploadDropzone.addEventListener('click', () => uploadFileInput.click());
+      // Dropzone, browse buttons, and file picking
+      if (uploadBrowseFilesBtn && uploadFileInput) {
+        uploadBrowseFilesBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          uploadFileInput.click();
+        });
+      }
+
+      if (uploadBrowseFolderBtn && uploadFolderInput) {
+        uploadBrowseFolderBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          uploadFolderInput.click();
+        });
+      }
+
+      if (uploadToggleListBtn && uploadItemsList) {
+        uploadToggleListBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isHidden = uploadItemsList.style.display === 'none';
+          uploadItemsList.style.display = isHidden ? 'flex' : 'none';
+          uploadToggleListBtn.innerHTML = isHidden ? '<i class="fas fa-chevron-up"></i> Hide' : '<i class="fas fa-list"></i> Details';
+        });
+      }
+
+      if (uploadFileInput) {
         uploadFileInput.addEventListener('change', () => {
           if (uploadFileInput.files && uploadFileInput.files.length > 0) {
-            handleSelectedUploadFile(uploadFileInput.files[0]);
+            const files = Array.from(uploadFileInput.files).map(f => ({ file: f, relPath: f.name }));
+            stageUploadItems(files, [], false);
           }
+        });
+      }
+
+      if (uploadFolderInput) {
+        uploadFolderInput.addEventListener('change', () => {
+          if (uploadFolderInput.files && uploadFolderInput.files.length > 0) {
+            const files = Array.from(uploadFolderInput.files).map(f => ({
+              file: f,
+              relPath: f.webkitRelativePath || f.name
+            }));
+            stageUploadItems(files, [], false);
+          }
+        });
+      }
+
+      if (uploadDropzone) {
+        uploadDropzone.addEventListener('click', (e) => {
+          if (e.target.closest('button')) return;
+          if (uploadFileInput) uploadFileInput.click();
         });
 
         uploadDropzone.addEventListener('dragover', (e) => {
@@ -1186,11 +1467,14 @@
           e.preventDefault();
           uploadDropzone.classList.remove('dragover');
         });
-        uploadDropzone.addEventListener('drop', (e) => {
+        uploadDropzone.addEventListener('drop', async (e) => {
           e.preventDefault();
           uploadDropzone.classList.remove('dragover');
-          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            handleSelectedUploadFile(e.dataTransfer.files[0]);
+          if (e.dataTransfer) {
+            const { files, emptyDirs } = await getFilesFromDataTransfer(e.dataTransfer);
+            if (files.length > 0 || emptyDirs.length > 0) {
+              stageUploadItems(files, emptyDirs, false);
+            }
           }
         });
       }
@@ -1199,46 +1483,155 @@
         uploadFileClear.addEventListener('click', clearSelectedUploadFile);
       }
 
+      // Batch upload function using XMLHttpRequest for upload progress tracking
+      function uploadBatchXhr(nodeName, batchFiles, destDir, batchDirs = [], onProgress) {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const formData = new FormData();
+          if (destDir) formData.append('dest_dir', destDir);
+
+          batchDirs.forEach(d => formData.append('dirs[]', d));
+          batchFiles.forEach(item => {
+            formData.append('files[]', item.file, item.file.name);
+            formData.append('paths[]', item.relPath);
+          });
+
+          if (xhr.upload && onProgress) {
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) onProgress(e.loaded, e.total);
+            };
+          }
+
+          xhr.onload = () => {
+            if ((xhr.status >= 200 && xhr.status < 300) || xhr.status === 207) {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data);
+              } catch (err) {
+                reject(new Error('Invalid response from server'));
+              }
+            } else {
+              try {
+                const data = JSON.parse(xhr.responseText);
+                reject(new Error(data.error || `HTTP ${xhr.status}`));
+              } catch {
+                reject(new Error(`Upload failed with HTTP status ${xhr.status}`));
+              }
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Network error during upload'));
+          xhr.open('POST', '/terminal/' + encodeURIComponent(nodeName) + '/upload');
+          xhr.send(formData);
+        });
+      }
+
       // Upload submit
       if (uploadSubmitBtn) {
         uploadSubmitBtn.addEventListener('click', async () => {
-          if (!currentUploadFile) return;
+          if (stagedUploadFiles.length === 0 && stagedUploadDirs.length === 0) return;
           const destDir = (uploadDirInput.value || '').trim();
           const customName = (uploadCustomName.value || '').trim();
 
           uploadSubmitBtn.disabled = true;
           uploadSubmitBtn.style.opacity = '0.7';
           uploadSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Uploading...</span>';
-          showUploadFeedback('<i class="fas fa-spinner fa-spin"></i> Uploading file to node...', 'info');
+          showUploadFeedback('<i class="fas fa-spinner fa-spin"></i> Uploading to node...', 'info');
 
-          const formData = new FormData();
-          formData.append('file', currentUploadFile);
-          if (destDir) formData.append('dest_dir', destDir);
-          if (customName) formData.append('filename', customName);
+          if (uploadProgressContainer) {
+            uploadProgressContainer.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            uploadProgressPercent.textContent = '0%';
+            uploadProgressBytes.textContent = 'Preparing...';
+            uploadProgressBatch.textContent = '';
+          }
+
+          // Compute effective relative paths and directories if customName is provided
+          let effectiveFiles = [];
+          let effectiveDirs = [];
+
+          if (stagedUploadFiles.length === 1 && stagedUploadDirs.length === 0 && !stagedUploadFiles[0].relPath.includes('/')) {
+            const single = stagedUploadFiles[0];
+            effectiveFiles = [{
+              file: single.file,
+              relPath: customName || single.relPath
+            }];
+          } else {
+            effectiveFiles = stagedUploadFiles.map(item => ({
+              file: item.file,
+              relPath: customName ? `${customName}/${item.relPath}` : item.relPath
+            }));
+            effectiveDirs = stagedUploadDirs.map(d => (customName ? `${customName}/${d}` : d));
+            if (customName && effectiveDirs.length === 0 && effectiveFiles.length === 0) {
+              effectiveDirs.push(customName);
+            }
+          }
+
+          const grandTotalBytes = effectiveFiles.reduce((acc, f) => acc + f.file.size, 0);
+          let completedBytes = 0;
+          let totalUploadedCount = 0;
+          let uploadErrors = [];
+
+          const BATCH_SIZE = 40;
+          const totalBatches = Math.max(1, Math.ceil(effectiveFiles.length / BATCH_SIZE));
 
           try {
-            const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/upload', {
-              method: 'POST',
-              body: formData,
-              credentials: 'same-origin'
-            });
-            const data = await res.json();
-            if (data.ok) {
-              const msg = `Successfully uploaded <strong>${escapeHtml(data.filename)}</strong> (${formatBytes(data.size)}) to <code>${escapeHtml(data.path)}</code>`;
+            for (let b = 0; b < totalBatches; b++) {
+              const startIdx = b * BATCH_SIZE;
+              const batchFiles = effectiveFiles.slice(startIdx, startIdx + BATCH_SIZE);
+              const batchDirs = (b === 0) ? effectiveDirs : [];
+              const batchBytes = batchFiles.reduce((acc, f) => acc + f.file.size, 0);
+
+              if (uploadProgressBatch) {
+                uploadProgressBatch.textContent = `Batch ${b + 1} of ${totalBatches}`;
+              }
+
+              const res = await uploadBatchXhr(
+                nodeName,
+                batchFiles,
+                destDir,
+                batchDirs,
+                (loadedBytes) => {
+                  const currentBytes = Math.min(completedBytes + loadedBytes, grandTotalBytes);
+                  const pct = grandTotalBytes > 0 ? Math.round((currentBytes / grandTotalBytes) * 100) : 100;
+                  if (uploadProgressBar) uploadProgressBar.style.width = pct + '%';
+                  if (uploadProgressPercent) uploadProgressPercent.textContent = pct + '%';
+                  if (uploadProgressBytes) uploadProgressBytes.textContent = `${formatBytes(currentBytes)} / ${formatBytes(grandTotalBytes)}`;
+                }
+              );
+
+              completedBytes += batchBytes;
+              totalUploadedCount += (res.count || batchFiles.length);
+              if (res.errors && res.errors.length > 0) {
+                uploadErrors.push(...res.errors);
+              }
+            }
+
+            if (uploadErrors.length === 0) {
+              if (uploadProgressBar) uploadProgressBar.style.width = '100%';
+              if (uploadProgressPercent) uploadProgressPercent.textContent = '100%';
+              if (uploadProgressBytes) uploadProgressBytes.textContent = `${formatBytes(grandTotalBytes)} / ${formatBytes(grandTotalBytes)}`;
+
+              const msg = `Successfully uploaded <strong>${totalUploadedCount} item${totalUploadedCount === 1 ? '' : 's'}</strong> (${formatBytes(grandTotalBytes)}) to <code>${escapeHtml(destDir || (nodeTargetInfo && nodeTargetInfo.default_dir) || '~')}</code>`;
               showUploadFeedback(`<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> ${msg}`, 'success');
-              showToast(`Uploaded ${data.filename} (${formatBytes(data.size)})`, 'success');
+              showToast(`Uploaded ${totalUploadedCount} item${totalUploadedCount === 1 ? '' : 's'} (${formatBytes(grandTotalBytes)})`, 'success');
               clearSelectedUploadFile();
               fetchNodeFileList(destDir || (nodeTargetInfo && nodeTargetInfo.default_dir) || '~');
             } else {
-              showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(data.error || 'Upload failed')}`, 'error');
+              const errSummary = uploadErrors.map(e => `${escapeHtml(e.filename)}: ${escapeHtml(e.error)}`).join('<br>');
+              showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> Upload completed with errors:<br>${errSummary}`, 'error');
             }
           } catch (err) {
-            showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(err.message || 'Network error')}`, 'error');
+            showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(err.message || 'Upload failed')}`, 'error');
           } finally {
-            uploadSubmitBtn.disabled = !currentUploadFile;
-            uploadSubmitBtn.style.opacity = currentUploadFile ? '1' : '0.6';
-            uploadSubmitBtn.style.cursor = currentUploadFile ? 'pointer' : 'not-allowed';
-            uploadSubmitBtn.innerHTML = '<i class="fas fa-upload"></i> <span>Upload File</span>';
+            const hasItems = stagedUploadFiles.length > 0 || stagedUploadDirs.length > 0;
+            uploadSubmitBtn.disabled = !hasItems;
+            uploadSubmitBtn.style.opacity = hasItems ? '1' : '0.6';
+            uploadSubmitBtn.style.cursor = hasItems ? 'pointer' : 'not-allowed';
+            const labelSpan = uploadSubmitBtn.querySelector('span');
+            if (labelSpan) {
+              labelSpan.textContent = stagedUploadFiles.length > 1 ? `Upload ${stagedUploadFiles.length} Files` : 'Upload File';
+            }
           }
         });
       }
@@ -1530,13 +1923,16 @@
         }
       });
 
-      window.addEventListener('drop', (e) => {
+      window.addEventListener('drop', async (e) => {
         e.preventDefault();
         dragCounter = 0;
         if (termDropOverlay) termDropOverlay.style.display = 'none';
-        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          handleSelectedUploadFile(e.dataTransfer.files[0]);
-          openFilesModal('upload');
+        if (e.dataTransfer) {
+          const { files, emptyDirs } = await getFilesFromDataTransfer(e.dataTransfer);
+          if (files.length > 0 || emptyDirs.length > 0) {
+            stageUploadItems(files, emptyDirs, false);
+            openFilesModal('upload');
+          }
         }
       });
 
@@ -1659,6 +2055,17 @@
       term.open(container);
 
       // Apply dynamic terminal display options
+      const reloadProtectSelect = document.getElementById('reload-protect-select');
+      let reloadProtection = localStorage.getItem('ctlabs_term_reload_protect') !== 'false';
+      if (reloadProtectSelect) reloadProtectSelect.value = String(reloadProtection);
+
+      if (reloadProtectSelect) {
+        reloadProtectSelect.addEventListener('change', () => {
+          reloadProtection = reloadProtectSelect.value === 'true';
+          localStorage.setItem('ctlabs_term_reload_protect', reloadProtection);
+        });
+      }
+
       if (fontSizeSelect) {
         fontSizeSelect.addEventListener('change', () => {
           const sz = parseInt(fontSizeSelect.value, 10);
@@ -1849,6 +2256,14 @@
       };
 
       term.attachCustomKeyEventHandler((e) => {
+        // Prevent accidental browser reload shortcuts (F5, Ctrl+R, Cmd+R)
+        if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+          if (e.type === 'keydown') {
+            e.preventDefault();
+          }
+          return false;
+        }
+
         // Intercept Shift+Enter to send ESC + CR (\x1b\r) instead of plain \r
         // This is the standard sequence for multiline prompts in Claude Code, IPython, etc.
         if (e.key === 'Enter' && e.shiftKey) {
@@ -1999,6 +2414,22 @@
           }
         });
       }
+
+      // Guard against accidental reloads (typing in address bar and pressing Enter, F5, Ctrl+R, or closing)
+      window.addEventListener('beforeunload', (e) => {
+        if (reloadProtection && activeWs && activeWs.readyState === WebSocket.OPEN) {
+          e.preventDefault();
+          e.returnValue = '';
+          return '';
+        }
+      });
+
+      // Prevent accidental reload shortcuts when window has focus outside terminal
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+          e.preventDefault();
+        }
+      });
 
       const start = () => {
         pinToGrid();

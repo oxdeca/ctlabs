@@ -13,7 +13,7 @@
   window.openTerminal = function(nodeName) {
       const w=960, h=660, t=(window.top.outerHeight/2)+window.top.screenY-(h/2), l=(window.top.outerWidth/2)+window.top.screenX-(w/2);
       const winName = `term_${nodeName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
-      window.open(`/terminal/${encodeURIComponent(nodeName)}`, winName, `width=${w},height=${h},top=${t},left=${l},resizable=yes,scrollbars=yes,toolbar=no,location=no`);
+      window.open(`/terminal/${encodeURIComponent(nodeName)}`, winName, `width=${w},height=${h},top=${t},left=${l},resizable=yes,scrollbars=yes,popup=yes,menubar=no,toolbar=no,location=no,status=no`);
   };
 
   window.manageTerminal = async function(nodeName) {

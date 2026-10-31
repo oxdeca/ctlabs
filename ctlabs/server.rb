@@ -8,6 +8,7 @@
 
 require 'sinatra'
 require 'sinatra/base'
+require 'rack'
 require 'json'
 require 'yaml'
 require 'fileutils'
@@ -70,6 +71,9 @@ set     :public_folder,      '/srv/ctlabs-server/public'
 set     :host_authorization, permitted_hosts: []
 set     :markdown,           input: 'GFM'
 disable :run
+
+# Increase Rack multipart part limit to accommodate directory uploads with many files
+Rack::Utils.multipart_part_limit = 4096 if defined?(Rack::Utils) && Rack::Utils.respond_to?(:multipart_part_limit=)
 
 # --- Global Constants ---
 CONFIG          = '/srv/ctlabs-server/public/config.yml'
