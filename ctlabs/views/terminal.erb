@@ -999,6 +999,7 @@
 
       let stagedUploadFiles = [];
       let stagedUploadDirs = [];
+      let isUploading = false;
       let activeTransferTab = 'upload';
       let nodeTargetInfo = { default_dir: '/root' };
       let currentBrowsedDir = '~';
@@ -1013,6 +1014,16 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
+      }
+
+      function resetUploadSubmitButton(customLabel = null) {
+        if (!uploadSubmitBtn) return;
+        const hasItems = stagedUploadFiles.length > 0 || stagedUploadDirs.length > 0;
+        uploadSubmitBtn.disabled = !hasItems || isUploading;
+        uploadSubmitBtn.style.opacity = (hasItems && !isUploading) ? '1' : '0.6';
+        uploadSubmitBtn.style.cursor = (hasItems && !isUploading) ? 'pointer' : 'not-allowed';
+        const labelText = customLabel || (stagedUploadFiles.length > 1 ? `Upload ${stagedUploadFiles.length} Files` : 'Upload File');
+        uploadSubmitBtn.innerHTML = `<i class="fas fa-upload"></i> <span>${escapeHtml(labelText)}</span>`;
       }
 
       function showToast(msg, type = 'info') {
@@ -1113,6 +1124,7 @@
         switchTransferTab(tab);
         if (uploadFeedback) uploadFeedback.style.display = 'none';
         if (downloadFeedback) downloadFeedback.style.display = 'none';
+        if (!isUploading) resetUploadSubmitButton();
         if (filesModalBackdrop) filesModalBackdrop.style.display = 'flex';
       }
 
@@ -1219,13 +1231,7 @@
           if (uploadItemsList) uploadItemsList.style.display = 'none';
           if (uploadCustomLabel) uploadCustomLabel.textContent = 'Rename on Node (Optional):';
           if (uploadCustomName) uploadCustomName.placeholder = 'Leave empty to keep original filename';
-          if (uploadSubmitBtn) {
-            uploadSubmitBtn.disabled = false;
-            uploadSubmitBtn.style.opacity = '1';
-            uploadSubmitBtn.style.cursor = 'pointer';
-            const labelSpan = uploadSubmitBtn.querySelector('span');
-            if (labelSpan) labelSpan.textContent = 'Upload File';
-          }
+          resetUploadSubmitButton('Upload File');
         } else {
           const allPaths = stagedUploadFiles.map(f => f.relPath).concat(stagedUploadDirs);
           const firstRoot = allPaths[0] ? allPaths[0].split('/')[0] : '';
@@ -1243,14 +1249,7 @@
           if (uploadToggleListBtn) uploadToggleListBtn.style.display = 'inline-flex';
           if (uploadCustomLabel) uploadCustomLabel.textContent = 'Subfolder on Node (Optional):';
           if (uploadCustomName) uploadCustomName.placeholder = 'e.g. my-folder (places files inside this folder)';
-
-          if (uploadSubmitBtn) {
-            uploadSubmitBtn.disabled = false;
-            uploadSubmitBtn.style.opacity = '1';
-            uploadSubmitBtn.style.cursor = 'pointer';
-            const labelSpan = uploadSubmitBtn.querySelector('span');
-            if (labelSpan) labelSpan.textContent = `Upload ${stagedUploadFiles.length} File${stagedUploadFiles.length === 1 ? '' : 's'}`;
-          }
+          resetUploadSubmitButton(`Upload ${stagedUploadFiles.length} File${stagedUploadFiles.length === 1 ? '' : 's'}`);
 
           if (uploadItemsList) {
             uploadItemsList.innerHTML = '';
@@ -1321,13 +1320,7 @@
         if (uploadCustomName) uploadCustomName.value = '';
         if (uploadCustomLabel) uploadCustomLabel.textContent = 'Rename on Node (Optional):';
         if (uploadProgressContainer) uploadProgressContainer.style.display = 'none';
-        if (uploadSubmitBtn) {
-          uploadSubmitBtn.disabled = true;
-          uploadSubmitBtn.style.opacity = '0.6';
-          uploadSubmitBtn.style.cursor = 'not-allowed';
-          const labelSpan = uploadSubmitBtn.querySelector('span');
-          if (labelSpan) labelSpan.textContent = 'Upload File';
-        }
+        resetUploadSubmitButton('Upload File');
       }
 
       // Populate shortcuts
@@ -1529,12 +1522,15 @@
       // Upload submit
       if (uploadSubmitBtn) {
         uploadSubmitBtn.addEventListener('click', async () => {
+          if (isUploading) return;
           if (stagedUploadFiles.length === 0 && stagedUploadDirs.length === 0) return;
+          isUploading = true;
           const destDir = (uploadDirInput.value || '').trim();
           const customName = (uploadCustomName.value || '').trim();
 
           uploadSubmitBtn.disabled = true;
           uploadSubmitBtn.style.opacity = '0.7';
+          uploadSubmitBtn.style.cursor = 'wait';
           uploadSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Uploading...</span>';
           showUploadFeedback('<i class="fas fa-spinner fa-spin"></i> Uploading to node...', 'info');
 
@@ -1624,14 +1620,8 @@
           } catch (err) {
             showUploadFeedback(`<i class="fas fa-exclamation-triangle" style="margin-right: 4px;"></i> ${escapeHtml(err.message || 'Upload failed')}`, 'error');
           } finally {
-            const hasItems = stagedUploadFiles.length > 0 || stagedUploadDirs.length > 0;
-            uploadSubmitBtn.disabled = !hasItems;
-            uploadSubmitBtn.style.opacity = hasItems ? '1' : '0.6';
-            uploadSubmitBtn.style.cursor = hasItems ? 'pointer' : 'not-allowed';
-            const labelSpan = uploadSubmitBtn.querySelector('span');
-            if (labelSpan) {
-              labelSpan.textContent = stagedUploadFiles.length > 1 ? `Upload ${stagedUploadFiles.length} Files` : 'Upload File';
-            }
+            isUploading = false;
+            resetUploadSubmitButton();
           }
         });
       }

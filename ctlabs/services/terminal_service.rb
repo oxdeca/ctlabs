@@ -967,6 +967,53 @@ class TerminalService
     end
   end
 
+  def self.private_key_content?(tempfile_or_io)
+    return false unless tempfile_or_io
+    sample = nil
+    if tempfile_or_io.respond_to?(:read)
+      tempfile_or_io.rewind rescue (tempfile_or_io.seek(0, IO::SEEK_SET) rescue nil)
+      sample = tempfile_or_io.read(512)
+      tempfile_or_io.rewind rescue (tempfile_or_io.seek(0, IO::SEEK_SET) rescue nil)
+    elsif tempfile_or_io.is_a?(String) && File.exist?(tempfile_or_io)
+      sample = File.read(tempfile_or_io, 512) rescue nil
+    end
+    return false unless sample
+    sample.include?('-----BEGIN OPENSSH PRIVATE KEY-----') ||
+      sample.include?('-----BEGIN RSA PRIVATE KEY-----') ||
+      sample.include?('-----BEGIN EC PRIVATE KEY-----') ||
+      sample.include?('-----BEGIN DSA PRIVATE KEY-----') ||
+      sample.include?('-----BEGIN PRIVATE KEY-----') ||
+      sample.include?('-----BEGIN ENCRYPTED PRIVATE KEY-----') ||
+      sample.start_with?('PuTTY-User-Key-File')
+  rescue
+    false
+  end
+
+  def self.determine_upload_mode(target_path, base_name, parent_dir, tempfile_or_io = nil)
+    is_ssh_path = parent_dir =~ %r{(^|/)\.ssh(/|$)}
+    is_pub_file = base_name.end_with?('.pub')
+    is_known_hosts = (base_name == 'known_hosts' || base_name == 'known_hosts.old')
+    is_auth_keys = (base_name == 'authorized_keys' || base_name == 'authorized_keys2' || base_name == 'config')
+    is_private_key = (base_name =~ /^id_[a-z0-9_.-]+$/i && !is_pub_file) ||
+                     base_name =~ /(\.pem|\.key|\.pkcs8|\.ppk)$/i ||
+                     base_name =~ /private[-_]?key/i ||
+                     private_key_content?(tempfile_or_io)
+
+    if is_auth_keys || is_private_key
+      '0600'
+    elsif is_ssh_path
+      # Inside .ssh or any subfolder (e.g. .ssh/keys/):
+      # Public keys and known_hosts can be 0644, everything else (keys, configs) is 0600
+      (is_pub_file || is_known_hosts) ? '0644' : '0600'
+    elsif is_pub_file || is_known_hosts
+      '0644'
+    elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
+      '0755'
+    else
+      nil
+    end
+  end
+
   def self.upload_file(node_name, tempfile_or_io, original_filename, dest_dir: nil, custom_filename: nil)
     target = resolve_node_target(node_name)
     raise ArgumentError, "Node '#{node_name}' cannot be resolved" unless target
@@ -1001,11 +1048,12 @@ class TerminalService
         raise "Container upload failed: #{stderr.read}" unless status.success?
       end
 
-      # Smart permissions for SSH keys and scripts
-      if parent_dir.end_with?('/.ssh')
-        system("#{engine} exec #{container} chmod 700 #{escaped_parent} >/dev/null 2>&1")
+      # Smart permissions for SSH directories (.ssh and any subfolder like .ssh/keys)
+      if parent_dir =~ %r{(^|/)\.ssh(/|$)}
+        ssh_root = parent_dir.sub(%r{(.*(?:^|/)\.ssh)(/.*)?$}, '\1')
+        system("#{engine} exec #{container} chmod 700 #{Shellwords.escape(ssh_root)} #{escaped_parent} >/dev/null 2>&1")
         if target[:user] && !target[:user].empty?
-          system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{escaped_parent} >/dev/null 2>&1")
+          system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{Shellwords.escape(ssh_root)} #{escaped_parent} >/dev/null 2>&1")
         end
       end
 
@@ -1013,14 +1061,7 @@ class TerminalService
         system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{escaped_path} >/dev/null 2>&1")
       end
 
-      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
-        '0600'
-      elsif base_name.end_with?('.pub')
-        '0644'
-      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
-        '0755'
-      end
+      mode = determine_upload_mode(target_path, base_name, parent_dir, tempfile_or_io)
       if mode
         system("#{engine} exec #{container} chmod #{mode} #{escaped_path} >/dev/null 2>&1")
       end
@@ -1032,24 +1073,20 @@ class TerminalService
 
     when :host
       FileUtils.mkdir_p(parent_dir)
+      if parent_dir =~ %r{(^|/)\.ssh(/|$)}
+        ssh_root = parent_dir.sub(%r{(.*(?:^|/)\.ssh)(/.*)?$}, '\1')
+        File.chmod(0700, ssh_root) rescue nil
+        File.chmod(0700, parent_dir) rescue nil
+      end
+
       if tempfile_or_io.respond_to?(:read)
         File.open(target_path, 'wb') { |f| IO.copy_stream(tempfile_or_io, f) }
       else
         FileUtils.cp(tempfile_or_io.to_s, target_path)
       end
 
-      if parent_dir.end_with?('/.ssh')
-        File.chmod(0700, parent_dir) rescue nil
-      end
-      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
-        0600
-      elsif base_name.end_with?('.pub')
-        0644
-      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
-        0755
-      end
-      File.chmod(mode, target_path) if mode rescue nil
+      mode = determine_upload_mode(target_path, base_name, parent_dir, tempfile_or_io)
+      File.chmod(mode.to_i(8), target_path) if mode rescue nil
 
       { ok: true, filename: base_name, relative_path: clean_rel, path: target_path, size: File.size(target_path) }
 
@@ -1070,10 +1107,11 @@ class TerminalService
       ssh_cmd.push("#{target[:user]}@#{target[:host]}", "mkdir -p #{Shellwords.escape(parent_dir)}")
       system(*ssh_cmd)
 
-      if parent_dir.end_with?('/.ssh')
+      if parent_dir =~ %r{(^|/)\.ssh(/|$)}
+        ssh_root = parent_dir.sub(%r{(.*(?:^|/)\.ssh)(/.*)?$}, '\1')
         chmod_dir_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
         chmod_dir_cmd.push("-i", target[:key]) if target[:key]
-        chmod_dir_cmd.push("#{target[:user]}@#{target[:host]}", "chmod 700 #{Shellwords.escape(parent_dir)}")
+        chmod_dir_cmd.push("#{target[:user]}@#{target[:host]}", "chmod 700 #{Shellwords.escape(ssh_root)} #{Shellwords.escape(parent_dir)}")
         system(*chmod_dir_cmd)
       end
 
@@ -1083,14 +1121,7 @@ class TerminalService
       success = system(*scp_cmd)
       raise "SCP transfer failed" unless success
 
-      is_private_key = (base_name =~ /^id_[a-z0-9_]+$/i) || base_name.end_with?('.pem', '.key')
-      mode = if is_private_key || (parent_dir.end_with?('/.ssh') && !base_name.end_with?('.pub'))
-        '0600'
-      elsif base_name.end_with?('.pub')
-        '0644'
-      elsif base_name.end_with?('.sh', '.py', '.rb', '.bash')
-        '0755'
-      end
+      mode = determine_upload_mode(target_path, base_name, parent_dir, tempfile_or_io)
       if mode
         chmod_file_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
         chmod_file_cmd.push("-i", target[:key]) if target[:key]
@@ -1113,21 +1144,40 @@ class TerminalService
     target_path = File.join(base_dir, clean_rel)
     escaped_path = Shellwords.escape(target_path)
 
+    is_ssh_tree = target_path =~ %r{(^|/)\.ssh(/|$)}
+    ssh_root = is_ssh_tree ? target_path.sub(%r{(.*(?:^|/)\.ssh)(/.*)?$}, '\1') : nil
+
     case target[:type]
     when :container
       engine = target[:engine]
       container = target[:container]
       system("#{engine} exec #{container} mkdir -p #{escaped_path} >/dev/null 2>&1")
+      if is_ssh_tree
+        system("#{engine} exec #{container} chmod 700 #{Shellwords.escape(ssh_root)} #{escaped_path} >/dev/null 2>&1")
+      end
       if target[:user] && !target[:user].empty?
         system("#{engine} exec #{container} chown -R #{target[:user]}:#{target[:user]} #{escaped_path} >/dev/null 2>&1")
+        if is_ssh_tree
+          system("#{engine} exec #{container} chown #{target[:user]}:#{target[:user]} #{Shellwords.escape(ssh_root)} >/dev/null 2>&1")
+        end
       end
     when :host
       FileUtils.mkdir_p(target_path)
+      if is_ssh_tree
+        File.chmod(0700, ssh_root) rescue nil
+        File.chmod(0700, target_path) rescue nil
+      end
     when :ssh
       ssh_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
       ssh_cmd.push("-i", target[:key]) if target[:key]
       ssh_cmd.push("#{target[:user]}@#{target[:host]}", "mkdir -p #{escaped_path}")
       system(*ssh_cmd)
+      if is_ssh_tree
+        chmod_cmd = ["ssh", "-o", "StrictHostKeyChecking=no"]
+        chmod_cmd.push("-i", target[:key]) if target[:key]
+        chmod_cmd.push("#{target[:user]}@#{target[:host]}", "chmod 700 #{Shellwords.escape(ssh_root)} #{escaped_path}")
+        system(*chmod_cmd)
+      end
     end
 
     { ok: true, path: target_path }
