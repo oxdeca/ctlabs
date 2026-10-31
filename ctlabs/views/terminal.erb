@@ -2330,10 +2330,27 @@
         }
       };
 
+      if (!window.name) {
+        window.name = 'term_' + encodeURIComponent(nodeName) + '_' + Math.random().toString(36).substring(2, 10);
+      }
+      const sessionKey = 'ctlabs_term_session_' + encodeURIComponent(nodeName) + '_' + window.name;
+
+      const getOrCreateSessionId = () => {
+        let sid = sessionStorage.getItem(sessionKey);
+        if (!sid) {
+          sid = (typeof crypto !== 'undefined' && crypto.randomUUID) ?
+            crypto.randomUUID() :
+            ('sess_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36));
+          sessionStorage.setItem(sessionKey, sid);
+        }
+        return sid;
+      };
+
       const openSocket = (token = null) => {
+        const sid = getOrCreateSessionId();
         const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
         let wsUrl = protocol + window.location.host + '/terminal/' + encodeURIComponent(nodeName) +
-                    `?cols=${term.cols}&rows=${term.rows}`;
+                    `?cols=${term.cols}&rows=${term.rows}&session_id=${encodeURIComponent(sid)}`;
         if (token) {
           wsUrl += `&token=${encodeURIComponent(token)}`;
         }
@@ -2356,6 +2373,15 @@
         };
 
         ws.onmessage = (event) => {
+          if (typeof event.data === 'string') {
+            if (event.data.startsWith('\x00')) {
+              // Ignore control frame in terminal display
+              return;
+            }
+            if (event.data.includes('[Session closed by container]') || event.data.includes('[Session Limit Reached')) {
+              sessionStorage.removeItem(sessionKey);
+            }
+          }
           term.write(event.data);
         };
 

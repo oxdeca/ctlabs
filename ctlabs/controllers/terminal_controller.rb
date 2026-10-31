@@ -16,12 +16,15 @@ class TerminalController < BaseController
       
       node_name = params[:node_name]
       env_token = params[:token]
+      session_id = params[:session_id].to_s.strip
+      session_id = nil if session_id.empty?
       cmd = TerminalService.resolve_terminal_command(node_name, session, env_token: env_token)
       
       TerminalService.handle_websocket(driver, cmd, io, ssl_mutex, node_name, 
                                        initial_cols: params[:cols], 
                                        initial_rows: params[:rows],
-                                       env_token: env_token)
+                                       env_token: env_token,
+                                       session_id: session_id)
 
       return [-1, {}, []]
     else

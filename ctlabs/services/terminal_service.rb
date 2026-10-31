@@ -16,6 +16,11 @@ require 'fileutils'
 require_relative 'recording_service'
 
 class TerminalService
+  DISCONNECT_GRACE_PERIOD = 45 # seconds
+  MAX_REPLAY_BUFFER = 128 * 1024 # 128 KB
+  @@pty_sessions = {}
+  @@pty_mutex = Mutex.new
+
   @@sessions = {}
   @@mutex = Mutex.new
   @@session_ttl = 24 * 60 * 60
@@ -82,6 +87,82 @@ class TerminalService
           @@sessions[key].reject! { |s| s[:created_at] && (now - s[:created_at]) > @@session_ttl }
         end
       end
+    end
+    cleanup_stale_pty_sessions
+  end
+
+  def self.cleanup_stale_pty_sessions
+    cutoff = Time.now - (DISCONNECT_GRACE_PERIOD + 10)
+    stale_ids = []
+    @@pty_mutex.synchronize do
+      @@pty_sessions.each do |sid, s|
+        if s[:detached_at] && s[:detached_at] < cutoff
+          stale_ids << sid
+        end
+      end
+    end
+    stale_ids.each { |sid| cleanup_pty_session(sid) }
+  end
+
+  def self.cleanup_pty_session(session_id)
+    sess = nil
+    @@pty_mutex.synchronize do
+      sess = @@pty_sessions.delete(session_id)
+    end
+    return unless sess
+    return if sess[:closed]
+    sess[:closed] = true
+
+    # Cancel detach timer
+    sess[:detach_timer]&.kill rescue nil
+
+    # Finalize recording if open
+    if sess[:rec_io] && !sess[:rec_io].closed?
+      sess[:rec_io].flush rescue nil
+      sess[:rec_io].close rescue nil
+      sess[:rec_io] = nil
+    end
+
+    # Clean up staged environment files if any
+    cleanup_env_files(sess[:env_token]) if sess[:env_token]
+
+    # Unregister from session limiter
+    unregister_session(sess[:node_name], sess[:session_info]) if sess[:session_info]
+
+    # Kill pty read thread unless current thread is the pty read thread
+    if sess[:pty_thread] && sess[:pty_thread] != Thread.current
+      sess[:pty_thread].kill rescue nil
+    end
+
+    # Close pty handles
+    sess[:pty_write]&.close rescue nil
+    sess[:pty_read]&.close rescue nil
+
+    # Terminate container exec process group
+    pid = sess[:pty_pid]
+    if pid
+      begin
+        Process.kill('TERM', -pid) rescue nil
+        sleep 0.05
+        Process.kill('KILL', -pid) rescue nil
+      rescue Errno::ESRCH
+      end
+      begin
+        Timeout.timeout(1) do
+          loop do
+            wpid, _ = Process.waitpid2(pid, Process::WNOHANG)
+            break if wpid
+            sleep 0.02
+          end
+        end
+      rescue Timeout::Error, Errno::ECHILD
+      end
+    end
+
+    # Close driver and IO
+    sess[:driver]&.close rescue nil
+    if sess[:io] && sess[:ssl_mutex]
+      sess[:ssl_mutex].synchronize { sess[:io].close rescue nil } rescue nil
     end
   end
 
@@ -383,34 +464,110 @@ class TerminalService
     cmd
   end
 
-  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil, env_token: nil)
-    pty_read     = nil
-    pty_write    = nil
-    pty_pid      = nil
-    pty_thread   = nil
-    session_info = nil
-    closed       = false
+  def self.handle_websocket(driver, cmd, io, ssl_mutex, node_name = 'unknown', initial_cols: nil, initial_rows: nil, env_token: nil, session_id: nil)
+    session_id = session_id.to_s.strip
+    session_id = session_id.gsub(/[^a-zA-Z0-9_\-]/, '')[0..63] unless session_id.empty?
+    session_id = SecureRandom.uuid if session_id.nil? || session_id.empty?
 
-    # --- Recording (asciicast v2) -------------------------------------------
-    # A recording is opt-in per browser tab. The PTY thread records output as
-    # it is forwarded, the message handler records resizes, and the file is
-    # finalized on stop or when the socket closes. Input is deliberately NOT
-    # recorded: the PTY echoes what the user types anyway, and skipping input
-    # keeps echo-off secrets (passwords) out of the cast.
-    rec_io      = nil
-    rec_id      = nil
-    rec_started = nil
-    rec_mutex   = Mutex.new
-    cur_cols    = (initial_cols || 120).to_i
-    cur_rows    = (initial_rows || 40).to_i
+    existing_sess = nil
+    @@pty_mutex.synchronize do
+      s = @@pty_sessions[session_id]
+      if s && !s[:closed] && s[:node_name] == node_name && s[:pty_pid]
+        begin
+          Process.kill(0, s[:pty_pid])
+          existing_sess = s
+        rescue Errno::ESRCH
+          @@pty_sessions.delete(session_id)
+        end
+      end
+    end
 
-    rec_event = lambda do |kind, data|
+    if existing_sess
+      # =========================================================================
+      # RESUMED SESSION: Reconnect to active running PTY
+      # =========================================================================
+      sess = existing_sess
+
+      # Cancel detach timer
+      sess[:detach_timer]&.kill rescue nil
+      sess[:detach_timer] = nil
+      sess[:detached_at] = nil
+
+      # Close old IO if still around and different
+      old_io = sess[:io]
+      old_ssl = sess[:ssl_mutex]
+      if old_io && old_io != io && old_ssl
+        old_ssl.synchronize { old_io.close rescue nil } rescue nil
+      end
+
+      # Swap in new connection handles
+      sess[:driver] = driver
+      sess[:io] = io
+      sess[:ssl_mutex] = ssl_mutex
+
+      # Update terminal size if provided
+      cols = (initial_cols || sess[:cur_cols] || 120).to_i
+      rows = (initial_rows || sess[:cur_rows] || 40).to_i
+      sess[:cur_cols] = cols if cols.positive?
+      sess[:cur_rows] = rows if rows.positive?
+      if sess[:pty_write]
+        winsize = [sess[:cur_rows], sess[:cur_cols], 0, 0].pack('SSSS')
+        sess[:pty_write].ioctl(0x5414, winsize) rescue nil
+      end
+
+      driver.on(:open) do |_|
+        sess[:output_mutex].synchronize do
+          buf = sess[:output_buffer]
+          if buf && !buf.empty?
+            driver.text(buf) rescue nil
+          end
+          if sess[:rec_id]
+            driver.text("\x00" + JSON.generate({ type: 'record', state: 'started', id: sess[:rec_id], node: node_name })) rescue nil
+          end
+        end
+      end
+
+      attach_driver_handlers(driver, io, ssl_mutex, sess)
+      driver.start
+      start_socket_reader(io, ssl_mutex, driver)
+      return
+    end
+
+    # =========================================================================
+    # NEW SESSION: Allocate session and spawn PTY
+    # =========================================================================
+    sess = {
+      session_id: session_id,
+      node_name: node_name,
+      pty_read: nil,
+      pty_write: nil,
+      pty_pid: nil,
+      pty_thread: nil,
+      session_info: nil,
+      output_buffer: ''.force_encoding('UTF-8'),
+      output_mutex: Mutex.new,
+      driver: driver,
+      io: io,
+      ssl_mutex: ssl_mutex,
+      env_token: env_token,
+      rec_io: nil,
+      rec_id: nil,
+      rec_started: nil,
+      rec_mutex: Mutex.new,
+      cur_cols: (initial_cols || 120).to_i,
+      cur_rows: (initial_rows || 40).to_i,
+      detach_timer: nil,
+      detached_at: nil,
+      closed: false
+    }
+
+    sess[:rec_event] = lambda do |kind, data|
       begin
-        rec_mutex.synchronize do
-          if rec_io && !rec_io.closed?
-            t = Process.clock_gettime(Process::CLOCK_MONOTONIC) - rec_started.to_f
-            rec_io.write(JSON.generate([t.round(6), kind, data]) + "\n")
-            rec_io.flush
+        sess[:rec_mutex].synchronize do
+          if sess[:rec_io] && !sess[:rec_io].closed?
+            t = Process.clock_gettime(Process::CLOCK_MONOTONIC) - sess[:rec_started].to_f
+            sess[:rec_io].write(JSON.generate([t.round(6), kind, data]) + "\n")
+            sess[:rec_io].flush
           end
         end
       rescue StandardError => e
@@ -418,46 +575,32 @@ class TerminalService
       end
     end
 
-    rec_start = lambda do |cols, rows|
-      rec_mutex.synchronize do
-        next if rec_io
-        id, io = RecordingService.open(node: node_name, cols: cols, rows: rows)
-        rec_io      = io
-        rec_id      = id
-        rec_started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    sess[:rec_start] = lambda do |cols, rows|
+      sess[:rec_mutex].synchronize do
+        next if sess[:rec_io]
+        id, io_handle = RecordingService.open(node: node_name, cols: cols, rows: rows)
+        sess[:rec_io]      = io_handle
+        sess[:rec_id]      = id
+        sess[:rec_started] = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       end
-      rec_id
+      sess[:rec_id]
     end
 
-    rec_stop = lambda do
+    sess[:rec_stop] = lambda do
       id       = nil
       duration = 0.0
-      rec_mutex.synchronize do
-        id = rec_id
-        if rec_io
-          duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - rec_started.to_f
-          rec_io.flush rescue nil
-          rec_io.close rescue nil
+      sess[:rec_mutex].synchronize do
+        id = sess[:rec_id]
+        if sess[:rec_io]
+          duration = Process.clock_gettime(Process::CLOCK_MONOTONIC) - sess[:rec_started].to_f
+          sess[:rec_io].flush rescue nil
+          sess[:rec_io].close rescue nil
         end
-        rec_io      = nil
-        rec_id      = nil
-        rec_started = nil
+        sess[:rec_io]      = nil
+        sess[:rec_id]      = nil
+        sess[:rec_started] = nil
       end
       [id, duration]
-    end
-
-    # Control frames are prefixed with NUL so they can share the terminal's
-    # websocket without ever being mistaken for terminal output. The client
-    # strips the prefix and handles the JSON; anything that fails to parse is
-    # written to the terminal as normal data.
-    rec_control = lambda do |payload|
-      driver.text("\x00" + JSON.generate(payload)) rescue nil
-    end
-
-    # Write to both the recording and the screen (used for our own notices).
-    emit = lambda do |text|
-      rec_event.call('o', text)
-      driver.text(text) rescue nil
     end
 
     driver.on(:open) do |_|
@@ -465,42 +608,57 @@ class TerminalService
         available, info = register_if_available(node_name)
         unless available
           cleanup_env_files(env_token) if env_token
-          driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n")
+          driver.text("\r\n\x1b[31m[Session Limit Reached: Max 3 terminal sessions per node]\x1b[0m\r\n") rescue nil
           driver.close
           return
         end
-        session_info = info
-        session_info[:close_proc] = proc { driver.close rescue nil }
+
+        sess[:session_info] = info
+        info[:close_proc] = proc { cleanup_pty_session(session_id) }
 
         pty_read, pty_write, pty_pid = PTY.spawn(*cmd)
-        
+        sess[:pty_read]  = pty_read
+        sess[:pty_write] = pty_write
+        sess[:pty_pid]   = pty_pid
+
         if initial_cols && initial_rows && pty_write
           winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
           pty_write.ioctl(0x5414, winsize) rescue nil
         end
 
-        pty_thread = Thread.new do
+        @@pty_mutex.synchronize do
+          @@pty_sessions[session_id] = sess
+        end
+
+        sess[:pty_thread] = Thread.new do
           utf8_buf = ''.force_encoding('BINARY')
           loop do
             begin
               chunk = pty_read.readpartial(8192)
               utf8_buf << chunk.force_encoding('BINARY')
 
-              # Convert buffered bytes to UTF-8. readpartial can split
-              # multi-byte sequences across chunks, so only emit when we
-              # have complete UTF-8; otherwise keep buffering.
               utf8 = utf8_buf.dup.force_encoding('UTF-8')
               if utf8.valid_encoding?
-                rec_event.call('o', utf8)
-                driver.text(utf8)
+                sess[:rec_event].call('o', utf8)
+                sess[:output_mutex].synchronize do
+                  sess[:output_buffer] << utf8
+                  if sess[:output_buffer].bytesize > MAX_REPLAY_BUFFER
+                    sess[:output_buffer] = sess[:output_buffer].byteslice(-MAX_REPLAY_BUFFER..-1).scrub('')
+                  end
+                  sess[:driver]&.text(utf8) rescue nil
+                end
                 utf8_buf.clear
               else
-                # Genuinely invalid bytes -> scrub and emit; otherwise
-                # an incomplete multibyte sequence is still pending.
                 scrubbed = utf8.scrub('?')
                 if scrubbed != utf8
-                  rec_event.call('o', scrubbed)
-                  driver.text(scrubbed)
+                  sess[:rec_event].call('o', scrubbed)
+                  sess[:output_mutex].synchronize do
+                    sess[:output_buffer] << scrubbed
+                    if sess[:output_buffer].bytesize > MAX_REPLAY_BUFFER
+                      sess[:output_buffer] = sess[:output_buffer].byteslice(-MAX_REPLAY_BUFFER..-1).scrub('')
+                    end
+                    sess[:driver]&.text(scrubbed) rescue nil
+                  end
                   utf8_buf.clear
                 end
               end
@@ -510,119 +668,122 @@ class TerminalService
             rescue EOFError, Errno::EIO, Errno::ECONNRESET, IOError
               remainder = utf8_buf.force_encoding('UTF-8')
               if remainder.bytesize > 0
-                rec_event.call('o', remainder.scrub('?'))
-                driver.text(remainder.scrub('?'))
+                s_rem = remainder.scrub('?')
+                sess[:rec_event].call('o', s_rem)
+                sess[:output_mutex].synchronize do
+                  sess[:output_buffer] << s_rem
+                  sess[:driver]&.text(s_rem) rescue nil
+                end
               end
-              emit.call("\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n")
+              exit_msg = "\r\n\x1b[31m[Session closed by container]\x1b[0m\r\n"
+              sess[:rec_event].call('o', exit_msg)
+              sess[:output_mutex].synchronize do
+                sess[:output_buffer] << exit_msg
+                sess[:driver]&.text(exit_msg) rescue nil
+              end
+              cleanup_pty_session(session_id)
               break
             rescue StandardError => e
               puts "[PTY Error] #{e.message}"
+              cleanup_pty_session(session_id)
               break
             end
           end
-          driver.close rescue nil
         end
       rescue => e
         cleanup_env_files(env_token) if env_token
-        unregister_session(node_name, session_info) if session_info
+        unregister_session(node_name, sess[:session_info]) if sess[:session_info]
         driver.text("\r\n\x1b[31m[Error spawning terminal: #{e.message}]\x1b[0m\r\n") rescue nil
         driver.close rescue nil
       end
     end
 
+    attach_driver_handlers(driver, io, ssl_mutex, sess)
+    driver.start
+    start_socket_reader(io, ssl_mutex, driver)
+  end
+
+  def self.attach_driver_handlers(driver, io, ssl_mutex, sess)
+    node_name = sess[:node_name]
+    session_id = sess[:session_id]
+
     driver.on(:message) do |event|
       payload = begin
         JSON.parse(event.data)
       rescue JSON::ParserError
-        pty_write&.write(event.data)
+        sess[:pty_write]&.write(event.data)
         next
       end
       next unless payload.is_a?(Hash)
 
       case payload['type']
       when 'input'
-        pty_write&.write(payload['data'])
+        sess[:pty_write]&.write(payload['data'])
 
       when 'resize'
         cols = payload['cols'].to_i
         rows = payload['rows'].to_i
-        if pty_write
+        if sess[:pty_write]
           winsize = [rows, cols, 0, 0].pack('SSSS')
-          pty_write.ioctl(0x5414, winsize) rescue nil
+          sess[:pty_write].ioctl(0x5414, winsize) rescue nil
         end
-        cur_cols = cols if cols.positive?
-        cur_rows = rows if rows.positive?
-        rec_event.call('r', "#{cur_cols}x#{cur_rows}")
+        sess[:cur_cols] = cols if cols.positive?
+        sess[:cur_rows] = rows if rows.positive?
+        sess[:rec_event]&.call('r', "#{sess[:cur_cols]}x#{sess[:cur_rows]}")
 
       when 'record_start'
         begin
-          cols = payload['cols'].to_i.positive? ? payload['cols'].to_i : cur_cols
-          rows = payload['rows'].to_i.positive? ? payload['rows'].to_i : cur_rows
-          id   = rec_start.call(cols, rows)
+          cols = payload['cols'].to_i.positive? ? payload['cols'].to_i : sess[:cur_cols]
+          rows = payload['rows'].to_i.positive? ? payload['rows'].to_i : sess[:cur_rows]
+          id   = sess[:rec_start]&.call(cols, rows)
           if id
-            emit.call("\r\n\x1b[31m● REC\x1b[0m #{id}\r\n")
-            rec_control.call({ type: 'record', state: 'started', id: id, node: node_name })
+            rec_text = "\r\n\x1b[31m● REC\x1b[0m #{id}\r\n"
+            sess[:rec_event]&.call('o', rec_text)
+            sess[:output_mutex].synchronize do
+              sess[:output_buffer] << rec_text
+              driver.text(rec_text) rescue nil
+            end
+            driver.text("\x00" + JSON.generate({ type: 'record', state: 'started', id: id, node: node_name })) rescue nil
           else
-            # Already recording (e.g. a second click raced the first): report
-            # the active id so the button converges on the real state.
-            active = rec_mutex.synchronize { rec_id }
-            rec_control.call({ type: 'record', state: 'started', id: active, node: node_name })
+            active = sess[:rec_mutex].synchronize { sess[:rec_id] }
+            driver.text("\x00" + JSON.generate({ type: 'record', state: 'started', id: active, node: node_name })) rescue nil
           end
         rescue StandardError => e
           puts "[Recording Start Error] #{e.class}: #{e.message}"
-          rec_control.call({ type: 'record', state: 'error', message: e.message })
+          driver.text("\x00" + JSON.generate({ type: 'record', state: 'error', message: e.message })) rescue nil
         end
 
       when 'record_stop'
-        id, duration = rec_stop.call
+        id, duration = sess[:rec_stop] ? sess[:rec_stop].call : [nil, 0.0]
         if id
-          emit.call("\r\n\x1b[32m■ Saved\x1b[0m #{id} (#{format('%.1fs', duration)}) — open Walkthrough to replay\r\n")
-          rec_control.call({ type: 'record', state: 'stopped', id: id, duration: duration.round(3) })
+          msg = "\r\n\x1b[32m■ Saved\x1b[0m #{id} (#{format('%.1fs', duration)}) — open Walkthrough to replay\r\n"
+          sess[:rec_event]&.call('o', msg)
+          sess[:output_mutex].synchronize do
+            sess[:output_buffer] << msg
+            driver.text(msg) rescue nil
+          end
+          driver.text("\x00" + JSON.generate({ type: 'record', state: 'stopped', id: id, duration: duration.round(3) })) rescue nil
         else
-          rec_control.call({ type: 'record', state: 'stopped', id: nil })
+          driver.text("\x00" + JSON.generate({ type: 'record', state: 'stopped', id: nil })) rescue nil
         end
       end
     end
 
     driver.on(:close) do |_|
-      next if closed
-      closed = true
-      begin
-        cleanup_env_files(env_token) if env_token
-        # Finalize any in-flight recording before the PTY is torn down so the
-        # cast is complete and closed even if the tab is simply closed.
-        rec_stop.call
-        unregister_session(node_name, session_info) if session_info && session_info[:id]
-        pty_thread&.kill
-        pty_write&.close rescue nil
-        pty_read&.close  rescue nil
-        if pty_pid
-          begin
-            Process.kill('TERM', -pty_pid) rescue nil
-            sleep 0.1
-            Process.kill('KILL', -pty_pid) rescue nil
-          rescue Errno::ESRCH
-          end
-          begin
-            Timeout.timeout(2) do
-              loop do
-                pid, _ = Process.waitpid2(pty_pid, Process::WNOHANG)
-                break if pid
-                sleep 0.05
-              end
-            end
-          rescue Timeout::Error, Errno::ECHILD
-          end
+      if sess[:driver] == driver && !sess[:closed]
+        sess[:driver] = nil
+        sess[:io] = nil
+        sess[:detached_at] = Time.now
+        sess[:detach_timer] = Thread.new do
+          sleep DISCONNECT_GRACE_PERIOD
+          cleanup_pty_session(session_id)
         end
-      rescue => e
-        puts "[Terminal Close Error] #{e.message}"
-      ensure
-        ssl_mutex.synchronize { io.close } rescue nil
       end
+      ssl_mutex.synchronize { io.close rescue nil } rescue nil
     end
+  end
 
-    driver.start
-
+  def self.start_socket_reader(io, ssl_mutex, driver)
     Thread.new do
       loop do
         begin
@@ -1185,5 +1346,10 @@ class TerminalService
         wait_thr.value
       end
     end
+  end
+
+  at_exit do
+    sids = @@pty_mutex.synchronize { @@pty_sessions.keys } rescue []
+    sids.each { |sid| cleanup_pty_session(sid) rescue nil }
   end
 end
