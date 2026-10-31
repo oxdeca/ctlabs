@@ -181,6 +181,28 @@ class RecordingService
     nil
   end
 
+  def self.walkthrough_for(id_or_path)
+    clean_id = File.basename(id_or_path.to_s, '.*')
+    path = id_or_path.to_s.include?('/') ? id_or_path.to_s : path_for(id_or_path)
+    if path && File.exist?(path)
+      parent = File.dirname(path)
+      if parent != DIR && parent.start_with?(DIR)
+        slug = File.basename(parent)
+        return slug unless slug == 'images'
+      end
+    end
+
+    # Fallback: scan walkthrough manifests for recording or unintegrated id
+    wks = load_walkthroughs rescue {}
+    wks.each do |slug, entry|
+      r_ids = Array(entry['recording_ids']).map(&:to_s)
+      u_ids = Array(entry['unintegrated_ids']).map(&:to_s)
+      return slug if r_ids.include?(clean_id) || u_ids.include?(clean_id)
+    end
+
+    nil
+  end
+
   def self.node_slug(node)
     node.to_s.gsub(/[^a-zA-Z0-9_.-]+/, '_').gsub(/\A_+|_+\z/, '')[0, NODE_MAX].to_s
   end

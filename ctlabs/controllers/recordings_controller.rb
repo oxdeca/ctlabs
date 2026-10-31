@@ -661,7 +661,8 @@ class RecordingsController < BaseController
       content = File.read(path) rescue ''
       rewritten_content = content.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
 
-      walkthrough = RecordingService.walkthrough_for(id)
+      walkthrough = params[:walkthrough].to_s.strip
+      walkthrough = RecordingService.walkthrough_for(path) if walkthrough.empty?
       images_to_add = {}
       content.scan(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}).flatten.uniq.each do |img_name|
         img_path = RecordingService.image_path(img_name, walkthrough: walkthrough)
