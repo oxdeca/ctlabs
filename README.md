@@ -321,3 +321,60 @@ To start the lab, we click the `Start` button which redirects us to the Logstrea
 If we return to the main page (`CTLABS` menu item), we see the message that a lab was already started. We can stop the lab by clicking the `Stop` button.
 
 ![screenshot](docs/pics/screenshot-20260419-195523.png)
+
+
+Walkthrough
+-----------
+
+- `Terminal Casts`
+- `Markdown Documents`
+- `Screen Recordings`
+- create walkthrough sets consisting of individual steps (cast, video, document).
+
+We can create new guides with `Terminal Casts`, `Markdown Documents`, `Screen Videos`. 
+![Walkthroug](docs/pics/screenshot-20261101-132423.png)
+
+## Terminal Casts
+
+By clicking the `REC` button on the top of a Terminal we can start a `Cast Recording`
+
+![Terminal Cast - REC button](docs/pics/screenshot-20261101-133029.png)
+
+We stop the recording by clicking the `STOP` button.
+
+![Terminal Cast - recording](docs/pics/screenshot-20261101-133150.png)
+
+We can then find the recording in the Walkthrough added as new Step (we might need to refresh the page to see it)
+
+
+![screenshot](docs/pics/screenshot-20261101-133551.png)
+
+
+## Mardown Editor
+
+- create/edit markdown documents
+- copy/paste from clipboard
+- use emoji's
+- import/export markdown documents
+
+In split mode we can edit and get a realtime preview.
+
+![screenshot](docs/pics/screenshot-20261101-133934.png)
+
+We can export markdown documents as zip-bundle or plain text.
+
+![screenshot](docs/pics/screenshot-20261101-134202.png)
+
+## Screen Recording
+
+We can create screen recordings that we can add to the walkthrough.
+
+![screenshot](docs/pics/screenshot-20261101-134745.png)
+
+
+We can see the recording as step in the arrange list. We also can reorder the steps or move them in the `Recordings/Notes` section below, so they
+are not part of the walkthrough steps but included in the walkthrough set.
+
+![screenshot](docs/pics/screenshot-20261101-134822.png)
+
+
