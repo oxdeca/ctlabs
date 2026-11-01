@@ -4,6 +4,8 @@ CTLABS
 `ctlabs` is a tool designed to create temporary lab environments using KVM that can be used as a playground for experimentations, testing, development, study ...
 It automates the setup and configuration of lab components, which are primarily run as containers. When full virtualization is required, QEMU instances can be created within containers. The QEMU instances are then connected via TAP interfaces to the container network. The environment is extensiable, e.g. more KVM instances can be added. Those can be located anywhere as long as they have network connectivity. This approach allows for a consistent, straightforward and flexible lab setup, regardless of the virtualization needs.
 
+
+
 ![CtLabs](docs/pics/lab_setup.gif) 
 
 
@@ -258,15 +260,17 @@ In the Automation Section we can configure ansible playbooks or terraform config
 
 In the `Settings` tab we can define the playbook and its configurations that should be run.
 
-![screenshot](docs/pics/screenshot-20260419-170718.png)
+
+![screenshot](docs/pics/screenshot-20261101-124800.png)
 
 We can also edit the files, e.g. the playbook, roles, inventory ...
 
-![screenshot](docs/pics/screenshot-20260419-170803.png)
+
+![screenshot](docs/pics/screenshot-20261101-124536.png)
 
 We can have multiple open files at the same time, create new ones, ...
 
-![screenshot](docs/pics/screenshot-20260419-171141.png)
+![screenshot](docs/pics/screenshot-20261101-124312.png)
 
 To run the playbook we press the `Run Playbook` button.
 
@@ -302,7 +306,7 @@ Labs
 
 2. Make sure all needed images are created
 
-![screenshot](docs/pics/screenshot-20260419-194137.png)
+![screenshot](docs/pics/screenshot-20261101-123456.png)
 
 
 In the `Nodes` table we can see if images used for the node are available or not. If the cube next to the image in the `Image` column is green the image is availabe and if its white it's not available.
