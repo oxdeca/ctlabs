@@ -39,6 +39,35 @@ class TerminalController < BaseController
     { count: TerminalService.session_count(params[:node_name]) }.to_json
   end
 
+  get '/terminal/:node_name/available_nodes' do
+    content_type :json
+    {
+      lab_name: (defined?(Lab) && Lab.respond_to?(:running?) && Lab.running? ? Lab.current_name : nil),
+      nodes: TerminalService.available_nodes
+    }.to_json
+  end
+
+  get '/terminal_nodes' do
+    content_type :json
+    {
+      lab_name: (defined?(Lab) && Lab.respond_to?(:running?) && Lab.running? ? Lab.current_name : nil),
+      nodes: TerminalService.available_nodes
+    }.to_json
+  end
+
+  post '/terminal/:node_name/terminate_session' do
+    content_type :json
+    payload = (JSON.parse(request.body.read) rescue {}) || {}
+    session_id = (payload['session_id'] || params['session_id']).to_s.strip
+    if !session_id.empty?
+      TerminalService.cleanup_pty_session(session_id)
+      { success: true }.to_json
+    else
+      status 400
+      { success: false, error: 'Missing session_id' }.to_json
+    end
+  end
+
   post '/terminal/:node_name/terminate_oldest' do
     content_type :json
     success = TerminalService.terminate_oldest(params[:node_name])

@@ -12,6 +12,7 @@ require 'base64'
 require 'open3'
 require 'shellwords'
 require 'fileutils'
+require 'set'
 
 require_relative 'recording_service'
 
@@ -152,9 +153,9 @@ class TerminalService
     pid = sess[:pty_pid]
     if pid
       begin
-        Process.kill('TERM', -pid) rescue nil
+        Process.kill('TERM', -pid) rescue Process.kill('TERM', pid) rescue nil
         sleep 0.05
-        Process.kill('KILL', -pid) rescue nil
+        Process.kill('KILL', -pid) rescue Process.kill('KILL', pid) rescue nil
       rescue Errno::ESRCH
       end
       begin
@@ -195,6 +196,79 @@ class TerminalService
       end
     end
     false
+  end
+
+  def self.available_nodes
+    nodes = []
+    seen = Set.new
+
+    # Controller plane nodes
+    if defined?(Controller) && Controller.respond_to?(:running_node_names)
+      begin
+        Controller.running_node_names.each do |cname|
+          next if seen.include?(cname)
+          seen << cname
+          nodes << {
+            name: cname,
+            type: 'controller',
+            group: 'Controller',
+            running: true,
+            icon: 'fa-shield-alt'
+          }
+        end
+      rescue => e
+        puts "[TerminalService available_nodes controller error] #{e.message}"
+      end
+    end
+
+    ['ctl-ctrl', 'ansible'].each do |cname|
+      next if seen.include?(cname)
+      if is_controller?(cname)
+        seen << cname
+        nodes << {
+          name: cname,
+          type: 'controller',
+          group: 'Controller',
+          running: true,
+          icon: 'fa-shield-alt'
+        }
+      end
+    end
+
+    # Lab nodes
+    if defined?(Lab) && Lab.respond_to?(:running?) && Lab.running?
+      runtime_path = Lab.get_file_path(Lab.current_name)
+      if File.file?(runtime_path)
+        begin
+          lab = Lab.new(cfg: runtime_path, log: LabLog.null)
+          Node.bulk_update_status(lab.nodes) if defined?(Node) && Node.respond_to?(:bulk_update_status)
+          lab.nodes.each do |n|
+            next if seen.include?(n.name)
+            seen << n.name
+
+            icon = case n.type.to_s
+                   when 'controller' then 'fa-shield-alt'
+                   when 'router'     then 'fa-route'
+                   when 'switch'     then 'fa-network-wired'
+                   when 'gateway'    then 'fa-torii-gate'
+                   else 'fa-server'
+                   end
+
+            nodes << {
+              name: n.name,
+              type: n.type.to_s,
+              group: 'Lab Nodes',
+              running: (n.running? rescue false),
+              icon: icon
+            }
+          end
+        rescue => e
+          puts "[TerminalService available_nodes lab error] #{e.message}"
+        end
+      end
+    end
+
+    nodes
   end
 
   def self.stage_env_files(node_name, files)
@@ -745,6 +819,10 @@ class TerminalService
       next unless payload.is_a?(Hash)
 
       case payload['type']
+      when 'terminate', 'disconnect'
+        cleanup_pty_session(session_id)
+        driver.close rescue nil
+
       when 'input'
         sess[:pty_write]&.write(payload['data'])
 

@@ -243,12 +243,138 @@
     .quick-download-btn:hover {
       background: #0d9488;
     }
+
+    /* Open / New Node Dropdown */
+    #open-node-btn {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #cbd5e1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.82em;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 24px;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    #open-node-btn:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      color: #f8fafc;
+    }
+    #open-node-menu {
+      display: none;
+      position: absolute;
+      top: 32px;
+      left: 0;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      z-index: 1000;
+      width: 290px;
+      font-size: 0.88em;
+    }
+    .open-node-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #cbd5e1;
+      transition: background 0.12s, color 0.12s;
+      text-decoration: none;
+      user-select: none;
+    }
+    .open-node-item:hover {
+      background: #334155;
+      color: #f8fafc;
+    }
+    .open-node-item.current {
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+    .open-node-badge {
+      font-size: 0.72em;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+    .open-node-badge.controller {
+      color: #38bdf8;
+      border-color: #0369a1;
+    }
+    .open-node-badge.router {
+      color: #a78bfa;
+      border-color: #6d28d9;
+    }
+    .open-node-badge.switch {
+      color: #34d399;
+      border-color: #047857;
+    }
+    .open-node-badge.gateway {
+      color: #fbbf24;
+      border-color: #b45309;
+    }
+    .open-node-badge.host {
+      color: #e2e8f0;
+      border-color: #475569;
+    }
+    .open-node-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .open-node-dot.running {
+      background: #10b981;
+      box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+    }
+    .open-node-dot.stopped {
+      background: #64748b;
+    }
   </style>
 </head>
 <body data-node-name="<%= ERB::Util.html_escape(@node_name) %>" data-is-controller="<%= @is_controller ? 'true' : 'false' %>">
   
   <div id="header">
-    <strong><i class="fas fa-terminal"></i> <%= @node_name %></strong>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <strong style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.95em;">
+        <i class="fas fa-terminal" style="color: #38bdf8;"></i> <span><%= @node_name %></span>
+      </strong>
+
+      <!-- Open / New Terminal Dropdown -->
+      <div style="position: relative;">
+        <button type="button" id="open-node-btn" title="Open terminal on another node">
+          <i class="fas fa-plus" style="font-size: 0.8em; color: #38bdf8;"></i>
+          <span>Open</span>
+          <i class="fas fa-chevron-down" style="font-size: 0.7em; opacity: 0.7;"></i>
+        </button>
+
+        <div id="open-node-menu">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 4px 6px 4px; border-bottom: 1px solid #334155; margin-bottom: 8px;">
+            <span style="font-weight: 600; font-size: 0.82em; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">
+              <i class="fas fa-server" style="color: #38bdf8;"></i> Available Nodes
+            </span>
+            <span id="open-node-count" style="background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 1px 6px; font-size: 0.75em; color: #38bdf8; font-weight: 600;">0</span>
+          </div>
+          <input type="text" id="open-node-filter" placeholder="Filter nodes..." style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.82em; margin-bottom: 8px; outline: none;">
+          <div id="open-node-list" class="slim-scroll" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;">
+            <div style="text-align: center; color: #64748b; padding: 12px; font-size: 0.85em;">Loading nodes...</div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div style="display: flex; align-items: center; gap: 8px; position: relative;">
       
       <!-- File Transfer Buttons (Upload / Download) -->
@@ -887,6 +1013,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xterm-addon-serialize@0.10.0/lib/xterm-addon-serialize.js"></script>
+  <script src="/js/terminal.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const container = document.getElementById('terminal-container');
@@ -2547,6 +2674,7 @@
       // Toggle settings popover menu
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (openNodeMenu) openNodeMenu.style.display = 'none';
         const willOpen = settingsMenu.style.display !== 'block';
         settingsMenu.style.display = willOpen ? 'block' : 'none';
         if (willOpen && typeof window.loadTermSshAgentStatus === 'function') {
@@ -2562,7 +2690,186 @@
         if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
           settingsMenu.style.display = 'none';
         }
+        if (openNodeMenu && !openNodeMenu.contains(e.target) && e.target !== openNodeBtn && !openNodeBtn.contains(e.target)) {
+          openNodeMenu.style.display = 'none';
+        }
       });
+
+      // =======================================================================
+      // Open / New Terminal Dropdown
+      // =======================================================================
+      const openNodeBtn = document.getElementById('open-node-btn');
+      const openNodeMenu = document.getElementById('open-node-menu');
+      const openNodeFilter = document.getElementById('open-node-filter');
+      const openNodeList = document.getElementById('open-node-list');
+      const openNodeCount = document.getElementById('open-node-count');
+
+      let availableNodesCache = null;
+      let isLoadingNodes = false;
+
+      function launchNodeTerminal(targetNodeName) {
+        if (typeof window.manageTerminal === 'function') {
+          window.manageTerminal(targetNodeName);
+        } else if (typeof window.openTerminal === 'function') {
+          window.openTerminal(targetNodeName);
+        } else {
+          const w = 960, h = 660;
+          const t = (window.top.outerHeight / 2) + window.top.screenY - (h / 2);
+          const l = (window.top.outerWidth / 2) + window.top.screenX - (w / 2);
+          const winName = `term_${targetNodeName.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`;
+          window.open(`/terminal/${encodeURIComponent(targetNodeName)}`, winName, `width=${w},height=${h},top=${t},left=${l},resizable=yes,scrollbars=yes,popup=yes,menubar=no,toolbar=no,location=no,status=no`);
+        }
+      }
+
+      function renderNodeList(nodes, filterText = '') {
+        if (!openNodeList) return;
+        const query = (filterText || '').trim().toLowerCase();
+        const filtered = (nodes || []).filter(n => {
+          if (!query) return true;
+          return (n.name && n.name.toLowerCase().includes(query)) ||
+                 (n.type && n.type.toLowerCase().includes(query)) ||
+                 (n.group && n.group.toLowerCase().includes(query));
+        });
+
+        if (openNodeCount) openNodeCount.textContent = filtered.length;
+
+        if (filtered.length === 0) {
+          openNodeList.innerHTML = `<div style="text-align: center; color: #64748b; padding: 12px; font-size: 0.85em;">${query ? 'No matching nodes found' : 'No nodes available'}</div>`;
+          return;
+        }
+
+        // Sort: running nodes first, then alphabetical by name
+        filtered.sort((a, b) => {
+          if (a.running !== b.running) return a.running ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        openNodeList.innerHTML = '';
+        filtered.forEach(n => {
+          const isCurrent = (n.name === nodeName);
+          const item = document.createElement('div');
+          item.className = 'open-node-item' + (isCurrent ? ' current' : '');
+          item.title = isCurrent ? `${n.name} (current session)` : `Open terminal for ${n.name} (${n.running ? 'running' : 'stopped'})`;
+
+          const left = document.createElement('div');
+          left.style.display = 'flex';
+          left.style.alignItems = 'center';
+          left.style.gap = '8px';
+          left.style.minWidth = '0';
+
+          const dot = document.createElement('span');
+          dot.className = 'open-node-dot ' + (n.running ? 'running' : 'stopped');
+          dot.title = n.running ? 'Running' : 'Stopped';
+
+          const icon = document.createElement('i');
+          icon.className = `fas ${n.icon || 'fa-server'}`;
+          icon.style.color = isCurrent ? '#38bdf8' : (n.running ? '#94a3b8' : '#64748b');
+          icon.style.fontSize = '0.9em';
+          icon.style.width = '14px';
+          icon.style.textAlign = 'center';
+
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = n.name;
+          nameSpan.style.fontWeight = isCurrent ? '700' : '500';
+          nameSpan.style.color = isCurrent ? '#38bdf8' : (n.running ? '#f8fafc' : '#94a3b8');
+          nameSpan.style.overflow = 'hidden';
+          nameSpan.style.textOverflow = 'ellipsis';
+          nameSpan.style.whiteSpace = 'nowrap';
+
+          left.appendChild(dot);
+          left.appendChild(icon);
+          left.appendChild(nameSpan);
+
+          if (isCurrent) {
+            const curTag = document.createElement('span');
+            curTag.textContent = '(current)';
+            curTag.style.fontSize = '0.75em';
+            curTag.style.color = '#38bdf8';
+            curTag.style.opacity = '0.85';
+            curTag.style.fontStyle = 'italic';
+            left.appendChild(curTag);
+          }
+
+          const right = document.createElement('div');
+          right.style.display = 'flex';
+          right.style.alignItems = 'center';
+          right.style.gap = '5px';
+
+          const badge = document.createElement('span');
+          badge.className = `open-node-badge ${n.type || 'host'}`;
+          badge.textContent = n.type || 'node';
+          right.appendChild(badge);
+
+          item.appendChild(left);
+          item.appendChild(right);
+
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (openNodeMenu) openNodeMenu.style.display = 'none';
+            launchNodeTerminal(n.name);
+          });
+
+          openNodeList.appendChild(item);
+        });
+      }
+
+      async function fetchAvailableNodes(force = false) {
+        if (availableNodesCache && !force) {
+          renderNodeList(availableNodesCache, openNodeFilter ? openNodeFilter.value : '');
+          return;
+        }
+        if (isLoadingNodes) return;
+        isLoadingNodes = true;
+        if (openNodeList && !availableNodesCache) {
+          openNodeList.innerHTML = '<div style="text-align: center; color: #64748b; padding: 12px; font-size: 0.85em;"><i class="fas fa-spinner fa-spin"></i> Loading nodes...</div>';
+        }
+        try {
+          const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/available_nodes?_=${Date.now()}`);
+          if (!res.ok) throw new Error('Failed to fetch available nodes');
+          const data = await res.json();
+          availableNodesCache = data.nodes || [];
+          renderNodeList(availableNodesCache, openNodeFilter ? openNodeFilter.value : '');
+        } catch (err) {
+          console.error('[OpenNodeMenu]', err);
+          if (openNodeList) {
+            openNodeList.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 12px; font-size: 0.85em;">Failed to load nodes</div>';
+          }
+        } finally {
+          isLoadingNodes = false;
+        }
+      }
+
+      if (openNodeBtn && openNodeMenu) {
+        openNodeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = openNodeMenu.style.display === 'block';
+          if (isOpen) {
+            openNodeMenu.style.display = 'none';
+          } else {
+            if (settingsMenu) settingsMenu.style.display = 'none';
+            openNodeMenu.style.display = 'block';
+            if (openNodeFilter) {
+              openNodeFilter.value = '';
+              setTimeout(() => openNodeFilter.focus(), 50);
+            }
+            fetchAvailableNodes();
+          }
+        });
+
+        if (openNodeFilter) {
+          openNodeFilter.addEventListener('input', () => {
+            renderNodeList(availableNodesCache || [], openNodeFilter.value);
+          });
+          openNodeFilter.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+              openNodeMenu.style.display = 'none';
+            } else if (e.key === 'Enter') {
+              const firstItem = openNodeList.querySelector('.open-node-item');
+              if (firstItem) firstItem.click();
+            }
+          });
+        }
+      }
 
       // --- Modular Settings Sections & Tabs ---
       function switchSettingsTab(section) {
@@ -2999,7 +3306,7 @@
           setDisconnectedState();
           if (intentionalDisconnect) {
             intentionalDisconnect = false;
-            term.write('\r\n\x1b[33m[Disconnected by user]\x1b[0m\r\n');
+            term.write('\r\n\x1b[33m[Disconnected by user — Session terminated]\x1b[0m\r\n');
           } else {
             term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
           }
@@ -3023,11 +3330,27 @@
       };
 
       const disconnectTerminal = () => {
+        const sid = sessionStorage.getItem(sessionKey);
+        sessionStorage.removeItem(sessionKey);
+        intentionalDisconnect = true;
+
         if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
-          intentionalDisconnect = true;
+          if (activeWs.readyState === WebSocket.OPEN) {
+            try {
+              activeWs.send(JSON.stringify({ type: 'terminate' }));
+            } catch (e) {}
+          }
           activeWs.close();
         } else {
           setDisconnectedState();
+        }
+
+        if (sid) {
+          fetch(`/terminal/${encodeURIComponent(nodeName)}/terminate_session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sid })
+          }).catch(() => {});
         }
       };
 
