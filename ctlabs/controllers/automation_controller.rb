@@ -5,6 +5,23 @@
 # -----------------------------------------------------------------------------
 
 class AutomationController < BaseController
+  helpers do
+    def resolve_lab_controller_container(lab_name)
+      ctrl_name = 'ansible'
+      begin
+        lab_path = Lab.get_file_path(lab_name)
+        if lab_path && File.file?(lab_path)
+          full_yaml = YAML.load_file(lab_path)
+          vm = full_yaml['topology']&.first || full_yaml
+          name, _, _ = Automation.find_automation_controller(vm)
+          ctrl_name = name if name && !name.empty?
+        end
+      rescue => e
+      end
+      ctrl_name
+    end
+  end
+
   # ===================================================
   # ANSIBLE
   # ===================================================
@@ -38,8 +55,9 @@ class AutomationController < BaseController
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      content = AutomationService.read_ansible_file(filepath, root_dir.empty? ? nil : root_dir)
+      content = AutomationService.read_ansible_file(filepath, root_dir.empty? ? nil : root_dir, container: ctrl)
       { content: content }.to_json
     rescue => e
       status 400
@@ -51,8 +69,9 @@ class AutomationController < BaseController
   get '/labs/*/ansible/tree' do
     content_type :json
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      AutomationService.ansible_tree(root_dir.empty? ? nil : root_dir).to_json
+      AutomationService.ansible_tree(root_dir.empty? ? nil : root_dir, container: ctrl).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -149,7 +168,8 @@ class AutomationController < BaseController
       LabRepository.update_ansible_play(lab_path, old_play, play_cfg, { 'setup' => params[:setup].to_s })
 
       ans_files = JSON.parse(params[:ans_files] || '{}')
-      AutomationService.write_ansible_files(ans_files, play_cfg['root_dir'])
+      ctrl = resolve_lab_controller_container(lab_name)
+      AutomationService.write_ansible_files(ans_files, play_cfg['root_dir'], container: ctrl)
 
       profile_files = {}
       profile_files['play_profiles.yml']  = params[:play_profiles]  if params[:play_profiles]  && !params[:play_profiles].to_s.strip.empty?
@@ -172,8 +192,9 @@ class AutomationController < BaseController
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      AutomationService.delete_ansible_file(filepath, root_dir.empty? ? nil : root_dir)
+      AutomationService.delete_ansible_file(filepath, root_dir.empty? ? nil : root_dir, container: ctrl)
       { success: true }.to_json
     rescue => e
       status 400
@@ -261,8 +282,9 @@ class AutomationController < BaseController
   get '/labs/*/terraform/tree' do
     content_type :json
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      AutomationService.terraform_tree(root_dir.empty? ? nil : root_dir).to_json
+      AutomationService.terraform_tree(root_dir.empty? ? nil : root_dir, container: ctrl).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -275,8 +297,9 @@ class AutomationController < BaseController
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      content = AutomationService.read_terraform_file(filepath, root_dir.empty? ? nil : root_dir)
+      content = AutomationService.read_terraform_file(filepath, root_dir.empty? ? nil : root_dir, container: ctrl)
       { content: content }.to_json
     rescue => e
       status 400
@@ -290,8 +313,9 @@ class AutomationController < BaseController
     halt 400, { error: "Invalid working directory" }.to_json if work_dir.empty? || work_dir.include?('..')
 
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      AutomationService.read_terraform_workdir_files(work_dir, root_dir.empty? ? nil : root_dir).to_json
+      AutomationService.read_terraform_workdir_files(work_dir, root_dir.empty? ? nil : root_dir, container: ctrl).to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -398,7 +422,8 @@ class AutomationController < BaseController
       LabRepository.write_formatted_yaml(lab_path, full_yaml)
 
       tf_files = JSON.parse(params[:tf_files] || '{}')
-      AutomationService.write_terraform_files(tf_files, tf_cfg['root_dir'])
+      ctrl = resolve_lab_controller_container(lab_name)
+      AutomationService.write_terraform_files(tf_files, tf_cfg['root_dir'], container: ctrl)
 
       content_type :json
       { success: true, message: "Configuration and all files saved successfully." }.to_json
@@ -415,8 +440,9 @@ class AutomationController < BaseController
     halt 400, { error: "Invalid path" }.to_json if filepath.empty? || filepath.include?('..') || filepath.start_with?('/')
 
     root_dir = params[:root_dir].to_s.strip
+    ctrl = resolve_lab_controller_container(params[:splat].first)
     begin
-      AutomationService.delete_terraform_file(filepath, root_dir.empty? ? nil : root_dir)
+      AutomationService.delete_terraform_file(filepath, root_dir.empty? ? nil : root_dir, container: ctrl)
       { success: true }.to_json
     rescue => e
       status 400
@@ -424,10 +450,37 @@ class AutomationController < BaseController
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Scoped and Container-Aware Directory and Repository Endpoints
+  # ---------------------------------------------------------------------------
+  get '/labs/*/directories' do
+    content_type :json
+    ctrl = resolve_lab_controller_container(params[:splat].first)
+    AutomationService.container_directories(params[:path], container: ctrl).to_json
+  rescue => e
+    status 400
+    { success: false, error: e.message }.to_json
+  end
+
+  get '/labs/*/repositories' do
+    content_type :json
+    ctrl = resolve_lab_controller_container(params[:splat].first)
+    AutomationService.container_repositories(container: ctrl).to_json
+  rescue => e
+    status 400
+    { error: e.message }.to_json
+  end
+
   get '/automation/repositories' do
     content_type :json
     begin
-      AutomationService.available_repositories.to_json
+      container = params[:container].to_s.strip
+      container = nil if container.empty?
+      if container
+        AutomationService.container_repositories(container: container).to_json
+      else
+        AutomationService.available_repositories.to_json
+      end
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -437,52 +490,58 @@ class AutomationController < BaseController
   get '/automation/directories' do
     content_type :json
     begin
-      req_path = params[:path].to_s.strip
-      req_path = '/root' if req_path.empty?
-      req_path = File.expand_path(req_path)
+      container = params[:container].to_s.strip
+      container = nil if container.empty?
+      if container
+        AutomationService.container_directories(params[:path], container: container).to_json
+      else
+        req_path = params[:path].to_s.strip
+        req_path = '/root' if req_path.empty?
+        req_path = File.expand_path(req_path)
 
-      unless File.directory?(req_path)
-        req_path = File.directory?('/root') ? '/root' : '/'
-      end
-
-      entries = []
-      parent = (req_path == '/' ? nil : File.expand_path('..', req_path))
-
-      begin
-        Dir.children(req_path).sort_by(&:downcase).each do |child|
-          next if child.start_with?('.') && child != '.ctlabs'
-          full_child = File.join(req_path, child)
-          next unless File.directory?(full_child)
-
-          has_ansible = File.file?(File.join(full_child, 'ansible.cfg')) ||
-                        Dir.exist?(File.join(full_child, 'playbooks')) ||
-                        Dir.exist?(File.join(full_child, 'roles'))
-          has_terraform = Dir.glob(File.join(full_child, '*.tf')).any?
-          has_git = Dir.exist?(File.join(full_child, '.git'))
-
-          entries << {
-            name: child,
-            path: full_child,
-            has_ansible: has_ansible,
-            has_terraform: has_terraform,
-            has_git: has_git
-          }
-        rescue Errno::EACCES
-          next
+        unless File.directory?(req_path)
+          req_path = File.directory?('/root') ? '/root' : '/'
         end
-      rescue Errno::EACCES
-        # Inaccessible directory
+
+        entries = []
+        parent = (req_path == '/' ? nil : File.expand_path('..', req_path))
+
+        begin
+          Dir.children(req_path).sort_by(&:downcase).each do |child|
+            next if child.start_with?('.') && child != '.ctlabs'
+            full_child = File.join(req_path, child)
+            next unless File.directory?(full_child)
+
+            has_ansible = File.file?(File.join(full_child, 'ansible.cfg')) ||
+                          Dir.exist?(File.join(full_child, 'playbooks')) ||
+                          Dir.exist?(File.join(full_child, 'roles'))
+            has_terraform = Dir.glob(File.join(full_child, '*.tf')).any?
+            has_git = Dir.exist?(File.join(full_child, '.git'))
+
+            entries << {
+              name: child,
+              path: full_child,
+              has_ansible: has_ansible,
+              has_terraform: has_terraform,
+              has_git: has_git
+            }
+          rescue Errno::EACCES
+            next
+          end
+        rescue Errno::EACCES
+          # Inaccessible directory
+        end
+
+        repos = AutomationService.available_repositories
+
+        {
+          success: true,
+          current: req_path,
+          parent: parent,
+          directories: entries,
+          repositories: repos
+        }.to_json
       end
-
-      repos = AutomationService.available_repositories
-
-      {
-        success: true,
-        current: req_path,
-        parent: parent,
-        directories: entries,
-        repositories: repos
-      }.to_json
     rescue => e
       status 400
       { success: false, error: e.message }.to_json

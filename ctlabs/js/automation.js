@@ -44,7 +44,9 @@ window.setProfileFileLabel = function(containerSelector, isController) {
 
 window.loadAvailableRepositories = async function() {
   try {
-    const res = await fetch('/automation/repositories');
+    const scope = (typeof window.ansScope === 'function') ? window.ansScope() : '';
+    const url = scope ? `${scope}/repositories?t=${Date.now()}` : `/automation/repositories?t=${Date.now()}`;
+    const res = await fetch(url);
     if (!res.ok) return;
     const repos = await res.json();
     const ansList = document.getElementById('available-ansible-repos');
@@ -1162,7 +1164,9 @@ window.openTfTab = function(tabId) {
     }
 
     try {
-      const res = await fetch(`/automation/directories?path=${encodeURIComponent(path || '/root')}`);
+      const scope = (typeof window.ansScope === 'function') ? window.ansScope() : '';
+      const url = scope ? `${scope}/directories?path=${encodeURIComponent(path || '/root')}` : `/automation/directories?path=${encodeURIComponent(path || '/root')}`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to list directory');
