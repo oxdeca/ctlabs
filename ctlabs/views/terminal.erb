@@ -2840,12 +2840,21 @@
       };
 
       term.attachCustomKeyEventHandler((e) => {
-        // Prevent accidental browser reload shortcuts (F5, Ctrl+R, Cmd+R)
-        if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+        // Prevent accidental browser reload shortcuts (F5, Cmd+R on macOS)
+        // Ctrl+R is bash/readline reverse-i-search and MUST be passed through to xterm
+        if (e.key === 'F5' || (e.metaKey && e.key.toLowerCase() === 'r')) {
           if (e.type === 'keydown') {
             e.preventDefault();
           }
           return false;
+        }
+
+        // Allow Ctrl+R to reach bash for reverse-i-search while preventing browser reload
+        if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'r') {
+          if (e.type === 'keydown') {
+            e.preventDefault();
+          }
+          return true;
         }
 
         // Intercept Shift+Enter to send ESC + CR (\x1b\r) instead of plain \r
