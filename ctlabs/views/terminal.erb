@@ -27,9 +27,60 @@
       flex-shrink:   0; font-size: 0.85em;
       position:      relative;
     }
-    .status { color: #10b981; font-size: 0.85em; display: inline-flex; align-items: center; gap: 5px; user-select: none; }
-    .status.disconnected { color: #ef4444; cursor: pointer; }
-    .status.disconnected:hover { text-decoration: underline; color: #f87171; }
+    .status {
+      font-size: 0.85em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      line-height: 1;
+    }
+    .status.disconnected {
+      cursor: pointer;
+    }
+    .status.disconnected:hover {
+      opacity: 0.75;
+    }
+
+    /* Connect / Disconnect Toggle Button */
+    .term-conn-btn {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.82em;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 24px;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      user-select: none;
+    }
+    .term-conn-btn.connected {
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #cbd5e1;
+    }
+    .term-conn-btn.connected:hover {
+      background: #334155;
+      border-color: #64748b;
+      color: #f8fafc;
+    }
+    .term-conn-btn.disconnected {
+      background: #0284c7;
+      border: 1px solid #38bdf8;
+      color: #ffffff;
+    }
+    .term-conn-btn.disconnected:hover {
+      background: #0369a1;
+      border-color: #7dd3fc;
+    }
+    .term-conn-btn.connecting {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      cursor: wait;
+    }
     
     /* Settings Popover Menu */
     #settings-menu {
@@ -44,7 +95,7 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.5);
       z-index: 1000;
       font-size: 0.9em;
-      width: 295px;
+      width: 320px;
       max-height: 85vh;
       overflow-y: auto;
     }
@@ -235,6 +286,11 @@
             <span>Env</span>
             <span id="settings-tab-env-badge" style="display: none; background: #0284c7; color: #fff; font-size: 0.7em; font-weight: bold; padding: 0 4px; border-radius: 8px; line-height: 14px;">0</span>
           </button>
+          <button type="button" class="settings-tab-btn" data-section="ssh-agent" style="flex: 1.2;" title="SSH Agent settings">
+            <i class="fas fa-shield-alt" style="font-size: 0.85em;"></i>
+            <span>Agent</span>
+            <span id="settings-tab-ssh-badge" style="display: none; background: #0d9488; color: #fff; font-size: 0.7em; font-weight: bold; padding: 0 4px; border-radius: 8px; line-height: 14px;">0</span>
+          </button>
           <button type="button" class="settings-tab-btn" data-section="recording" style="flex: 1.3;" title="Recording settings">
             <i class="fas fa-video" style="font-size: 0.85em;"></i>
             <span>Recording</span>
@@ -266,6 +322,45 @@
           <% else %>
           <div style="font-size: 0.8em; color: #64748b; font-style: italic; background: #0f172a; padding: 6px 8px; border-radius: 4px; border: 1px solid #1e293b;">
             <i class="fas fa-info-circle"></i> Environment file staging is only available on controller nodes.
+          </div>
+          <% end %>
+        </div>
+
+        <!-- Section: SSH Agent -->
+        <div class="settings-section" id="settings-sec-ssh-agent" style="margin-bottom: 12px; border-top: 1px solid #334155; padding-top: 10px;">
+          <div class="settings-section-title" style="color: #14b8a6;">
+            <i class="fas fa-shield-alt"></i> SSH Agent
+          </div>
+          <% if @is_controller %>
+          <div style="font-size: 0.78em; color: #94a3b8; margin-bottom: 8px; line-height: 1.3;">
+            In-memory SSH keys for Git, Terraform, and Ansible.
+          </div>
+          <div id="term-ssh-status-card" style="background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 7px 10px; margin-bottom: 8px; font-size: 0.82em;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="color: #94a3b8;">Status:</span>
+              <span id="term-ssh-status-indicator" style="color: #10b981; font-weight: 600; font-size: 0.9em; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="fas fa-circle" style="font-size: 0.65em;"></i> <span>Running</span>
+              </span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: #94a3b8;">Loaded Keys:</span>
+              <span id="term-ssh-key-count" style="font-weight: 600; color: #38bdf8;">0 keys</span>
+            </div>
+            <div id="term-ssh-quick-summary" style="display: none; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #334155; font-size: 0.8em; color: #cbd5e1; word-break: break-all;"></div>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="term-ssh-manage-btn" title="Open SSH Agent Key Manager" style="flex: 1; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.borderColor='#14b8a6'" onmouseout="this.style.background='#0f172a'; this.style.borderColor='#475569'">
+              <i class="fas fa-key" style="color: #14b8a6;"></i>
+              <span>Manage Keys</span>
+            </button>
+            <button type="button" id="term-ssh-clear-btn" title="Clear all loaded SSH keys" style="background: #0f172a; border: 1px solid #475569; color: #f87171; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; display: none; align-items: center; justify-content: center; gap: 4px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.borderColor='#ef4444'" onmouseout="this.style.background='#0f172a'; this.style.borderColor='#475569'">
+              <i class="fas fa-trash-alt"></i>
+              <span>Clear</span>
+            </button>
+          </div>
+          <% else %>
+          <div style="font-size: 0.8em; color: #64748b; font-style: italic; background: #0f172a; padding: 6px 8px; border-radius: 4px; border: 1px solid #1e293b;">
+            <i class="fas fa-info-circle"></i> SSH agent management is only available on controller nodes.
           </div>
           <% end %>
         </div>
@@ -342,12 +437,15 @@
         <span id="rec-timer" style="font-variant-numeric: tabular-nums; display: none; margin-left: 2px;">00:00</span>
       </button>
 
-      <!-- Connect Button (visible when disconnected) -->
-      <button type="button" id="connect-btn" title="Reconnect terminal session" style="display: none; background: #0284c7; border: 1px solid #38bdf8; color: #ffffff; padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; align-items: center; gap: 5px; height: 24px; transition: background 0.15s;" onmouseover="this.style.background='#0369a1'" onmouseout="this.style.background='#0284c7'">
-        <i class="fas fa-plug"></i> <span>Connect</span>
+      <!-- Connect / Disconnect Toggle Button -->
+      <button type="button" id="connect-btn" class="term-conn-btn connecting" title="Connecting to terminal session..." disabled>
+        <i class="fas fa-circle-notch fa-spin"></i> <span>Connecting...</span>
       </button>
 
-      <span id="status" class="status" title=""><i class="fas fa-circle"></i> Connecting...</span>
+      <!-- Status Indicator (just the circle) -->
+      <span id="status" class="status" title="Connecting...">
+        <i class="fas fa-circle-notch fa-spin" style="color: #38bdf8;"></i>
+      </span>
     </div>
   </div>
 
@@ -438,6 +536,154 @@
         <button id="env-modal-apply" style="background: #10b981; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
           <i class="fas fa-check"></i>
           <span>Save & Apply</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SSH Agent Modal Backdrop -->
+  <div id="term-ssh-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center;">
+    <div id="term-ssh-modal" style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; width: 620px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
+      
+      <!-- Modal Header -->
+      <div style="padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 1em; color: #f8fafc;">
+          <i class="fas fa-shield-alt" style="color: #14b8a6;"></i>
+          <span>SSH Agent Manager (<%= ERB::Util.html_escape(@node_name) %>)</span>
+        </div>
+        <button id="term-ssh-modal-close" style="background: transparent; border: none; color: #94a3b8; font-size: 1.3em; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: 16px; overflow-y: auto; flex: 1; font-size: 0.88em; line-height: 1.4;">
+        
+        <!-- Alert feedback box -->
+        <div id="term-ssh-alert" style="display: none; padding: 10px 14px; margin-bottom: 14px; font-size: 0.85em; border-radius: 6px;"></div>
+
+        <!-- Loaded Keys Section -->
+        <div style="margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-weight: 600; color: #cbd5e1; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px;">
+              <i class="fas fa-shield-alt" style="color: #14b8a6;"></i> Active Identities in Agent
+            </span>
+            <button type="button" id="term-ssh-modal-clear-btn" style="display: none; background: #334155; color: #f87171; border: 1px solid #475569; padding: 2px 8px; font-size: 0.78em; border-radius: 4px; cursor: pointer;">
+              <i class="fas fa-trash-alt"></i> Clear All Keys
+            </button>
+          </div>
+
+          <div id="term-ssh-identities-container" style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; min-height: 56px;">
+            <div id="term-ssh-loading-identities" style="color: #94a3b8; text-align: center; padding: 12px; font-size: 0.85em;">
+              <i class="fas fa-spinner fa-spin"></i> Checking agent status...
+            </div>
+            <div id="term-ssh-empty-msg" style="display: none; color: #64748b; text-align: center; padding: 12px; font-size: 0.85em; font-style: italic;">
+              <i class="fas fa-info-circle"></i> No private keys currently loaded in agent.
+            </div>
+            <table id="term-ssh-identities-table" style="display: none; width: 100%; border-collapse: collapse; font-size: 0.82em;">
+              <thead>
+                <tr style="border-bottom: 1px solid #334155; color: #94a3b8; text-align: left;">
+                  <th style="padding: 4px 6px;">Type</th>
+                  <th style="padding: 4px 6px;">Fingerprint</th>
+                  <th style="padding: 4px 6px;">Comment / ID</th>
+                </tr>
+              </thead>
+              <tbody id="term-ssh-identities-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Add Key Box -->
+        <div style="border: 1px solid #334155; border-radius: 6px; padding: 12px; background: #0f172a;">
+          <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-plus-circle" style="color: #10b981;"></i>
+            <span>Load Key into Agent</span>
+          </div>
+
+          <!-- Mode Toggle Tabs -->
+          <div style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid #334155; padding-bottom: 8px;">
+            <button type="button" id="term-ssh-mode-local-btn" class="settings-tab-btn active" style="flex: 1; padding: 6px 12px; font-size: 0.82em;">
+              <i class="fas fa-laptop"></i> From My Computer
+            </button>
+            <button type="button" id="term-ssh-mode-remote-btn" class="settings-tab-btn" style="flex: 1; padding: 6px 12px; font-size: 0.82em;">
+              <i class="fas fa-server"></i> From Container Path
+            </button>
+          </div>
+
+          <form id="term-ssh-add-form">
+            <!-- Mode 1: Local -->
+            <div id="term-ssh-pane-local">
+              <input type="file" id="term-ssh-file-picker" style="display: none;">
+              
+              <div id="term-ssh-dropzone" style="border: 2px dashed #475569; border-radius: 6px; padding: 16px; cursor: pointer; background: #0b1120; text-align: center; margin-bottom: 8px; transition: border-color 0.2s;">
+                <i class="fas fa-cloud-upload-alt fa-2x" style="color: #14b8a6; margin-bottom: 4px;"></i>
+                <div style="font-size: 0.88em; color: #e2e8f0; font-weight: 500;">Click to select private key file from your computer</div>
+                <div style="font-size: 0.78em; color: #64748b; margin-top: 2px;">(e.g. ~/.ssh/id_rsa, git_oanda, id_ed25519)</div>
+                <div id="term-ssh-selected-file-label" style="display: none; margin-top: 8px; background: #0d9488; color: #fff; font-family: monospace; font-size: 0.82em; padding: 4px 10px; border-radius: 4px; display: inline-block;"></div>
+              </div>
+
+              <div style="text-align: right; margin-bottom: 10px;">
+                <a href="javascript:void(0)" id="term-ssh-paste-toggle-link" style="font-size: 0.78em; color: #38bdf8; text-decoration: none;">
+                  <i class="fas fa-keyboard"></i> Or paste key text directly
+                </a>
+              </div>
+
+              <div id="term-ssh-paste-box" style="display: none; margin-bottom: 12px;">
+                <label style="display: block; font-size: 0.8em; color: #94a3b8; margin-bottom: 4px;">Paste Private Key Content</label>
+                <textarea id="term-ssh-paste-content" rows="5" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-family: monospace; font-size: 0.8em; padding: 6px 8px; resize: vertical;"></textarea>
+              </div>
+
+              <div style="margin-bottom: 10px;">
+                <label style="display: block; font-size: 0.8em; color: #94a3b8; margin-bottom: 4px;">Key Name / Identifier</label>
+                <input type="text" id="term-ssh-key-name" placeholder="e.g. git_oanda or id_rsa" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-family: monospace; font-size: 0.85em; padding: 6px 8px;">
+              </div>
+
+              <div style="margin-bottom: 10px;">
+                <label style="font-size: 0.8em; color: #cbd5e1; cursor: pointer; display: flex; align-items: flex-start; gap: 8px;">
+                  <input type="checkbox" id="term-ssh-save-disk" checked style="accent-color: #14b8a6; margin-top: 2px; cursor: pointer;">
+                  <span>Save copy to <code style="color: #38bdf8; background: #1e293b; padding: 1px 5px; border-radius: 4px;">~/.ssh/keys/&lt;name&gt;</code> on container (for <code style="color: #a78bfa;">IdentityFile</code> in <code style="color: #a78bfa;">~/.ssh/config</code>)</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Mode 2: Remote Path -->
+            <div id="term-ssh-pane-remote" style="display: none; margin-bottom: 10px;">
+              <label style="display: block; font-size: 0.8em; color: #94a3b8; margin-bottom: 4px;">Private Key Path (in container)</label>
+              <input type="text" id="term-ssh-key-path" list="term-ssh-candidate-keys" placeholder="e.g. ~/.ssh/keys/git_oanda or /root/.ssh/id_ed25519" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-family: monospace; font-size: 0.85em; padding: 6px 8px;">
+              <datalist id="term-ssh-candidate-keys"></datalist>
+            </div>
+
+            <!-- Passphrase -->
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label style="font-size: 0.8em; color: #94a3b8;">Passphrase (leave blank if unencrypted)</label>
+                <a href="javascript:void(0)" id="term-ssh-pass-toggle-link" style="font-size: 0.78em; color: #38bdf8; text-decoration: none;">
+                  <i id="term-ssh-pass-icon" class="fas fa-eye"></i> Show
+                </a>
+              </div>
+              <input type="password" id="term-ssh-passphrase" placeholder="Key Passphrase" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-family: monospace; font-size: 0.85em; padding: 6px 8px;">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+              <button type="submit" id="term-ssh-submit-btn" style="background: #0d9488; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; font-weight: 600; font-size: 0.85em; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-unlock-alt"></i> Load Key into Agent
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Terminal Tip -->
+        <div style="margin-top: 12px; color: #64748b; font-size: 0.8em; line-height: 1.4;">
+          <i class="fas fa-lightbulb" style="color: #facc15; margin-right: 4px;"></i>
+          <strong>Terminal Tip:</strong> You can also load keys directly in this terminal session using:
+          <code style="background: #0f172a; padding: 2px 6px; color: #38bdf8; border-radius: 4px;">ssh-add ~/.ssh/keys/git_oanda</code>.
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: 10px 16px; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 10px; background: #0f172a; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+        <button id="term-ssh-modal-cancel" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">
+          <i class="fas fa-times" style="margin-right: 4px;"></i> Close
         </button>
       </div>
 
@@ -939,6 +1185,350 @@
             }
           });
         }
+
+        // --- SSH Agent Management ---
+        let uploadedTermSshKeyContent = '';
+        let termSshAgentMode = 'local';
+
+        const termSshManageBtn = document.getElementById('term-ssh-manage-btn');
+        const termSshClearBtn = document.getElementById('term-ssh-clear-btn');
+        const termSshModalBackdrop = document.getElementById('term-ssh-modal-backdrop');
+        const termSshModalClose = document.getElementById('term-ssh-modal-close');
+        const termSshModalCancel = document.getElementById('term-ssh-modal-cancel');
+        const termSshModalClearBtn = document.getElementById('term-ssh-modal-clear-btn');
+
+        const termSshModeLocalBtn = document.getElementById('term-ssh-mode-local-btn');
+        const termSshModeRemoteBtn = document.getElementById('term-ssh-mode-remote-btn');
+        const termSshPaneLocal = document.getElementById('term-ssh-pane-local');
+        const termSshPaneRemote = document.getElementById('term-ssh-pane-remote');
+
+        const termSshFilePicker = document.getElementById('term-ssh-file-picker');
+        const termSshDropzone = document.getElementById('term-ssh-dropzone');
+        const termSshSelectedFileLabel = document.getElementById('term-ssh-selected-file-label');
+        const termSshPasteToggleLink = document.getElementById('term-ssh-paste-toggle-link');
+        const termSshPasteBox = document.getElementById('term-ssh-paste-box');
+        const termSshPasteContent = document.getElementById('term-ssh-paste-content');
+        const termSshKeyName = document.getElementById('term-ssh-key-name');
+        const termSshSaveDisk = document.getElementById('term-ssh-save-disk');
+        const termSshKeyPath = document.getElementById('term-ssh-key-path');
+        const termSshPassphrase = document.getElementById('term-ssh-passphrase');
+        const termSshPassToggleLink = document.getElementById('term-ssh-pass-toggle-link');
+        const termSshPassIcon = document.getElementById('term-ssh-pass-icon');
+        const termSshAddForm = document.getElementById('term-ssh-add-form');
+        const termSshSubmitBtn = document.getElementById('term-ssh-submit-btn');
+        const termSshAlert = document.getElementById('term-ssh-alert');
+
+        function showTermSshAlert(msg, type) {
+          if (!termSshAlert) return;
+          termSshAlert.style.display = 'block';
+          if (type === 'success') {
+            termSshAlert.style.background = '#064e3b';
+            termSshAlert.style.color = '#6ee7b7';
+            termSshAlert.style.border = '1px solid #059669';
+            termSshAlert.innerHTML = '<i class="fas fa-check-circle"></i> ' + escapeHtml(msg);
+          } else {
+            termSshAlert.style.background = '#7f1d1d';
+            termSshAlert.style.color = '#fca5a5';
+            termSshAlert.style.border = '1px solid #dc2626';
+            termSshAlert.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + escapeHtml(msg);
+          }
+        }
+
+        async function loadTermSshAgentStatus() {
+          const statusInd = document.getElementById('term-ssh-status-indicator');
+          const countEl = document.getElementById('term-ssh-key-count');
+          const summaryEl = document.getElementById('term-ssh-quick-summary');
+          const badgeEl = document.getElementById('settings-tab-ssh-badge');
+
+          const modalLoading = document.getElementById('term-ssh-loading-identities');
+          const modalEmpty = document.getElementById('term-ssh-empty-msg');
+          const modalTable = document.getElementById('term-ssh-identities-table');
+          const modalTbody = document.getElementById('term-ssh-identities-tbody');
+          const candidateDatalist = document.getElementById('term-ssh-candidate-keys');
+
+          if (modalLoading) modalLoading.style.display = 'block';
+          if (modalEmpty) modalEmpty.style.display = 'none';
+          if (modalTable) modalTable.style.display = 'none';
+          if (termSshModalClearBtn) termSshModalClearBtn.style.display = 'none';
+
+          try {
+            const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/ssh_agent?t=' + Date.now(), {
+              credentials: 'same-origin'
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.error || ('HTTP ' + res.status));
+            }
+            const data = await res.json();
+            const identities = Array.isArray(data.identities) ? data.identities : [];
+            const count = identities.length;
+
+            if (modalLoading) modalLoading.style.display = 'none';
+
+            if (statusInd) {
+              statusInd.innerHTML = '<i class="fas fa-circle" style="font-size: 0.65em;"></i> <span>Running</span>';
+              statusInd.style.color = '#10b981';
+            }
+            if (countEl) {
+              countEl.textContent = count + (count === 1 ? ' key' : ' keys');
+            }
+            if (badgeEl) {
+              if (count > 0) {
+                badgeEl.textContent = count;
+                badgeEl.style.display = 'inline-block';
+              } else {
+                badgeEl.style.display = 'none';
+              }
+            }
+            if (termSshClearBtn) {
+              termSshClearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+            }
+            if (summaryEl) {
+              if (count > 0) {
+                const names = identities.map(id => id.comment || id.type || 'key').join(', ');
+                summaryEl.innerHTML = `<span style="color: #14b8a6;"><i class="fas fa-key"></i></span> ${escapeHtml(names)}`;
+                summaryEl.style.display = 'block';
+              } else {
+                summaryEl.style.display = 'none';
+              }
+            }
+
+            if (modalTbody) {
+              modalTbody.innerHTML = '';
+              identities.forEach(id => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #334155';
+                tr.innerHTML = `
+                  <td style="padding: 6px;"><span style="background: #334155; color: #cbd5e1; font-family: monospace; font-size: 0.75em; padding: 2px 5px; border-radius: 3px;">${escapeHtml(id.type || 'RSA')}</span></td>
+                  <td style="padding: 6px;"><code style="color: #38bdf8; font-size: 0.85em;">${escapeHtml(id.fingerprint || '')}</code></td>
+                  <td style="padding: 6px; color: #e2e8f0; font-family: monospace;">${escapeHtml(id.comment || id.raw || '')}</td>
+                `;
+                modalTbody.appendChild(tr);
+              });
+            }
+            if (count > 0) {
+              if (modalTable) modalTable.style.display = 'table';
+              if (termSshModalClearBtn) termSshModalClearBtn.style.display = 'inline-block';
+            } else {
+              if (modalEmpty) modalEmpty.style.display = 'block';
+            }
+
+            if (candidateDatalist && Array.isArray(data.candidate_keys)) {
+              candidateDatalist.innerHTML = data.candidate_keys.map(k => `<option value="${escapeHtml(k)}"></option>`).join('');
+              if (termSshKeyPath && !termSshKeyPath.value && data.candidate_keys.length > 0) {
+                termSshKeyPath.value = data.candidate_keys[0];
+              }
+            }
+          } catch (err) {
+            if (modalLoading) modalLoading.style.display = 'none';
+            if (statusInd) {
+              statusInd.innerHTML = '<i class="fas fa-circle" style="font-size: 0.65em;"></i> <span>Error</span>';
+              statusInd.style.color = '#ef4444';
+            }
+            if (countEl) countEl.textContent = 'Unavailable';
+          }
+        }
+
+        async function clearTermSshAgentKeys() {
+          if (!confirm('Clear all in-memory keys from the SSH Agent?')) return;
+          try {
+            const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/ssh_agent/clear', {
+              method: 'POST',
+              credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Failed to clear keys');
+            showTermSshAlert('All SSH keys cleared from agent.', 'success');
+            loadTermSshAgentStatus();
+          } catch (err) {
+            showTermSshAlert('Error clearing keys: ' + err.message, 'error');
+          }
+        }
+
+        function switchTermSshMode(mode) {
+          termSshAgentMode = mode;
+          if (mode === 'local') {
+            if (termSshModeLocalBtn) termSshModeLocalBtn.classList.add('active');
+            if (termSshModeRemoteBtn) termSshModeRemoteBtn.classList.remove('active');
+            if (termSshPaneLocal) termSshPaneLocal.style.display = 'block';
+            if (termSshPaneRemote) termSshPaneRemote.style.display = 'none';
+          } else {
+            if (termSshModeLocalBtn) termSshModeLocalBtn.classList.remove('active');
+            if (termSshModeRemoteBtn) termSshModeRemoteBtn.classList.add('active');
+            if (termSshPaneLocal) termSshPaneLocal.style.display = 'none';
+            if (termSshPaneRemote) termSshPaneRemote.style.display = 'block';
+          }
+        }
+
+        function openTermSshModal() {
+          if (settingsMenu) settingsMenu.style.display = 'none';
+          if (termSshAlert) {
+            termSshAlert.style.display = 'none';
+            termSshAlert.innerHTML = '';
+          }
+          if (termSshModalBackdrop) termSshModalBackdrop.style.display = 'flex';
+          switchTermSshMode('local');
+          loadTermSshAgentStatus();
+        }
+
+        function closeTermSshModal() {
+          if (termSshModalBackdrop) termSshModalBackdrop.style.display = 'none';
+        }
+
+        if (termSshManageBtn) termSshManageBtn.addEventListener('click', openTermSshModal);
+        if (termSshClearBtn) termSshClearBtn.addEventListener('click', clearTermSshAgentKeys);
+        if (termSshModalClearBtn) termSshModalClearBtn.addEventListener('click', clearTermSshAgentKeys);
+        if (termSshModalClose) termSshModalClose.addEventListener('click', closeTermSshModal);
+        if (termSshModalCancel) termSshModalCancel.addEventListener('click', closeTermSshModal);
+        if (termSshModalBackdrop) {
+          termSshModalBackdrop.addEventListener('click', (e) => {
+            if (e.target === termSshModalBackdrop) closeTermSshModal();
+          });
+        }
+
+        if (termSshModeLocalBtn) termSshModeLocalBtn.addEventListener('click', () => switchTermSshMode('local'));
+        if (termSshModeRemoteBtn) termSshModeRemoteBtn.addEventListener('click', () => switchTermSshMode('remote'));
+
+        function handleTermSshKeyFile(file) {
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            uploadedTermSshKeyContent = e.target.result;
+            if (termSshSelectedFileLabel) {
+              termSshSelectedFileLabel.textContent = file.name + ' (' + formatBytes(file.size) + ')';
+              termSshSelectedFileLabel.style.display = 'inline-block';
+            }
+            if (termSshKeyName && !termSshKeyName.value) {
+              termSshKeyName.value = file.name;
+            }
+            if (termSshPasteBox) termSshPasteBox.style.display = 'none';
+            if (termSshPasteContent) termSshPasteContent.value = '';
+          };
+          reader.readAsText(file);
+        }
+
+        if (termSshDropzone && termSshFilePicker) {
+          termSshDropzone.addEventListener('click', () => termSshFilePicker.click());
+          termSshFilePicker.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) handleTermSshKeyFile(e.target.files[0]);
+          });
+          termSshDropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            termSshDropzone.style.borderColor = '#14b8a6';
+            termSshDropzone.style.backgroundColor = '#132338';
+          });
+          termSshDropzone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            termSshDropzone.style.borderColor = '#475569';
+            termSshDropzone.style.backgroundColor = '#0b1120';
+          });
+          termSshDropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            termSshDropzone.style.borderColor = '#475569';
+            termSshDropzone.style.backgroundColor = '#0b1120';
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+              handleTermSshKeyFile(e.dataTransfer.files[0]);
+            }
+          });
+        }
+
+        if (termSshPasteToggleLink && termSshPasteBox) {
+          termSshPasteToggleLink.addEventListener('click', () => {
+            const isHidden = termSshPasteBox.style.display === 'none';
+            termSshPasteBox.style.display = isHidden ? 'block' : 'none';
+            termSshPasteToggleLink.innerHTML = isHidden
+              ? '<i class="fas fa-times"></i> Hide paste box'
+              : '<i class="fas fa-keyboard"></i> Or paste key text directly';
+            if (isHidden && termSshPasteContent) termSshPasteContent.focus();
+          });
+        }
+
+        if (termSshPassToggleLink && termSshPassphrase) {
+          termSshPassToggleLink.addEventListener('click', () => {
+            const isPass = termSshPassphrase.type === 'password';
+            termSshPassphrase.type = isPass ? 'text' : 'password';
+            termSshPassToggleLink.innerHTML = isPass
+              ? '<i class="fas fa-eye-slash"></i> Hide'
+              : '<i class="fas fa-eye"></i> Show';
+          });
+        }
+
+        if (termSshAddForm) {
+          termSshAddForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (termSshAlert) termSshAlert.style.display = 'none';
+
+            let payload = {};
+            const passphrase = termSshPassphrase ? termSshPassphrase.value : '';
+
+            if (termSshAgentMode === 'local') {
+              const pasteVal = termSshPasteContent ? termSshPasteContent.value : '';
+              const keyContent = uploadedTermSshKeyContent || pasteVal;
+              const keyName = termSshKeyName ? termSshKeyName.value.trim() : '';
+              const saveToDisk = termSshSaveDisk ? termSshSaveDisk.checked : true;
+
+              if (!keyContent || !keyContent.trim()) {
+                showTermSshAlert('Please choose a private key file or paste private key content.', 'error');
+                return;
+              }
+
+              payload = {
+                key_content: keyContent,
+                key_name: keyName,
+                passphrase: passphrase,
+                save_to_disk: saveToDisk
+              };
+            } else {
+              const keyPath = termSshKeyPath ? termSshKeyPath.value.trim() : '';
+              if (!keyPath) {
+                showTermSshAlert('Please enter the container key path.', 'error');
+                return;
+              }
+              payload = {
+                key_path: keyPath,
+                passphrase: passphrase
+              };
+            }
+
+            if (termSshSubmitBtn) {
+              termSshSubmitBtn.disabled = true;
+              termSshSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading key...';
+            }
+
+            try {
+              const res = await fetch('/terminal/' + encodeURIComponent(nodeName) + '/ssh_agent/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
+              });
+              const data = await res.json();
+              if (!res.ok || !data.success) {
+                throw new Error(data.error || ('HTTP ' + res.status));
+              }
+
+              showTermSshAlert(data.message || 'Key successfully loaded into SSH Agent!', 'success');
+              if (termSshPassphrase) termSshPassphrase.value = '';
+              if (termSshFilePicker) termSshFilePicker.value = '';
+              uploadedTermSshKeyContent = '';
+              if (termSshSelectedFileLabel) termSshSelectedFileLabel.style.display = 'none';
+              if (termSshPasteContent) termSshPasteContent.value = '';
+
+              await loadTermSshAgentStatus();
+            } catch (err) {
+              showTermSshAlert('Failed to load key: ' + err.message, 'error');
+            } finally {
+              if (termSshSubmitBtn) {
+                termSshSubmitBtn.disabled = false;
+                termSshSubmitBtn.innerHTML = '<i class="fas fa-unlock-alt"></i> Load Key into Agent';
+              }
+            }
+          });
+        }
+
+        // Initial check of agent status
+        loadTermSshAgentStatus();
+        window.loadTermSshAgentStatus = loadTermSshAgentStatus;
       }
 
       // =========================================================================
@@ -1957,7 +2547,11 @@
       // Toggle settings popover menu
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        settingsMenu.style.display = settingsMenu.style.display === 'block' ? 'none' : 'block';
+        const willOpen = settingsMenu.style.display !== 'block';
+        settingsMenu.style.display = willOpen ? 'block' : 'none';
+        if (willOpen && typeof window.loadTermSshAgentStatus === 'function') {
+          window.loadTermSshAgentStatus();
+        }
       });
 
       settingsClose.addEventListener('click', () => {
@@ -2292,31 +2886,47 @@
 
       const connectBtn = document.getElementById('connect-btn');
       const statusEl = document.getElementById('status');
+      let intentionalDisconnect = false;
 
       const setDisconnectedState = () => {
-        if (connectBtn) connectBtn.style.display = 'inline-flex';
+        if (connectBtn) {
+          connectBtn.className = 'term-conn-btn disconnected';
+          connectBtn.innerHTML = '<i class="fas fa-plug"></i> <span>Connect</span>';
+          connectBtn.title = 'Connect terminal session';
+          connectBtn.disabled = false;
+        }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-times-circle"></i> Disconnected';
+          statusEl.innerHTML = '<i class="fas fa-circle" style="color: #ef4444;"></i>';
           statusEl.classList.add('disconnected');
-          statusEl.title = 'Click to reconnect';
+          statusEl.title = 'Disconnected (click to connect)';
         }
       };
 
       const setConnectedState = () => {
-        if (connectBtn) connectBtn.style.display = 'none';
+        if (connectBtn) {
+          connectBtn.className = 'term-conn-btn connected';
+          connectBtn.innerHTML = '<i class="fas fa-plug"></i> <span>Disconnect</span>';
+          connectBtn.title = 'Disconnect terminal session';
+          connectBtn.disabled = false;
+        }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-circle"></i> Connected';
+          statusEl.innerHTML = '<i class="fas fa-circle" style="color: #10b981;"></i>';
           statusEl.classList.remove('disconnected');
-          statusEl.title = '';
+          statusEl.title = 'Connected';
         }
       };
 
       const setConnectingState = () => {
-        if (connectBtn) connectBtn.style.display = 'none';
+        if (connectBtn) {
+          connectBtn.className = 'term-conn-btn connecting';
+          connectBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span>Connecting...</span>';
+          connectBtn.title = 'Connecting to terminal session...';
+          connectBtn.disabled = true;
+        }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Connecting...';
+          statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="color: #38bdf8;"></i>';
           statusEl.classList.remove('disconnected');
-          statusEl.title = '';
+          statusEl.title = 'Connecting...';
         }
       };
 
@@ -2378,7 +2988,12 @@
         ws.onclose = () => {
           if (intentionalReconnect) return;
           setDisconnectedState();
-          term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+          if (intentionalDisconnect) {
+            intentionalDisconnect = false;
+            term.write('\r\n\x1b[33m[Disconnected by user]\x1b[0m\r\n');
+          } else {
+            term.write('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+          }
 
           if (recording) {
             stopRecording();
@@ -2398,7 +3013,17 @@
         };
       };
 
+      const disconnectTerminal = () => {
+        if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
+          intentionalDisconnect = true;
+          activeWs.close();
+        } else {
+          setDisconnectedState();
+        }
+      };
+
       const connectTerminal = async () => {
+        intentionalDisconnect = false;
         setConnectingState();
         try {
           if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
@@ -2420,8 +3045,16 @@
         }
       };
 
+      const toggleConnection = () => {
+        if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
+          disconnectTerminal();
+        } else {
+          connectTerminal();
+        }
+      };
+
       if (connectBtn) {
-        connectBtn.addEventListener('click', () => connectTerminal());
+        connectBtn.addEventListener('click', toggleConnection);
       }
       if (statusEl) {
         statusEl.addEventListener('click', () => {

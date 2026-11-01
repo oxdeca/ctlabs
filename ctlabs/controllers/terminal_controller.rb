@@ -66,6 +66,69 @@ class TerminalController < BaseController
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # SSH Agent Endpoints
+  # ---------------------------------------------------------------------------
+  get '/terminal/:node_name/ssh_agent' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'SSH agent is only available on controller nodes' }.to_json
+    end
+
+    target = TerminalService.resolve_node_target(node_name)
+    container = target ? target[:container] : node_name
+    user = (target && target[:user]) ? target[:user] : 'root'
+
+    Automation.ssh_agent_status(container, user).to_json
+  end
+
+  post '/terminal/:node_name/ssh_agent/add' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'SSH agent is only available on controller nodes' }.to_json
+    end
+
+    target = TerminalService.resolve_node_target(node_name)
+    container = target ? target[:container] : node_name
+    user = (target && target[:user]) ? target[:user] : 'root'
+
+    payload = (JSON.parse(request.body.read) rescue {}) || {}
+    key_content  = (payload['key_content'] || params['key_content']).to_s
+    key_name     = (payload['key_name'] || params['key_name']).to_s
+    key_path     = (payload['key_path'] || params['key_path']).to_s.strip
+    passphrase   = (payload['passphrase'] || params['passphrase']).to_s
+    save_to_disk = payload.key?('save_to_disk') ? !!payload['save_to_disk'] : true
+
+    result = if !key_content.strip.empty?
+      Automation.ssh_agent_load_raw_key(container, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: user)
+    elsif !key_path.empty?
+      Automation.ssh_agent_add_key(container, key_path, passphrase, user)
+    else
+      { success: false, error: 'Key file/content or key path is required' }
+    end
+
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
+
+  post '/terminal/:node_name/ssh_agent/clear' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'SSH agent is only available on controller nodes' }.to_json
+    end
+
+    target = TerminalService.resolve_node_target(node_name)
+    container = target ? target[:container] : node_name
+    user = (target && target[:user]) ? target[:user] : 'root'
+
+    result = Automation.ssh_agent_clear(container, user)
+    status(result[:success] ? 200 : 400)
+    result.to_json
+  end
+
   get '/terminal/:node_name/target_info' do
     content_type :json
     node_name = params[:node_name]
