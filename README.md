@@ -326,10 +326,19 @@ If we return to the main page (`CTLABS` menu item), we see the message that a la
 Walkthrough
 -----------
 
-- `Terminal Casts`
-- `Markdown Documents`
-- `Screen Recordings`
-- create walkthrough sets consisting of individual steps (cast, video, document).
+**Features**:
+- Create walkthrough sets consisting of individual steps
+- supported steps:
+  - `Terminal Casts`
+  - `Markdown Documents`
+  - `Screen Recordings`
+- export/import walkthrough sets (zip-files)
+
+
+![screenshot](docs/pics/screenshot-20261101-140107.png) 
+
+![screenshot](docs/pics/screenshot-20261101-140235.png)
+
 
 We can create new guides with `Terminal Casts`, `Markdown Documents`, `Screen Videos`. 
 ![Walkthroug](docs/pics/screenshot-20261101-132423.png)
