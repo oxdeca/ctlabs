@@ -74,12 +74,12 @@ class GcpAuth
         tf_repo = repo_dir_ctl || tf_cfg['root_dir_ctl']
         if tf_repo.to_s.empty?
           tf_repo_host = tf_cfg['root_dir'].to_s.strip
-          tf_repo = if tf_repo_host.empty?
+          tf_repo = if tf_repo_host.empty? || tf_repo_host == '/root/ctlabs-terraform'
                       '/srv/ctlabs/ctlabs-terraform'
                     elsif tf_repo_host.start_with?('/srv/ctlabs/')
                       tf_repo_host
                     else
-                      tf_repo_host.sub(%r{\A/root/}, '/srv/ctlabs/')
+                      tf_repo_host
                     end
         end
 

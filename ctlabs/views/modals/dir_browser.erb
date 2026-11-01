@@ -1,0 +1,127 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/dir_browser.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<style>
+  .dir-browser-item-row {
+    padding: 7px 12px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 0.88em;
+    border-bottom: 1px solid #1e293b;
+    user-select: none;
+  }
+  .dir-browser-item-row:hover {
+    background-color: #334155;
+  }
+  .dir-browser-item-row.selected {
+    background-color: #0284c7 !important;
+    color: #ffffff !important;
+  }
+  .dir-browser-item-row.selected span,
+  .dir-browser-item-row.selected i {
+    color: #ffffff !important;
+  }
+  .dir-breadcrumb-btn {
+    background: transparent;
+    border: none;
+    color: #38bdf8;
+    cursor: pointer;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.88em;
+    transition: background 0.15s;
+  }
+  .dir-breadcrumb-btn:hover {
+    background: #334155;
+    text-decoration: underline;
+  }
+  .repo-badge {
+    font-size: 0.72em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    margin-left: 6px;
+  }
+  .repo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    background-color: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    font-size: 0.78em;
+    font-family: monospace;
+    color: #93c5fd;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .repo-chip:hover {
+    background-color: #2563eb;
+    color: #ffffff;
+    border-color: #38bdf8;
+  }
+</style>
+
+<div id="unified-dir-browser-modal" class="w3-modal" style="z-index: 10001; padding-top: 8vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 680px; display: flex; flex-direction: column; max-height: 82vh; border: 1px solid #334155;">
+
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+      <h4 style="margin: 0; font-size: 1.1em; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-folder-tree" style="color: #38bdf8;"></i>
+        <span id="dir-browser-title">Select Repository / Root Directory</span>
+      </h4>
+      <span onclick="document.getElementById('unified-dir-browser-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1; font-size: 1.2em;">&times;</span>
+    </header>
+
+    <!-- Detected repositories quick-pick bar -->
+    <div id="dir-browser-quickpicks-container" class="w3-container w3-padding-small" style="background-color: #0f172a; border-bottom: 1px solid #334155; flex-shrink: 0; padding-left: 12px; padding-right: 12px;">
+      <div style="font-size: 0.76em; color: #94a3b8; margin-bottom: 4px; text-transform: uppercase; font-weight: bold; letter-spacing: 0.05em;">
+        <i class="fas fa-bookmark" style="color: #38bdf8;"></i> Detected Repositories:
+      </div>
+      <div id="dir-browser-quickpicks" style="display: flex; flex-wrap: wrap; gap: 6px;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+
+    <!-- Breadcrumbs bar -->
+    <div class="w3-container w3-padding-small" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; padding-left: 12px; padding-right: 12px;">
+      <div id="dir-browser-breadcrumbs" style="display: flex; align-items: center; gap: 4px; overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0; padding: 2px 0;">
+        <!-- Breadcrumbs dynamically filled -->
+      </div>
+      <button type="button" onclick="window.refreshDirBrowser()" style="background: transparent; border: none; color: #38bdf8; cursor: pointer; font-size: 0.82em; display: flex; align-items: center; gap: 5px; flex-shrink: 0; margin-left: 8px;" title="Refresh directory list">
+        <i class="fas fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+
+    <!-- Directory list container -->
+    <div id="dir-browser-items-list" class="slim-scroll" style="flex: 1; overflow-y: auto; background-color: #0f172a; border-bottom: 1px solid #334155; min-height: 260px; max-height: 380px; padding: 4px;">
+      <!-- Populated dynamically -->
+    </div>
+
+    <!-- Selected Path Input -->
+    <div class="w3-container w3-padding" style="flex-shrink: 0; background-color: #1e293b;">
+      <label style="font-size: 0.82em; color: #94a3b8; display: block; margin-bottom: 4px;">
+        Selected Directory:
+      </label>
+      <input type="text" id="dir-browser-selected-input" class="w3-monospace w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;" placeholder="/root/ctlabs-ansible">
+    </div>
+
+    <!-- Modal Footer -->
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0;">
+      <button onclick="document.getElementById('unified-dir-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569; color: #f8fafc;">Cancel</button>
+      <button onclick="window.confirmDirBrowserSelection()" class="w3-button w3-blue w3-round w3-small" style="display: flex; align-items: center; gap: 6px;">
+        <i class="fas fa-check"></i> Select Directory
+      </button>
+    </footer>
+  </div>
+</div>

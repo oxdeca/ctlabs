@@ -1080,6 +1080,7 @@ module Automation
       end
     end
 
+    FileUtils.mkdir_p(File.dirname(out_file))
     File.write(out_file, JSON.pretty_generate({ 'play_setup' => result }))
     @log.write "#{__method__}(): wrote #{out_file}", "debug"
     result
@@ -1169,6 +1170,7 @@ module Automation
     # it targets. We only replace the placeholder line with the generated
     # per-profile facts plays.
     tpl_path = "#{out_path}.tpl"
+    FileUtils.mkdir_p(File.dirname(tpl_path))
     File.write(tpl_path, PLAY_SETUP_TPL_SEED) unless File.file?(tpl_path)
     tpl  = File.read(tpl_path)
     body = tpl.match?(PLACEHOLDER_RE) ?
@@ -1241,6 +1243,7 @@ module Automation
     # everything static: header, which playbooks get imported (up.yml /
     # setup*.yml), fixed plays. All that's left here is replacing the
     # placeholder line with the generated role plays.
+    FileUtils.mkdir_p(File.dirname(tpl_path))
     File.write(tpl_path, PLAYBOOK_TPL_SEED) unless File.file?(tpl_path)
     tpl       = File.read(tpl_path)
     body = tpl.match?(PLACEHOLDER_RE) ?
@@ -1274,12 +1277,36 @@ module Automation
       play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
 
       ans_base_host = play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip
-      ans_base_ctl  = play_cfg['root_dir_ctl'] || (ans_base_host.start_with?('/srv/ctlabs/') ? ans_base_host : ans_base_host.sub(%r{\A/root/}, '/srv/ctlabs/'))
+      ans_base_ctl  = if play_cfg['root_dir_ctl'].to_s.strip != ''
+                        play_cfg['root_dir_ctl'].to_s.strip
+                      elsif ans_base_host == ANSIBLE_DIR
+                        ANSIBLE_DIR_CTL
+                      elsif ans_base_host.start_with?('/srv/ctlabs/')
+                        ans_base_host
+                      else
+                        ans_base_host
+                      end
 
       # generate ansible artifacts from lab topology + profiles
       build_play_setup(play_cfg, base_dir: ans_base_host)
       generate_setup_yml(play_cfg, base_dir: ans_base_host)
       generate_ctlabs_yml(play_cfg, base_dir: ans_base_host)
+
+      # Sync setup file and custom repo to container if needed
+      setup_file_name = @standalone ? '.play_setup_ctl.json' : '.play_setup_lab.json'
+      host_setup_file = "#{ans_base_host}/playbooks/#{setup_file_name}"
+      if File.exist?(host_setup_file)
+        system("docker exec #{controller_exec_name} mkdir -p #{Shellwords.escape("#{ans_base_ctl}/playbooks")} 2>/dev/null")
+        system("docker cp #{Shellwords.escape(host_setup_file)} #{controller_exec_name}:#{Shellwords.escape("#{ans_base_ctl}/playbooks/#{setup_file_name}")} 2>/dev/null")
+      end
+
+      if ans_base_host != ANSIBLE_DIR && File.directory?(ans_base_host)
+        has_dir = system("docker exec #{controller_exec_name} test -d #{Shellwords.escape(ans_base_ctl)} 2>/dev/null")
+        unless has_dir
+          system("docker exec #{controller_exec_name} mkdir -p #{Shellwords.escape(File.dirname(ans_base_ctl))} 2>/dev/null")
+          system("docker cp #{Shellwords.escape(ans_base_host)} #{controller_exec_name}:#{Shellwords.escape(ans_base_ctl)} 2>/dev/null")
+        end
+      end
 
       vars_map = build_automation_vars(play_cfg)
       domain   = vars_map['CTLABS_DOMAIN'] || (@cfg['domain'] || @domain)
@@ -1292,15 +1319,39 @@ module Automation
         play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
       elsif play_cfg['book'].is_a?(String)
         if @standalone
-          inv_file = play_cfg['inv'] || 'controller.ini'
+          default_inv = 'controller.ini'
           play_book_path = "./playbooks/#{play_cfg['book'] || 'ctlabs-ctl.yml'}"
         else
-          inv_file  = play_cfg['inv'] || "#{@name}.ini"
+          default_inv = "#{@name}.ini"
           play_book_path = " ./playbooks/#{play_cfg['book']}"
         end
-        # Always use a .ini inventory filename so -i ./inventories/<inv> resolves.
-        inv_file += '.ini' if inv_file && !inv_file.include?('/') && !inv_file.end_with?('.ini')
-        play_inv  = " -i ./inventories/#{inv_file}"
+
+        inv_raw = play_cfg['inv']
+        inv_items = if inv_raw.is_a?(Array)
+                      inv_raw.map(&:to_s).map(&:strip).reject(&:empty?)
+                    elsif inv_raw.is_a?(String) && !inv_raw.strip.empty?
+                      inv_raw.split(/[,\s\n]+/).reject(&:empty?)
+                    else
+                      [default_inv]
+                    end
+
+        if play_cfg['custom_inv'] && !play_cfg['custom_inv'].to_s.strip.empty?
+          c_inv = play_cfg['custom_inv'].to_s.strip
+          inv_items << c_inv unless inv_items.include?(c_inv)
+        end
+        inv_items = [default_inv] if inv_items.empty?
+
+        play_inv = inv_items.map do |item|
+          item = item.strip
+          f_item = if item.include?('/')
+                     item
+                   else
+                     item += '.ini' unless item =~ /\.(ini|ya?ml|json|cfg|py|sh)$/i
+                     "./inventories/#{item}"
+                   end
+          " -i #{f_item}"
+        end.join
+
         play_env  = " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
         inner_setup_file = @standalone ? "#{ans_base_ctl}/playbooks/.play_setup_ctl.json" : "#{ans_base_ctl}/playbooks/.play_setup_lab.json"
         play_env += " -e @#{inner_setup_file}"
@@ -1380,7 +1431,23 @@ module Automation
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
     tf_base_host = tf_cfg['root_dir'].to_s.strip.empty? ? TF_DIR : tf_cfg['root_dir'].to_s.strip
-    tf_base_ctl  = tf_cfg['root_dir_ctl'] || (tf_base_host.start_with?('/srv/ctlabs/') ? tf_base_host : tf_base_host.sub(%r{\A/root/}, '/srv/ctlabs/'))
+    tf_base_ctl  = if tf_cfg['root_dir_ctl'].to_s.strip != ''
+                     tf_cfg['root_dir_ctl'].to_s.strip
+                   elsif tf_base_host == TF_DIR
+                     TF_DIR_CTL
+                   elsif tf_base_host.start_with?('/srv/ctlabs/')
+                     tf_base_host
+                   else
+                     tf_base_host
+                   end
+
+    if tf_base_host != TF_DIR && File.directory?(tf_base_host)
+      has_dir = system("docker exec #{target_container} test -d #{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
+      unless has_dir
+        system("docker exec #{target_container} mkdir -p #{Shellwords.escape(File.dirname(tf_base_ctl))} 2>/dev/null")
+        system("docker cp #{Shellwords.escape(tf_base_host)} #{target_container}:#{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
+      end
+    end
 
     tf_work_dir = tf_cfg['work_dir'] && !tf_cfg['work_dir'].empty? ? tf_cfg['work_dir'] : '.'
     work_dir = "#{tf_base_ctl}/#{tf_work_dir}"

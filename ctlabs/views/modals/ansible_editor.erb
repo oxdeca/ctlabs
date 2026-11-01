@@ -55,7 +55,12 @@
 
         <div class="w3-margin-bottom">
           <label>Repository / Root Directory</label>
-          <input type="text" id="edit-ansible-root-dir" list="available-ansible-repos" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="/root/ctlabs-ansible">
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="edit-ansible-root-dir" list="available-ansible-repos" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="/root/ctlabs-ansible" style="flex: 1;">
+            <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.browseAnsibleRootDir()" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;" title="Browse Repository Directory">
+              <i class="fas fa-folder-open"></i> Browse
+            </button>
+          </div>
           <datalist id="available-ansible-repos"></datalist>
         </div>
 
@@ -65,13 +70,8 @@
         </div>
 
         <div class="w3-margin-bottom">
-          <label>Auto-Generated Inventory File (Read-Only)</label>
-          <input type="text" id="edit-ansible-inv" class="w3-input w3-small w3-round w3-hover-text-light-green" readonly title="This is calculated dynamically when the lab starts" style="cursor: not-allowed;">
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label>Custom Inventory File (Appended to auto-generated inventory)</label>
-          <input type="text" id="edit-ansible-custom-inv" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. custom_hosts.ini or dyn_inv.py">
+          <label>Inventory Files (List or comma-separated — prefilled with auto-generated inventory)</label>
+          <input type="text" id="edit-ansible-inv" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. controller.ini, custom_hosts.ini">
         </div>
 
         <div class="w3-margin-bottom">
@@ -80,9 +80,9 @@
         </div>
 
         <div class="w3-margin-bottom">
-            <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
-            <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 56px; overflow: hidden; resize: none;" rows="2" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='56px'; this.style.height = Math.max(this.scrollHeight, 56) + 'px'"></textarea>
-          </div>
+          <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
+          <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 90px; height: 110px; overflow-y: auto; resize: vertical; line-height: 1.4;" rows="4" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='auto'; this.style.height = Math.max(this.scrollHeight + 4, 90) + 'px'"></textarea>
+        </div>
       </div>
 
       <div id="AnsPlaySetup" class="ans-tab" style="display: none;">

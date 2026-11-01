@@ -106,7 +106,13 @@ class AutomationController < BaseController
 
       params[:root_dir].to_s.strip.empty? ? play_cfg.delete('root_dir') : play_cfg['root_dir'] = params[:root_dir].strip
       params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
-      params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
+
+      if params[:inv] && !params[:inv].to_s.strip.empty?
+        inv_list = params[:inv].to_s.split(/[,\n]+/).map(&:strip).reject(&:empty?)
+        play_cfg['inv'] = inv_list.length > 1 ? inv_list : (inv_list.first || '')
+      else
+        play_cfg.delete('inv')
+      end
 
       if params[:custom_inv] && !params[:custom_inv].to_s.strip.empty?
         play_cfg['custom_inv'] = params[:custom_inv].to_s.strip
@@ -425,6 +431,61 @@ class AutomationController < BaseController
     rescue => e
       status 400
       { error: e.message }.to_json
+    end
+  end
+
+  get '/automation/directories' do
+    content_type :json
+    begin
+      req_path = params[:path].to_s.strip
+      req_path = '/root' if req_path.empty?
+      req_path = File.expand_path(req_path)
+
+      unless File.directory?(req_path)
+        req_path = File.directory?('/root') ? '/root' : '/'
+      end
+
+      entries = []
+      parent = (req_path == '/' ? nil : File.expand_path('..', req_path))
+
+      begin
+        Dir.children(req_path).sort_by(&:downcase).each do |child|
+          next if child.start_with?('.') && child != '.ctlabs'
+          full_child = File.join(req_path, child)
+          next unless File.directory?(full_child)
+
+          has_ansible = File.file?(File.join(full_child, 'ansible.cfg')) ||
+                        Dir.exist?(File.join(full_child, 'playbooks')) ||
+                        Dir.exist?(File.join(full_child, 'roles'))
+          has_terraform = Dir.glob(File.join(full_child, '*.tf')).any?
+          has_git = Dir.exist?(File.join(full_child, '.git'))
+
+          entries << {
+            name: child,
+            path: full_child,
+            has_ansible: has_ansible,
+            has_terraform: has_terraform,
+            has_git: has_git
+          }
+        rescue Errno::EACCES
+          next
+        end
+      rescue Errno::EACCES
+        # Inaccessible directory
+      end
+
+      repos = AutomationService.available_repositories
+
+      {
+        success: true,
+        current: req_path,
+        parent: parent,
+        directories: entries,
+        repositories: repos
+      }.to_json
+    rescue => e
+      status 400
+      { success: false, error: e.message }.to_json
     end
   end
 

@@ -156,7 +156,13 @@ class ControllerController < BaseController
 
       params[:root_dir].to_s.strip.empty? ? play_cfg.delete('root_dir') : play_cfg['root_dir'] = params[:root_dir].strip
       params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
-      params[:inv].to_s.strip.empty? ? play_cfg.delete('inv') : play_cfg['inv'] = params[:inv].strip
+
+      if params[:inv] && !params[:inv].to_s.strip.empty?
+        inv_list = params[:inv].to_s.split(/[,\n]+/).map(&:strip).reject(&:empty?)
+        play_cfg['inv'] = inv_list.length > 1 ? inv_list : (inv_list.first || '')
+      else
+        play_cfg.delete('inv')
+      end
 
       if params[:custom_inv] && !params[:custom_inv].to_s.strip.empty?
         play_cfg['custom_inv'] = params[:custom_inv].to_s.strip

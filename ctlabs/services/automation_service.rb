@@ -26,27 +26,83 @@ class AutomationService
 
   def self.ansible_tree(root_dir = nil)
     base = resolve_ansible_dir(root_dir)
-    return [] unless Dir.exist?(base)
-    Dir.glob(File.join(base, "**", "*"))
-       .reject { |f| File.directory?(f) || f.include?('/.git/') || f.include?('/__pycache__/') || f.include?('/.idea/') }
-       .map { |f| f.sub(base + '/', '') }
-       .sort
+    if Dir.exist?(base)
+      Dir.glob(File.join(base, "**", "*"))
+         .reject { |f| f.include?('/.git/') || f.include?('/__pycache__/') || f.include?('/.idea/') }
+         .map { |f| File.directory?(f) ? "#{f.sub(base + '/', '')}/" : f.sub(base + '/', '') }
+         .sort
+    else
+      # Check if running controller container has this directory
+      items = []
+      cnames = [defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl', 'ansible']
+      cnames.each do |cname|
+        has_dir = system("docker exec #{cname} test -d #{Shellwords.escape(base)} 2>/dev/null")
+        if has_dir
+          cmd = "docker exec #{cname} find #{Shellwords.escape(base)} -mindepth 1 -not -path '*/.*' -printf '%p|%Y\\n' 2>/dev/null"
+          out = `#{cmd}` rescue ''
+          if out && !out.strip.empty?
+            prefix = base.end_with?('/') ? base : "#{base}/"
+            items = out.lines.map(&:strip).reject(&:empty?).map do |line|
+              p, type = line.split('|', 2)
+              rel = p.sub(%r{\A#{Regexp.escape(prefix)}}, '')
+              next if rel.empty? || rel.include?('/.git/') || rel.include?('/__pycache__/') || rel.include?('/.idea/')
+              type == 'd' ? "#{rel}/" : rel
+            end.compact.sort
+            break
+          end
+        end
+      end
+      items
+    end
   end
 
   def self.read_ansible_file(filepath, root_dir = nil)
     base = resolve_ansible_dir(root_dir)
     full_path = File.join(base, filepath)
-    File.file?(full_path) ? File.read(full_path) : "# New file: #{filepath}\n"
+    if File.file?(full_path)
+      File.read(full_path)
+    else
+      # Check if file exists in running controller container
+      content = nil
+      cnames = [defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl', 'ansible']
+      cnames.each do |cname|
+        out, status = Open3.capture2("docker exec #{cname} cat #{Shellwords.escape(full_path)} 2>/dev/null")
+        if status.success?
+          content = out
+          break
+        end
+      end
+      content || "# New file: #{filepath}\n"
+    end
   end
 
   def self.write_ansible_files(files_hash, root_dir = nil)
     base = resolve_ansible_dir(root_dir)
+    cnames = [defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl', 'ansible']
     files_hash.each do |filepath, content|
       next if filepath.include?('..') || filepath.start_with?('/')
       full_path = File.join(base, filepath)
-      FileUtils.mkdir_p(File.dirname(full_path))
-      File.write(full_path, content)
-      FileUtils.chmod("+x", full_path) if filepath.end_with?('.py') || filepath.end_with?('.sh')
+      begin
+        FileUtils.mkdir_p(File.dirname(full_path))
+        File.write(full_path, content)
+        FileUtils.chmod("+x", full_path) if filepath.end_with?('.py') || filepath.end_with?('.sh')
+      rescue => e
+      end
+
+      # Also sync to running container if container has the base directory
+      cnames.each do |cname|
+        if system("docker exec #{cname} test -d #{Shellwords.escape(base)} 2>/dev/null")
+          c_dir = File.dirname(full_path)
+          system("docker exec #{cname} mkdir -p #{Shellwords.escape(c_dir)} 2>/dev/null")
+          require 'tempfile'
+          t = Tempfile.new('ans_write')
+          t.write(content)
+          t.close
+          system("docker cp #{Shellwords.escape(t.path)} #{cname}:#{Shellwords.escape(full_path)} 2>/dev/null")
+          system("docker exec #{cname} chmod +x #{Shellwords.escape(full_path)} 2>/dev/null") if filepath.end_with?('.py') || filepath.end_with?('.sh')
+          t.unlink
+        end
+      end
     end
   end
 
@@ -54,6 +110,10 @@ class AutomationService
     base = resolve_ansible_dir(root_dir)
     full_path = File.join(base, filepath)
     File.delete(full_path) if File.exist?(full_path)
+    cnames = [defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl', 'ansible']
+    cnames.each do |cname|
+      system("docker exec #{cname} rm -f #{Shellwords.escape(full_path)} 2>/dev/null")
+    end
   end
 
   # --- Global role/setup/terraform profile files. The lab instance reads
@@ -141,7 +201,7 @@ class AutomationService
 
   def self.available_repositories
     repos = { ansible: [ANS_BASE_DIR], terraform: [TF_BASE_DIR] }
-    Dir.glob('/root/*').each do |p|
+    (Dir.glob('/root/*') + Dir.glob('/srv/*') + Dir.glob('/home/*/*')).each do |p|
       next unless File.directory?(p)
       repos[:ansible] << p if File.file?(File.join(p, 'ansible.cfg')) || Dir.exist?(File.join(p, 'playbooks')) || Dir.exist?(File.join(p, 'roles'))
       repos[:terraform] << p if Dir.glob(File.join(p, '*.tf')).any? || Dir.glob(File.join(p, '**', '*.tf')).any?

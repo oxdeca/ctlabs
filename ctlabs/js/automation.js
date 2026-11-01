@@ -81,6 +81,16 @@ window.openAnsTab = function(tabId) {
   const activeTab = document.getElementById(tabId);
   if (activeTab) activeTab.style.display = "block";
 
+  if (tabId === 'AnsSettings') {
+    const envEl = document.getElementById('edit-ansible-env');
+    if (envEl) {
+      setTimeout(() => {
+        envEl.style.height = 'auto';
+        envEl.style.height = Math.max(envEl.scrollHeight + 4, 90) + 'px';
+      }, 0);
+    }
+  }
+
   const deleteBtn = document.getElementById('ans-delete-file-btn');
   if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings' || tabId === 'AnsPlayProfiles' || tabId === 'AnsSetupProfiles' || tabId === 'AnsPlaySetup') ? 'none' : 'inline-block';
 
@@ -271,28 +281,53 @@ window.loadAnsProfiles = async function() {
         if (typeof play === 'string') play = { book: play };
         
         const book = play.book || 'main.yml';
-        let defaultInv = play.inv;
-        if (!defaultInv) {
+        let invVal = play.inv;
+        if (Array.isArray(invVal)) {
+            invVal = invVal.join(', ');
+        } else if (typeof invVal === 'string') {
+            invVal = invVal.trim();
+        } else {
+            invVal = '';
+        }
+        if (!invVal) {
             // Controller scope passes 'controller' (no .yml), labs pass e.g.
             // 'labs/net01.yml'. Always normalize to a .ini inventory filename.
-            defaultInv = window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini');
+            invVal = (window.automationBase === '/controller')
+                ? 'controller.ini'
+                : window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini');
         }
-        if (defaultInv && !defaultInv.includes('/')) {
-            if (window.automationBase === '/controller' && !defaultInv.startsWith('controller')) {
-                defaultInv = 'controller';
+        if (invVal && !invVal.includes('/') && !invVal.includes(',')) {
+            if (window.automationBase === '/controller' && !invVal.startsWith('controller')) {
+                invVal = 'controller.ini';
             }
-            if (!defaultInv.endsWith('.ini')) defaultInv += '.ini';
+            if (!invVal.endsWith('.ini')) invVal += '.ini';
+        }
+        if (play.custom_inv && !invVal.includes(play.custom_inv)) {
+            invVal += `, ${play.custom_inv}`;
         }
         const customInv = play.custom_inv || '';
+
         document.getElementById('edit-ansible-book').value = book;
         if (document.getElementById('edit-ansible-root-dir')) {
             document.getElementById('edit-ansible-root-dir').value = play.root_dir || '';
         }
         window.loadAvailableRepositories && window.loadAvailableRepositories();
-        document.getElementById('edit-ansible-inv').value = defaultInv;
-        document.getElementById('edit-ansible-custom-inv').value = customInv;
+
+        const invInput = document.getElementById('edit-ansible-inv');
+        if (invInput) invInput.value = invVal;
+        if (document.getElementById('edit-ansible-custom-inv')) {
+            document.getElementById('edit-ansible-custom-inv').value = customInv;
+        }
         document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
-        document.getElementById('edit-ansible-env').value = (play.env || []).join('\n');
+        
+        const envEl = document.getElementById('edit-ansible-env');
+        if (envEl) {
+            envEl.value = (play.env || []).join('\n');
+            setTimeout(() => {
+                envEl.style.height = 'auto';
+                envEl.style.height = Math.max(envEl.scrollHeight + 4, 90) + 'px';
+            }, 0);
+        }
         
         const playSetupEd = window.initCodeEditor('editor-AnsPlaySetup', 'yaml');
         playSetupEd.setValue(data.json.setup_yaml || '');
@@ -319,9 +354,9 @@ window.loadAnsProfiles = async function() {
         } else {
           // Only load defaults if no tabs were saved
           await window.fetchAnsibleFile(book.includes('/') ? book : `playbooks/${book}`);
-          await window.fetchAnsibleFile(defaultInv.includes('/') ? defaultInv : `inventories/${defaultInv}`);
-          if (customInv !== '') {
-            await window.fetchAnsibleFile(customInv.includes('/') ? customInv : `inventories/${customInv}`);
+          const invList = invVal.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+          for (const inv of invList) {
+            await window.fetchAnsibleFile(inv.includes('/') ? inv : `inventories/${inv}`);
           }
         }
 
@@ -350,11 +385,14 @@ window.loadAnsProfiles = async function() {
       const setupProf = window.cmEditors['editor-AnsSetupProfiles'] ? window.cmEditors['editor-AnsSetupProfiles'].getValue() : '';
       const playSetup = window.cmEditors['editor-AnsPlaySetup']     ? window.cmEditors['editor-AnsPlaySetup'].getValue()     : '';
 
+      const invVal = (document.getElementById('edit-ansible-inv')?.value || '').trim();
+      const customInvVal = (document.getElementById('edit-ansible-custom-inv')?.value || '').trim();
+
       const formData = new URLSearchParams({
           root_dir: (document.getElementById('edit-ansible-root-dir')?.value || '').trim(),
           book: document.getElementById('edit-ansible-book').value,
-          inv: document.getElementById('edit-ansible-inv').value,
-          custom_inv: document.getElementById('edit-ansible-custom-inv').value,
+          inv: invVal,
+          custom_inv: customInvVal,
           tags: document.getElementById('edit-ansible-tags').value,
           env: document.getElementById('edit-ansible-env').value,
           setup: playSetup,
@@ -1074,6 +1112,196 @@ window.openTfTab = function(tabId) {
           btn.innerHTML = '<i class="fas fa-play"></i> Apply Terraform';
           btn.classList.replace('w3-grey', 'w3-green');
       }
+  };
+
+  // ----------------------------------------------------------------------------
+  // --- ROOT REPOSITORY / DIRECTORY BROWSER MODAL ---
+  // ----------------------------------------------------------------------------
+  window.dirBrowserTargetInputId = null;
+  window.dirBrowserMode = 'ansible';
+  window.dirBrowserCurrentPath = '/root';
+  window.dirBrowserSelectedPath = '/root';
+
+  window.openDirBrowser = async function(targetInputId, options = {}) {
+    window.dirBrowserTargetInputId = targetInputId;
+    window.dirBrowserMode = options.mode || 'ansible';
+
+    const modalTitle = document.getElementById('dir-browser-title');
+    if (modalTitle) {
+      modalTitle.textContent = (window.dirBrowserMode === 'terraform')
+        ? 'Select Terraform Repository / Directory'
+        : 'Select Ansible Repository / Directory';
+    }
+
+    const currentVal = (document.getElementById(targetInputId)?.value || '').trim();
+    const startPath = currentVal || '/root';
+    window.dirBrowserSelectedPath = startPath;
+
+    const modal = document.getElementById('unified-dir-browser-modal');
+    if (modal) modal.style.display = 'block';
+
+    await window.navigateToDir(startPath);
+  };
+
+  window.browseAnsibleRootDir = function() {
+    window.openDirBrowser('edit-ansible-root-dir', { mode: 'ansible' });
+  };
+
+  window.browseTerraformRootDir = function() {
+    window.openDirBrowser('edit-terraform-root-dir', { mode: 'terraform' });
+  };
+
+  window.navigateToDir = async function(path) {
+    const listDiv = document.getElementById('dir-browser-items-list');
+    const selectedInput = document.getElementById('dir-browser-selected-input');
+    const breadcrumbsDiv = document.getElementById('dir-browser-breadcrumbs');
+    const quickpicksDiv = document.getElementById('dir-browser-quickpicks');
+
+    if (listDiv) {
+      listDiv.innerHTML = '<div style="color: #64748b; font-style: italic; font-size: 0.85em; text-align: center; padding: 24px;"><i class="fas fa-spinner fa-spin"></i> Loading directory...</div>';
+    }
+
+    try {
+      const res = await fetch(`/automation/directories?path=${encodeURIComponent(path || '/root')}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Failed to list directory');
+
+      window.dirBrowserCurrentPath = data.current;
+      window.dirBrowserSelectedPath = data.current;
+      if (selectedInput) selectedInput.value = data.current;
+
+      // Render quick picks
+      if (quickpicksDiv && data.repositories) {
+        const repos = (window.dirBrowserMode === 'terraform')
+          ? (data.repositories.terraform || [])
+          : (data.repositories.ansible || []);
+
+        if (repos.length > 0) {
+          quickpicksDiv.innerHTML = repos.map(r => {
+            const isSelected = (r === data.current);
+            const activeStyle = isSelected ? 'background-color: #2563eb; color: #fff; border-color: #38bdf8;' : '';
+            return `<button type="button" class="repo-chip" style="${activeStyle}" onclick="window.selectQuickPickRepo('${window.escapeHtml(r)}')"><i class="fas fa-folder"></i> ${window.escapeHtml(r)}</button>`;
+          }).join('');
+          const qContainer = document.getElementById('dir-browser-quickpicks-container');
+          if (qContainer) qContainer.style.display = 'block';
+        } else {
+          const qContainer = document.getElementById('dir-browser-quickpicks-container');
+          if (qContainer) qContainer.style.display = 'none';
+        }
+      }
+
+      // Render breadcrumbs
+      if (breadcrumbsDiv) {
+        const parts = data.current.split('/').filter(Boolean);
+        let bcHtml = `<button type="button" class="dir-breadcrumb-btn" onclick="window.navigateToDir('/')"><i class="fas fa-hdd"></i> /</button>`;
+        let built = '';
+        for (const part of parts) {
+          built += '/' + part;
+          const target = built;
+          bcHtml += `<span style="color: #64748b; font-size: 0.8em;">/</span><button type="button" class="dir-breadcrumb-btn" onclick="window.navigateToDir('${window.escapeHtml(target)}')">${window.escapeHtml(part)}</button>`;
+        }
+        breadcrumbsDiv.innerHTML = bcHtml;
+      }
+
+      // Render directories list
+      if (listDiv) {
+        let itemsHtml = '';
+
+        // Parent directory row
+        if (data.parent) {
+          itemsHtml += `
+            <div class="dir-browser-item-row" onclick="window.navigateToDir('${window.escapeHtml(data.parent)}')">
+              <span style="display: flex; align-items: center; gap: 8px; color: #94a3b8;">
+                <i class="fas fa-level-up-alt" style="color: #64748b;"></i>
+                <span>.. (parent directory)</span>
+              </span>
+              <span class="w3-text-gray" style="font-size: 0.8em;"><i class="fas fa-arrow-up"></i> Up</span>
+            </div>
+          `;
+        }
+
+        if (data.directories && data.directories.length > 0) {
+          data.directories.forEach(dir => {
+            const isSelected = (dir.path === window.dirBrowserSelectedPath);
+            let badges = '';
+            if (dir.has_ansible) {
+              badges += `<span class="repo-badge w3-green w3-text-white">Ansible</span>`;
+            }
+            if (dir.has_terraform) {
+              badges += `<span class="repo-badge w3-purple w3-text-white">Terraform</span>`;
+            }
+            if (dir.has_git) {
+              badges += `<span class="repo-badge w3-teal w3-text-white"><i class="fab fa-git-alt"></i> Git</span>`;
+            }
+
+            itemsHtml += `
+              <div class="dir-browser-item-row ${isSelected ? 'selected' : ''}" 
+                   onclick="window.selectDirBrowserItem('${window.escapeHtml(dir.path)}')" 
+                   ondblclick="window.navigateToDir('${window.escapeHtml(dir.path)}')">
+                <span style="display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <i class="fas fa-folder" style="color: #f59e0b; flex-shrink: 0;"></i>
+                  <span style="font-weight: 500;">${window.escapeHtml(dir.name)}</span>
+                  ${badges}
+                </span>
+                <button type="button" class="w3-button w3-tiny w3-round w3-blue-gray" onclick="event.stopPropagation(); window.navigateToDir('${window.escapeHtml(dir.path)}')" title="Open folder" style="padding: 2px 7px;">
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+            `;
+          });
+        } else {
+          itemsHtml += `<div style="padding: 24px; color: #64748b; text-align: center; font-style: italic;">No subdirectories found</div>`;
+        }
+
+        listDiv.innerHTML = itemsHtml;
+      }
+    } catch (err) {
+      if (listDiv) {
+        listDiv.innerHTML = `<div style="padding: 20px; color: #ef4444; text-align: center;"><i class="fas fa-exclamation-triangle"></i> Error loading directory: ${window.escapeHtml(err.message)}</div>`;
+      }
+    }
+  };
+
+  window.selectQuickPickRepo = function(path) {
+    window.dirBrowserSelectedPath = path;
+    const selectedInput = document.getElementById('dir-browser-selected-input');
+    if (selectedInput) selectedInput.value = path;
+    window.navigateToDir(path);
+  };
+
+  window.selectDirBrowserItem = function(path) {
+    window.dirBrowserSelectedPath = path;
+    const selectedInput = document.getElementById('dir-browser-selected-input');
+    if (selectedInput) selectedInput.value = path;
+
+    document.querySelectorAll('.dir-browser-item-row').forEach(row => {
+      row.classList.remove('selected');
+    });
+    if (window.event && window.event.currentTarget) {
+      window.event.currentTarget.classList.add('selected');
+    }
+  };
+
+  window.refreshDirBrowser = function() {
+    window.navigateToDir(window.dirBrowserCurrentPath || '/root');
+  };
+
+  window.confirmDirBrowserSelection = function() {
+    const selectedInput = document.getElementById('dir-browser-selected-input');
+    const path = (selectedInput?.value || window.dirBrowserSelectedPath || '').trim();
+
+    if (window.dirBrowserTargetInputId) {
+      const targetInput = document.getElementById(window.dirBrowserTargetInputId);
+      if (targetInput) {
+        targetInput.value = path;
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+
+    const modal = document.getElementById('unified-dir-browser-modal');
+    if (modal) modal.style.display = 'none';
   };
 
 // --- DIRECTORY BROWSER ---
