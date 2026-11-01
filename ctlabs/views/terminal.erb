@@ -71,14 +71,14 @@
 
     /* Connect / Disconnect Toggle Button */
     .term-conn-btn {
-      padding: 2px 8px;
+      padding: 0;
+      width: 24px;
+      height: 24px;
       border-radius: 4px;
-      font-size: 0.82em;
-      font-weight: 600;
+      font-size: 0.85em;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      height: 24px;
+      justify-content: center;
       cursor: pointer;
       transition: all 0.15s ease-in-out;
       user-select: none;
@@ -90,8 +90,8 @@
     }
     .term-conn-btn.connected:hover {
       background: #334155;
-      border-color: #64748b;
-      color: #f8fafc;
+      border-color: #ef4444;
+      color: #f87171;
     }
     .term-conn-btn.disconnected {
       background: #0284c7;
@@ -276,15 +276,15 @@
       background: #1e293b;
       border: 1px solid #475569;
       color: #cbd5e1;
-      padding: 2px 8px;
+      padding: 0;
+      width: 24px;
+      height: 24px;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 0.82em;
-      font-weight: 600;
+      font-size: 0.85em;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      height: 24px;
+      justify-content: center;
       transition: all 0.15s ease;
       user-select: none;
     }
@@ -383,9 +383,7 @@
       <!-- Open / New Terminal Dropdown -->
       <div style="position: relative;">
         <button type="button" id="open-node-btn" title="Open terminal on another node">
-          <i class="fas fa-plus" style="font-size: 0.8em; color: #38bdf8;"></i>
-          <span>Open</span>
-          <i class="fas fa-chevron-down" style="font-size: 0.7em; opacity: 0.7;"></i>
+          <i class="fas fa-plus" style="color: #38bdf8;"></i>
         </button>
 
         <div id="open-node-menu">
@@ -613,8 +611,8 @@
       </button>
 
       <!-- Connect / Disconnect Toggle Button -->
-      <button type="button" id="connect-btn" class="term-conn-btn connecting" title="Connecting to terminal session..." disabled>
-        <i class="fas fa-circle-notch fa-spin"></i> <span>Connecting...</span>
+      <button type="button" id="connect-btn" class="term-conn-btn connecting" title="Connecting..." disabled>
+        <i class="fas fa-circle-notch fa-spin"></i>
       </button>
 
       <!-- Status Indicator (just the circle) -->
@@ -3263,8 +3261,8 @@
       const setDisconnectedState = () => {
         if (connectBtn) {
           connectBtn.className = 'term-conn-btn disconnected';
-          connectBtn.innerHTML = '<i class="fas fa-plug"></i> <span>Connect</span>';
-          connectBtn.title = 'Connect terminal session';
+          connectBtn.innerHTML = '<i class="fas fa-plug"></i>';
+          connectBtn.title = 'Connect';
           connectBtn.disabled = false;
         }
         if (statusEl) {
@@ -3277,8 +3275,8 @@
       const setConnectedState = () => {
         if (connectBtn) {
           connectBtn.className = 'term-conn-btn connected';
-          connectBtn.innerHTML = '<i class="fas fa-plug"></i> <span>Disconnect</span>';
-          connectBtn.title = 'Disconnect terminal session';
+          connectBtn.innerHTML = '<i class="fas fa-plug-circle-xmark"></i>';
+          connectBtn.title = 'Disconnect';
           connectBtn.disabled = false;
         }
         if (statusEl) {
@@ -3291,8 +3289,8 @@
       const setConnectingState = () => {
         if (connectBtn) {
           connectBtn.className = 'term-conn-btn connecting';
-          connectBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> <span>Connecting...</span>';
-          connectBtn.title = 'Connecting to terminal session...';
+          connectBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+          connectBtn.title = 'Connecting...';
           connectBtn.disabled = true;
         }
         if (statusEl) {
