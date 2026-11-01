@@ -28,18 +28,45 @@
       position:      relative;
     }
     .status {
-      font-size: 0.85em;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      user-select: none;
+      font-size: 0.82em;
+      font-weight: 700;
       line-height: 1;
+      user-select: none;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
     }
-    .status.disconnected {
+    .status.connected {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 0 6px rgba(16, 185, 129, 0.45);
       cursor: pointer;
     }
+    .status.connected:hover {
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+      transform: scale(1.06);
+    }
+    .status.disconnected {
+      background: #ef4444;
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 4px rgba(239, 68, 68, 0.35);
+    }
     .status.disconnected:hover {
-      opacity: 0.75;
+      opacity: 0.85;
+      transform: scale(1.06);
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+    }
+    .status.connecting {
+      background: transparent;
+      color: #38bdf8;
+      cursor: wait;
     }
 
     /* Connect / Disconnect Toggle Button */
@@ -425,6 +452,7 @@
           <button type="button" class="settings-tab-btn" data-section="terminal" style="flex: 1.2;" title="Terminal display settings">
             <i class="fas fa-terminal" style="font-size: 0.85em;"></i>
             <span>Terminal</span>
+            <span id="settings-tab-sessions-badge" style="display: none; background: #0284c7; color: #fff; font-size: 0.7em; font-weight: bold; padding: 0 4px; border-radius: 8px; line-height: 14px;">0</span>
           </button>
         </div>
 
@@ -553,6 +581,27 @@
               <option value="true" selected>Prompt on Reload (Safe)</option>
               <option value="false">Allow Instant Reload</option>
             </select>
+          </div>
+
+          <!-- Active Sessions Management -->
+          <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed #334155;">
+            <div class="settings-section-title" style="color: #38bdf8; margin-bottom: 6px;">
+              <i class="fas fa-layer-group"></i> Active Sessions
+            </div>
+            <div style="background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 7px 10px; margin-bottom: 8px; font-size: 0.82em;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <span style="color: #94a3b8;">Active Sessions:</span>
+                <span id="settings-sessions-count" style="font-weight: 700; color: #38bdf8;">0 of 3</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #94a3b8;">Target Node:</span>
+                <span style="font-weight: 600; color: #f8fafc;"><%= ERB::Util.html_escape(@node_name) %></span>
+              </div>
+            </div>
+            <button type="button" id="btn-clean-all-sessions" style="width: 100%; box-sizing: border-box; background: #dc2626; border: 1px solid #ef4444; color: #ffffff; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s ease;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">
+              <i class="fas fa-trash-alt"></i>
+              <span>Clean All Sessions</span>
+            </button>
           </div>
         </div>
       </div>
@@ -2687,7 +2736,8 @@
       });
 
       document.addEventListener('click', (e) => {
-        if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
+        const sEl = document.getElementById('status');
+        if (!settingsMenu.contains(e.target) && e.target !== settingsBtn && (!sEl || (e.target !== sEl && !sEl.contains(e.target)))) {
           settingsMenu.style.display = 'none';
         }
         if (openNodeMenu && !openNodeMenu.contains(e.target) && e.target !== openNodeBtn && !openNodeBtn.contains(e.target)) {
@@ -3203,6 +3253,12 @@
       const connectBtn = document.getElementById('connect-btn');
       const statusEl = document.getElementById('status');
       let intentionalDisconnect = false;
+      let currentSessionCount = 1;
+
+      // Settings Sessions Management
+      const cleanAllBtn = document.getElementById('btn-clean-all-sessions');
+      const settingsSessionsCount = document.getElementById('settings-sessions-count');
+      const settingsTabSessionsBadge = document.getElementById('settings-tab-sessions-badge');
 
       const setDisconnectedState = () => {
         if (connectBtn) {
@@ -3212,9 +3268,9 @@
           connectBtn.disabled = false;
         }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-circle" style="color: #ef4444;"></i>';
-          statusEl.classList.add('disconnected');
-          statusEl.title = 'Disconnected (click to connect)';
+          statusEl.className = 'status disconnected';
+          statusEl.textContent = currentSessionCount;
+          statusEl.title = `Disconnected · ${currentSessionCount}/3 active sessions (click to connect)`;
         }
       };
 
@@ -3226,9 +3282,9 @@
           connectBtn.disabled = false;
         }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-circle" style="color: #10b981;"></i>';
-          statusEl.classList.remove('disconnected');
-          statusEl.title = 'Connected';
+          statusEl.className = 'status connected';
+          statusEl.textContent = currentSessionCount;
+          statusEl.title = `Connected · ${currentSessionCount}/3 active sessions (click Settings to manage)`;
         }
       };
 
@@ -3240,11 +3296,68 @@
           connectBtn.disabled = true;
         }
         if (statusEl) {
-          statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="color: #38bdf8;"></i>';
-          statusEl.classList.remove('disconnected');
+          statusEl.className = 'status connecting';
+          statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
           statusEl.title = 'Connecting...';
         }
       };
+
+      const updateSessionCount = async () => {
+        try {
+          const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/sessions?_=${Date.now()}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const count = typeof data.count === 'number' ? data.count : 0;
+          currentSessionCount = count;
+
+          if (settingsSessionsCount) {
+            settingsSessionsCount.textContent = `${count} of 3`;
+            settingsSessionsCount.style.color = count >= 3 ? '#ef4444' : '#38bdf8';
+          }
+          if (settingsTabSessionsBadge) {
+            settingsTabSessionsBadge.textContent = count;
+            settingsTabSessionsBadge.style.display = 'inline-block';
+            settingsTabSessionsBadge.style.background = count >= 3 ? '#ef4444' : '#0284c7';
+          }
+
+          if (statusEl) {
+            if (statusEl.classList.contains('connected')) {
+              statusEl.textContent = count;
+              statusEl.title = `Connected · ${count}/3 active sessions (click Settings to manage)`;
+            } else if (statusEl.classList.contains('disconnected')) {
+              statusEl.textContent = count;
+              statusEl.title = `Disconnected · ${count}/3 active sessions (click to connect)`;
+            }
+          }
+        } catch (e) {}
+      };
+
+      if (cleanAllBtn) {
+        cleanAllBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          cleanAllBtn.disabled = true;
+          const origHtml = cleanAllBtn.innerHTML;
+          cleanAllBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Cleaning...</span>';
+          try {
+            const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/terminate_all`, { method: 'POST' });
+            if (!res.ok) throw new Error('Server returned error');
+            sessionStorage.removeItem(sessionKey);
+            if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
+              intentionalDisconnect = true;
+              try { activeWs.close(); } catch (e) {}
+            }
+            currentSessionCount = 0;
+            setDisconnectedState();
+            term.write('\r\n\x1b[33m[All sessions for this node were terminated by user]\x1b[0m\r\n');
+            await updateSessionCount();
+          } catch (err) {
+            alert('Failed to clean sessions: ' + err.message);
+          } finally {
+            cleanAllBtn.disabled = false;
+            cleanAllBtn.innerHTML = origHtml;
+          }
+        });
+      }
 
       if (!window.name) {
         window.name = 'term_' + encodeURIComponent(nodeName) + '_' + Math.random().toString(36).substring(2, 10);
@@ -3277,6 +3390,7 @@
           setConnectedState();
           term.focus();
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          updateSessionCount();
           if (token && configuredFiles.length > 0) {
             const names = configuredFiles.map(f => f.env_var).join(', ');
             term.write(`\r\n\x1b[32m[✓ Controller environment files active: ${names}]\x1b[0m\r\n`);
@@ -3296,6 +3410,7 @@
             }
             if (event.data.includes('[Session closed by container]') || event.data.includes('[Session Limit Reached')) {
               sessionStorage.removeItem(sessionKey);
+              updateSessionCount();
             }
           }
           term.write(event.data);
@@ -3304,6 +3419,7 @@
         ws.onclose = () => {
           if (intentionalReconnect) return;
           setDisconnectedState();
+          updateSessionCount();
           if (intentionalDisconnect) {
             intentionalDisconnect = false;
             term.write('\r\n\x1b[33m[Disconnected by user — Session terminated]\x1b[0m\r\n');
@@ -3350,7 +3466,9 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: sid })
-          }).catch(() => {});
+          }).then(() => updateSessionCount()).catch(() => {});
+        } else {
+          updateSessionCount();
         }
       };
 
@@ -3389,9 +3507,20 @@
         connectBtn.addEventListener('click', toggleConnection);
       }
       if (statusEl) {
-        statusEl.addEventListener('click', () => {
+        statusEl.addEventListener('click', (e) => {
+          e.stopPropagation();
           if (statusEl.classList.contains('disconnected')) {
             connectTerminal();
+          } else if (statusEl.classList.contains('connected')) {
+            if (openNodeMenu) openNodeMenu.style.display = 'none';
+            const willOpen = settingsMenu.style.display !== 'block';
+            settingsMenu.style.display = willOpen ? 'block' : 'none';
+            if (willOpen) {
+              switchSettingsTab('terminal');
+              if (typeof window.loadTermSshAgentStatus === 'function') {
+                window.loadTermSshAgentStatus();
+              }
+            }
           }
         });
       }
@@ -3402,6 +3531,29 @@
           e.preventDefault();
           e.returnValue = '';
           return '';
+        }
+      });
+
+      // Terminate session immediately when window/tab is closed
+      window.addEventListener('pagehide', () => {
+        const sid = sessionStorage.getItem(sessionKey);
+        if (sid) {
+          sessionStorage.removeItem(sessionKey);
+          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            try { activeWs.send(JSON.stringify({ type: 'terminate' })); } catch (e) {}
+          }
+          const payload = JSON.stringify({ session_id: sid });
+          if (navigator.sendBeacon) {
+            const blob = new Blob([payload], { type: 'application/json' });
+            navigator.sendBeacon(`/terminal/${encodeURIComponent(nodeName)}/terminate_session`, blob);
+          } else {
+            fetch(`/terminal/${encodeURIComponent(nodeName)}/terminate_session`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: payload,
+              keepalive: true
+            }).catch(() => {});
+          }
         }
       });
 
@@ -3417,6 +3569,8 @@
         requestAnimationFrame(() => {
           fitAddon.fit();
           connectTerminal();
+          updateSessionCount();
+          setInterval(updateSessionCount, 8000);
         });
       };
 

@@ -86,6 +86,29 @@ class TerminalService
     true
   end
 
+  def self.terminate_all(node_name)
+    sessions_to_close = []
+    @@mutex.synchronize do
+      sessions_to_close = (@@sessions.delete(node_name) || []).dup
+    end
+    sessions_to_close.each do |session|
+      begin
+        session[:close_proc].call if session[:close_proc]
+      rescue => e
+        puts "[Terminal Termination All Error] #{e.message}"
+      end
+    end
+
+    sids = []
+    @@pty_mutex.synchronize do
+      @@pty_sessions.each do |sid, s|
+        sids << sid if s[:node_name] == node_name
+      end
+    end
+    sids.each { |sid| cleanup_pty_session(sid) }
+    true
+  end
+
   def self.cleanup_stale(node_name = nil)
     now = Time.now
     @@mutex.synchronize do
@@ -876,15 +899,7 @@ class TerminalService
     end
 
     driver.on(:close) do |_|
-      if sess[:driver] == driver && !sess[:closed]
-        sess[:driver] = nil
-        sess[:io] = nil
-        sess[:detached_at] = Time.now
-        sess[:detach_timer] = Thread.new do
-          sleep DISCONNECT_GRACE_PERIOD
-          cleanup_pty_session(session_id)
-        end
-      end
+      cleanup_pty_session(session_id)
       ssl_mutex.synchronize { io.close rescue nil } rescue nil
     end
   end

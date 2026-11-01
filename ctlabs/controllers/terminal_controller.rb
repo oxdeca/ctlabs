@@ -57,7 +57,8 @@ class TerminalController < BaseController
 
   post '/terminal/:node_name/terminate_session' do
     content_type :json
-    payload = (JSON.parse(request.body.read) rescue {}) || {}
+    body = request.body.read rescue ''
+    payload = (JSON.parse(body) rescue {}) || {}
     session_id = (payload['session_id'] || params['session_id']).to_s.strip
     if !session_id.empty?
       TerminalService.cleanup_pty_session(session_id)
@@ -72,6 +73,12 @@ class TerminalController < BaseController
     content_type :json
     success = TerminalService.terminate_oldest(params[:node_name])
     { success: success }.to_json
+  end
+
+  post '/terminal/:node_name/terminate_all' do
+    content_type :json
+    TerminalService.terminate_all(params[:node_name])
+    { success: true }.to_json
   end
 
   post '/terminal/:node_name/env_files' do

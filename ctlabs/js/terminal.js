@@ -71,8 +71,34 @@
 
       const terminateBtn = document.getElementById('btn-terminate-oldest');
       const openBtn = document.getElementById('btn-open-new');
-      const originalTerminateHtml = terminateBtn.innerHTML;
-      const originalOpenHtml = openBtn.innerHTML;
+      const cleanBtn = document.getElementById('btn-terminate-all');
+      const originalTerminateHtml = terminateBtn ? terminateBtn.innerHTML : '';
+      const originalOpenHtml = openBtn ? openBtn.innerHTML : '';
+      const originalCleanHtml = cleanBtn ? cleanBtn.innerHTML : '';
+
+      if (action === 'clean_all') {
+          if (cleanBtn) {
+              cleanBtn.disabled = true;
+              cleanBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning...';
+          }
+          try {
+              const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/terminate_all`, { method: 'POST' });
+              if (!res.ok) throw new Error("Failed to clean sessions");
+          } catch (e) {
+              alert("Error cleaning sessions: " + e.message);
+              if (cleanBtn) {
+                  cleanBtn.disabled = false;
+                  cleanBtn.innerHTML = originalCleanHtml;
+              }
+              return;
+          }
+          document.getElementById('terminal-manager-modal').style.display = 'none';
+          if (cleanBtn) {
+              cleanBtn.disabled = false;
+              cleanBtn.innerHTML = originalCleanHtml;
+          }
+          return;
+      }
 
       if (action === 'terminate') {
           terminateBtn.disabled = true;
