@@ -576,7 +576,7 @@
               <span style="color: #94a3b8; font-size: 0.84em;">Mouse Reporting (for TUI apps)</span>
               <button type="button" id="toggle-mouse-btn" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em;">Disable</button>
             </div>
-            <div style="color: #64748b; font-size: 0.75em; margin-top: 4px;">Disable to allow text selection with mouse. Hold Shift may also work.</div>
+            <div style="color: #64748b; font-size: 0.75em; margin-top: 4px;">Shift+drag selects text in TUI apps; Ctrl+Shift+C copies. Disable mouse reporting for plain drag selection.</div>
           </div>
           <div class="setting-group" style="margin-bottom: 0;">
             <label for="reload-protect-select">Reload Guard:</label>
@@ -2967,22 +2967,33 @@
       const savedFontSize = parseInt(localStorage.getItem('ctlabs_term_font_size'), 10) || 14;
       const savedCursorStyle = localStorage.getItem('ctlabs_term_cursor_style') || 'block';
       const savedCursorBlink = localStorage.getItem('ctlabs_term_cursor_blink') !== 'false';
-      let mouseReportingEnabled = localStorage.getItem('ctlabs_term_mouse_reporting') !== 'false';
+      // Mouse reporting is app-controlled (DECSET 1000/1002/1003). This flag is
+      // only the session-local action state for the force-disable button.
+      let mouseReportingEnabled = true;
 
       if (fontSizeSelect) fontSizeSelect.value = String(savedFontSize);
       if (cursorStyleSelect) cursorStyleSelect.value = savedCursorStyle;
       if (cursorBlinkSelect) cursorBlinkSelect.value = String(savedCursorBlink);
       if (toggleMouseBtn) {
+        const MODE_BY_TRACKING = { x10: 9, vt200: 1000, drag: 1002, any: 1003 };
+        let disabledTrackingCode = null;
         toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
         toggleMouseBtn.onclick = () => {
           mouseReportingEnabled = !mouseReportingEnabled;
-          localStorage.setItem('ctlabs_term_mouse_reporting', mouseReportingEnabled);
           toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
-          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
-            if (mouseReportingEnabled) {
-              activeWs.send(JSON.stringify({ type: 'input', data: '\x1b[?1000h\x1b[?1002h\x1b[?1003h' }));
-            } else {
-              activeWs.send(JSON.stringify({ type: 'input', data: '\x1b[?1000l\x1b[?1002l\x1b[?1003l' }));
+          if (!term) return;
+          if (mouseReportingEnabled) {
+            // Restore the app's tracking mode locally. Never hits the PTY.
+            if (disabledTrackingCode) {
+              origWrite('\x1b[?' + disabledTrackingCode + 'h');
+              disabledTrackingCode = null;
+            }
+          } else {
+            const tracking = term.modes && term.modes.mouseTrackingMode;
+            if (tracking && tracking !== 'none' && MODE_BY_TRACKING[tracking]) {
+              disabledTrackingCode = MODE_BY_TRACKING[tracking];
+              // Disable the terminal emulator's local reporting so plain drag selects.
+              origWrite('\x1b[?' + disabledTrackingCode + 'l');
             }
           }
         };
@@ -3002,33 +3013,30 @@
         fontSize: savedFontSize
       });
 
-      term.onSelectionChange(() => {
-          const selection = term.getSelection();
-          if (selection) navigator.clipboard.writeText(selection);
-      });
+      // Copy the current xterm selection. Do NOT intercept xterm's mouse events:
+      // xterm 5.x already forces a local selection on Shift+drag while an app
+      // has mouse reporting enabled (SelectionService.shouldForceSelection).
+      const copyTerminalSelection = () => {
+        const selection = term.getSelection();
+        if (!selection) return false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(selection).catch(() => {});
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = selection;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+        }
+        return true;
+      };
 
-      // Allow Shift+drag for text selection even when apps enable mouse reporting
-      const termEl = container;
-      if (termEl) {
-        termEl.addEventListener('mousedown', (e) => {
-          if (e.shiftKey) {
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          }
-        }, true);
-        termEl.addEventListener('mousemove', (e) => {
-          if (e.shiftKey && e.buttons === 1) {
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          }
-        }, true);
-        termEl.addEventListener('mouseup', (e) => {
-          if (e.shiftKey) {
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-          }
-        }, true);
-      }
+      term.onSelectionChange(() => {
+        if (term.getSelection()) copyTerminalSelection();
+      });
 
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
@@ -3240,6 +3248,15 @@
       };
 
       term.attachCustomKeyEventHandler((e) => {
+        // Ctrl+Shift+C = copy selection (standard terminal shortcut). Never sent to the app.
+        if (e.ctrlKey && e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'c') {
+          if (e.type === 'keydown') {
+            e.preventDefault();
+            copyTerminalSelection();
+          }
+          return false;
+        }
+
         // Prevent accidental browser reload shortcuts (F5, Cmd+R on macOS)
         // Ctrl+R is bash/readline reverse-i-search and MUST be passed through to xterm
         if (e.key === 'F5' || (e.metaKey && e.key.toLowerCase() === 'r')) {
