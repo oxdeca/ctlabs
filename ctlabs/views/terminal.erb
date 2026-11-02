@@ -570,8 +570,13 @@
             <label for="cursor-blink-select">Cursor Blink:</label>
             <select id="cursor-blink-select">
               <option value="true" selected>Blinking</option>
-              <option value="false">Steady</option>
+              <option value="false">Solid</option>
             </select>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
+              <span style="color: #94a3b8; font-size: 0.84em;">Mouse Reporting (for TUI apps)</span>
+              <button type="button" id="toggle-mouse-btn" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em;">Disable</button>
+            </div>
+            <div style="color: #64748b; font-size: 0.75em; margin-top: 4px;">Disable to allow text selection with mouse. Hold Shift may also work.</div>
           </div>
           <div class="setting-group" style="margin-bottom: 0;">
             <label for="reload-protect-select">Reload Guard:</label>
@@ -2957,14 +2962,31 @@
       const fontSizeSelect = document.getElementById('font-size-select');
       const cursorStyleSelect = document.getElementById('cursor-style-select');
       const cursorBlinkSelect = document.getElementById('cursor-blink-select');
+      const toggleMouseBtn = document.getElementById('toggle-mouse-btn');
 
       const savedFontSize = parseInt(localStorage.getItem('ctlabs_term_font_size'), 10) || 14;
       const savedCursorStyle = localStorage.getItem('ctlabs_term_cursor_style') || 'block';
       const savedCursorBlink = localStorage.getItem('ctlabs_term_cursor_blink') !== 'false';
+      let mouseReportingEnabled = localStorage.getItem('ctlabs_term_mouse_reporting') !== 'false';
 
       if (fontSizeSelect) fontSizeSelect.value = String(savedFontSize);
       if (cursorStyleSelect) cursorStyleSelect.value = savedCursorStyle;
       if (cursorBlinkSelect) cursorBlinkSelect.value = String(savedCursorBlink);
+      if (toggleMouseBtn) {
+        toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
+        toggleMouseBtn.onclick = () => {
+          mouseReportingEnabled = !mouseReportingEnabled;
+          localStorage.setItem('ctlabs_term_mouse_reporting', mouseReportingEnabled);
+          toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
+          if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+            if (mouseReportingEnabled) {
+              activeWs.send(JSON.stringify({ type: 'input', data: '\x1b[?1000h\x1b[?1002h\x1b[?1003h' }));
+            } else {
+              activeWs.send(JSON.stringify({ type: 'input', data: '\x1b[?1000l\x1b[?1002l\x1b[?1003l' }));
+            }
+          }
+        };
+      }
 
       const initialCols = 130;
       const initialRows = 40;
@@ -2984,6 +3006,29 @@
           const selection = term.getSelection();
           if (selection) navigator.clipboard.writeText(selection);
       });
+
+      // Allow Shift+drag for text selection even when apps enable mouse reporting
+      const termEl = container;
+      if (termEl) {
+        termEl.addEventListener('mousedown', (e) => {
+          if (e.shiftKey) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+        termEl.addEventListener('mousemove', (e) => {
+          if (e.shiftKey && e.buttons === 1) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+        termEl.addEventListener('mouseup', (e) => {
+          if (e.shiftKey) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+      }
 
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
