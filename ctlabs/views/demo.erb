@@ -192,6 +192,8 @@
                         <span class="step-num" style="color: #38bdf8; margin-right: 4px;">#<%= r[:step].to_i > 0 ? r[:step] : (idx + 1) %></span> 
                         <% if is_md %>
                           <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% else %>
+                          <i class="fas fa-terminal" style="color: #10b981; margin-right: 3px; font-size: 0.95em;"></i>
                         <% elsif is_vid %>
                           <i class="fas fa-video" style="color: #f43f5e; margin-right: 3px; font-size: 0.95em;"></i>
                         <% end %>
@@ -207,7 +209,7 @@
                         <% elsif is_vid %>
                           <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
                         <% else %>
-                          <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
+                          <i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %>
                         <% end %>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
@@ -290,6 +292,8 @@
                         <span class="step-num" style="color: #64748b; margin-right: 4px;">+</span>
                         <% if is_md %>
                           <i class="fab fa-markdown" style="color: #38bdf8; margin-right: 3px; font-size: 0.95em;"></i>
+                        <% else %>
+                          <i class="fas fa-terminal" style="color: #10b981; margin-right: 3px; font-size: 0.95em;"></i>
                         <% elsif is_vid %>
                           <i class="fas fa-video" style="color: #f43f5e; margin-right: 3px; font-size: 0.95em;"></i>
                         <% end %>
@@ -304,7 +308,7 @@
                         <% elsif is_vid %>
                           <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
                         <% else %>
-                          <i class="fas fa-terminal"></i> <%= ERB::Util.html_escape(node_str) %>
+                          <i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %>
                         <% end %>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
