@@ -572,11 +572,14 @@
               <option value="true" selected>Blinking</option>
               <option value="false">Solid</option>
             </select>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #334155;">
-              <span style="color: #94a3b8; font-size: 0.84em;">Mouse Reporting (for TUI apps)</span>
-              <button type="button" id="toggle-mouse-btn" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em;">Disable</button>
-            </div>
-            <div style="color: #64748b; font-size: 0.75em; margin-top: 4px;">Shift+drag selects text in TUI apps; Ctrl+Shift+C copies. Disable mouse reporting for plain drag selection.</div>
+          </div>
+          <div class="setting-group" style="margin-bottom: 8px;">
+            <label for="mouse-mode-select">Mouse Action:</label>
+            <select id="mouse-mode-select">
+              <option value="select" selected>Text Selection (Recommended)</option>
+              <option value="app">TUI App Mouse (htop, mc)</option>
+            </select>
+            <div style="color: #64748b; font-size: 0.75em; margin-top: 4px;">In Selection mode, drag freely selects text (even in AI CLIs like claude, agy, opencode). Hold Shift to click TUI buttons.</div>
           </div>
           <div class="setting-group" style="margin-bottom: 0;">
             <label for="reload-protect-select">Reload Guard:</label>
@@ -1795,7 +1798,7 @@
         uploadSubmitBtn.innerHTML = `<i class="fas fa-upload"></i> <span>${escapeHtml(labelText)}</span>`;
       }
 
-      function showToast(msg, type = 'info') {
+      function showToast(msg, type = 'info', duration = 3000) {
         if (!termToast || !termToastMsg) return;
         termToastMsg.textContent = msg;
         if (type === 'success') {
@@ -1814,7 +1817,7 @@
         toastTimer = setTimeout(() => {
           termToast.style.opacity = '0';
           setTimeout(() => { termToast.style.display = 'none'; }, 300);
-        }, 4000);
+        }, duration);
       }
 
       function showUploadFeedback(msg, type = 'info') {
@@ -2962,41 +2965,23 @@
       const fontSizeSelect = document.getElementById('font-size-select');
       const cursorStyleSelect = document.getElementById('cursor-style-select');
       const cursorBlinkSelect = document.getElementById('cursor-blink-select');
-      const toggleMouseBtn = document.getElementById('toggle-mouse-btn');
+      const mouseModeSelect = document.getElementById('mouse-mode-select');
 
       const savedFontSize = parseInt(localStorage.getItem('ctlabs_term_font_size'), 10) || 14;
       const savedCursorStyle = localStorage.getItem('ctlabs_term_cursor_style') || 'block';
       const savedCursorBlink = localStorage.getItem('ctlabs_term_cursor_blink') !== 'false';
-      // Mouse reporting is app-controlled (DECSET 1000/1002/1003). This flag is
-      // only the session-local action state for the force-disable button.
-      let mouseReportingEnabled = true;
+      let mouseReportingMode = localStorage.getItem('ctlabs_term_mouse_mode') || 'select';
 
       if (fontSizeSelect) fontSizeSelect.value = String(savedFontSize);
       if (cursorStyleSelect) cursorStyleSelect.value = savedCursorStyle;
       if (cursorBlinkSelect) cursorBlinkSelect.value = String(savedCursorBlink);
-      if (toggleMouseBtn) {
-        const MODE_BY_TRACKING = { x10: 9, vt200: 1000, drag: 1002, any: 1003 };
-        let disabledTrackingCode = null;
-        toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
-        toggleMouseBtn.onclick = () => {
-          mouseReportingEnabled = !mouseReportingEnabled;
-          toggleMouseBtn.textContent = mouseReportingEnabled ? 'Disable' : 'Enable';
-          if (!term) return;
-          if (mouseReportingEnabled) {
-            // Restore the app's tracking mode locally. Never hits the PTY.
-            if (disabledTrackingCode) {
-              origWrite('\x1b[?' + disabledTrackingCode + 'h');
-              disabledTrackingCode = null;
-            }
-          } else {
-            const tracking = term.modes && term.modes.mouseTrackingMode;
-            if (tracking && tracking !== 'none' && MODE_BY_TRACKING[tracking]) {
-              disabledTrackingCode = MODE_BY_TRACKING[tracking];
-              // Disable the terminal emulator's local reporting so plain drag selects.
-              origWrite('\x1b[?' + disabledTrackingCode + 'l');
-            }
-          }
-        };
+      if (mouseModeSelect) mouseModeSelect.value = mouseReportingMode;
+
+      if (mouseModeSelect) {
+        mouseModeSelect.addEventListener('change', () => {
+          mouseReportingMode = mouseModeSelect.value;
+          localStorage.setItem('ctlabs_term_mouse_mode', mouseReportingMode);
+        });
       }
 
       const initialCols = 130;
@@ -3013,30 +2998,48 @@
         fontSize: savedFontSize
       });
 
-      // Copy the current xterm selection. Do NOT intercept xterm's mouse events:
-      // xterm 5.x already forces a local selection on Shift+drag while an app
-      // has mouse reporting enabled (SelectionService.shouldForceSelection).
-      const copyTerminalSelection = () => {
-        const selection = term.getSelection();
-        if (!selection) return false;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(selection).catch(() => {});
-        } else {
+      const fallbackCopy = (text) => {
+        try {
           const ta = document.createElement('textarea');
-          ta.value = selection;
+          ta.value = text;
           ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          ta.style.top = '-9999px';
           ta.style.opacity = '0';
           document.body.appendChild(ta);
+          ta.focus();
           ta.select();
-          try { document.execCommand('copy'); } catch (e) {}
+          const ok = document.execCommand('copy');
           document.body.removeChild(ta);
+          return ok;
+        } catch (e) {
+          return false;
         }
-        return true;
       };
 
-      term.onSelectionChange(() => {
-        if (term.getSelection()) copyTerminalSelection();
-      });
+      const copyTerminalSelection = (showFeedback = true) => {
+        const selection = term.getSelection();
+        if (!selection || !selection.length) return false;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(selection).then(() => {
+            if (showFeedback && typeof showToast === 'function') {
+              showToast('Copied to clipboard', 'success', 2000);
+            }
+          }).catch(() => {
+            if (fallbackCopy(selection) && showFeedback && typeof showToast === 'function') {
+              showToast('Copied to clipboard', 'success', 2000);
+            }
+          });
+          return true;
+        }
+
+        const ok = fallbackCopy(selection);
+        if (ok && showFeedback && typeof showToast === 'function') {
+          showToast('Copied to clipboard', 'success', 2000);
+        }
+        return ok;
+      };
 
       const fitAddon = new FitAddon.FitAddon();
       term.loadAddon(fitAddon);
@@ -3045,6 +3048,53 @@
       term.loadAddon(serializeAddon);
 
       term.open(container);
+
+      // Force native text selection even when TUI apps (antigravity_cli, claude code, opencode, etc.)
+      // enable mouse reporting mode via DECSET 1000/1002/1003.
+      if (term._core && term._core._selectionService) {
+        const origShouldForce = term._core._selectionService.shouldForceSelection.bind(term._core._selectionService);
+        term._core._selectionService.shouldForceSelection = function(e) {
+          if (mouseReportingMode === 'select') {
+            // Left-click (button 0): plain drag forces text selection; Shift+click passes through to TUI app
+            if (e.button === 0) {
+              return !e.shiftKey;
+            }
+            return origShouldForce(e);
+          }
+          return origShouldForce(e);
+        };
+      }
+
+      // Auto-copy selection on mouseup
+      container.addEventListener('mouseup', (e) => {
+        if (e.button === 0 && term.hasSelection()) {
+          copyTerminalSelection(true);
+        }
+      });
+
+      // Right-click on selected text copies it immediately
+      container.addEventListener('contextmenu', (e) => {
+        if (term.hasSelection()) {
+          e.preventDefault();
+          copyTerminalSelection(true);
+        }
+      });
+
+      // Native browser copy event hook (browser Edit > Copy, system shortcuts)
+      document.addEventListener('copy', (e) => {
+        if (term && term.hasSelection()) {
+          const text = term.getSelection();
+          if (text && text.length > 0) {
+            if (e.clipboardData) {
+              e.clipboardData.setData('text/plain', text);
+              e.preventDefault();
+              if (typeof showToast === 'function') {
+                showToast('Copied to clipboard', 'success', 2000);
+              }
+            }
+          }
+        }
+      });
 
       // Apply dynamic terminal display options
       const reloadProtectSelect = document.getElementById('reload-protect-select');
@@ -3248,11 +3298,27 @@
       };
 
       term.attachCustomKeyEventHandler((e) => {
+        // Ctrl+C or Cmd+C (macOS):
+        // If text is selected, COPY the selection and NEVER send \x03 (SIGINT) to the app!
+        const isCopyKey = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c';
+        if (isCopyKey && !e.shiftKey) {
+          if (term.hasSelection()) {
+            if (e.type === 'keydown') {
+              copyTerminalSelection(true);
+            }
+            e.preventDefault();
+            return false;
+          }
+          // When nothing is selected: Cmd+C on Mac is a no-op, Ctrl+C sends SIGINT (\x03)
+          if (e.metaKey) return false;
+          return true;
+        }
+
         // Ctrl+Shift+C = copy selection (standard terminal shortcut). Never sent to the app.
         if (e.ctrlKey && e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'c') {
           if (e.type === 'keydown') {
             e.preventDefault();
-            copyTerminalSelection();
+            copyTerminalSelection(true);
           }
           return false;
         }
