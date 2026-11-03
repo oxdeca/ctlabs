@@ -2995,20 +2995,49 @@
         fontFamily: '"Courier New", Courier, monospace',
         cursorBlink: savedCursorBlink,
         cursorStyle: savedCursorStyle,
-        fontSize: savedFontSize
+        fontSize: savedFontSize,
+        macOptionClickForcesSelection: true,
+        macOptionIsMeta: false
       });
 
-      const fallbackCopy = (text) => {
+      const execCopy = (text) => {
+        if (!text) return false;
+        try {
+          if (term && term.textarea) {
+            term.textarea.value = text;
+            term.textarea.focus({ preventScroll: true });
+            term.textarea.select();
+            if (term.textarea.setSelectionRange) {
+              term.textarea.setSelectionRange(0, text.length);
+            }
+            if (document.execCommand('copy')) {
+              return true;
+            }
+          }
+        } catch (e) {}
+
         try {
           const ta = document.createElement('textarea');
           ta.value = text;
+          ta.setAttribute('readonly', '');
           ta.style.position = 'fixed';
-          ta.style.left = '-9999px';
-          ta.style.top = '-9999px';
-          ta.style.opacity = '0';
+          ta.style.top = '0';
+          ta.style.left = '0';
+          ta.style.width = '2em';
+          ta.style.height = '2em';
+          ta.style.padding = '0';
+          ta.style.border = 'none';
+          ta.style.outline = 'none';
+          ta.style.boxShadow = 'none';
+          ta.style.background = 'transparent';
+          ta.style.opacity = '0.01';
+          ta.style.zIndex = '-9999';
           document.body.appendChild(ta);
-          ta.focus();
+          ta.focus({ preventScroll: true });
           ta.select();
+          if (ta.setSelectionRange) {
+            ta.setSelectionRange(0, text.length);
+          }
           const ok = document.execCommand('copy');
           document.body.removeChild(ta);
           return ok;
@@ -3017,28 +3046,34 @@
         }
       };
 
+      let lastCopyToastTime = 0;
       const copyTerminalSelection = (showFeedback = true) => {
-        const selection = term.getSelection();
+        const selection = term ? term.getSelection() : '';
         if (!selection || !selection.length) return false;
+
+        let copied = false;
+        try {
+          copied = execCopy(selection);
+        } catch (err) {
+          copied = false;
+        }
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(selection).then(() => {
-            if (showFeedback && typeof showToast === 'function') {
+            const now = Date.now();
+            if (showFeedback && !copied && (now - lastCopyToastTime > 1200)) {
+              lastCopyToastTime = now;
               showToast('Copied to clipboard', 'success', 2000);
             }
-          }).catch(() => {
-            if (fallbackCopy(selection) && showFeedback && typeof showToast === 'function') {
-              showToast('Copied to clipboard', 'success', 2000);
-            }
-          });
-          return true;
+          }).catch(() => {});
         }
 
-        const ok = fallbackCopy(selection);
-        if (ok && showFeedback && typeof showToast === 'function') {
+        const now = Date.now();
+        if (copied && showFeedback && (now - lastCopyToastTime > 1200)) {
+          lastCopyToastTime = now;
           showToast('Copied to clipboard', 'success', 2000);
         }
-        return ok;
+        return copied;
       };
 
       const fitAddon = new FitAddon.FitAddon();
@@ -3055,9 +3090,9 @@
         const origShouldForce = term._core._selectionService.shouldForceSelection.bind(term._core._selectionService);
         term._core._selectionService.shouldForceSelection = function(e) {
           if (mouseReportingMode === 'select') {
-            // Left-click (button 0): plain drag forces text selection; Shift+click passes through to TUI app
+            // In selection mode, any left-click drag forces native text selection
             if (e.button === 0) {
-              return !e.shiftKey;
+              return true;
             }
             return origShouldForce(e);
           }
@@ -3065,16 +3100,41 @@
         };
       }
 
-      // Auto-copy selection on mouseup
-      container.addEventListener('mouseup', (e) => {
-        if (e.button === 0 && term.hasSelection()) {
+      // Synchronize selection changes directly into term.textarea so macOS Edit->Copy,
+      // native browser copy commands, and auto-copy work reliably on WebKit/Safari and Chrome.
+      term.onSelectionChange(() => {
+        const selection = term.getSelection();
+        if (selection && selection.length > 0) {
+          if (term.textarea) {
+            try {
+              term.textarea.value = selection;
+              term.textarea.focus({ preventScroll: true });
+              term.textarea.select();
+              if (term.textarea.setSelectionRange) {
+                term.textarea.setSelectionRange(0, selection.length);
+              }
+            } catch (err) {}
+          }
+          copyTerminalSelection(true);
+        } else {
+          if (term.textarea) {
+            try {
+              term.textarea.value = '';
+            } catch (err) {}
+          }
+        }
+      });
+
+      // Auto-copy selection on mouseup anywhere in the document
+      document.addEventListener('mouseup', (e) => {
+        if (e.button === 0 && term && term.hasSelection()) {
           copyTerminalSelection(true);
         }
       });
 
       // Right-click on selected text copies it immediately
       container.addEventListener('contextmenu', (e) => {
-        if (term.hasSelection()) {
+        if (term && term.hasSelection()) {
           e.preventDefault();
           copyTerminalSelection(true);
         }
@@ -3082,15 +3142,15 @@
 
       // Native browser copy event hook (browser Edit > Copy, system shortcuts)
       document.addEventListener('copy', (e) => {
-        if (term && term.hasSelection()) {
-          const text = term.getSelection();
-          if (text && text.length > 0) {
-            if (e.clipboardData) {
-              e.clipboardData.setData('text/plain', text);
-              e.preventDefault();
-              if (typeof showToast === 'function') {
-                showToast('Copied to clipboard', 'success', 2000);
-              }
+        const text = (term && term.hasSelection()) ? term.getSelection() : (term && term.textarea ? term.textarea.value : '');
+        if (text && text.length > 0) {
+          if (e.clipboardData) {
+            e.clipboardData.setData('text/plain', text);
+            e.preventDefault();
+            const now = Date.now();
+            if (typeof showToast === 'function' && (now - lastCopyToastTime > 1200)) {
+              lastCopyToastTime = now;
+              showToast('Copied to clipboard', 'success', 2000);
             }
           }
         }
@@ -3298,19 +3358,29 @@
       };
 
       term.attachCustomKeyEventHandler((e) => {
-        // Ctrl+C or Cmd+C (macOS):
-        // If text is selected, COPY the selection and NEVER send \x03 (SIGINT) to the app!
-        const isCopyKey = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c';
-        if (isCopyKey && !e.shiftKey) {
+        // macOS Command+C:
+        // When text is selected, copy it. Do NOT call e.preventDefault(), allowing browser native copy event to fire.
+        if (e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'c') {
           if (term.hasSelection()) {
+            if (e.type === 'keydown') {
+              copyTerminalSelection(true);
+            }
+            return false; // Tells xterm not to handle it as terminal typing
+          }
+          return false; // No selection: Cmd+C is browser no-op, never send to terminal
+        }
+
+        // Ctrl+C (Linux/Windows copy when selected, or Mac user using Ctrl+C):
+        // If text is selected, COPY and NEVER send \x03 (SIGINT) to the app!
+        if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'c') {
+          if (!e.shiftKey && term.hasSelection()) {
             if (e.type === 'keydown') {
               copyTerminalSelection(true);
             }
             e.preventDefault();
             return false;
           }
-          // When nothing is selected: Cmd+C on Mac is a no-op, Ctrl+C sends SIGINT (\x03)
-          if (e.metaKey) return false;
+          // When nothing is selected, allow Ctrl+C to send SIGINT (\x03)
           return true;
         }
 
