@@ -442,7 +442,7 @@ class TerminalService
 
   def self.resolve_terminal_command(node_name, session, env_token: nil)
     if node_name == 'ctlabs_host'
-      cmd = ['env', 'TERM=linux']
+      cmd = ['env', 'TERM=xterm-256color', 'LANG=en_US.UTF-8', 'LC_ALL=en_US.UTF-8']
       cmd.push("VAULT_TOKEN=#{session[:vault_token]}") if session[:vault_token]
       cmd.push("VAULT_ADDR=#{session[:vault_addr]}") if session[:vault_addr]
       cmd.push('bash')
@@ -511,7 +511,7 @@ class TerminalService
       user = uri.user || 'root'
       host = uri.host
       
-      cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'SetEnv="TERM=xterm-256color"']
+      cmd = ['ssh', '-o', 'StrictHostKeyChecking=no', '-o', 'SetEnv="TERM=xterm-256color LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8"']
       if Lab.running?
         safe_name = Lab.current_name.gsub('/', '_')
         priv_key_path = "/var/run/ctlabs/keys/#{safe_name}_id_ed25519"
@@ -540,6 +540,8 @@ class TerminalService
       work_dir = nil if work_dir && !container_dir_exists?(engine, exec_name, work_dir)
       cmd.push('-w', work_dir) if work_dir
       cmd.push('-e', 'TERM=xterm-256color')
+      cmd.push('-e', 'LANG=en_US.UTF-8')
+      cmd.push('-e', 'LC_ALL=en_US.UTF-8')
 
       # Inject GCP creds when opening a terminal in a controller container: the
       # lab's in-lab controller node (ansible/controller), or the persistent
@@ -762,29 +764,38 @@ class TerminalService
               chunk = pty_read.readpartial(8192)
               utf8_buf << chunk.force_encoding('BINARY')
 
-              utf8 = utf8_buf.dup.force_encoding('UTF-8')
-              if utf8.valid_encoding?
-                sess[:rec_event].call('o', utf8)
+              # Split off any incomplete multi-byte UTF-8 sequence at the tail of the buffer.
+              # UTF-8 sequences can be up to 4 bytes and can get sliced across readpartial boundaries.
+              len = utf8_buf.bytesize
+              split_at = len
+              tail_len = [len, 3].min
+              (1..tail_len).each do |n|
+                pos = len - n
+                b = utf8_buf.getbyte(pos)
+                if (b & 0xC0) == 0xC0 # Leading byte of multi-byte sequence
+                  expected = if (b & 0xE0) == 0xC0 then 2
+                             elsif (b & 0xF0) == 0xE0 then 3
+                             elsif (b & 0xF8) == 0xF0 then 4
+                             else 0
+                             end
+                  split_at = pos if expected > 0 && n < expected
+                  break
+                elsif (b & 0x80) == 0 # ASCII single byte (0xxxxxxx)
+                  break
+                end
+              end
+
+              if split_at > 0
+                to_emit = utf8_buf[0...split_at].force_encoding('UTF-8').scrub('?')
+                utf8_buf = utf8_buf[split_at..-1] || ''.force_encoding('BINARY')
+
+                sess[:rec_event].call('o', to_emit)
                 sess[:output_mutex].synchronize do
-                  sess[:output_buffer] << utf8
+                  sess[:output_buffer] << to_emit
                   if sess[:output_buffer].bytesize > MAX_REPLAY_BUFFER
                     sess[:output_buffer] = sess[:output_buffer].byteslice(-MAX_REPLAY_BUFFER..-1).scrub('')
                   end
-                  sess[:driver]&.text(utf8) rescue nil
-                end
-                utf8_buf.clear
-              else
-                scrubbed = utf8.scrub('?')
-                if scrubbed != utf8
-                  sess[:rec_event].call('o', scrubbed)
-                  sess[:output_mutex].synchronize do
-                    sess[:output_buffer] << scrubbed
-                    if sess[:output_buffer].bytesize > MAX_REPLAY_BUFFER
-                      sess[:output_buffer] = sess[:output_buffer].byteslice(-MAX_REPLAY_BUFFER..-1).scrub('')
-                    end
-                    sess[:driver]&.text(scrubbed) rescue nil
-                  end
-                  utf8_buf.clear
+                  sess[:driver]&.text(to_emit) rescue nil
                 end
               end
             rescue IO::WaitReadable
