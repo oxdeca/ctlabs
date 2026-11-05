@@ -179,7 +179,7 @@
                                r[:node].to_s.split(' - ').first.strip
                              end
                 %>
-                <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
+                <div class="rec-item-wrapper" id="step-<%= ERB::Util.html_escape(r[:id]) %>" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
                         data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
@@ -279,7 +279,7 @@
                                r[:node].to_s.split(' - ').first.strip
                              end
                 %>
-                <div class="rec-item-wrapper" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
+                <div class="rec-item-wrapper" id="step-<%= ERB::Util.html_escape(r[:id]) %>" draggable="true" data-id="<%= ERB::Util.html_escape(r[:id]) %>" style="border-bottom: 1px solid #334155; cursor: grab;">
                   <button class="rec-item" 
                         data-src="/recordings/<%= ERB::Util.url_encode(r[:id]) %>" 
                         data-id="<%= ERB::Util.html_escape(r[:id]) %>"
@@ -961,6 +961,14 @@
       <div id="image-modal-caption" style="margin-top: 12px; color: #cbd5e1; font-size: 0.9em; font-weight: 500; text-align: center; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,0.8);"></div>
     </div>
 
+    <!-- Step Context Menu (right-click a step in the sidebar) -->
+    <div id="step-context-menu" style="display: none; position: fixed; z-index: 10001; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); padding: 4px 0; user-select: none;">
+      <div id="step-context-title" style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 700; border-bottom: 1px solid #334155; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+      <button type="button" id="step-context-copy-link" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+        <i class="fas fa-link" style="color: #38bdf8; width: 14px; text-align: center;"></i> Copy step link
+      </button>
+    </div>
+
     <script src="/js/marked.min.js"></script>
     <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/overlay.min.js"></script>
@@ -987,6 +995,10 @@
         const deleteForm = document.getElementById('rec-delete');
         const metaForm = document.getElementById('meta-form');
         const editTitle = document.getElementById('edit-title');
+        const stepContextMenu = document.getElementById('step-context-menu');
+        const stepContextTitle = document.getElementById('step-context-title');
+        const stepContextCopyLink = document.getElementById('step-context-copy-link');
+        let stepContextBtn = null;
         const recsList = document.getElementById('recs-list');
         const otherList = document.getElementById('other-list');
         const importBtn = document.getElementById('import-btn');
@@ -1857,6 +1869,112 @@
             if (mdSaveStatus) mdSaveStatus.style.display = 'none';
           });
         }
+
+        // --- In-app Step Links from Markdown ---
+        // Notes can link to a step by its stable recording id:
+        //   [Step 3](#step-20261103-101500_ro1_a1b2c3)
+        //   [Step 3](step:20261103-101500_ro1_a1b2c3)
+        // Select the step without reloading the page. Step numbers are not
+        // supported on purpose: they change when steps are reordered.
+        if (mdPreviewPane) {
+          mdPreviewPane.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (!link) return;
+            const href = (link.getAttribute('href') || '').trim();
+            const id = href.startsWith('#step-') ? href.slice(6)
+                     : href.startsWith('step:') ? href.slice(5)
+                     : null;
+            if (!id) return;
+            const target = document.querySelector(`.rec-item[data-id="${CSS.escape(id)}"]`);
+            if (!target) return;
+            e.preventDefault();
+            selectRecording(target, true);
+            target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          });
+        }
+
+        // --- Step Context Menu (right-click -> copy Markdown link) ---
+        function copyTextToClipboard(text) {
+          // Synchronous path first: WebKit requires a live user activation for
+          // execCommand('copy'), and the async clipboard call may not have it.
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.left = '0';
+          ta.style.top = '0';
+          ta.style.opacity = '0.01';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta);
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(() => {});
+          }
+        }
+
+        function hideStepContextMenu() {
+          if (stepContextMenu) stepContextMenu.style.display = 'none';
+          stepContextBtn = null;
+        }
+
+        function stepLinkFor(btn) {
+          const id = btn.getAttribute('data-id') || '';
+          if (!id) return null;
+          const titleNode = btn.querySelector('.item-title');
+          const rawTitle = (btn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || 'Step').trim();
+          const label = rawTitle.replace(/[[\]]/g, '\\$&').replace(/\s+/g, ' ');
+          return `[${label}](#step-${id})`;
+        }
+
+        document.addEventListener('contextmenu', (e) => {
+          const btn = e.target.closest('.rec-item');
+          if (!btn || !stepContextMenu) return;
+          e.preventDefault();
+          stepContextBtn = btn;
+
+          const id = btn.getAttribute('data-id') || '';
+          const step = btn.getAttribute('data-step') || '';
+          const titleNode = btn.querySelector('.item-title');
+          const title = (btn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || id || 'Step').trim();
+          if (stepContextTitle) stepContextTitle.textContent = (step ? '#' + step + ' ' : '') + title;
+
+          stepContextMenu.style.display = 'block';
+          const rect = stepContextMenu.getBoundingClientRect();
+          let x = e.clientX;
+          let y = e.clientY;
+          if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+          if (y + rect.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - rect.height - 8);
+          stepContextMenu.style.left = x + 'px';
+          stepContextMenu.style.top = y + 'px';
+        });
+
+        if (stepContextCopyLink) {
+          stepContextCopyLink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!stepContextBtn) return;
+            const snippet = stepLinkFor(stepContextBtn);
+            if (!snippet) return;
+            copyTextToClipboard(snippet);
+            const original = stepContextCopyLink.innerHTML;
+            stepContextCopyLink.innerHTML = '<i class="fas fa-check" style="color: #10b981; width: 14px; text-align: center;"></i> Copied!';
+            setTimeout(() => {
+              stepContextCopyLink.innerHTML = original;
+              hideStepContextMenu();
+            }, 800);
+          });
+        }
+
+        document.addEventListener('click', (e) => {
+          if (stepContextMenu && stepContextMenu.style.display !== 'none' && !stepContextMenu.contains(e.target)) {
+            hideStepContextMenu();
+          }
+        });
+        document.addEventListener('scroll', hideStepContextMenu, true);
+        window.addEventListener('resize', hideStepContextMenu);
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') hideStepContextMenu();
+        });
 
         // --- Note Tab Mode Listeners ---
         if (mdTabPreview) mdTabPreview.addEventListener('click', () => setMdMode('preview'));
