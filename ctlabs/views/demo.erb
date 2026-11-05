@@ -446,7 +446,7 @@
               </div>
 
               <!-- Emoji Helper Dropdown -->
-              <div style="position: relative; display: flex; align-items: center; gap: 6px;">
+              <div id="md-emoji-wrapper" style="position: relative; display: flex; align-items: center; gap: 6px;">
                 <button type="button" id="md-emoji-btn" title="Insert Emoji (:shortcode: or character, Ctrl+E)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <span style="font-size: 1.1em; line-height: 1;">😃</span>
                   <span style="font-weight: 500;">Emoji</span>
@@ -1057,6 +1057,7 @@
           }
           return [];
         }
+        const mdEmojiWrapper = document.getElementById('md-emoji-wrapper');
         const mdEmojiBtn = document.getElementById('md-emoji-btn');
         const mdEmojiMenu = document.getElementById('md-emoji-menu');
         const mdEmojiSearch = document.getElementById('md-emoji-search');
@@ -1566,6 +1567,12 @@
             activeTab.style.background = '#0284c7';
             activeTab.style.color = '#ffffff';
             activeTab.style.borderColor = '#38bdf8';
+          }
+
+          // The emoji picker inserts text, so it is only useful while editing.
+          if (mdEmojiWrapper) {
+            mdEmojiWrapper.style.display = (mode === 'preview') ? 'none' : 'flex';
+            if (mode === 'preview') toggleMdEmojiMenu(false);
           }
 
           const cm = getMdEditor();
