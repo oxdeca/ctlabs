@@ -1625,8 +1625,16 @@
                 try { hljs.highlightElement(block); } catch (e) {}
               });
             }
-            // Add click-to-view in full size modal for images
+            // Add click-to-view in full size modal for images. Images wrapped in
+            // a step link are left alone so the delegated link handler below can
+            // open the step instead of the lightbox.
             mdPreviewPane.querySelectorAll('img').forEach(img => {
+              const link = img.closest('a');
+              if (link && stepIdFromHref(link.getAttribute('href'))) {
+                img.title = img.title || 'Click to open step';
+                img.style.cursor = 'pointer';
+                return;
+              }
               img.title = img.title || 'Click to enlarge';
               img.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1874,16 +1882,22 @@
         // Notes can link to a step by its stable recording id:
         //   [Step 3](#step-20261103-101500_ro1_a1b2c3)
         //   [Step 3](step:20261103-101500_ro1_a1b2c3)
+        // A picture can be the link target too:
+        //   [![alt](images/shot.png)](#step-20261103-101500_ro1_a1b2c3)
         // Select the step without reloading the page. Step numbers are not
         // supported on purpose: they change when steps are reordered.
+        function stepIdFromHref(href) {
+          const h = (href || '').trim();
+          if (h.startsWith('#step-')) return h.slice(6);
+          if (h.startsWith('step:')) return h.slice(5);
+          return null;
+        }
+
         if (mdPreviewPane) {
           mdPreviewPane.addEventListener('click', (e) => {
             const link = e.target.closest('a');
             if (!link) return;
-            const href = (link.getAttribute('href') || '').trim();
-            const id = href.startsWith('#step-') ? href.slice(6)
-                     : href.startsWith('step:') ? href.slice(5)
-                     : null;
+            const id = stepIdFromHref(link.getAttribute('href'));
             if (!id) return;
             const target = document.querySelector(`.rec-item[data-id="${CSS.escape(id)}"]`);
             if (!target) return;
