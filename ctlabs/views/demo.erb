@@ -324,6 +324,16 @@
             </div>
           </div>
 
+          <!-- Picture Inspector Bar -->
+          <div id="pic-inspector-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 14px; border-top: 1px solid #334155; background: #0e1726; flex-shrink: 0;">
+            <div style="font-weight: 600; color: #cbd5e1; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.04em;">
+              <i class="fas fa-images" style="color: #64748b; margin-right: 4px;"></i> PICTURES
+            </div>
+            <button type="button" id="pic-inspector-btn" title="Picture inspector — find unused or missing images" style="background: #334155; color: #f8fafc; padding: 4px 10px; border-radius: 4px; border: 1px solid #475569; font-weight: 600; font-size: 0.8em; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#475569'" onmouseout="this.style.background='#334155'">
+              <i class="fas fa-search" style="color: #38bdf8;"></i> Inspect
+            </button>
+          </div>
+
         </aside>
 
         <!-- Vertical Divider / Sidebar Resizer -->
@@ -544,6 +554,26 @@
             <button type="submit" class="w3-button w3-round w3-red" style="font-size: 0.85em; padding: 6px 14px; font-weight: 600;"><i class="fas fa-trash-alt"></i> Delete Set</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Picture Inspector Modal -->
+    <div id="pic-inspector-modal" class="w3-modal" style="z-index: 9999;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 820px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;"><i class="fas fa-images"></i> Picture Inspector</h3>
+          <span onclick="document.getElementById('pic-inspector-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 14px 16px;">
+          <p id="pic-inspector-summary" style="color: #cbd5e1; font-size: 0.88em; margin: 0 0 10px 0;">Loading pictures…</p>
+          <div id="pic-inspector-list" style="max-height: 60vh; overflow-y: auto; border: 1px solid #334155; border-radius: 6px; background: #0f172a;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 14px;">
+            <button type="button" id="pic-inspector-delete-unused" class="w3-button w3-round" style="background: #ef4444; color: #ffffff; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fas fa-broom"></i> Delete all unused
+            </button>
+            <button type="button" onclick="document.getElementById('pic-inspector-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1688,6 +1718,151 @@
             }
           });
         }
+
+        // --- Picture Inspector ---
+        const picInspectorModal = document.getElementById('pic-inspector-modal');
+        const picInspectorSummary = document.getElementById('pic-inspector-summary');
+        const picInspectorList = document.getElementById('pic-inspector-list');
+        const picInspectorDeleteUnused = document.getElementById('pic-inspector-delete-unused');
+        const picInspectorBtn = document.getElementById('pic-inspector-btn');
+
+        function escapeHtml(str) {
+          return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+          }[c]));
+        }
+
+        function picInspectorImageUrl(name) {
+          return '/recordings/' + encodeURIComponent(activeWalkthrough) + '/images/' + encodeURIComponent(name);
+        }
+
+        function picInspectorMarkdownFor(filename) {
+          const alt = String(filename || '').replace(/\.[^.]+$/, '');
+          return `![${alt}](/recordings/images/${filename})`;
+        }
+
+        function renderPicInspector(items) {
+          if (!picInspectorList) return;
+          const used = items.filter(i => i.used && !i.missing).length;
+          const unused = items.filter(i => !i.used && !i.missing).length;
+          const missing = items.filter(i => i.missing).length;
+          if (picInspectorSummary) {
+            picInspectorSummary.textContent = `${items.length} picture${items.length === 1 ? '' : 's'} · ${used} used · ${unused} unused · ${missing} missing`;
+          }
+          if (picInspectorDeleteUnused) {
+            picInspectorDeleteUnused.disabled = unused === 0;
+            picInspectorDeleteUnused.style.opacity = unused === 0 ? '0.5' : '1';
+            picInspectorDeleteUnused.style.cursor = unused === 0 ? 'not-allowed' : 'pointer';
+          }
+          if (items.length === 0) {
+            picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;">No pictures in this walkthrough set.</div>';
+            return;
+          }
+          picInspectorList.innerHTML = items.map(item => {
+            const usedBy = (item.used_by || []).map(u => (u.step ? '#' + u.step + ' ' : '') + escapeHtml(u.title)).join(', ');
+            const status = item.missing
+              ? '<span style="background:#7f1d1d; color:#fecaca; padding:1px 6px; border-radius:3px; font-size:0.75em;">Missing</span>'
+              : item.used
+                ? '<span style="background:#14532d; color:#bbf7d0; padding:1px 6px; border-radius:3px; font-size:0.75em;">Used</span>'
+                : '<span style="background:#78350f; color:#fde68a; padding:1px 6px; border-radius:3px; font-size:0.75em;">Unused</span>';
+            const thumb = item.missing
+              ? '<div style="width:56px; height:42px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#ef4444;"><i class="fas fa-image-slash"></i></div>'
+              : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" style="width:56px; height:42px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b;" />`;
+            const detail = item.missing
+              ? 'Referenced but file is missing'
+              : (item.used ? 'Used in: ' + usedBy : 'Not referenced by any note');
+            const globalTag = item.global_only ? ' <span style="color:#94a3b8; font-size:0.75em;">(global fallback)</span>' : '';
+            const copyBtn = item.missing
+              ? ''
+              : `<button type="button" class="pic-inspector-copy w3-button w3-round" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown image link" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-link" style="color:#38bdf8; margin-right:4px;"></i>Copy link</button>`;
+            const deleteBtn = (!item.used && !item.missing && item.scoped)
+              ? `<button type="button" class="pic-inspector-delete w3-button w3-round" data-filename="${escapeHtml(item.filename)}" style="background:#7f1d1d; color:#fecaca; font-size:0.78em; padding:4px 10px; white-space:nowrap;">Delete</button>`
+              : '';
+            return `<div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #334155;">
+              ${thumb}
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <span style="font-family:ui-monospace, monospace; font-size:0.82em; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.filename)}</span>
+                  ${status}${globalTag}
+                </div>
+                <div style="color:#94a3b8; font-size:0.78em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detail}</div>
+              </div>
+              <div style="color:#94a3b8; font-size:0.78em; white-space:nowrap;">${formatFileSize(item.size)}</div>
+              ${copyBtn}
+              ${deleteBtn}
+            </div>`;
+          }).join('');
+          picInspectorList.querySelectorAll('.pic-inspector-copy').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const filename = btn.getAttribute('data-filename');
+              if (!filename) return;
+              copyTextToClipboard(picInspectorMarkdownFor(filename));
+              const original = btn.innerHTML;
+              btn.innerHTML = '<i class="fas fa-check" style="color:#10b981; margin-right:4px;"></i>Copied!';
+              setTimeout(() => { btn.innerHTML = original; }, 1200);
+            });
+          });
+          picInspectorList.querySelectorAll('.pic-inspector-delete').forEach(btn => {
+            btn.addEventListener('click', () => deletePicInspectorImage(btn.getAttribute('data-filename')));
+          });
+        }
+
+        async function loadPicInspector() {
+          if (!picInspectorList) return;
+          picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;"><i class="fas fa-spinner fa-spin"></i> Loading pictures...</div>';
+          try {
+            const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/inventory', { credentials: 'same-origin' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const items = await res.json();
+            renderPicInspector(Array.isArray(items) ? items : []);
+          } catch (err) {
+            console.error('Picture inspector load failed:', err);
+            if (picInspectorSummary) picInspectorSummary.textContent = '';
+            picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #ef4444; font-size: 0.9em;"><i class="fas fa-exclamation-triangle"></i> Failed to load pictures.</div>';
+          }
+        }
+
+        async function deletePicInspectorImage(filename) {
+          if (!filename) return;
+          if (!confirm('Delete unused picture "' + filename + '"?')) return;
+          const fd = new FormData();
+          fd.append('filename', filename);
+          try {
+            const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/delete', { method: 'POST', credentials: 'same-origin', body: fd });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+            loadPicInspector();
+          } catch (err) {
+            alert('Failed to delete picture: ' + err.message);
+          }
+        }
+
+        if (picInspectorDeleteUnused) {
+          picInspectorDeleteUnused.addEventListener('click', async () => {
+            if (!confirm('Delete all pictures that are not referenced by any note in this set?')) return;
+            try {
+              const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/delete-unused', { method: 'POST', credentials: 'same-origin' });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+              loadPicInspector();
+            } catch (err) {
+              alert('Failed to delete unused pictures: ' + err.message);
+            }
+          });
+        }
+
+        if (picInspectorBtn) {
+          picInspectorBtn.addEventListener('click', () => {
+            if (picInspectorModal) picInspectorModal.style.display = 'block';
+            loadPicInspector();
+          });
+        }
+
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && picInspectorModal && picInspectorModal.style.display === 'block') {
+            picInspectorModal.style.display = 'none';
+          }
+        });
 
         function loadMarkdownContent(id) {
           clearTimeout(mdAutoSaveTimer);

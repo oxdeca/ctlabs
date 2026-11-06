@@ -27,6 +27,7 @@ class RecordingService
   VIDEO_EXTS      = ['.webm', '.mp4'].freeze
   VIDEO_EXT       = '.webm'
   IMAGE_EXTS      = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
+  IMAGE_REF_RE    = %r{(?<![\w.-])images/([a-zA-Z0-9_.-]+)}
   MANIFEST        = '_walkthrough.json'
   LEGACY_MANIFEST = '_walkthroughs.json'
   ID_RE           = /\A[a-zA-Z0-9_.-]{1,120}\z/
@@ -120,6 +121,114 @@ class RecordingService
     return direct if File.file?(direct)
 
     nil
+  end
+
+  # Maps image filename => [recording ids that reference it] for one set.
+  # Only markdown steps/notes can reference pictures, so scan every .md file in
+  # the set directory (including files not yet adopted into the manifest).
+  def self.image_references(slug)
+    refs = Hash.new { |h, k| h[k] = [] }
+    Dir.glob(File.join(walkthrough_dir(slug), "*#{MD_EXT}")).each do |path|
+      next unless File.file?(path)
+
+      id = File.basename(path, MD_EXT)
+      content = begin
+        File.read(path, encoding: 'UTF-8')
+      rescue StandardError
+        ''
+      end
+      content.scan(IMAGE_REF_RE).flatten.uniq.each { |name| refs[name] << id }
+    end
+    refs
+  end
+
+  # Inventory of the pictures belonging to one walkthrough set. Each entry
+  # reports whether it is used by any note, which steps use it, and whether a
+  # referenced file is missing.
+  def self.image_inventory(slug)
+    key, entry, = walkthrough_entry(slug)
+    scoped_dir = ensure_images_dir(key)
+    global_dir = ensure_images_dir
+    refs = image_references(key)
+
+    titles = {}
+    Dir.glob(File.join(walkthrough_dir(key), "*#{MD_EXT}")).each do |path|
+      m = meta(path)
+      titles[m[:id]] = m[:title] if m
+    end
+
+    step_positions = {}
+    Array(entry['recording_ids']).each_with_index { |id, i| step_positions[id.to_s] = i + 1 }
+
+    names = Dir.children(scoped_dir).select do |name|
+      path = File.join(scoped_dir, name)
+      File.file?(path) && IMAGE_EXTS.include?(File.extname(name).downcase)
+    end
+    refs.each_key { |name| names << name unless names.include?(name) }
+
+    names.uniq.sort.map do |name|
+      scoped_path = File.join(scoped_dir, name)
+      global_path = File.join(global_dir, name)
+      in_scoped = File.file?(scoped_path)
+      in_global = File.file?(global_path)
+      used_by = Array(refs[name]).uniq.map do |id|
+        {
+          'id'    => id,
+          'title' => (titles[id] || id).to_s,
+          'step'  => step_positions[id]
+        }
+      end
+
+      {
+        'filename'    => name,
+        'size'        => in_scoped ? File.size(scoped_path) : (in_global ? File.size(global_path) : 0),
+        'scoped'      => in_scoped,
+        'global_only' => !in_scoped && in_global,
+        'missing'     => !in_scoped && !in_global,
+        'used'        => used_by.any?,
+        'used_by'     => used_by
+      }
+    end
+  end
+
+  # Removes an unused picture from a set's images/ directory. Refuses to delete
+  # a picture that is still referenced by a note in this set, or one that
+  # another set needs and cannot resolve through the global fallback.
+  def self.delete_image(slug, filename)
+    clean = filename.to_s
+    return false if clean.empty? || clean != File.basename(clean) || clean.include?('..')
+    return false unless IMAGE_EXTS.include?(File.extname(clean).downcase)
+
+    key, = walkthrough_entry(slug)
+    return false if image_references(key).key?(clean)
+
+    path = File.join(ensure_images_dir(key), clean)
+    return false unless File.file?(path)
+
+    if other_sets_reference_image?(clean, except_slug: key) && !File.file?(File.join(ensure_images_dir, clean))
+      return false
+    end
+
+    File.delete(path)
+    true
+  rescue SystemCallError
+    false
+  end
+
+  def self.other_sets_reference_image?(filename, except_slug:)
+    load_walkthroughs.keys.any? do |slug|
+      next false if slug == except_slug
+
+      image_references(slug).key?(filename)
+    end
+  end
+
+  def self.delete_unused_images(slug)
+    image_inventory(slug).count do |img|
+      next false if img['used'] || img['missing'] || !img['scoped']
+
+      delete_image(slug, img['filename'])
+    end
   end
 
   # The public id is the basename without extension. It travels in URLs, so

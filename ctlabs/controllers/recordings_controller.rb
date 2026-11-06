@@ -801,6 +801,34 @@ class RecordingsController < BaseController
     redirect "/demo?walkthrough=#{slug}&recording=#{id}"
   end
 
+  get '/walkthroughs/:slug/images/inventory' do
+    content_type :json
+    RecordingService.image_inventory(params[:slug].to_s).to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/walkthroughs/:slug/images/delete' do
+    content_type :json
+    filename = params[:filename].to_s
+    ok = RecordingService.delete_image(params[:slug].to_s, filename)
+    status ok ? 200 : 422
+    { ok: ok, filename: filename }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/walkthroughs/:slug/images/delete-unused' do
+    content_type :json
+    count = RecordingService.delete_unused_images(params[:slug].to_s)
+    { ok: true, deleted: count }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   post '/recordings/:id/active' do
     slug = params[:walkthrough].to_s
     if RecordingService.valid_id?(params[:id])
