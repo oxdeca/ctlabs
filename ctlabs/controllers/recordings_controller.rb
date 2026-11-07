@@ -158,6 +158,13 @@ class RecordingsController < BaseController
 
       images_to_add.each do |img_name, img_path|
         zipfile.add("images/#{img_name}", img_path)
+        sidecar = File.join(
+          File.dirname(img_path),
+          "#{File.basename(img_name, File.extname(img_name))}#{RecordingService::DOT_EXT}"
+        )
+        if File.file?(sidecar)
+          zipfile.add("images/#{File.basename(sidecar)}", sidecar)
+        end
       end
 
       manifest = {
@@ -376,6 +383,21 @@ class RecordingsController < BaseController
             elsif ext == '.json' && !base.start_with?('_') && base != RecordingService::MANIFEST
               old_id = clean_base
               pending_sidecars[old_id] = entry.get_input_stream.read
+            elsif ext == RecordingService::DOT_EXT && (entry.name.start_with?('images/') || entry.name.include?('/images/'))
+              dot_basename = base
+              dot_data = entry.get_input_stream.read
+              File.binwrite(File.join(RecordingService.ensure_images_dir, dot_basename), dot_data)
+
+              wk_target = params[:walkthrough].to_s.strip
+              if !wk_target.empty?
+                begin
+                  scoped_dir = RecordingService.ensure_images_dir(wk_target)
+                  File.binwrite(File.join(scoped_dir, dot_basename), dot_data)
+                rescue StandardError
+                end
+              end
+
+              extracted_images << dot_basename
             elsif entry.name.start_with?('images/') || entry.name.include?('/images/') || RecordingService::IMAGE_EXTS.include?(ext)
               img_basename = base
               img_data = entry.get_input_stream.read
@@ -569,6 +591,56 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  post '/recordings/graphviz/preview' do
+    content_type :json
+    engine = params[:engine].to_s
+    result = GraphvizService.render(params[:source].to_s, format: 'svg', engine: engine)
+    unless result[:ok]
+      status 422
+      return { ok: false, error: result[:error] }.to_json
+    end
+
+    { ok: true, svg: result[:data].dup.force_encoding('UTF-8') }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/graphviz' do
+    content_type :json
+    source = params[:source].to_s
+    format = params[:format].to_s.downcase
+    format = 'svg' unless GraphvizService::FORMATS.include?(format)
+    engine = params[:engine].to_s
+    base   = params[:base].to_s.strip
+    name   = params[:name].to_s.strip
+    name   = 'diagram' if name.empty?
+
+    wk = params[:walkthrough].to_s.strip
+    wk = session[:walkthrough].to_s.strip if wk.empty?
+
+    result = GraphvizService.render(source, format: format, engine: engine)
+    unless result[:ok]
+      status 422
+      return { ok: false, error: result[:error] }.to_json
+    end
+
+    saved = RecordingService.save_diagram(
+      result[:data], name,
+      walkthrough: wk, source: source, format: format, base: base
+    )
+
+    {
+      ok:       true,
+      filename: saved['filename'],
+      base:     saved['base'],
+      url:      "/recordings/images/#{saved['filename']}"
+    }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   get '/recordings/images/:filename' do
     path = RecordingService.image_path(params[:filename])
     halt 404, 'Image not found' unless path
@@ -675,6 +747,13 @@ class RecordingsController < BaseController
         end
         images_to_add.each do |img_name, img_path|
           zipfile.add("images/#{img_name}", img_path)
+          sidecar = File.join(
+            File.dirname(img_path),
+            "#{File.basename(img_name, File.extname(img_name))}#{RecordingService::DOT_EXT}"
+          )
+          if File.file?(sidecar)
+            zipfile.add("images/#{File.basename(sidecar)}", sidecar)
+          end
         end
       end
 
@@ -824,6 +903,73 @@ class RecordingsController < BaseController
     content_type :json
     count = RecordingService.delete_unused_images(params[:slug].to_s)
     { ok: true, deleted: count }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/walkthroughs/:slug/graphviz/sources' do
+    content_type :json
+    RecordingService.diagram_sources(params[:slug].to_s).to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/walkthroughs/:slug/graphviz/sources/:base' do
+    content_type :json
+    source = RecordingService.diagram_source(params[:slug].to_s, params[:base].to_s)
+    halt 404, { ok: false, error: 'Diagram not found' }.to_json unless source
+
+    { ok: true, base: params[:base].to_s, source: source }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/walkthroughs/:slug/graphviz/sources/:base/delete' do
+    content_type :json
+    slug = params[:slug].to_s
+    base = params[:base].to_s.strip
+    halt 400, { ok: false, error: 'Invalid diagram name' }.to_json unless RecordingService.diagram_base_valid?(base)
+
+    key, = RecordingService.walkthrough_entry(slug)
+    scoped_dir = RecordingService.ensure_images_dir(key)
+
+    svg_name = "#{base}.svg"
+    png_name = "#{base}.png"
+
+    # Check if used by any markdown note in this set
+    refs = RecordingService.image_references(key)
+    if refs.key?(svg_name) || refs.key?(png_name)
+      status 422
+      return { ok: false, error: 'Diagram is in use and cannot be deleted.' }.to_json
+    end
+
+    deleted = false
+    [svg_name, png_name].each do |fname|
+      deleted = true if RecordingService.delete_image(key, fname)
+    end
+
+    # Also remove .dot if it was orphaned without an image
+    dot_file = File.join(scoped_dir, "#{base}#{RecordingService::DOT_EXT}")
+    if File.file?(dot_file)
+      File.delete(dot_file)
+      deleted = true
+    end
+
+    global_dot = File.join(RecordingService.ensure_images_dir, "#{base}#{RecordingService::DOT_EXT}")
+    unless RecordingService.other_sets_reference_image?(svg_name, except_slug: key) ||
+           RecordingService.other_sets_reference_image?(png_name, except_slug: key)
+      File.delete(global_dot) if File.file?(global_dot)
+    end
+
+    if deleted
+      { ok: true }.to_json
+    else
+      status 404
+      { ok: false, error: 'Diagram not found' }.to_json
+    end
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json

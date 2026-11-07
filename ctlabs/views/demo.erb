@@ -455,8 +455,16 @@
                 </button>
               </div>
 
-              <!-- Emoji Helper Dropdown -->
-              <div id="md-emoji-wrapper" style="position: relative; display: flex; align-items: center; gap: 6px;">
+              <!-- Editor Actions (Diagram & Emoji) -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <!-- Graphviz Diagram Editor -->
+                <button type="button" id="md-graphviz-btn" title="Graphviz diagram editor (Ctrl+Shift+G)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-project-diagram" style="color: #38bdf8; font-size: 0.95em;"></i>
+                  <span style="font-weight: 500;">Diagram</span>
+                </button>
+
+                <!-- Emoji Helper Dropdown -->
+                <div id="md-emoji-wrapper" style="position: relative; display: flex; align-items: center; gap: 6px;">
                 <button type="button" id="md-emoji-btn" title="Insert Emoji (:shortcode: or character, Ctrl+E)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <span style="font-size: 1.1em; line-height: 1;">😃</span>
                   <span style="font-weight: 500;">Emoji</span>
@@ -503,9 +511,10 @@
                 </div>
               </div>
             </div>
-            <div id="md-content-area" style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
+          </div>
+          <div id="md-content-area" style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
               <!-- Edit Pane -->
-              <div id="md-edit-pane" style="flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; border-right: 1px solid #334155;">
+              <div id="md-edit-pane" style="flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; border-right: none;">
                 <div style="flex: 1; min-height: 0; position: relative;">
                   <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, monospace !important; font-size: 0.8em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
                 </div>
@@ -517,6 +526,10 @@
                   </div>
                   <span style="color: #64748b; font-size: 0.9em;">:w save &bull; Esc normal mode</span>
                 </div>
+              </div>
+              <!-- Middle Resizer Bar (Split Mode) -->
+              <div id="md-splitter" title="Drag left/right to resize panes (double-click to reset 50/50)" style="display: none; width: 8px; background: #0b1120; border-left: 1px solid #334155; border-right: 1px solid #334155; cursor: col-resize; flex: none; align-items: center; justify-content: center; user-select: none; touch-action: none; transition: background 0.15s ease, border-color 0.15s ease; z-index: 10;">
+                <div class="v-grip-handle" style="width: 2px; height: 32px; background: #64748b; border-radius: 2px; transition: background 0.15s; pointer-events: none;"></div>
               </div>
               <!-- Preview Pane -->
               <div id="md-preview-pane" class="markdown-body" style="flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding: 24px 32px; color: #e2e8f0; line-height: 1.65; box-sizing: border-box;">
@@ -572,6 +585,148 @@
               <i class="fas fa-broom"></i> Delete all unused
             </button>
             <button type="button" onclick="document.getElementById('pic-inspector-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graphviz Diagram Modal -->
+    <div id="md-graphviz-modal" class="w3-modal" style="z-index: 10001; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;"><i class="fas fa-project-diagram"></i> Graphviz Diagram</h3>
+          <span onclick="document.getElementById('md-graphviz-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0;">
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: none;">
+            <div style="flex: 1 1 200px; min-width: 160px;">
+              <label for="md-graphviz-name" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Diagram name</label>
+              <input type="text" id="md-graphviz-name" placeholder="diagram" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" />
+            </div>
+            <div style="flex: 1 1 200px; min-width: 160px;">
+              <label for="md-graphviz-existing" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Edit saved diagram</label>
+              <select id="md-graphviz-existing" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+                <option value="">New diagram</option>
+              </select>
+            </div>
+            <div style="flex: 0 1 160px; min-width: 130px;">
+              <label for="md-graphviz-engine" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Layout engine</label>
+              <select id="md-graphviz-engine" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+                <option value="dot" selected>dot (hierarchical)</option>
+                <option value="neato">neato (spring model)</option>
+                <option value="fdp">fdp (force-directed)</option>
+                <option value="sfdp">sfdp (large graphs)</option>
+                <option value="circo">circo (circular)</option>
+                <option value="twopi">twopi (radial)</option>
+                <option value="osage">osage (clustered)</option>
+                <option value="patchwork">patchwork (treemap)</option>
+              </select>
+            </div>
+            <div style="flex: 0 1 180px; min-width: 150px;">
+              <label for="md-graphviz-template" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Insert template</label>
+              <select id="md-graphviz-template" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+                <option value="">Select template…</option>
+                <option value="flowchart_lr">Flowchart (LR)</option>
+                <option value="flowchart_tb">Flowchart (TB)</option>
+                <option value="network">Network Topology</option>
+                <option value="state_machine">State Machine</option>
+                <option value="records">Data Structures / Record</option>
+              </select>
+            </div>
+            <div style="flex: 0 0 auto;">
+              <label for="md-graphviz-bg" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Preview BG</label>
+              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box; gap: 4px;">
+                <button type="button" id="md-graphviz-bg-white" title="White background" style="width: 26px; height: 26px; border-radius: 3px; border: 2px solid #38bdf8; background: #ffffff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                <button type="button" id="md-graphviz-bg-slate" title="Slate dark background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                <button type="button" id="md-graphviz-bg-checker" title="Transparent checkerboard background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 8px 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                <label title="Custom color picker" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin: 0; background: #334155;">
+                  <i class="fas fa-eye-dropper" style="font-size: 11px; color: #94a3b8; pointer-events: none;"></i>
+                  <input type="color" id="md-graphviz-bg-picker" value="#ffffff" style="opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;" />
+                </label>
+              </div>
+            </div>
+            <div style="flex: 0 0 auto;">
+              <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Panes</label>
+              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box;">
+                <button type="button" id="md-graphviz-layout-side" title="Side by side: Source left, Preview right" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: #0284c7; color: #ffffff; font-weight: 600;">
+                  <i class="fas fa-columns"></i>
+                  <span>Left / Right</span>
+                </button>
+                <button type="button" id="md-graphviz-layout-stack" title="Stacked: Preview top, Source bottom" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: transparent; color: #94a3b8; font-weight: 400;">
+                  <i class="fas fa-bars"></i>
+                  <span>Top / Bottom</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="md-graphviz-split-container" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; min-height: 0; position: relative;">
+            <div id="md-graphviz-source-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: none; box-sizing: border-box;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex: none; gap: 8px; flex-wrap: wrap;">
+                <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <label for="md-graphviz-source" style="color: #f8fafc; font-size: 0.85em; font-weight: 600; margin: 0; margin-right: 2px;">DOT source</label>
+                  <select id="md-graphviz-font-family" title="Font family" style="height: 26px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 0 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
+                    <option value="courier" selected>Courier</option>
+                    <option value="mono">System Monospace</option>
+                    <option value="consolas">Consolas / SFMono</option>
+                    <option value="fira">Fira Code</option>
+                  </select>
+                  <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 26px; box-sizing: border-box;">
+                    <button type="button" id="md-graphviz-font-dec" title="Decrease editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">&minus;</button>
+                    <span id="md-graphviz-font-size-label" style="min-width: 32px; text-align: center; font-size: 0.75em; color: #38bdf8; font-family: monospace; font-weight: 600; user-select: none;">13px</span>
+                    <button type="button" id="md-graphviz-font-inc" title="Increase editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">+</button>
+                  </div>
+                  <button type="button" id="md-graphviz-wrap-btn" title="Toggle line wrap mode" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+                    <i class="fas fa-align-left" style="font-size: 0.85em;"></i>
+                    <span>Wrap</span>
+                  </button>
+                  <button type="button" id="md-graphviz-vim-btn" title="Toggle Vi / Vim keybindings" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+                    <i class="fas fa-terminal" style="font-size: 0.85em;"></i>
+                    <span>Vim</span>
+                  </button>
+                </div>
+                <span style="color: #64748b; font-size: 0.75em;">Tab = indent &middot; Ctrl+S = save &middot; Ctrl+Enter = render</span>
+              </div>
+              <div id="md-graphviz-editor-container" style="flex: 1; min-height: 100px; display: flex; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0f172a;">
+                <textarea id="md-graphviz-source" spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 100px; resize: none; background: #0f172a; border: none; color: #e2e8f0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; tab-size: 2; outline: none;"></textarea>
+              </div>
+              <div id="md-graphviz-vim-status-bar" style="display: none; margin-top: 4px; padding: 3px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; flex: none;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span id="md-graphviz-vim-status-mode" style="font-weight: 700; color: #22c55e; letter-spacing: 0.5px;">-- NORMAL --</span>
+                  <span id="md-graphviz-vim-status-key" style="color: #cbd5e1;"></span>
+                </div>
+                <span style="color: #64748b; font-size: 0.85em;">:w save &bull; :wq save &amp; insert &bull; :q close &bull; Esc normal mode</span>
+              </div>
+            </div>
+            <div id="md-graphviz-splitter" title="Drag to resize panes (double-click to reset 50/50)" style="flex: none; display: flex; align-items: center; justify-content: center; background: #1e293b; transition: background 0.15s ease; user-select: none; touch-action: none; z-index: 5;">
+              <i id="md-graphviz-splitter-grip" class="fas fa-grip-vertical" style="color: #64748b; font-size: 10px; pointer-events: none;"></i>
+            </div>
+            <div id="md-graphviz-preview-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: 1; box-sizing: border-box;">
+              <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px; flex: none;">Preview <span style="color: #64748b; font-weight: 400;">(live &mdash; drag to pan, scroll to zoom)</span></label>
+              <div id="md-graphviz-preview" style="position: relative; flex: 1; min-height: 120px; box-sizing: border-box; border: 1px solid #334155; border-radius: 6px; background: #ffffff; overflow: hidden; cursor: grab; touch-action: none; user-select: none;">
+                <span id="md-graphviz-preview-empty" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.85em; pointer-events: none;">Render to preview</span>
+                <img id="md-graphviz-preview-img" alt="Graphviz preview" draggable="false" style="display: none; position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; max-height: none; user-select: none; -webkit-user-drag: none; will-change: transform;" />
+                <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2;">
+                  <button type="button" id="md-graphviz-zoom-out" title="Zoom out" style="width: 28px; height: 28px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">&minus;</button>
+                  <button type="button" id="md-graphviz-zoom-reset" title="Reset to 100%" style="min-width: 48px; height: 28px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 0.75em; line-height: 1;">100%</button>
+                  <button type="button" id="md-graphviz-zoom-in" title="Zoom in" style="width: 28px; height: 28px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">+</button>
+                  <button type="button" id="md-graphviz-zoom-fit" title="Fit diagram to view" style="height: 28px; padding: 0 9px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 0.75em; line-height: 1;">Fit</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div id="md-graphviz-error" style="display: none; color: #fca5a5; background: #450a0a; border: 1px solid #7f1d1d; border-radius: 6px; padding: 8px 10px; font-size: 0.82em; white-space: pre-wrap; max-height: 120px; overflow: auto;"></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <button type="button" id="md-graphviz-delete-btn" class="w3-button w3-round" style="display: none; background: #7f1d1d; color: #fecaca; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-trash-alt"></i> Delete Diagram</button>
+              <span id="md-graphviz-status" style="color: #94a3b8; font-size: 0.8em;"></span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button type="button" id="md-graphviz-download-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-download"></i> Download SVG</button>
+              <button type="button" id="md-graphviz-render-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-play"></i> Render</button>
+              <button type="button" id="md-graphviz-save-new-btn" class="w3-button w3-round" style="display: none; background: #334155; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-copy"></i> Save as New</button>
+              <button type="button" id="md-graphviz-insert-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i id="md-graphviz-insert-icon" class="fas fa-plus"></i> <span id="md-graphviz-insert-text">Save &amp; Insert</span></button>
+              <button type="button" id="md-graphviz-close-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600;">Close</button>
+            </div>
           </div>
         </div>
       </div>
@@ -971,24 +1126,40 @@
     </div>
 
     <!-- Image Lightbox / Full Size Modal -->
-    <div id="image-modal" style="display: none; position: fixed; z-index: 10000; inset: 0; background: rgba(0, 0, 0, 0.88); backdrop-filter: blur(4px); align-items: center; justify-content: center; flex-direction: column; padding: 24px;">
+    <div id="image-modal" style="display: none; position: fixed; z-index: 10000; inset: 0; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(6px); align-items: center; justify-content: center; flex-direction: column; padding: 20px 24px; box-sizing: border-box; overflow: hidden;">
       <!-- Top Action Bar -->
-      <div style="position: absolute; top: 16px; right: 20px; display: flex; align-items: center; gap: 10px; z-index: 10001;">
-        <a id="image-modal-external" href="#" target="_blank" title="Open original in new window" style="color: #cbd5e1; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all 0.15s ease;">
-          <i class="fas fa-external-link-alt" style="font-size: 0.9em;"></i>
-        </a>
-        <button type="button" id="image-modal-close" title="Close (Esc)" style="color: #f8fafc; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3em; cursor: pointer; transition: all 0.15s ease;">
-          &times;
-        </button>
+      <div id="image-modal-top-bar" style="position: absolute; top: 16px; left: 20px; right: 20px; display: flex; align-items: center; justify-content: space-between; pointer-events: none; z-index: 10002;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; color: #94a3b8; font-size: 0.78em; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(71, 85, 105, 0.5); border-radius: 20px; padding: 4px 12px; backdrop-filter: blur(4px);">
+          <i class="fas fa-search-plus" style="color: #38bdf8;"></i>
+          <span>Scroll to zoom &bull; Drag to pan &bull; Double-click to toggle fit &bull; Esc to close</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; pointer-events: auto;">
+          <!-- Zoom Controls -->
+          <div style="display: inline-flex; align-items: center; gap: 3px; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; border-radius: 20px; padding: 3px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
+            <button type="button" id="image-modal-zoom-out" title="Zoom out (− or Scroll down)" style="width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; font-size: 1.1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">&minus;</button>
+            <button type="button" id="image-modal-zoom-reset" title="Reset zoom (100% actual size)" style="min-width: 52px; height: 26px; padding: 0 8px; border-radius: 13px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.7); color: #38bdf8; cursor: pointer; font-size: 0.75em; font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">100%</button>
+            <button type="button" id="image-modal-zoom-in" title="Zoom in (+ or Scroll up)" style="width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; font-size: 1.1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">+</button>
+            <button type="button" id="image-modal-zoom-fit" title="Fit to screen (F)" style="height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.7); color: #cbd5e1; cursor: pointer; font-size: 0.75em; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">Fit</button>
+          </div>
+          <button type="button" id="image-modal-edit-diagram" title="Edit Graphviz Diagram" style="display: none; color: #38bdf8; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; font-size: 0.9em; cursor: pointer; transition: all 0.15s ease;">
+            <i class="fas fa-project-diagram"></i>
+          </button>
+          <a id="image-modal-external" href="#" target="_blank" title="Open original in new tab" style="color: #cbd5e1; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; text-decoration: none; transition: all 0.15s ease;">
+            <i class="fas fa-external-link-alt" style="font-size: 0.9em;"></i>
+          </a>
+          <button type="button" id="image-modal-close" title="Close (Esc)" style="color: #f8fafc; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.3em; cursor: pointer; transition: all 0.15s ease;">
+            &times;
+          </button>
+        </div>
       </div>
 
-      <!-- Image Display Container -->
-      <div style="max-width: 95vw; max-height: 85vh; display: flex; align-items: center; justify-content: center; position: relative;">
-        <img id="image-modal-img" src="" alt="" style="max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 6px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); border: 1px solid #334155; background: #0b1120;" />
+      <!-- Image Display Container / Stage -->
+      <div id="image-modal-stage" style="position: relative; width: 100%; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; user-select: none; cursor: grab;">
+        <img id="image-modal-img" src="" alt="" draggable="false" style="display: block; position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; max-height: none; user-select: none; -webkit-user-drag: none; will-change: transform; border-radius: 6px; box-shadow: 0 10px 35px rgba(0, 0, 0, 0.8); border: 1px solid #334155; background: #0b1120;" />
       </div>
 
       <!-- Caption -->
-      <div id="image-modal-caption" style="margin-top: 12px; color: #cbd5e1; font-size: 0.9em; font-weight: 500; text-align: center; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,0.8);"></div>
+      <div id="image-modal-caption" style="margin-top: 10px; color: #cbd5e1; font-size: 0.9em; font-weight: 500; text-align: center; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,0.8); flex: none; z-index: 10001; pointer-events: none;"></div>
     </div>
 
     <!-- Step Context Menu (right-click a step in the sidebar) -->
@@ -1041,8 +1212,10 @@
         const stepNavCounter = document.getElementById('step-nav-counter');
 
         const mdTextarea = document.getElementById('md-textarea');
+        const mdContentArea = document.getElementById('md-content-area');
         const mdPreviewPane = document.getElementById('md-preview-pane');
         const mdEditPane = document.getElementById('md-edit-pane');
+        const mdSplitter = document.getElementById('md-splitter');
         const recSaveBtn = document.getElementById('rec-save-btn');
         const mdSaveBtn = recSaveBtn;
         const mdSaveStatus = document.getElementById('md-save-status');
@@ -1051,6 +1224,52 @@
         const mdTabSplit = document.getElementById('md-tab-split');
         const mdInsertImgBtn = document.getElementById('md-insert-img-btn');
         const mdImgFileInput = document.getElementById('md-img-file-input');
+        const mdGraphvizBtn = document.getElementById('md-graphviz-btn');
+        const mdGraphvizModal = document.getElementById('md-graphviz-modal');
+        const mdGraphvizName = document.getElementById('md-graphviz-name');
+        const mdGraphvizExisting = document.getElementById('md-graphviz-existing');
+        const mdGraphvizEngine = document.getElementById('md-graphviz-engine');
+        const mdGraphvizTemplate = document.getElementById('md-graphviz-template');
+        const mdGraphvizSource = document.getElementById('md-graphviz-source');
+        const mdGraphvizEditorContainer = document.getElementById('md-graphviz-editor-container');
+        const mdGraphvizFontDec = document.getElementById('md-graphviz-font-dec');
+        const mdGraphvizFontInc = document.getElementById('md-graphviz-font-inc');
+        const mdGraphvizFontSizeLabel = document.getElementById('md-graphviz-font-size-label');
+        const mdGraphvizFontFamily = document.getElementById('md-graphviz-font-family');
+        const mdGraphvizWrapBtn = document.getElementById('md-graphviz-wrap-btn');
+        const mdGraphvizVimBtn = document.getElementById('md-graphviz-vim-btn');
+        const mdGraphvizVimStatusBar = document.getElementById('md-graphviz-vim-status-bar');
+        const mdGraphvizVimStatusMode = document.getElementById('md-graphviz-vim-status-mode');
+        const mdGraphvizVimStatusKey = document.getElementById('md-graphviz-vim-status-key');
+        const mdGraphvizBgWhite = document.getElementById('md-graphviz-bg-white');
+        const mdGraphvizBgSlate = document.getElementById('md-graphviz-bg-slate');
+        const mdGraphvizBgChecker = document.getElementById('md-graphviz-bg-checker');
+        const mdGraphvizBgPicker = document.getElementById('md-graphviz-bg-picker');
+        const mdGraphvizPreview = document.getElementById('md-graphviz-preview');
+        const mdGraphvizPreviewImg = document.getElementById('md-graphviz-preview-img');
+        const mdGraphvizPreviewEmpty = document.getElementById('md-graphviz-preview-empty');
+        const mdGraphvizError = document.getElementById('md-graphviz-error');
+        const mdGraphvizStatus = document.getElementById('md-graphviz-status');
+        const mdGraphvizRenderBtn = document.getElementById('md-graphviz-render-btn');
+        const mdGraphvizDownloadBtn = document.getElementById('md-graphviz-download-btn');
+        const mdGraphvizDeleteBtn = document.getElementById('md-graphviz-delete-btn');
+        const mdGraphvizSaveNewBtn = document.getElementById('md-graphviz-save-new-btn');
+        const mdGraphvizInsertBtn = document.getElementById('md-graphviz-insert-btn');
+        const mdGraphvizInsertText = document.getElementById('md-graphviz-insert-text');
+        const mdGraphvizInsertIcon = document.getElementById('md-graphviz-insert-icon');
+        const mdGraphvizCloseBtn = document.getElementById('md-graphviz-close-btn');
+        const mdGraphvizZoomIn = document.getElementById('md-graphviz-zoom-in');
+        const mdGraphvizZoomOut = document.getElementById('md-graphviz-zoom-out');
+        const mdGraphvizZoomReset = document.getElementById('md-graphviz-zoom-reset');
+        const mdGraphvizZoomFit = document.getElementById('md-graphviz-zoom-fit');
+        const mdGraphvizSplitContainer = document.getElementById('md-graphviz-split-container');
+        const mdGraphvizSplitter = document.getElementById('md-graphviz-splitter');
+        const mdGraphvizSplitterGrip = document.getElementById('md-graphviz-splitter-grip');
+        const mdGraphvizSourcePane = document.getElementById('md-graphviz-source-pane');
+        const mdGraphvizPreviewPane = document.getElementById('md-graphviz-preview-pane');
+        const mdGraphvizLayoutSide = document.getElementById('md-graphviz-layout-side');
+        const mdGraphvizLayoutStack = document.getElementById('md-graphviz-layout-stack');
+        const imageModalEditDiagram = document.getElementById('image-modal-edit-diagram');
         const mdSettingsWrapper = document.getElementById('md-settings-wrapper');
         const mdSettingsDivider = document.getElementById('md-settings-divider');
         const mdSettingsBtn = document.getElementById('md-settings-btn');
@@ -1097,10 +1316,15 @@
         const mdEmojiCatBtns = document.querySelectorAll('.md-emoji-cat-btn');
 
         const imageModal = document.getElementById('image-modal');
+        const imageModalStage = document.getElementById('image-modal-stage');
         const imageModalImg = document.getElementById('image-modal-img');
         const imageModalCaption = document.getElementById('image-modal-caption');
         const imageModalExternal = document.getElementById('image-modal-external');
         const imageModalClose = document.getElementById('image-modal-close');
+        const imageModalZoomIn = document.getElementById('image-modal-zoom-in');
+        const imageModalZoomOut = document.getElementById('image-modal-zoom-out');
+        const imageModalZoomReset = document.getElementById('image-modal-zoom-reset');
+        const imageModalZoomFit = document.getElementById('image-modal-zoom-fit');
 
         const videoContainer = document.getElementById('video-container');
         const videoPlayer = document.getElementById('video-player');
@@ -1395,6 +1619,8 @@
                 'Cmd-S': () => saveMarkdownContent(false),
                 'Ctrl-E': () => toggleMdEmojiMenu(),
                 'Cmd-E': () => toggleMdEmojiMenu(),
+                'Ctrl-Shift-G': () => openGraphvizModal(),
+                'Cmd-Shift-G': () => openGraphvizModal(),
                 'Tab': (cm) => {
                   if (cm.somethingSelected()) {
                     cm.indentSelection('add');
@@ -1406,8 +1632,26 @@
             });
 
             if (typeof CodeMirror !== 'undefined' && CodeMirror.Vim) {
-              CodeMirror.Vim.defineEx('write', 'w', () => saveMarkdownContent(false));
-              CodeMirror.Vim.defineEx('wq', 'wq', () => saveMarkdownContent(false));
+              CodeMirror.Vim.defineEx('write', 'w', (cm) => {
+                if (cm && typeof mdGraphvizCodeEditor !== 'undefined' && cm === mdGraphvizCodeEditor) {
+                  saveAndInsertGraphviz({ saveAsNew: false });
+                } else {
+                  saveMarkdownContent(false);
+                }
+              });
+              CodeMirror.Vim.defineEx('wq', 'wq', (cm) => {
+                if (cm && typeof mdGraphvizCodeEditor !== 'undefined' && cm === mdGraphvizCodeEditor) {
+                  saveAndInsertGraphviz({ saveAsNew: false });
+                } else {
+                  saveMarkdownContent(false);
+                }
+              });
+              CodeMirror.Vim.defineEx('quit', 'q', (cm) => {
+                if (cm && typeof mdGraphvizCodeEditor !== 'undefined' && cm === mdGraphvizCodeEditor) {
+                  clearTimeout(mdGraphvizDebounceTimer);
+                  if (mdGraphvizModal) mdGraphvizModal.style.display = 'none';
+                }
+              });
             }
 
             mdCodeEditor.on('vim-mode-change', (arg) => {
@@ -1580,7 +1824,106 @@
           });
         }
 
-        // --- Markdown Mode & Editing Functions ---
+        // --- Markdown Mode & Split Resizing Functions ---
+        let mdSplitRatio = 50;
+        try {
+          const savedMdSplit = localStorage.getItem('ctlabs_md_split_ratio');
+          if (savedMdSplit) {
+            const parsed = parseFloat(savedMdSplit);
+            if (!isNaN(parsed) && parsed >= 15 && parsed <= 85) {
+              mdSplitRatio = parsed;
+            }
+          }
+        } catch (e) {}
+
+        function applyMdSplitSizes() {
+          if (currentMdMode !== 'split') return;
+          if (!mdEditPane || !mdPreviewPane) return;
+          mdEditPane.style.flex = `0 0 ${mdSplitRatio}%`;
+          mdEditPane.style.maxWidth = `${mdSplitRatio}%`;
+          mdEditPane.style.width = `${mdSplitRatio}%`;
+          mdPreviewPane.style.flex = '1 1 0%';
+          mdPreviewPane.style.minWidth = '0';
+          mdPreviewPane.style.maxWidth = '';
+          mdPreviewPane.style.width = '';
+          const cm = (typeof getMdEditor === 'function') ? getMdEditor() : mdCodeEditor;
+          if (cm) {
+            cm.refresh();
+          }
+        }
+
+        let isResizingMdSplit = false;
+        let mdSplitRaf = null;
+
+        if (mdSplitter) {
+          mdSplitter.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            if (currentMdMode !== 'split') return;
+            isResizingMdSplit = true;
+            mdSplitter.classList.add('dragging');
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'col-resize';
+            if (mdSplitter.setPointerCapture) {
+              try { mdSplitter.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            e.preventDefault();
+          });
+
+          mdSplitter.addEventListener('pointermove', (e) => {
+            if (!isResizingMdSplit || !mdContentArea) return;
+            const rect = mdContentArea.getBoundingClientRect();
+            if (rect.width <= 0) return;
+            const offsetX = e.clientX - rect.left;
+            let pct = (offsetX / rect.width) * 100;
+            const minPx = 150;
+            const minPct = (minPx / rect.width) * 100;
+            const clampedMin = Math.max(15, minPct);
+            const clampedMax = Math.min(85, 100 - minPct);
+            pct = Math.max(clampedMin, Math.min(clampedMax, pct));
+            mdSplitRatio = Math.round(pct * 10) / 10;
+            applyMdSplitSizes();
+
+            if (!mdSplitRaf) {
+              mdSplitRaf = requestAnimationFrame(() => {
+                mdSplitRaf = null;
+                const cm = (typeof getMdEditor === 'function') ? getMdEditor() : mdCodeEditor;
+                if (cm) cm.refresh();
+              });
+            }
+          });
+
+          const stopMdSplitResize = (e) => {
+            if (!isResizingMdSplit) return;
+            isResizingMdSplit = false;
+            mdSplitter.classList.remove('dragging');
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            if (e && mdSplitter.releasePointerCapture && e.pointerId !== undefined) {
+              try { mdSplitter.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+            try {
+              localStorage.setItem('ctlabs_md_split_ratio', mdSplitRatio);
+            } catch (err) {}
+            const cm = (typeof getMdEditor === 'function') ? getMdEditor() : mdCodeEditor;
+            if (cm) {
+              cm.refresh();
+              cm.focus();
+            }
+          };
+
+          mdSplitter.addEventListener('pointerup', stopMdSplitResize);
+          mdSplitter.addEventListener('pointercancel', stopMdSplitResize);
+
+          mdSplitter.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            mdSplitRatio = 50;
+            applyMdSplitSizes();
+            try {
+              localStorage.setItem('ctlabs_md_split_ratio', '50');
+            } catch (err) {}
+          });
+        }
+
         function setMdMode(mode) {
           currentMdMode = mode;
           [mdTabPreview, mdTabEdit, mdTabSplit].forEach(tab => {
@@ -1599,10 +1942,13 @@
             activeTab.style.borderColor = '#38bdf8';
           }
 
-          // The emoji picker inserts text, so it is only useful while editing.
+          // The emoji picker and graphviz diagram editor insert content, so they are only visible while editing.
           if (mdEmojiWrapper) {
             mdEmojiWrapper.style.display = (mode === 'preview') ? 'none' : 'flex';
             if (mode === 'preview') toggleMdEmojiMenu(false);
+          }
+          if (mdGraphvizBtn) {
+            mdGraphvizBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
           }
 
           const cm = getMdEditor();
@@ -1616,16 +1962,27 @@
           }
 
           if (mode === 'preview') {
-            if (mdEditPane) mdEditPane.style.display = 'none';
+            if (mdSplitter) mdSplitter.style.display = 'none';
+            if (mdEditPane) {
+              mdEditPane.style.display = 'none';
+              mdEditPane.style.flex = '1';
+              mdEditPane.style.maxWidth = '';
+              mdEditPane.style.width = '';
+            }
             if (mdPreviewPane) {
               mdPreviewPane.style.display = 'block';
               mdPreviewPane.style.flex = '1';
+              mdPreviewPane.style.maxWidth = '';
+              mdPreviewPane.style.width = '';
             }
             renderMarkdownPreview();
           } else if (mode === 'edit') {
+            if (mdSplitter) mdSplitter.style.display = 'none';
             if (mdEditPane) {
               mdEditPane.style.display = 'flex';
               mdEditPane.style.flex = '1';
+              mdEditPane.style.maxWidth = '';
+              mdEditPane.style.width = '';
               mdEditPane.style.borderRight = 'none';
             }
             if (mdPreviewPane) mdPreviewPane.style.display = 'none';
@@ -1637,13 +1994,13 @@
           } else if (mode === 'split') {
             if (mdEditPane) {
               mdEditPane.style.display = 'flex';
-              mdEditPane.style.flex = '1';
-              mdEditPane.style.borderRight = '1px solid #334155';
+              mdEditPane.style.borderRight = 'none';
             }
+            if (mdSplitter) mdSplitter.style.display = 'flex';
             if (mdPreviewPane) {
               mdPreviewPane.style.display = 'block';
-              mdPreviewPane.style.flex = '1';
             }
+            applyMdSplitSizes();
             renderMarkdownPreview();
             if (cm) {
               setTimeout(() => { cm.refresh(); cm.focus(); }, 40);
@@ -1685,6 +2042,223 @@
         }
 
         // --- Image Lightbox Modal Functions ---
+        let cachedDiagramBases = new Set();
+
+        function getBaseFromImageUrl(url) {
+          if (!url) return null;
+          try {
+            const clean = url.split('?')[0].split('#')[0];
+            const filename = clean.substring(clean.lastIndexOf('/') + 1);
+            const match = filename.match(/^([a-zA-Z0-9_\-]+)\.(?:svg|png)$/i);
+            return match ? decodeURIComponent(match[1]) : null;
+          } catch (err) {
+            return null;
+          }
+        }
+
+        function refreshCachedDiagramBases() {
+          if (!activeWalkthrough) return Promise.resolve();
+          return fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough)}/graphviz/sources`, {
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(list => {
+            if (Array.isArray(list)) {
+              cachedDiagramBases = new Set(list.map(item => item && item.base).filter(Boolean));
+            }
+          })
+          .catch(() => {});
+        }
+
+        let imageModalScale = 1;
+        let imageModalPanX = 0;
+        let imageModalPanY = 0;
+        let imageModalDragging = false;
+        let imageModalDragStart = null;
+        let imageModalHasDragged = false;
+
+        function applyImageModalTransform() {
+          if (!imageModalImg) return;
+          imageModalImg.style.transform = `translate(${imageModalPanX}px, ${imageModalPanY}px) scale(${imageModalScale})`;
+          if (imageModalZoomReset) {
+            imageModalZoomReset.textContent = Math.round(imageModalScale * 100) + '%';
+          }
+        }
+
+        function initImageModalDimensions() {
+          if (!imageModalStage || !imageModalImg) return;
+          const cw = imageModalStage.clientWidth;
+          const ch = imageModalStage.clientHeight;
+          if (cw <= 0 || ch <= 0) return;
+
+          const nw = imageModalImg.naturalWidth || imageModalImg.clientWidth || 800;
+          const nh = imageModalImg.naturalHeight || imageModalImg.clientHeight || 600;
+
+          if (imageModalImg.naturalWidth && imageModalImg.naturalHeight) {
+            imageModalImg.style.width = imageModalImg.naturalWidth + 'px';
+            imageModalImg.style.height = imageModalImg.naturalHeight + 'px';
+          } else {
+            imageModalImg.style.width = '';
+            imageModalImg.style.height = '';
+          }
+
+          const pad = 40;
+          const availW = Math.max(50, cw - pad);
+          const availH = Math.max(50, ch - pad);
+          const fitScale = Math.min(availW / nw, availH / nh);
+          // If image exceeds viewport, fit it; otherwise start at 100% actual size
+          const startScale = fitScale < 1 ? fitScale : 1.0;
+          imageModalScale = Math.min(15, Math.max(0.05, startScale));
+          imageModalPanX = (cw - nw * imageModalScale) / 2;
+          imageModalPanY = (ch - nh * imageModalScale) / 2;
+          applyImageModalTransform();
+        }
+
+        function fitImageModalToView() {
+          if (!imageModalStage || !imageModalImg) return;
+          const cw = imageModalStage.clientWidth;
+          const ch = imageModalStage.clientHeight;
+          if (cw <= 0 || ch <= 0) return;
+
+          const nw = imageModalImg.naturalWidth || imageModalImg.clientWidth || 800;
+          const nh = imageModalImg.naturalHeight || imageModalImg.clientHeight || 600;
+          const pad = 40;
+          const availW = Math.max(50, cw - pad);
+          const availH = Math.max(50, ch - pad);
+          const scale = Math.min(15, Math.max(0.05, Math.min(availW / nw, availH / nh)));
+
+          imageModalScale = scale;
+          imageModalPanX = (cw - nw * scale) / 2;
+          imageModalPanY = (ch - nh * scale) / 2;
+          applyImageModalTransform();
+        }
+
+        function resetImageModalZoom() {
+          if (!imageModalStage || !imageModalImg) return;
+          const cw = imageModalStage.clientWidth;
+          const ch = imageModalStage.clientHeight;
+          if (cw <= 0 || ch <= 0) return;
+
+          const nw = imageModalImg.naturalWidth || imageModalImg.clientWidth || 800;
+          const nh = imageModalImg.naturalHeight || imageModalImg.clientHeight || 600;
+
+          imageModalScale = 1.0;
+          imageModalPanX = (cw - nw) / 2;
+          imageModalPanY = (ch - nh) / 2;
+          applyImageModalTransform();
+        }
+
+        function zoomImageModalAt(clientX, clientY, factor) {
+          if (!imageModalStage || !imageModalImg) return;
+          const rect = imageModalStage.getBoundingClientRect();
+          const cx = clientX - rect.left;
+          const cy = clientY - rect.top;
+          const previous = imageModalScale;
+          const next = Math.min(15, Math.max(0.05, previous * factor));
+          if (next === previous) return;
+
+          imageModalPanX = cx - (cx - imageModalPanX) * (next / previous);
+          imageModalPanY = cy - (cy - imageModalPanY) * (next / previous);
+          imageModalScale = next;
+          applyImageModalTransform();
+        }
+
+        function zoomImageModalBy(factor) {
+          if (!imageModalStage) return;
+          const rect = imageModalStage.getBoundingClientRect();
+          zoomImageModalAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+        }
+
+        if (imageModalZoomIn) {
+          imageModalZoomIn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            zoomImageModalBy(1.25);
+          });
+        }
+
+        if (imageModalZoomOut) {
+          imageModalZoomOut.addEventListener('click', (e) => {
+            e.stopPropagation();
+            zoomImageModalBy(1 / 1.25);
+          });
+        }
+
+        if (imageModalZoomReset) {
+          imageModalZoomReset.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resetImageModalZoom();
+          });
+        }
+
+        if (imageModalZoomFit) {
+          imageModalZoomFit.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fitImageModalToView();
+          });
+        }
+
+        if (imageModalStage) {
+          imageModalStage.addEventListener('wheel', (e) => {
+            if (!imageModalImg || !imageModalImg.src) return;
+            e.preventDefault();
+            zoomImageModalAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.15 : (1 / 1.15));
+          }, { passive: false });
+
+          imageModalStage.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            if (!imageModalImg || !imageModalImg.src) return;
+            imageModalDragging = true;
+            imageModalHasDragged = false;
+            imageModalDragStart = { x: e.clientX, y: e.clientY, panX: imageModalPanX, panY: imageModalPanY };
+          });
+
+          imageModalStage.addEventListener('pointermove', (e) => {
+            if (!imageModalDragging || !imageModalDragStart) return;
+            const dx = e.clientX - imageModalDragStart.x;
+            const dy = e.clientY - imageModalDragStart.y;
+            if (!imageModalHasDragged) {
+              if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                imageModalHasDragged = true;
+                imageModalStage.style.cursor = 'grabbing';
+                if (imageModalStage.setPointerCapture) {
+                  try { imageModalStage.setPointerCapture(e.pointerId); } catch (err) {}
+                }
+              } else {
+                return;
+              }
+            }
+            e.preventDefault();
+            imageModalPanX = imageModalDragStart.panX + dx;
+            imageModalPanY = imageModalDragStart.panY + dy;
+            applyImageModalTransform();
+          });
+
+          const endImageModalDrag = (e) => {
+            if (!imageModalDragging) return;
+            imageModalDragging = false;
+            imageModalDragStart = null;
+            imageModalStage.style.cursor = 'grab';
+            if (e && imageModalStage.releasePointerCapture && e.pointerId !== undefined) {
+              try { imageModalStage.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+          };
+
+          imageModalStage.addEventListener('pointerup', endImageModalDrag);
+          imageModalStage.addEventListener('pointercancel', endImageModalDrag);
+
+          imageModalStage.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            e.preventDefault();
+            // Toggle between 100% actual size and fit to view
+            if (Math.abs(imageModalScale - 1.0) < 0.05) {
+              fitImageModalToView();
+            } else {
+              zoomImageModalAt(e.clientX, e.clientY, 1.0 / imageModalScale);
+            }
+          });
+        }
+
         function openImageModal(src, alt, title) {
           if (!imageModal || !imageModalImg) return;
           imageModalImg.src = src;
@@ -1695,13 +2269,74 @@
             imageModalCaption.style.display = cap ? 'block' : 'none';
           }
           if (imageModalExternal) imageModalExternal.href = src;
+
+          imageModalDragging = false;
+          imageModalDragStart = null;
+          imageModalHasDragged = false;
+          imageModalScale = 1;
+          imageModalPanX = 0;
+          imageModalPanY = 0;
+
           imageModal.style.display = 'flex';
+
+          const setupImg = () => {
+            initImageModalDimensions();
+          };
+
+          if (imageModalImg.complete && imageModalImg.naturalWidth) {
+            requestAnimationFrame(setupImg);
+          } else {
+            imageModalImg.onload = () => {
+              setupImg();
+            };
+          }
+
+          const base = getBaseFromImageUrl(src);
+          if (imageModalEditDiagram) {
+            if (base && cachedDiagramBases.has(base)) {
+              imageModalEditDiagram.style.display = 'flex';
+              imageModalEditDiagram.onclick = (e) => {
+                e.stopPropagation();
+                closeImageModal();
+                openGraphvizModal(base);
+              };
+            } else if (base) {
+              imageModalEditDiagram.style.display = 'none';
+              fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources/${encodeURIComponent(base)}`, {
+                credentials: 'same-origin'
+              })
+              .then(res => res.json())
+              .then(data => {
+                if (data.ok && imageModal && imageModal.style.display === 'flex' && imageModalImg.src === src) {
+                  cachedDiagramBases.add(base);
+                  imageModalEditDiagram.style.display = 'flex';
+                  imageModalEditDiagram.onclick = (e) => {
+                    e.stopPropagation();
+                    closeImageModal();
+                    openGraphvizModal(base);
+                  };
+                }
+              })
+              .catch(() => {});
+            } else {
+              imageModalEditDiagram.style.display = 'none';
+            }
+          }
         }
 
         function closeImageModal() {
           if (!imageModal) return;
           imageModal.style.display = 'none';
-          if (imageModalImg) imageModalImg.src = '';
+          if (imageModalImg) {
+            imageModalImg.src = '';
+            imageModalImg.style.width = '';
+            imageModalImg.style.height = '';
+            imageModalImg.style.transform = '';
+          }
+          if (imageModalEditDiagram) imageModalEditDiagram.style.display = 'none';
+          imageModalDragging = false;
+          imageModalDragStart = null;
+          imageModalHasDragged = false;
         }
 
         if (imageModalClose) {
@@ -1711,13 +2346,7 @@
           });
         }
 
-        if (imageModal) {
-          imageModal.addEventListener('click', (e) => {
-            if (e.target !== imageModalImg && !e.target.closest('#image-modal-external')) {
-              closeImageModal();
-            }
-          });
-        }
+
 
         // --- Picture Inspector ---
         const picInspectorModal = document.getElementById('pic-inspector-modal');
@@ -1743,6 +2372,9 @@
 
         function renderPicInspector(items) {
           if (!picInspectorList) return;
+          items.forEach(i => {
+            if (i.diagram && i.diagram_base) cachedDiagramBases.add(i.diagram_base);
+          });
           const used = items.filter(i => i.used && !i.missing).length;
           const unused = items.filter(i => !i.used && !i.missing).length;
           const missing = items.filter(i => i.missing).length;
@@ -1765,6 +2397,9 @@
               : item.used
                 ? '<span style="background:#14532d; color:#bbf7d0; padding:1px 6px; border-radius:3px; font-size:0.75em;">Used</span>'
                 : '<span style="background:#78350f; color:#fde68a; padding:1px 6px; border-radius:3px; font-size:0.75em;">Unused</span>';
+            const diagramBadge = item.diagram
+              ? '<span style="background:#0369a1; color:#bae6fd; padding:1px 6px; border-radius:3px; font-size:0.75em;"><i class="fas fa-project-diagram" style="margin-right:3px;"></i>Diagram</span>'
+              : '';
             const thumb = item.missing
               ? '<div style="width:56px; height:42px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#ef4444;"><i class="fas fa-image-slash"></i></div>'
               : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" style="width:56px; height:42px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b;" />`;
@@ -1775,6 +2410,9 @@
             const copyBtn = item.missing
               ? ''
               : `<button type="button" class="pic-inspector-copy w3-button w3-round" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown image link" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-link" style="color:#38bdf8; margin-right:4px;"></i>Copy link</button>`;
+            const editBtn = (item.diagram && item.diagram_base)
+              ? `<button type="button" class="pic-inspector-edit w3-button w3-round" data-base="${escapeHtml(item.diagram_base)}" title="Edit diagram source" style="background:#0284c7; color:#ffffff; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-edit" style="margin-right:4px;"></i>Edit</button>`
+              : '';
             const deleteBtn = (!item.used && !item.missing && item.scoped)
               ? `<button type="button" class="pic-inspector-delete w3-button w3-round" data-filename="${escapeHtml(item.filename)}" style="background:#7f1d1d; color:#fecaca; font-size:0.78em; padding:4px 10px; white-space:nowrap;">Delete</button>`
               : '';
@@ -1783,12 +2421,13 @@
               <div style="flex:1; min-width:0;">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                   <span style="font-family:ui-monospace, monospace; font-size:0.82em; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.filename)}</span>
-                  ${status}${globalTag}
+                  ${status}${diagramBadge}${globalTag}
                 </div>
                 <div style="color:#94a3b8; font-size:0.78em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detail}</div>
               </div>
               <div style="color:#94a3b8; font-size:0.78em; white-space:nowrap;">${formatFileSize(item.size)}</div>
               ${copyBtn}
+              ${editBtn}
               ${deleteBtn}
             </div>`;
           }).join('');
@@ -1800,6 +2439,14 @@
               const original = btn.innerHTML;
               btn.innerHTML = '<i class="fas fa-check" style="color:#10b981; margin-right:4px;"></i>Copied!';
               setTimeout(() => { btn.innerHTML = original; }, 1200);
+            });
+          });
+          picInspectorList.querySelectorAll('.pic-inspector-edit').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const base = btn.getAttribute('data-base');
+              if (!base) return;
+              if (picInspectorModal) picInspectorModal.style.display = 'none';
+              openGraphvizModal(base);
             });
           });
           picInspectorList.querySelectorAll('.pic-inspector-delete').forEach(btn => {
@@ -1869,6 +2516,7 @@
           mdIsDirty = false;
           mdIsLoading = true;
           if (mdSaveStatus) mdSaveStatus.style.display = 'none';
+          refreshCachedDiagramBases();
 
           if (mdCache[id] !== undefined) {
             const cached = mdCache[id];
@@ -1982,6 +2630,48 @@
         }
 
         // --- Picture Upload & Markdown Embedding ---
+        // Inserts a markdown block at the current editor position, adding the
+        // blank lines needed to keep it as its own paragraph. Works with both
+        // CodeMirror and the plain textarea fallback.
+        function insertMarkdownBlock(snippet, targetPos = null, caretOffset = null) {
+          const offset = (caretOffset === null || caretOffset === undefined) ? snippet.length : caretOffset;
+          const cm = getMdEditor();
+
+          if (cm) {
+            const doc = cm.getDoc();
+            const cursor = targetPos || doc.getCursor();
+            const cmVal = cm.getValue();
+            const cmIndex = cm.indexFromPos(cursor);
+            const before = cmVal.substring(0, cmIndex);
+            const after = cmVal.substring(cmIndex);
+            const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+            const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+            const block = `${prefix}${snippet}${suffix}`;
+
+            doc.replaceRange(block, cursor);
+            const newPos = cm.posFromIndex(cmIndex + prefix.length + offset);
+            cm.setCursor(newPos);
+            cm.focus();
+            if (mdTextarea) mdTextarea.value = cm.getValue();
+          } else if (mdTextarea) {
+            const start = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length);
+            const end = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length);
+            const before = mdTextarea.value.substring(0, start);
+            const after = mdTextarea.value.substring(end);
+            const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+            const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+            const block = `${prefix}${snippet}${suffix}`;
+
+            mdTextarea.value = before + block + after;
+            const newPos = start + prefix.length + offset;
+            mdTextarea.selectionStart = mdTextarea.selectionEnd = newPos;
+            mdTextarea.focus();
+          }
+
+          onMarkdownContentChanged();
+          saveMarkdownContent(false);
+        }
+
         function uploadAndInsertImage(file, targetPos = null) {
           if (!file) return;
           const isImg = (file.type && file.type.startsWith('image/')) ||
@@ -2015,39 +2705,7 @@
               const rawName = (file.name || 'Picture').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, ' ').trim();
               const altText = rawName || 'Picture';
               const cm = getMdEditor();
-              if (cm) {
-                const doc = cm.getDoc();
-                const cursor = targetPos || doc.getCursor();
-                const cmVal = cm.getValue();
-                const cmIndex = cm.indexFromPos(cursor);
-                const before = cmVal.substring(0, cmIndex);
-                const after = cmVal.substring(cmIndex);
-                const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
-                const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
-                const markdownImage = `${prefix}![${altText}](${data.url})${suffix}`;
-
-                doc.replaceRange(markdownImage, cursor);
-                const insertedLen = prefix.length + `![${altText}](${data.url})`.length;
-                const newPos = cm.posFromIndex(cmIndex + insertedLen);
-                cm.setCursor(newPos);
-                cm.focus();
-                if (mdTextarea) mdTextarea.value = cm.getValue();
-              } else if (mdTextarea) {
-                const start = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length);
-                const end = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length);
-                const before = mdTextarea.value.substring(0, start);
-                const after = mdTextarea.value.substring(end);
-                const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
-                const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
-                const markdownImage = `${prefix}![${altText}](${data.url})${suffix}`;
-
-                mdTextarea.value = before + markdownImage + after;
-                const newPos = start + prefix.length + markdownImage.length - suffix.length;
-                mdTextarea.selectionStart = mdTextarea.selectionEnd = newPos;
-                mdTextarea.focus();
-              }
-              onMarkdownContentChanged();
-              saveMarkdownContent(false);
+              insertMarkdownBlock(`![${altText}](${data.url})`, cm ? cm.getCursor() : targetPos);
             } else {
               alert('Failed to upload picture: ' + (data.error || 'Unknown error'));
               if (mdSaveStatus) mdSaveStatus.style.display = 'none';
@@ -2059,6 +2717,1370 @@
             if (mdSaveStatus) mdSaveStatus.style.display = 'none';
           });
         }
+
+        // Register custom CodeMirror mode for Graphviz DOT
+        if (typeof CodeMirror !== 'undefined' && typeof CodeMirror.defineSimpleMode === 'function') {
+          try {
+            CodeMirror.defineSimpleMode('dot', {
+              start: [
+                // Keywords & graph declarations
+                { regex: /\b(?:strict\s+)?(?:di)?graph\b/i, token: 'keyword' },
+                { regex: /\b(?:subgraph|node|edge)\b/i, token: 'keyword' },
+                // Common Graphviz attribute names
+                { regex: /\b(?:label|shape|style|fillcolor|color|fontname|fontcolor|fontsize|rankdir|compound|dir|arrowhead|arrowsize|penwidth|weight|len|rank|same|min|max|headport|tailport|margin|width|height|fixedsize|nodesep|ranksep|splines|overlap|layout)\b/i, token: 'builtin' },
+                // Edge operators (-> for directed digraphs, -- for undirected graphs)
+                { regex: /->|--/, token: 'operator' },
+                // Booleans / constants
+                { regex: /\b(?:true|false|none|both|forward|back|same|LR|TB|RL|BT)\b/i, token: 'atom' },
+                // Strings (double quotes with escape support)
+                { regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: 'string' },
+                // HTML-like labels: <...>
+                { regex: /<[^>]*>/, token: 'string url' },
+                // Numeric values and hex colors (#f8fafc)
+                { regex: /#[a-fA-F0-9]{3,8}\b/, token: 'atom' },
+                { regex: /[-+]?(?:\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/i, token: 'number' },
+                // Comments: //, /* */, and #
+                { regex: /\/\/.*/, token: 'comment' },
+                { regex: /\#.*/, token: 'comment' },
+                { regex: /\/\*/, token: 'comment', next: 'comment' },
+                // Operators and punctuation
+                { regex: /[=;,]/, token: 'operator' },
+                { regex: /[{}\[\]]/, token: 'bracket' },
+                // Node identifiers / attributes values
+                { regex: /[a-zA-Z_][a-zA-Z0-9_]*/, token: 'variable' }
+              ],
+              comment: [
+                { regex: /.*?\*\//, token: 'comment', next: 'start' },
+                { regex: /.*/, token: 'comment' }
+              ],
+              meta: {
+                lineComment: '//',
+                blockCommentStart: '/*',
+                blockCommentEnd: '*/'
+              }
+            });
+          } catch (e) {
+            console.warn('Could not register CodeMirror dot mode:', e);
+          }
+        }
+
+        let mdGraphvizCodeEditor = null;
+        let mdGraphvizFontSize = 13;
+        let mdGraphvizFont = 'courier';
+        let mdGraphvizBg = 'white';
+        let mdGraphvizLineWrap = false;
+        let mdGraphvizVimMode = false;
+
+        const GRAPHVIZ_FONTS = {
+          courier: "'Courier New', Courier, monospace",
+          mono: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          consolas: "Consolas, 'Liberation Mono', Menlo, Courier, monospace",
+          fira: "'Fira Code', 'JetBrains Mono', Consolas, monospace"
+        };
+
+        try {
+          const savedSize = parseInt(localStorage.getItem('ctlabs_graphviz_font_size'), 10);
+          if (!isNaN(savedSize) && savedSize >= 10 && savedSize <= 26) mdGraphvizFontSize = savedSize;
+          const savedFont = localStorage.getItem('ctlabs_graphviz_font_family');
+          if (savedFont && GRAPHVIZ_FONTS[savedFont]) mdGraphvizFont = savedFont;
+          const savedBg = localStorage.getItem('ctlabs_graphviz_bg');
+          if (savedBg) mdGraphvizBg = savedBg;
+          const savedWrap = localStorage.getItem('ctlabs_graphviz_line_wrap');
+          if (savedWrap !== null) mdGraphvizLineWrap = savedWrap === 'true';
+          const savedVim = localStorage.getItem('ctlabs_graphviz_vim_mode');
+          if (savedVim !== null) {
+            mdGraphvizVimMode = savedVim === 'true';
+          } else {
+            mdGraphvizVimMode = localStorage.getItem('ctlabs_md_vim_mode') === 'true';
+          }
+        } catch (e) {}
+
+        function updateGraphvizVimIndicator(e) {
+          if (!mdGraphvizVimStatusMode) return;
+          let mode = e ? e.mode : null;
+          let subMode = e ? e.subMode : '';
+          if (!mode && mdGraphvizCodeEditor && mdGraphvizCodeEditor.state && mdGraphvizCodeEditor.state.vim) {
+            const vState = mdGraphvizCodeEditor.state.vim;
+            if (vState.insertMode) mode = 'insert';
+            else if (vState.visualMode) mode = 'visual';
+            else mode = 'normal';
+          }
+          if (!mode) mode = 'normal';
+
+          if (mode === 'insert') {
+            mdGraphvizVimStatusMode.textContent = '-- INSERT --';
+            mdGraphvizVimStatusMode.style.color = '#38bdf8';
+          } else if (mode === 'visual') {
+            mdGraphvizVimStatusMode.textContent = subMode === 'linewise' ? '-- VISUAL LINE --' : (subMode === 'blockwise' ? '-- VISUAL BLOCK --' : '-- VISUAL --');
+            mdGraphvizVimStatusMode.style.color = '#f59e0b';
+          } else if (mode === 'replace') {
+            mdGraphvizVimStatusMode.textContent = '-- REPLACE --';
+            mdGraphvizVimStatusMode.style.color = '#ef4444';
+          } else {
+            mdGraphvizVimStatusMode.textContent = '-- NORMAL --';
+            mdGraphvizVimStatusMode.style.color = '#22c55e';
+          }
+          if (mdGraphvizVimStatusKey && e && e.keyBuffer === '') {
+            mdGraphvizVimStatusKey.textContent = '';
+          }
+        }
+
+        function setGraphvizLineWrap(enabled) {
+          mdGraphvizLineWrap = !!enabled;
+          try {
+            localStorage.setItem('ctlabs_graphviz_line_wrap', mdGraphvizLineWrap ? 'true' : 'false');
+          } catch (e) {}
+
+          if (mdGraphvizWrapBtn) {
+            if (mdGraphvizLineWrap) {
+              mdGraphvizWrapBtn.style.background = '#0284c7';
+              mdGraphvizWrapBtn.style.color = '#ffffff';
+              mdGraphvizWrapBtn.style.borderColor = '#38bdf8';
+            } else {
+              mdGraphvizWrapBtn.style.background = '#0f172a';
+              mdGraphvizWrapBtn.style.color = '#94a3b8';
+              mdGraphvizWrapBtn.style.borderColor = '#475569';
+            }
+          }
+
+          if (mdGraphvizCodeEditor) {
+            mdGraphvizCodeEditor.setOption('lineWrapping', mdGraphvizLineWrap);
+            mdGraphvizCodeEditor.refresh();
+          } else if (mdGraphvizSource) {
+            mdGraphvizSource.wrap = mdGraphvizLineWrap ? 'soft' : 'off';
+          }
+        }
+
+        function setGraphvizVimMode(enabled) {
+          mdGraphvizVimMode = !!enabled;
+          try {
+            localStorage.setItem('ctlabs_graphviz_vim_mode', mdGraphvizVimMode ? 'true' : 'false');
+          } catch (e) {}
+
+          if (mdGraphvizVimBtn) {
+            if (mdGraphvizVimMode) {
+              mdGraphvizVimBtn.style.background = '#16a34a';
+              mdGraphvizVimBtn.style.color = '#ffffff';
+              mdGraphvizVimBtn.style.borderColor = '#22c55e';
+            } else {
+              mdGraphvizVimBtn.style.background = '#0f172a';
+              mdGraphvizVimBtn.style.color = '#94a3b8';
+              mdGraphvizVimBtn.style.borderColor = '#475569';
+            }
+          }
+
+          if (mdGraphvizVimStatusBar) {
+            mdGraphvizVimStatusBar.style.display = mdGraphvizVimMode ? 'flex' : 'none';
+          }
+
+          if (mdGraphvizCodeEditor) {
+            const currentKeyMap = mdGraphvizCodeEditor.getOption('keyMap') || 'default';
+            if (mdGraphvizVimMode) {
+              if (!currentKeyMap.startsWith('vim')) {
+                mdGraphvizCodeEditor.setOption('keyMap', 'vim');
+                updateGraphvizVimIndicator({ mode: 'normal' });
+              }
+            } else {
+              if (currentKeyMap.startsWith('vim')) {
+                mdGraphvizCodeEditor.setOption('keyMap', 'default');
+              }
+            }
+          }
+        }
+
+        function setGraphvizPreviewBg(bg) {
+          mdGraphvizBg = bg || 'white';
+          try { localStorage.setItem('ctlabs_graphviz_bg', mdGraphvizBg); } catch (e) {}
+
+          if (!mdGraphvizPreview) return;
+
+          // Reset swatch borders
+          [mdGraphvizBgWhite, mdGraphvizBgSlate, mdGraphvizBgChecker].forEach(btn => {
+            if (btn) btn.style.border = '1px solid #475569';
+          });
+          if (mdGraphvizBgPicker && mdGraphvizBgPicker.parentElement) {
+            mdGraphvizBgPicker.parentElement.style.border = '1px solid #475569';
+          }
+
+          if (mdGraphvizBg === 'white') {
+            mdGraphvizPreview.style.background = '#ffffff';
+            if (mdGraphvizBgWhite) mdGraphvizBgWhite.style.border = '2px solid #38bdf8';
+          } else if (mdGraphvizBg === 'slate') {
+            mdGraphvizPreview.style.background = '#0f172a';
+            if (mdGraphvizBgSlate) mdGraphvizBgSlate.style.border = '2px solid #38bdf8';
+          } else if (mdGraphvizBg === 'checker') {
+            mdGraphvizPreview.style.background = 'repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 16px 16px';
+            if (mdGraphvizBgChecker) mdGraphvizBgChecker.style.border = '2px solid #38bdf8';
+          } else {
+            // Custom hex / css color
+            mdGraphvizPreview.style.background = mdGraphvizBg;
+            if (mdGraphvizBgPicker) {
+              mdGraphvizBgPicker.value = mdGraphvizBg;
+              if (mdGraphvizBgPicker.parentElement) {
+                mdGraphvizBgPicker.parentElement.style.border = '2px solid #38bdf8';
+              }
+            }
+          }
+        }
+
+        function applyGraphvizEditorFont() {
+          const fontStack = GRAPHVIZ_FONTS[mdGraphvizFont] || GRAPHVIZ_FONTS.courier;
+          if (mdGraphvizFontSizeLabel) mdGraphvizFontSizeLabel.textContent = `${mdGraphvizFontSize}px`;
+          if (mdGraphvizFontFamily) mdGraphvizFontFamily.value = mdGraphvizFont;
+
+          if (mdGraphvizCodeEditor) {
+            const wrapper = mdGraphvizCodeEditor.getWrapperElement();
+            if (wrapper) {
+              wrapper.style.fontSize = `${mdGraphvizFontSize}px`;
+              wrapper.style.fontFamily = fontStack;
+              const cmLines = wrapper.querySelectorAll('.CodeMirror-line, .CodeMirror-linenumber, .CodeMirror-lines');
+              cmLines.forEach(el => { el.style.fontFamily = fontStack; });
+            }
+            mdGraphvizCodeEditor.refresh();
+          } else if (mdGraphvizSource) {
+            mdGraphvizSource.style.fontSize = `${mdGraphvizFontSize}px`;
+            mdGraphvizSource.style.fontFamily = fontStack;
+          }
+        }
+
+        function getGraphvizEditorValue() {
+          if (mdGraphvizCodeEditor) return mdGraphvizCodeEditor.getValue();
+          return mdGraphvizSource ? mdGraphvizSource.value : '';
+        }
+
+        function setGraphvizEditorValue(val) {
+          if (mdGraphvizCodeEditor) {
+            mdGraphvizCodeEditor.setValue(val || '');
+          }
+          if (mdGraphvizSource) {
+            mdGraphvizSource.value = val || '';
+          }
+        }
+
+        function initGraphvizCodeEditor() {
+          if (mdGraphvizCodeEditor) return mdGraphvizCodeEditor;
+          if (typeof CodeMirror === 'undefined') return null;
+          const ta = document.getElementById('md-graphviz-source');
+          if (!ta) return null;
+
+          try {
+            mdGraphvizCodeEditor = CodeMirror.fromTextArea(ta, {
+              mode: 'dot',
+              theme: 'material-ocean',
+              lineNumbers: true,
+              tabSize: 2,
+              lineWrapping: mdGraphvizLineWrap,
+              keyMap: mdGraphvizVimMode ? 'vim' : 'default',
+              viewportMargin: Infinity,
+              extraKeys: {
+                'Ctrl-S': () => saveAndInsertGraphviz(),
+                'Cmd-S': () => saveAndInsertGraphviz(),
+                'Ctrl-Enter': () => renderGraphviz(),
+                'Cmd-Enter': () => renderGraphviz(),
+                'Tab': (cm) => {
+                  if (cm.somethingSelected()) {
+                    cm.indentSelection('add');
+                  } else {
+                    cm.replaceSelection('  ', 'end');
+                  }
+                },
+                'Shift-Tab': (cm) => {
+                  cm.indentSelection('subtract');
+                }
+              }
+            });
+
+            mdGraphvizCodeEditor.on('vim-mode-change', (arg) => {
+              updateGraphvizVimIndicator(arg);
+            });
+
+            mdGraphvizCodeEditor.on('vim-keypress', (key) => {
+              if (mdGraphvizVimStatusKey) {
+                mdGraphvizVimStatusKey.textContent = key || '';
+              }
+            });
+
+            mdGraphvizCodeEditor.setSize('100%', '100%');
+            window.cmEditors = window.cmEditors || {};
+            window.cmEditors['md-graphviz-source'] = mdGraphvizCodeEditor;
+            mdGraphvizCodeEditor.on('change', () => {
+              if (mdGraphvizSource) mdGraphvizSource.value = mdGraphvizCodeEditor.getValue();
+              scheduleGraphvizPreview();
+            });
+
+            applyGraphvizEditorFont();
+            setTimeout(() => mdGraphvizCodeEditor.refresh(), 30);
+            return mdGraphvizCodeEditor;
+          } catch (e) {
+            console.error('Failed to initialize CodeMirror for Graphviz:', e);
+            return null;
+          }
+        }
+
+        const MD_GRAPHVIZ_DEFAULT = `digraph G {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#475569", fontname="sans-serif", fontcolor="#0f172a"];
+  edge [color="#64748b"];
+
+  A [label="Start"];
+  B [label="Next step"];
+  A -> B;
+}`;
+
+        const MD_GRAPHVIZ_TEMPLATES = {
+          flowchart_lr: `digraph flowchart_lr {
+  rankdir=LR;
+  node [shape=box, style="rounded,filled", fillcolor="#f1f5f9", color="#475569", fontname="sans-serif", fontcolor="#0f172a"];
+  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+
+  start [label="Start", shape=ellipse, fillcolor="#dbeafe", color="#3b82f6"];
+  step1 [label="Process Task"];
+  check [label="Success?", shape=diamond, fillcolor="#fef3c7", color="#f59e0b"];
+  end   [label="Done", shape=ellipse, fillcolor="#dcfce7", color="#22c55e"];
+
+  start -> step1;
+  step1 -> check;
+  check -> end [label="Yes"];
+  check -> step1 [label="Retry (No)"];
+}`,
+          flowchart_tb: `digraph flowchart_tb {
+  rankdir=TB;
+  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#64748b", fontname="sans-serif", fontcolor="#0f172a"];
+  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+
+  input  [label="User Input", shape=ellipse, fillcolor="#e0e7ff", color="#6366f1"];
+  parse  [label="Validate & Parse"];
+  route  [label="Route Request", shape=diamond, fillcolor="#fef3c7", color="#f59e0b"];
+  render [label="Render View"];
+  api    [label="JSON API Response"];
+
+  input -> parse;
+  parse -> route;
+  route -> render [label="HTML"];
+  route -> api [label="JSON"];
+}`,
+          network: `digraph network_topology {
+  rankdir=TB;
+  compound=true;
+  node [shape=box, style="filled,rounded", fontname="sans-serif", fontsize=11];
+  edge [color="#475569", fontname="sans-serif", fontsize=10];
+
+  subgraph cluster_dmz {
+    label="Public / DMZ";
+    style="rounded,dashed";
+    color="#94a3b8";
+    fontname="sans-serif";
+    fontcolor="#475569";
+    lb [label="Load Balancer\\n(Nginx)", fillcolor="#e0f2fe", color="#0284c7"];
+  }
+
+  subgraph cluster_app {
+    label="App Tier (Private)";
+    style="rounded,dashed";
+    color="#94a3b8";
+    fontname="sans-serif";
+    fontcolor="#475569";
+    app1 [label="App Server 1", fillcolor="#ede9fe", color="#7c3aed"];
+    app2 [label="App Server 2", fillcolor="#ede9fe", color="#7c3aed"];
+  }
+
+  subgraph cluster_data {
+    label="Database Tier";
+    style="rounded,dashed";
+    color="#94a3b8";
+    fontname="sans-serif";
+    fontcolor="#475569";
+    db [label="Primary DB\\n(PostgreSQL)", shape=cylinder, fillcolor="#dcfce7", color="#16a34a"];
+    cache [label="Cache (Redis)", shape=cylinder, fillcolor="#fee2e2", color="#dc2626"];
+  }
+
+  client [label="Clients\\n(Web & Mobile)", shape=ellipse, fillcolor="#f1f5f9", color="#64748b"];
+
+  client -> lb;
+  lb -> app1;
+  lb -> app2;
+  app1 -> db;
+  app2 -> db;
+  app1 -> cache;
+  app2 -> cache;
+}`,
+          state_machine: `digraph state_machine {
+  rankdir=LR;
+  node [shape=circle, style="filled", fillcolor="#f8fafc", color="#475569", fontname="sans-serif", fontcolor="#0f172a", width=0.9, fixedsize=true];
+  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+
+  init [shape=point, width=0.2];
+  idle [label="Idle", fillcolor="#e0f2fe", color="#0284c7"];
+  run  [label="Running", fillcolor="#fef3c7", color="#d97706"];
+  done [label="Done", shape=doublecircle, fillcolor="#dcfce7", color="#16a34a"];
+  fail [label="Failed", shape=doublecircle, fillcolor="#fee2e2", color="#dc2626"];
+
+  init -> idle;
+  idle -> run [label="start"];
+  run -> idle [label="pause"];
+  run -> done [label="complete"];
+  run -> fail [label="error"];
+  fail -> run [label="retry"];
+}`,
+          records: `digraph record_example {
+  rankdir=LR;
+  node [shape=record, fontname="sans-serif", fontsize=11, style="filled", fillcolor="#f8fafc", color="#475569"];
+  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+
+  node0 [label="<f0> head | <f1> tail"];
+  node1 [label="<f0> val: 42 | <f1> next"];
+  node2 [label="<f0> val: 99 | <f1> next = null"];
+
+  node0:f0 -> node1:f0;
+  node1:f1 -> node2:f0;
+}`
+        };
+
+        let mdGraphvizPreviewUrl = null;
+        let mdGraphvizCurrentSvg = '';
+        let mdGraphvizScale = 1;
+        let mdGraphvizPanX = 0;
+        let mdGraphvizPanY = 0;
+        let mdGraphvizDragging = false;
+        let mdGraphvizDragStart = null;
+        let mdGraphvizPendingFit = true;
+        let mdGraphvizDebounceTimer = null;
+        let mdGraphvizRenderSeq = 0;
+
+        function setGraphvizError(message) {
+          if (!mdGraphvizError) return;
+          if (message) {
+            mdGraphvizError.textContent = message;
+            mdGraphvizError.style.display = 'block';
+          } else {
+            mdGraphvizError.textContent = '';
+            mdGraphvizError.style.display = 'none';
+          }
+        }
+
+        function applyGraphvizTransform() {
+          if (!mdGraphvizPreviewImg) return;
+          mdGraphvizPreviewImg.style.transform = `translate(${mdGraphvizPanX}px, ${mdGraphvizPanY}px) scale(${mdGraphvizScale})`;
+          if (mdGraphvizZoomReset) {
+            mdGraphvizZoomReset.textContent = `${Math.round(mdGraphvizScale * 100)}%`;
+          }
+        }
+
+        let mdGraphvizLayout = 'side';
+        try {
+          mdGraphvizLayout = localStorage.getItem('ctlabs_graphviz_layout') || 'side';
+        } catch (e) {}
+
+        let mdGraphvizSplitCol = 50;
+        let mdGraphvizSplitRow = 50;
+        try {
+          const savedCol = parseFloat(localStorage.getItem('ctlabs_graphviz_split_col'));
+          if (!isNaN(savedCol) && savedCol >= 15 && savedCol <= 85) mdGraphvizSplitCol = savedCol;
+          const savedRow = parseFloat(localStorage.getItem('ctlabs_graphviz_split_row'));
+          if (!isNaN(savedRow) && savedRow >= 15 && savedRow <= 85) mdGraphvizSplitRow = savedRow;
+        } catch (e) {}
+
+        function applyGraphvizPaneSizes() {
+          const isStacked = mdGraphvizLayout === 'stacked';
+          if (isStacked) {
+            // Stacked mode: Preview (top) gets mdGraphvizSplitRow%, Source (bottom) takes remaining space
+            if (mdGraphvizPreviewPane) {
+              mdGraphvizPreviewPane.style.width = '100%';
+              mdGraphvizPreviewPane.style.height = `calc(${mdGraphvizSplitRow}% - 5px)`;
+              mdGraphvizPreviewPane.style.flex = 'none';
+            }
+            if (mdGraphvizSourcePane) {
+              mdGraphvizSourcePane.style.width = '100%';
+              mdGraphvizSourcePane.style.height = `calc(${100 - mdGraphvizSplitRow}% - 5px)`;
+              mdGraphvizSourcePane.style.flex = 'none';
+            }
+          } else {
+            // Side mode: Source (left) gets mdGraphvizSplitCol%, Preview (right) takes remaining space
+            if (mdGraphvizSourcePane) {
+              mdGraphvizSourcePane.style.height = '100%';
+              mdGraphvizSourcePane.style.width = `calc(${mdGraphvizSplitCol}% - 5px)`;
+              mdGraphvizSourcePane.style.flex = 'none';
+            }
+            if (mdGraphvizPreviewPane) {
+              mdGraphvizPreviewPane.style.height = '100%';
+              mdGraphvizPreviewPane.style.width = `calc(${100 - mdGraphvizSplitCol}% - 5px)`;
+              mdGraphvizPreviewPane.style.flex = 'none';
+            }
+          }
+        }
+
+        function setGraphvizLayout(layout) {
+          mdGraphvizLayout = (layout === 'stacked') ? 'stacked' : 'side';
+          try {
+            localStorage.setItem('ctlabs_graphviz_layout', mdGraphvizLayout);
+          } catch (e) {}
+
+          const isStacked = mdGraphvizLayout === 'stacked';
+          if (mdGraphvizSplitContainer) {
+            mdGraphvizSplitContainer.style.flexDirection = isStacked ? 'column' : 'row';
+          }
+
+          if (mdGraphvizSplitter) {
+            if (isStacked) {
+              mdGraphvizSplitter.style.width = '100%';
+              mdGraphvizSplitter.style.height = '10px';
+              mdGraphvizSplitter.style.cursor = 'row-resize';
+              mdGraphvizSplitter.style.margin = '2px 0';
+              mdGraphvizSplitter.style.borderTop = '1px solid #334155';
+              mdGraphvizSplitter.style.borderBottom = '1px solid #334155';
+              mdGraphvizSplitter.style.borderLeft = 'none';
+              mdGraphvizSplitter.style.borderRight = 'none';
+              mdGraphvizSplitter.style.order = '2';
+            } else {
+              mdGraphvizSplitter.style.width = '10px';
+              mdGraphvizSplitter.style.height = '100%';
+              mdGraphvizSplitter.style.cursor = 'col-resize';
+              mdGraphvizSplitter.style.margin = '0 2px';
+              mdGraphvizSplitter.style.borderLeft = '1px solid #334155';
+              mdGraphvizSplitter.style.borderRight = '1px solid #334155';
+              mdGraphvizSplitter.style.borderTop = 'none';
+              mdGraphvizSplitter.style.borderBottom = 'none';
+              mdGraphvizSplitter.style.order = '2';
+            }
+          }
+
+          if (mdGraphvizSplitterGrip) {
+            mdGraphvizSplitterGrip.className = isStacked ? 'fas fa-grip-lines' : 'fas fa-grip-vertical';
+          }
+
+          if (mdGraphvizSourcePane) {
+            mdGraphvizSourcePane.style.order = isStacked ? '3' : '1';
+          }
+          if (mdGraphvizPreviewPane) {
+            mdGraphvizPreviewPane.style.order = isStacked ? '1' : '3';
+          }
+
+          applyGraphvizPaneSizes();
+
+          if (mdGraphvizLayoutSide) {
+            mdGraphvizLayoutSide.style.background = isStacked ? 'transparent' : '#0284c7';
+            mdGraphvizLayoutSide.style.color = isStacked ? '#94a3b8' : '#ffffff';
+            mdGraphvizLayoutSide.style.fontWeight = isStacked ? '400' : '600';
+          }
+          if (mdGraphvizLayoutStack) {
+            mdGraphvizLayoutStack.style.background = isStacked ? '#0284c7' : 'transparent';
+            mdGraphvizLayoutStack.style.color = isStacked ? '#ffffff' : '#94a3b8';
+            mdGraphvizLayoutStack.style.fontWeight = isStacked ? '600' : '400';
+          }
+
+          setTimeout(() => {
+            if (mdGraphvizCodeEditor) mdGraphvizCodeEditor.refresh();
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.refresh();
+            }
+            if (mdGraphvizPreviewImg && mdGraphvizPreviewImg.style.display !== 'none') {
+              fitGraphvizToView();
+            }
+          }, 35);
+        }
+
+        function resetGraphvizView() {
+          mdGraphvizScale = 1;
+          if (mdGraphvizPreview && mdGraphvizPreviewImg) {
+            const nw = mdGraphvizPreviewImg.naturalWidth || 0;
+            const nh = mdGraphvizPreviewImg.naturalHeight || 0;
+            mdGraphvizPanX = nw ? (mdGraphvizPreview.clientWidth - nw) / 2 : 0;
+            mdGraphvizPanY = nh ? (mdGraphvizPreview.clientHeight - nh) / 2 : 0;
+          } else {
+            mdGraphvizPanX = 0;
+            mdGraphvizPanY = 0;
+          }
+          applyGraphvizTransform();
+        }
+
+        function fitGraphvizToView() {
+          if (!mdGraphvizPreview || !mdGraphvizPreviewImg) return;
+          const nw = mdGraphvizPreviewImg.naturalWidth;
+          const nh = mdGraphvizPreviewImg.naturalHeight;
+          if (!nw || !nh) return;
+
+          const cw = mdGraphvizPreview.clientWidth - 24;
+          const ch = mdGraphvizPreview.clientHeight - 24;
+          if (cw <= 0 || ch <= 0) return;
+
+          const scale = Math.min(8, Math.max(0.1, Math.min(cw / nw, ch / nh)));
+          mdGraphvizScale = scale;
+          mdGraphvizPanX = (mdGraphvizPreview.clientWidth - nw * scale) / 2;
+          mdGraphvizPanY = (mdGraphvizPreview.clientHeight - nh * scale) / 2;
+          applyGraphvizTransform();
+        }
+
+        function zoomGraphvizAt(clientX, clientY, factor) {
+          if (!mdGraphvizPreview || !mdGraphvizPreviewImg) return;
+          const rect = mdGraphvizPreview.getBoundingClientRect();
+          const cx = clientX - rect.left;
+          const cy = clientY - rect.top;
+          const previous = mdGraphvizScale;
+          const next = Math.min(8, Math.max(0.1, previous * factor));
+          if (next === previous) return;
+
+          mdGraphvizPanX = cx - (cx - mdGraphvizPanX) * (next / previous);
+          mdGraphvizPanY = cy - (cy - mdGraphvizPanY) * (next / previous);
+          mdGraphvizScale = next;
+          applyGraphvizTransform();
+        }
+
+        function zoomGraphvizBy(factor) {
+          if (!mdGraphvizPreview) return;
+          const rect = mdGraphvizPreview.getBoundingClientRect();
+          zoomGraphvizAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+        }
+
+        function setGraphvizPreview(svgText) {
+          if (mdGraphvizPreviewUrl) {
+            URL.revokeObjectURL(mdGraphvizPreviewUrl);
+            mdGraphvizPreviewUrl = null;
+          }
+          mdGraphvizCurrentSvg = svgText || '';
+          if (!mdGraphvizPreviewImg) return;
+          if (!svgText) {
+            mdGraphvizPreviewImg.style.display = 'none';
+            mdGraphvizPreviewImg.removeAttribute('src');
+            if (mdGraphvizPreviewEmpty) mdGraphvizPreviewEmpty.style.display = 'flex';
+            return;
+          }
+          const shouldFit = mdGraphvizPendingFit;
+          mdGraphvizPendingFit = false;
+          mdGraphvizPreviewUrl = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml' }));
+          mdGraphvizPreviewImg.onload = () => {
+            if (shouldFit) {
+              fitGraphvizToView();
+            } else {
+              applyGraphvizTransform();
+            }
+          };
+          mdGraphvizPreviewImg.src = mdGraphvizPreviewUrl;
+          mdGraphvizPreviewImg.style.display = 'block';
+          if (mdGraphvizPreviewEmpty) mdGraphvizPreviewEmpty.style.display = 'none';
+        }
+
+        function scheduleGraphvizPreview() {
+          clearTimeout(mdGraphvizDebounceTimer);
+          mdGraphvizDebounceTimer = setTimeout(() => {
+            if (!mdGraphvizModal || mdGraphvizModal.style.display !== 'block') return;
+            const currentVal = getGraphvizEditorValue();
+            if (!currentVal.trim()) {
+              mdGraphvizRenderSeq += 1;
+              setGraphvizError('');
+              setGraphvizPreview(null);
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+              return;
+            }
+            renderGraphviz({ silent: true });
+          }, 400);
+        }
+
+        function isDiagramReferencedInActiveNote(base, filename) {
+          const cm = getMdEditor();
+          const text = cm ? cm.getValue() : (mdTextarea ? mdTextarea.value : '');
+          if (!text) return false;
+          if (filename && text.includes(filename)) return true;
+          if (base && (text.includes(`${base}.svg`) || text.includes(`${base}.png`))) return true;
+          return false;
+        }
+
+        function loadGraphvizSources(selectedBase = '') {
+          if (!mdGraphvizExisting) return Promise.resolve();
+          return fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources`, {
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(list => {
+            if (!Array.isArray(list)) return;
+            cachedDiagramBases = new Set(list.map(item => item && item.base).filter(Boolean));
+            const current = selectedBase || mdGraphvizExisting.value || '';
+            mdGraphvizExisting.innerHTML = '';
+            const blank = document.createElement('option');
+            blank.value = '';
+            blank.textContent = 'New diagram';
+            mdGraphvizExisting.appendChild(blank);
+            list.forEach(item => {
+              if (!item || !item.base) return;
+              const opt = document.createElement('option');
+              opt.value = item.base;
+              opt.textContent = item.base;
+              mdGraphvizExisting.appendChild(opt);
+            });
+            if (current) mdGraphvizExisting.value = current;
+          })
+          .catch(() => {});
+        }
+
+        function loadGraphvizSource(base) {
+          if (!base) {
+            setGraphvizError('');
+            mdGraphvizPendingFit = true;
+            setGraphvizPreview(null);
+            if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+            if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
+            if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
+            if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+            return Promise.resolve();
+          }
+          if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Loading…';
+          return fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources/${encodeURIComponent(base)}`, {
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.ok && typeof data.source === 'string') {
+              setGraphvizEditorValue(data.source);
+              if (mdGraphvizName) mdGraphvizName.value = base;
+              if (mdGraphvizExisting) mdGraphvizExisting.value = base;
+              if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
+              if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
+
+              const isReferenced = isDiagramReferencedInActiveNote(base, `${base}.svg`);
+              if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = isReferenced ? 'Save Changes' : 'Save & Insert';
+              if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = isReferenced ? 'fas fa-save' : 'fas fa-plus';
+
+              setGraphvizError('');
+              mdGraphvizPendingFit = true;
+              setGraphvizPreview(null);
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Loaded ${base}`;
+              return renderGraphviz({ silent: true });
+            } else {
+              setGraphvizError(data.error || 'Could not load diagram.');
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+            }
+          })
+          .catch(err => {
+            setGraphvizError('Load failed: ' + (err.message || 'network error'));
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+          });
+        }
+
+        function renderGraphviz(options = {}) {
+          const silent = !!options.silent;
+          const source = getGraphvizEditorValue();
+          if (!source.trim()) {
+            if (!silent) setGraphvizError('Enter some DOT source first.');
+            return Promise.resolve(false);
+          }
+
+          const engine = (mdGraphvizEngine && mdGraphvizEngine.value) || 'dot';
+          const seq = ++mdGraphvizRenderSeq;
+          setGraphvizError('');
+          if (!silent) {
+            if (mdGraphvizRenderBtn) mdGraphvizRenderBtn.disabled = true;
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Rendering…';
+          }
+
+          const body = new URLSearchParams();
+          body.set('source', source);
+          body.set('engine', engine);
+
+          return fetch('/recordings/graphviz/preview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+            body
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (seq !== mdGraphvizRenderSeq) return false;
+            if (data.ok && data.svg) {
+              setGraphvizPreview(data.svg);
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = silent ? '' : 'Preview ready';
+              return true;
+            }
+            setGraphvizError(data.error || 'Failed to render diagram.');
+            if (!silent) setGraphvizPreview(null);
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+            return false;
+          })
+          .catch(err => {
+            if (seq !== mdGraphvizRenderSeq) return false;
+            setGraphvizError('Render failed: ' + (err.message || 'network error'));
+            if (!silent) setGraphvizPreview(null);
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+            return false;
+          })
+          .finally(() => {
+            if (!silent && mdGraphvizRenderBtn) mdGraphvizRenderBtn.disabled = false;
+          });
+        }
+
+        function saveAndInsertGraphviz(options = {}) {
+          const saveAsNew = !!options.saveAsNew;
+          const source = getGraphvizEditorValue();
+          if (!source.trim()) {
+            setGraphvizError('Enter some DOT source first.');
+            return;
+          }
+
+          let name = (mdGraphvizName && mdGraphvizName.value.trim()) || 'diagram';
+          const base = saveAsNew ? '' : ((mdGraphvizExisting && mdGraphvizExisting.value) || '');
+          const engine = (mdGraphvizEngine && mdGraphvizEngine.value) || 'dot';
+
+          if (saveAsNew && mdGraphvizExisting && mdGraphvizExisting.value) {
+            if (name === mdGraphvizExisting.value) {
+              name = `${name}-copy`;
+            }
+          }
+
+          setGraphvizError('');
+          if (mdGraphvizInsertBtn) mdGraphvizInsertBtn.disabled = true;
+          if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.disabled = true;
+          if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Saving…';
+
+          const body = new URLSearchParams();
+          body.set('source', source);
+          body.set('name', name);
+          body.set('format', 'svg');
+          body.set('engine', engine);
+          body.set('walkthrough', activeWalkthrough || '');
+          if (base) body.set('base', base);
+
+          fetch('/recordings/graphviz', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+            body
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.ok || !data.url) {
+              setGraphvizError(data.error || 'Failed to save diagram.');
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+              return;
+            }
+
+            cachedDiagramBases.add(data.base);
+
+            const cm = getMdEditor();
+            const noteText = cm ? cm.getValue() : (mdTextarea ? mdTextarea.value : '');
+            const alreadyReferenced = !saveAsNew && (
+              noteText.includes(data.filename) ||
+              (base && (noteText.includes(`${base}.svg`) || noteText.includes(`${base}.png`)))
+            );
+
+            if (alreadyReferenced) {
+              // Diagram already referenced in note; bust image cache in preview pane
+              if (mdPreviewPane) {
+                const previewImgs = mdPreviewPane.querySelectorAll('img');
+                previewImgs.forEach(img => {
+                  if (img.src && (img.src.includes(data.filename) || (base && img.src.includes(base)))) {
+                    const baseSrc = img.src.split('?')[0];
+                    img.src = `${baseSrc}?t=${Date.now()}`;
+                  }
+                });
+              }
+            } else {
+              // Insert new markdown link
+              insertMarkdownBlock(`![${name}](${data.url})`, cm ? cm.getCursor() : null);
+            }
+
+            if (mdGraphvizModal) mdGraphvizModal.style.display = 'none';
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+          })
+          .catch(err => {
+            setGraphvizError('Save failed: ' + (err.message || 'network error'));
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+          })
+          .finally(() => {
+            if (mdGraphvizInsertBtn) mdGraphvizInsertBtn.disabled = false;
+            if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.disabled = false;
+          });
+        }
+
+        function deleteGraphvizDiagram() {
+          const base = mdGraphvizExisting ? mdGraphvizExisting.value : '';
+          if (!base) return;
+
+          if (!confirm(`Delete diagram "${base}"? This will remove the source DOT file and the rendered image.`)) {
+            return;
+          }
+
+          setGraphvizError('');
+          if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.disabled = true;
+          if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Deleting…';
+
+          fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources/${encodeURIComponent(base)}/delete`, {
+            method: 'POST',
+            credentials: 'same-origin'
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (!data.ok) {
+              setGraphvizError(data.error || 'Failed to delete diagram.');
+              if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+              return;
+            }
+
+            cachedDiagramBases.delete(base);
+            if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+            if (mdGraphvizName) mdGraphvizName.value = '';
+            setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+            if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+            if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
+            if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
+            if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Deleted ${base}`;
+
+            loadGraphvizSources();
+            renderGraphviz({ silent: true });
+          })
+          .catch(err => {
+            setGraphvizError('Delete failed: ' + (err.message || 'network error'));
+            if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+          })
+          .finally(() => {
+            if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.disabled = false;
+          });
+        }
+
+        function downloadGraphvizSvg() {
+          if (!mdGraphvizCurrentSvg) {
+            setGraphvizError('No diagram to download. Render your DOT source first.');
+            return;
+          }
+          const name = (mdGraphvizName && mdGraphvizName.value.trim()) || 'diagram';
+          const blob = new Blob([mdGraphvizCurrentSvg], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${name}.svg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function openGraphvizModal(initialBase = '') {
+          if (!mdGraphvizModal) return;
+          if (currentMdMode === 'preview') setMdMode('split');
+          clearTimeout(mdGraphvizDebounceTimer);
+          mdGraphvizRenderSeq += 1;
+          setGraphvizError('');
+          mdGraphvizPendingFit = true;
+          mdGraphvizScale = 1;
+          mdGraphvizPanX = 0;
+          mdGraphvizPanY = 0;
+          setGraphvizPreview(null);
+
+          if (initialBase) {
+            if (mdGraphvizName) mdGraphvizName.value = initialBase;
+            if (mdGraphvizExisting) mdGraphvizExisting.value = initialBase;
+            if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
+            if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
+          } else {
+            if (!getGraphvizEditorValue().trim()) {
+              setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+            }
+            if (mdGraphvizName) mdGraphvizName.value = '';
+            if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+            if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+            if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
+            if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
+            if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+          }
+
+          if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+          mdGraphvizModal.style.display = 'block';
+          setGraphvizLayout(mdGraphvizLayout);
+          setGraphvizPreviewBg(mdGraphvizBg);
+          setGraphvizLineWrap(mdGraphvizLineWrap);
+          setGraphvizVimMode(mdGraphvizVimMode);
+          applyGraphvizTransform();
+
+          initGraphvizCodeEditor();
+          applyGraphvizEditorFont();
+
+          setTimeout(() => {
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.refresh();
+              mdGraphvizCodeEditor.focus();
+            } else if (mdGraphvizSource) {
+              mdGraphvizSource.focus();
+            }
+          }, 40);
+
+          loadGraphvizSources(initialBase).then(() => {
+            if (initialBase) {
+              loadGraphvizSource(initialBase);
+            } else {
+              const val = getGraphvizEditorValue();
+              if (val.trim()) {
+                renderGraphviz({ silent: true });
+              }
+            }
+          });
+        }
+
+        function handleGraphvizSourceKeydown(e) {
+          if (e.key === 'Tab') {
+            e.preventDefault();
+            const ta = mdGraphvizSource;
+            if (!ta) return;
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            const val = ta.value;
+
+            if (e.shiftKey) {
+              // Unindent 2 spaces
+              const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+              const lineEnd = val.indexOf('\n', end);
+              const selLines = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+              const unindented = selLines.replace(/^(  | )/gm, '');
+              ta.setRangeText(unindented, lineStart, lineEnd === -1 ? val.length : lineEnd, 'select');
+            } else {
+              if (start !== end) {
+                // Multi-line indent 2 spaces
+                const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+                const lineEnd = val.indexOf('\n', end);
+                const selLines = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+                const indented = selLines.replace(/^/gm, '  ');
+                ta.setRangeText(indented, lineStart, lineEnd === -1 ? val.length : lineEnd, 'select');
+              } else {
+                // Single cursor: insert 2 spaces
+                ta.setRangeText('  ', start, end, 'end');
+              }
+            }
+            scheduleGraphvizPreview();
+            return;
+          }
+
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault();
+            saveAndInsertGraphviz();
+            return;
+          }
+
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            renderGraphviz();
+            return;
+          }
+        }
+
+        if (mdGraphvizBtn) {
+          mdGraphvizBtn.addEventListener('click', () => openGraphvizModal());
+        }
+        if (mdGraphvizExisting) {
+          mdGraphvizExisting.addEventListener('change', () => {
+            loadGraphvizSource(mdGraphvizExisting.value);
+          });
+        }
+        if (mdGraphvizEngine) {
+          mdGraphvizEngine.addEventListener('change', () => {
+            const currentVal = getGraphvizEditorValue();
+            if (currentVal.trim()) {
+              renderGraphviz();
+            }
+          });
+        }
+        if (mdGraphvizTemplate) {
+          mdGraphvizTemplate.addEventListener('change', () => {
+            const key = mdGraphvizTemplate.value;
+            if (!key || !MD_GRAPHVIZ_TEMPLATES[key]) return;
+            const templateSource = MD_GRAPHVIZ_TEMPLATES[key];
+
+            const currentVal = getGraphvizEditorValue();
+            if (currentVal.trim() && currentVal.trim() !== MD_GRAPHVIZ_DEFAULT.trim()) {
+              if (!confirm('Replace current DOT source with this template?')) {
+                mdGraphvizTemplate.value = '';
+                return;
+              }
+            }
+
+            setGraphvizEditorValue(templateSource);
+            if (mdGraphvizName && (!mdGraphvizName.value.trim() || mdGraphvizName.value === 'diagram')) {
+              mdGraphvizName.value = key;
+            }
+            mdGraphvizTemplate.value = '';
+            renderGraphviz();
+          });
+        }
+        if (mdGraphvizRenderBtn) {
+          mdGraphvizRenderBtn.addEventListener('click', () => renderGraphviz());
+        }
+        if (mdGraphvizDownloadBtn) {
+          mdGraphvizDownloadBtn.addEventListener('click', downloadGraphvizSvg);
+        }
+        if (mdGraphvizDeleteBtn) {
+          mdGraphvizDeleteBtn.addEventListener('click', deleteGraphvizDiagram);
+        }
+        if (mdGraphvizSaveNewBtn) {
+          mdGraphvizSaveNewBtn.addEventListener('click', () => saveAndInsertGraphviz({ saveAsNew: true }));
+        }
+        if (mdGraphvizInsertBtn) {
+          mdGraphvizInsertBtn.addEventListener('click', () => saveAndInsertGraphviz({ saveAsNew: false }));
+        }
+        if (mdGraphvizCloseBtn) {
+          mdGraphvizCloseBtn.addEventListener('click', () => {
+            clearTimeout(mdGraphvizDebounceTimer);
+            if (mdGraphvizModal) mdGraphvizModal.style.display = 'none';
+          });
+        }
+        if (mdGraphvizSource) {
+          mdGraphvizSource.addEventListener('input', scheduleGraphvizPreview);
+          mdGraphvizSource.addEventListener('keydown', handleGraphvizSourceKeydown);
+        }
+
+        if (mdGraphvizFontDec) {
+          mdGraphvizFontDec.addEventListener('click', () => {
+            if (mdGraphvizFontSize > 10) {
+              mdGraphvizFontSize -= 1;
+              try { localStorage.setItem('ctlabs_graphviz_font_size', mdGraphvizFontSize); } catch (e) {}
+              applyGraphvizEditorFont();
+            }
+          });
+        }
+        if (mdGraphvizFontInc) {
+          mdGraphvizFontInc.addEventListener('click', () => {
+            if (mdGraphvizFontSize < 26) {
+              mdGraphvizFontSize += 1;
+              try { localStorage.setItem('ctlabs_graphviz_font_size', mdGraphvizFontSize); } catch (e) {}
+              applyGraphvizEditorFont();
+            }
+          });
+        }
+        if (mdGraphvizFontFamily) {
+          mdGraphvizFontFamily.addEventListener('change', () => {
+            mdGraphvizFont = mdGraphvizFontFamily.value || 'courier';
+            try { localStorage.setItem('ctlabs_graphviz_font_family', mdGraphvizFont); } catch (e) {}
+            applyGraphvizEditorFont();
+          });
+        }
+
+        if (mdGraphvizWrapBtn) {
+          mdGraphvizWrapBtn.addEventListener('click', () => {
+            setGraphvizLineWrap(!mdGraphvizLineWrap);
+          });
+        }
+        if (mdGraphvizVimBtn) {
+          mdGraphvizVimBtn.addEventListener('click', () => {
+            setGraphvizVimMode(!mdGraphvizVimMode);
+          });
+        }
+
+        if (mdGraphvizBgWhite) {
+          mdGraphvizBgWhite.addEventListener('click', () => setGraphvizPreviewBg('white'));
+        }
+        if (mdGraphvizBgSlate) {
+          mdGraphvizBgSlate.addEventListener('click', () => setGraphvizPreviewBg('slate'));
+        }
+        if (mdGraphvizBgChecker) {
+          mdGraphvizBgChecker.addEventListener('click', () => setGraphvizPreviewBg('checker'));
+        }
+        if (mdGraphvizBgPicker) {
+          mdGraphvizBgPicker.addEventListener('input', (e) => setGraphvizPreviewBg(e.target.value));
+        }
+
+        if (mdGraphvizZoomIn) {
+          mdGraphvizZoomIn.addEventListener('click', () => zoomGraphvizBy(1.2));
+        }
+        if (mdGraphvizZoomOut) {
+          mdGraphvizZoomOut.addEventListener('click', () => zoomGraphvizBy(1 / 1.2));
+        }
+        if (mdGraphvizZoomReset) {
+          mdGraphvizZoomReset.addEventListener('click', resetGraphvizView);
+        }
+        if (mdGraphvizZoomFit) {
+          mdGraphvizZoomFit.addEventListener('click', fitGraphvizToView);
+        }
+        if (mdGraphvizLayoutSide) {
+          mdGraphvizLayoutSide.addEventListener('click', () => setGraphvizLayout('side'));
+        }
+        if (mdGraphvizLayoutStack) {
+          mdGraphvizLayoutStack.addEventListener('click', () => setGraphvizLayout('stacked'));
+        }
+
+        if (mdGraphvizSplitter) {
+          let isResizingGraphvizSplit = false;
+          let graphvizSplitRaf = null;
+
+          mdGraphvizSplitter.addEventListener('mouseenter', () => {
+            if (!isResizingGraphvizSplit) {
+              mdGraphvizSplitter.style.background = '#334155';
+              if (mdGraphvizSplitterGrip) mdGraphvizSplitterGrip.style.color = '#38bdf8';
+            }
+          });
+
+          mdGraphvizSplitter.addEventListener('mouseleave', () => {
+            if (!isResizingGraphvizSplit) {
+              mdGraphvizSplitter.style.background = '#1e293b';
+              if (mdGraphvizSplitterGrip) mdGraphvizSplitterGrip.style.color = '#64748b';
+            }
+          });
+
+          mdGraphvizSplitter.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            isResizingGraphvizSplit = true;
+            mdGraphvizSplitter.style.background = '#0284c7';
+            if (mdGraphvizSplitterGrip) mdGraphvizSplitterGrip.style.color = '#ffffff';
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = mdGraphvizLayout === 'stacked' ? 'row-resize' : 'col-resize';
+            if (mdGraphvizSplitter.setPointerCapture) {
+              try { mdGraphvizSplitter.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            e.preventDefault();
+          });
+
+          mdGraphvizSplitter.addEventListener('pointermove', (e) => {
+            if (!isResizingGraphvizSplit || !mdGraphvizSplitContainer) return;
+            const rect = mdGraphvizSplitContainer.getBoundingClientRect();
+            if (mdGraphvizLayout === 'stacked') {
+              if (rect.height <= 0) return;
+              const offsetY = e.clientY - rect.top;
+              let pct = (offsetY / rect.height) * 100;
+              const minPx = 120;
+              const minPct = (minPx / rect.height) * 100;
+              const clampedMin = Math.max(15, minPct);
+              const clampedMax = Math.min(85, 100 - minPct);
+              pct = Math.max(clampedMin, Math.min(clampedMax, pct));
+              mdGraphvizSplitRow = Math.round(pct * 10) / 10;
+              applyGraphvizPaneSizes();
+            } else {
+              if (rect.width <= 0) return;
+              const offsetX = e.clientX - rect.left;
+              let pct = (offsetX / rect.width) * 100;
+              const minPx = 150;
+              const minPct = (minPx / rect.width) * 100;
+              const clampedMin = Math.max(15, minPct);
+              const clampedMax = Math.min(85, 100 - minPct);
+              pct = Math.max(clampedMin, Math.min(clampedMax, pct));
+              mdGraphvizSplitCol = Math.round(pct * 10) / 10;
+              applyGraphvizPaneSizes();
+            }
+
+            if (!graphvizSplitRaf) {
+              graphvizSplitRaf = requestAnimationFrame(() => {
+                graphvizSplitRaf = null;
+                if (mdGraphvizPreviewImg && mdGraphvizPreviewImg.style.display !== 'none') {
+                  fitGraphvizToView();
+                }
+              });
+            }
+          });
+
+          const stopGraphvizSplitResize = (e) => {
+            if (!isResizingGraphvizSplit) return;
+            isResizingGraphvizSplit = false;
+            mdGraphvizSplitter.style.background = '#1e293b';
+            if (mdGraphvizSplitterGrip) mdGraphvizSplitterGrip.style.color = '#64748b';
+            document.body.style.userSelect = '';
+            document.body.style.cursor = '';
+            if (e && mdGraphvizSplitter.releasePointerCapture && e.pointerId !== undefined) {
+              try { mdGraphvizSplitter.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+            try {
+              if (mdGraphvizLayout === 'stacked') {
+                localStorage.setItem('ctlabs_graphviz_split_row', mdGraphvizSplitRow);
+              } else {
+                localStorage.setItem('ctlabs_graphviz_split_col', mdGraphvizSplitCol);
+              }
+            } catch (err) {}
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.refresh();
+            }
+            if (mdGraphvizPreviewImg && mdGraphvizPreviewImg.style.display !== 'none') {
+              fitGraphvizToView();
+            }
+          };
+
+          mdGraphvizSplitter.addEventListener('pointerup', stopGraphvizSplitResize);
+          mdGraphvizSplitter.addEventListener('pointercancel', stopGraphvizSplitResize);
+
+          // Double click on splitter resets to 50/50
+          mdGraphvizSplitter.addEventListener('dblclick', () => {
+            if (mdGraphvizLayout === 'stacked') {
+              mdGraphvizSplitRow = 50;
+              try { localStorage.setItem('ctlabs_graphviz_split_row', 50); } catch (err) {}
+            } else {
+              mdGraphvizSplitCol = 50;
+              try { localStorage.setItem('ctlabs_graphviz_split_col', 50); } catch (err) {}
+            }
+            applyGraphvizPaneSizes();
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.refresh();
+            }
+            if (mdGraphvizPreviewImg && mdGraphvizPreviewImg.style.display !== 'none') {
+              fitGraphvizToView();
+            }
+          });
+        }
+
+        if (mdGraphvizPreview) {
+          mdGraphvizPreview.addEventListener('wheel', (e) => {
+            if (!mdGraphvizPreviewImg || mdGraphvizPreviewImg.style.display === 'none') return;
+            e.preventDefault();
+            zoomGraphvizAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.12 : (1 / 1.12));
+          }, { passive: false });
+
+          mdGraphvizPreview.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            if (e.target.closest('button')) return;
+            if (!mdGraphvizPreviewImg || mdGraphvizPreviewImg.style.display === 'none') return;
+            mdGraphvizDragging = true;
+            mdGraphvizDragStart = { x: e.clientX, y: e.clientY, panX: mdGraphvizPanX, panY: mdGraphvizPanY };
+            mdGraphvizPreview.style.cursor = 'grabbing';
+            if (mdGraphvizPreview.setPointerCapture) {
+              try { mdGraphvizPreview.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            e.preventDefault();
+          });
+
+          mdGraphvizPreview.addEventListener('pointermove', (e) => {
+            if (!mdGraphvizDragging || !mdGraphvizDragStart) return;
+            mdGraphvizPanX = mdGraphvizDragStart.panX + (e.clientX - mdGraphvizDragStart.x);
+            mdGraphvizPanY = mdGraphvizDragStart.panY + (e.clientY - mdGraphvizDragStart.y);
+            applyGraphvizTransform();
+          });
+
+          const endGraphvizDrag = (e) => {
+            if (!mdGraphvizDragging) return;
+            mdGraphvizDragging = false;
+            mdGraphvizDragStart = null;
+            mdGraphvizPreview.style.cursor = 'grab';
+            if (e && mdGraphvizPreview.releasePointerCapture && e.pointerId !== undefined) {
+              try { mdGraphvizPreview.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+          };
+          mdGraphvizPreview.addEventListener('pointerup', endGraphvizDrag);
+          mdGraphvizPreview.addEventListener('pointercancel', endGraphvizDrag);
+          mdGraphvizPreview.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button')) return;
+            fitGraphvizToView();
+          });
+        }
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && mdGraphvizModal && mdGraphvizModal.style.display === 'block') {
+            // In Vim mode, Esc is a primary editor command (returning from Insert/Visual to Normal mode),
+            // so Esc must never close the modal.
+            if (mdGraphvizVimMode) {
+              return;
+            }
+            // When Vim mode is off, don't close if focused inside CodeMirror or modal input fields
+            const active = document.activeElement;
+            const isCmFocused = mdGraphvizCodeEditor && mdGraphvizCodeEditor.hasFocus();
+            const isInModal = mdGraphvizModal.contains(active);
+            if (isCmFocused || (isInModal && active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active.closest && active.closest('.CodeMirror'))))) {
+              return;
+            }
+            clearTimeout(mdGraphvizDebounceTimer);
+            mdGraphvizModal.style.display = 'none';
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          if (mdGraphvizModal && mdGraphvizModal.style.display === 'block') {
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.refresh();
+            }
+            if (mdGraphvizPreviewImg && mdGraphvizPreviewImg.style.display !== 'none') {
+              fitGraphvizToView();
+            }
+          }
+        });
 
         // --- In-app Step Links from Markdown ---
         // Notes can link to a step by its stable recording id:
@@ -3882,6 +5904,7 @@
             if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'inline-block';
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'block';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload picture or import markdown / zip note (or drag & drop)';
+            if (mdGraphvizBtn) mdGraphvizBtn.style.display = (currentMdMode === 'preview') ? 'none' : 'inline-flex';
             if (titleIcon) {
               titleIcon.className = 'fab fa-markdown';
               titleIcon.style.color = '#38bdf8';
@@ -3895,6 +5918,7 @@
             if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'none';
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
+            if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
             if (titleIcon) {
               titleIcon.className = 'fas fa-video';
               titleIcon.style.color = '#f43f5e';
@@ -3913,6 +5937,7 @@
             if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'none';
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
+            if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
             if (titleIcon) {
               titleIcon.className = 'fas fa-play-circle w3-text-green';
               titleIcon.style.color = '';
@@ -4042,11 +6067,59 @@
         if (stepNextBtn) stepNextBtn.addEventListener('click', () => goToNextStep(true));
 
         window.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') {
-            if (imageModal && imageModal.style.display === 'flex') {
+          if (imageModal && imageModal.style.display === 'flex') {
+            if (e.key === 'Escape') {
               closeImageModal();
               return;
             }
+            if (e.key === '+' || e.key === '=') {
+              e.preventDefault();
+              zoomImageModalBy(1.25);
+              return;
+            }
+            if (e.key === '-' || e.key === '_') {
+              e.preventDefault();
+              zoomImageModalBy(1 / 1.25);
+              return;
+            }
+            if (e.key === '0') {
+              e.preventDefault();
+              resetImageModalZoom();
+              return;
+            }
+            if (e.key === 'f' || e.key === 'F') {
+              e.preventDefault();
+              fitImageModalToView();
+              return;
+            }
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              imageModalPanX += 60;
+              applyImageModalTransform();
+              return;
+            }
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              imageModalPanX -= 60;
+              applyImageModalTransform();
+              return;
+            }
+            if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              imageModalPanY += 60;
+              applyImageModalTransform();
+              return;
+            }
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              imageModalPanY -= 60;
+              applyImageModalTransform();
+              return;
+            }
+            return;
+          }
+
+          if (e.key === 'Escape') {
             const deleteModal = document.getElementById('delete-set-modal');
             if (deleteModal && deleteModal.style.display === 'block') deleteModal.style.display = 'none';
             const exportModal = document.getElementById('export-modal');

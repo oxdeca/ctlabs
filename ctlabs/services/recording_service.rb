@@ -27,6 +27,8 @@ class RecordingService
   VIDEO_EXTS      = ['.webm', '.mp4'].freeze
   VIDEO_EXT       = '.webm'
   IMAGE_EXTS      = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
+  DIAGRAM_EXTS    = ['.svg', '.png'].freeze
+  DOT_EXT         = '.dot'
   IMAGE_REF_RE    = %r{(?<![\w.-])images/([a-zA-Z0-9_.-]+)}
   MANIFEST        = '_walkthrough.json'
   LEGACY_MANIFEST = '_walkthroughs.json'
@@ -57,6 +59,16 @@ class RecordingService
     target
   end
 
+  def self.images_dir_for(walkthrough)
+    if walkthrough && !walkthrough.to_s.empty?
+      ensure_images_dir(walkthrough)
+    else
+      wks = load_walkthroughs rescue {}
+      first_slug = wks.keys.first
+      first_slug ? ensure_images_dir(first_slug) : ensure_images_dir
+    end
+  end
+
   def self.save_image(tempfile_or_path, original_filename, walkthrough: nil)
     ext = File.extname(original_filename.to_s).downcase
     ext = '.png' unless IMAGE_EXTS.include?(ext)
@@ -67,14 +79,7 @@ class RecordingService
     token      = SecureRandom.hex(3)
     filename   = "#{clean_base}_#{timestamp}_#{token}#{ext}"
 
-    # Determine target images directory
-    target_dir = if walkthrough && !walkthrough.to_s.empty?
-                   ensure_images_dir(walkthrough)
-                 else
-                   wks = load_walkthroughs rescue {}
-                   first_slug = wks.keys.first
-                   first_slug ? ensure_images_dir(first_slug) : ensure_images_dir
-                 end
+    target_dir = images_dir_for(walkthrough)
 
     FileUtils.mkdir_p(target_dir)
     target = File.join(target_dir, filename)
@@ -95,6 +100,85 @@ class RecordingService
     end
 
     filename
+  end
+
+  def self.diagram_base_valid?(base)
+    clean = base.to_s
+    return false if clean.empty? || clean.include?('..') || clean.include?('/') || clean.include?('\\')
+    return false unless clean.match?(/\A[a-zA-Z0-9_.-]{1,80}\z/)
+
+    !%w[. ..].include?(clean)
+  end
+
+  def self.save_diagram(rendered, original_name, walkthrough: nil, source: nil, format: 'svg', base: nil)
+    ext = ".#{format.to_s.downcase}"
+    ext = '.svg' unless DIAGRAM_EXTS.include?(ext)
+
+    clean_base = base.to_s.strip
+    unless diagram_base_valid?(clean_base)
+      clean_base = File.basename(original_name.to_s, '.*').gsub(/[^a-zA-Z0-9_-]+/, '_')[0, 40]
+      clean_base = 'graph' if clean_base.empty?
+      clean_base = "#{clean_base}_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{SecureRandom.hex(3)}"
+    end
+
+    filename   = "#{clean_base}#{ext}"
+    target_dir = images_dir_for(walkthrough)
+    FileUtils.mkdir_p(target_dir)
+    target = File.join(target_dir, filename)
+
+    data = rendered.respond_to?(:read) ? rendered.read : rendered.to_s
+    File.binwrite(target, data)
+    File.chmod(0644, target) rescue nil
+    File.write(File.join(target_dir, "#{clean_base}#{DOT_EXT}"), source.to_s, mode: 'wb') unless source.nil?
+
+    begin
+      ensure_images_dir
+      [filename, "#{clean_base}#{DOT_EXT}"].each do |name|
+        src = File.join(target_dir, name)
+        dst = File.join(IMAGES_DIR, name)
+        FileUtils.cp(src, dst) if File.file?(src) && src != dst
+      end
+    rescue StandardError
+    end
+
+    { 'filename' => filename, 'base' => clean_base }
+  end
+
+  def self.diagram_sources(slug)
+    key, = walkthrough_entry(slug)
+    dir = ensure_images_dir(key)
+
+    Dir.glob(File.join(dir, "*#{DOT_EXT}")).filter_map do |path|
+      next unless File.file?(path)
+
+      base = File.basename(path, DOT_EXT)
+      next unless diagram_base_valid?(base)
+
+      svg = File.join(dir, "#{base}.svg")
+      png = File.join(dir, "#{base}.png")
+      image = if File.file?(svg)
+                "#{base}.svg"
+              elsif File.file?(png)
+                "#{base}.png"
+              end
+
+      {
+        'base'       => base,
+        'filename'   => image,
+        'url'        => image ? "/recordings/images/#{image}" : nil,
+        'updated_at' => File.mtime(path).to_i
+      }
+    end.sort_by { |entry| -entry['updated_at'] }
+  end
+
+  def self.diagram_source(slug, base)
+    return nil unless diagram_base_valid?(base)
+
+    key, = walkthrough_entry(slug)
+    path = File.join(ensure_images_dir(key), "#{base}#{DOT_EXT}")
+    return nil unless File.file?(path)
+
+    File.read(path, encoding: 'UTF-8')
   end
 
   def self.image_path(filename, walkthrough: nil)
@@ -179,14 +263,20 @@ class RecordingService
         }
       end
 
+      sidecar_base = File.basename(name, File.extname(name))
+      has_dot = File.file?(File.join(scoped_dir, "#{sidecar_base}#{DOT_EXT}")) ||
+                File.file?(File.join(global_dir, "#{sidecar_base}#{DOT_EXT}"))
+
       {
-        'filename'    => name,
-        'size'        => in_scoped ? File.size(scoped_path) : (in_global ? File.size(global_path) : 0),
-        'scoped'      => in_scoped,
-        'global_only' => !in_scoped && in_global,
-        'missing'     => !in_scoped && !in_global,
-        'used'        => used_by.any?,
-        'used_by'     => used_by
+        'filename'     => name,
+        'size'         => in_scoped ? File.size(scoped_path) : (in_global ? File.size(global_path) : 0),
+        'scoped'       => in_scoped,
+        'global_only'  => !in_scoped && in_global,
+        'missing'      => !in_scoped && !in_global,
+        'used'         => used_by.any?,
+        'used_by'      => used_by,
+        'diagram'      => has_dot,
+        'diagram_base' => (has_dot ? sidecar_base : nil)
       }
     end
   end
@@ -210,6 +300,16 @@ class RecordingService
     end
 
     File.delete(path)
+
+    sidecar_base   = File.basename(clean, File.extname(clean))
+    scoped_sidecar = File.join(ensure_images_dir(key), "#{sidecar_base}#{DOT_EXT}")
+    File.delete(scoped_sidecar) if File.file?(scoped_sidecar)
+
+    unless other_sets_reference_image?(clean, except_slug: key)
+      global_sidecar = File.join(IMAGES_DIR, "#{sidecar_base}#{DOT_EXT}")
+      File.delete(global_sidecar) if File.file?(global_sidecar)
+    end
+
     true
   rescue SystemCallError
     false

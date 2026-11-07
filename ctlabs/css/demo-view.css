@@ -68,11 +68,13 @@
   border-color: #38bdf8 !important;
   color: #ffffff !important;
 }
-#sidebar-divider:hover, #sidebar-divider.dragging {
+#sidebar-divider:hover, #sidebar-divider.dragging,
+#md-splitter:hover, #md-splitter.dragging {
   background: #0284c7 !important;
   border-color: #38bdf8 !important;
 }
-#sidebar-divider:hover .v-grip-handle, #sidebar-divider.dragging .v-grip-handle {
+#sidebar-divider:hover .v-grip-handle, #sidebar-divider.dragging .v-grip-handle,
+#md-splitter:hover .v-grip-handle, #md-splitter.dragging .v-grip-handle {
   background: #ffffff !important;
 }
 #set-divider:hover, #set-divider.dragging {
@@ -292,3 +294,19 @@
 #md-edit-pane .cm-variable-2 { color: #c792ea !important; }
 #md-edit-pane .cm-variable-3 { color: #ffcb6b !important; }
 #md-edit-pane .cm-hr { color: #475569 !important; font-weight: bold; }
+
+/* Image Lightbox Modal Zoom Controls */
+#image-modal-zoom-out:hover, #image-modal-zoom-in:hover {
+  background: rgba(51, 65, 85, 0.7) !important;
+  color: #f8fafc !important;
+}
+#image-modal-zoom-reset:hover, #image-modal-zoom-fit:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border-color: #38bdf8 !important;
+  color: #38bdf8 !important;
+}
+#image-modal-external:hover, #image-modal-edit-diagram:hover, #image-modal-close:hover {
+  background: rgba(51, 65, 85, 0.95) !important;
+  color: #ffffff !important;
+  border-color: #64748b !important;
+}
