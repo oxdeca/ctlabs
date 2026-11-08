@@ -8,6 +8,7 @@
 
 <link rel="stylesheet" href="/css/codemirror-dialog.min.css">
 <link rel="stylesheet" href="/css/demo-view.css">
+<link rel="stylesheet" href="/css/screenshot-editor.css">
 
     <div class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 0;">
       <h2><i class="fas fa-video"></i> Walkthrough <span style="font-size: 0.55em; opacity: 0.8;">&mdash; <%= ERB::Util.html_escape(@walkthrough_name.to_s) %></span></h2>
@@ -1141,6 +1142,9 @@
             <button type="button" id="image-modal-zoom-in" title="Zoom in (+ or Scroll up)" style="width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; font-size: 1.1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">+</button>
             <button type="button" id="image-modal-zoom-fit" title="Fit to screen (F)" style="height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.7); color: #cbd5e1; cursor: pointer; font-size: 0.75em; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease;">Fit</button>
           </div>
+          <button type="button" id="image-modal-annotate" title="Annotate / Edit Screenshot" style="display: flex; color: #10b981; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; font-size: 0.9em; cursor: pointer; transition: all 0.15s ease;">
+            <i class="fas fa-paint-brush"></i>
+          </button>
           <button type="button" id="image-modal-edit-diagram" title="Edit Graphviz Diagram" style="display: none; color: #38bdf8; background: rgba(30, 41, 59, 0.85); border: 1px solid #475569; width: 36px; height: 36px; border-radius: 50%; align-items: center; justify-content: center; font-size: 0.9em; cursor: pointer; transition: all 0.15s ease;">
             <i class="fas fa-project-diagram"></i>
           </button>
@@ -1170,6 +1174,8 @@
       </button>
     </div>
 
+    <%= erb :'modals/screenshot_editor' %>
+
     <script src="/js/marked.min.js"></script>
     <script>if (typeof marked === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"><\/script>'); }</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/overlay.min.js"></script>
@@ -1184,6 +1190,8 @@
     <script src="/js/codemirror-vim.min.js"></script>
     <script src="/js/asciinema-player.min.js"></script>
     <script src="/js/terminal.js"></script>
+    <script src="/js/jxl_polyfill.js"></script>
+    <script src="/js/screenshot_editor.js"></script>
     <script>
       (function() {
         const demoDiv = document.getElementById('demo');
@@ -2346,6 +2354,20 @@
           });
         }
 
+        const imageModalAnnotate = document.getElementById('image-modal-annotate');
+        if (imageModalAnnotate) {
+          imageModalAnnotate.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!imageModalImg || !imageModalImg.src) return;
+            const src = imageModalImg.src;
+            const alt = imageModalImg.alt || '';
+            closeImageModal();
+            if (typeof window.openScreenshotEditor === 'function') {
+              window.openScreenshotEditor(src, { alt: alt });
+            }
+          });
+        }
+
 
 
         // --- Picture Inspector ---
@@ -2410,6 +2432,9 @@
             const copyBtn = item.missing
               ? ''
               : `<button type="button" class="pic-inspector-copy w3-button w3-round" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown image link" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-link" style="color:#38bdf8; margin-right:4px;"></i>Copy link</button>`;
+            const annotateBtn = item.missing
+              ? ''
+              : `<button type="button" class="pic-inspector-annotate w3-button w3-round" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Annotate picture in screenshot editor" style="background:#1e293b; border:1px solid #475569; color:#10b981; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-paint-brush" style="margin-right:4px;"></i>Annotate</button>`;
             const editBtn = (item.diagram && item.diagram_base)
               ? `<button type="button" class="pic-inspector-edit w3-button w3-round" data-base="${escapeHtml(item.diagram_base)}" title="Edit diagram source" style="background:#0284c7; color:#ffffff; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-edit" style="margin-right:4px;"></i>Edit</button>`
               : '';
@@ -2426,11 +2451,23 @@
                 <div style="color:#94a3b8; font-size:0.78em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detail}</div>
               </div>
               <div style="color:#94a3b8; font-size:0.78em; white-space:nowrap;">${formatFileSize(item.size)}</div>
+              ${annotateBtn}
               ${copyBtn}
               ${editBtn}
               ${deleteBtn}
             </div>`;
           }).join('');
+          picInspectorList.querySelectorAll('.pic-inspector-annotate').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const filename = btn.getAttribute('data-filename');
+              const url = btn.getAttribute('data-url');
+              if (!filename || !url) return;
+              if (picInspectorModal) picInspectorModal.style.display = 'none';
+              if (typeof window.openScreenshotEditor === 'function') {
+                window.openScreenshotEditor(url, { filename });
+              }
+            });
+          });
           picInspectorList.querySelectorAll('.pic-inspector-copy').forEach(btn => {
             btn.addEventListener('click', () => {
               const filename = btn.getAttribute('data-filename');
@@ -6684,5 +6721,38 @@
             recordScreenModal.style.display = 'none';
           }
         });
+
+        // --- Bridge for Screenshot & Diagram External Modules ---
+        window.CtlabsWalkthrough = {
+          openGraphvizModal: (base) => openGraphvizModal(base),
+          openImageModal: (src, alt, title) => openImageModal(src, alt, title),
+          getActiveWalkthrough: () => activeWalkthrough,
+          cachedDiagramBases: cachedDiagramBases,
+          getBaseFromImageUrl: getBaseFromImageUrl,
+          replaceOrInsertImage: (oldFilename, newFilename) => {
+            const cm = getMdEditor();
+            const newSnippet = `![${newFilename.replace(/\.[^.]+$/, '')}](/recordings/images/${newFilename})`;
+            if (cm) {
+              const val = cm.getValue();
+              const regex = new RegExp(`!\\[([^\\]]*)\\]\\([^)]*${oldFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^)]*\\)`, 'g');
+              if (regex.test(val)) {
+                cm.setValue(val.replace(regex, `![$1](/recordings/images/${newFilename})`));
+              } else {
+                insertMarkdownBlock(newSnippet, cm.getCursor());
+              }
+              if (mdTextarea) mdTextarea.value = cm.getValue();
+            } else if (mdTextarea) {
+              const val = mdTextarea.value;
+              const regex = new RegExp(`!\\[([^\\]]*)\\]\\([^)]*${oldFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^)]*\\)`, 'g');
+              if (regex.test(val)) {
+                mdTextarea.value = val.replace(regex, `![$1](/recordings/images/${newFilename})`);
+              } else {
+                insertMarkdownBlock(newSnippet);
+              }
+            }
+            onMarkdownContentChanged();
+            saveMarkdownContent(false);
+          }
+        };
       })();
     </script>

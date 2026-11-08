@@ -1,0 +1,247 @@
+/*
+# -----------------------------------------------------------------------------
+# File        : ctlabs/css/screenshot-editor.css
+# Description : Styling for Screenshot Editor modal and Image Context Menu
+# License     : MIT License
+# -----------------------------------------------------------------------------
+*/
+
+/* Floating Context Menu */
+.ctlabs-context-menu {
+  animation: ctlabsFadeIn 0.12s ease-out;
+}
+
+@keyframes ctlabsFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ctlabs-context-item {
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ctlabs-context-item:hover {
+  background: #334155 !important;
+  color: #38bdf8 !important;
+}
+
+/* Annotator Modal Dialog */
+.annotator-modal-content {
+  box-sizing: border-box;
+}
+
+.annotator-tool-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.82em;
+  padding: 5px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.annotator-tool-btn:hover {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.annotator-tool-btn.active {
+  background: #10b981;
+  color: #0f172a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.annotator-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.annotator-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.annotator-color-swatch.active {
+  border-color: #ffffff !important;
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px #38bdf8;
+}
+
+.annotator-stroke-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.annotator-stroke-btn:hover {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.annotator-stroke-btn.active {
+  background: #334155;
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.annotator-font-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.78em;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.annotator-font-btn:hover {
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.annotator-font-btn.active {
+  background: #334155;
+  color: #38bdf8;
+}
+
+.annotator-action-btn {
+  background: #0f172a;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.annotator-action-btn:hover:not(:disabled) {
+  background: #334155;
+  color: #f8fafc;
+  border-color: #64748b;
+}
+
+.annotator-action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.annotator-zoom-btn {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05em;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.annotator-zoom-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+.annotator-divider {
+  width: 1px;
+  height: 20px;
+  background: #334155;
+  margin: 0 4px;
+  flex: none;
+}
+
+/* Canvas Stage and Viewport */
+.annotator-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #0b1120;
+  overflow: hidden;
+  display: block !important;
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.annotator-viewport {
+  position: absolute;
+  left: 0 !important;
+  top: 0 !important;
+  margin: 0 !important;
+  transform-origin: 0 0 !important;
+  will-change: transform;
+}
+
+/* Number inputs in annotator toolbar */
+#annotator-font-size-input::-webkit-outer-spin-button,
+#annotator-font-size-input::-webkit-inner-spin-button,
+#annotator-badge-num::-webkit-outer-spin-button,
+#annotator-badge-num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+#annotator-font-size-input,
+#annotator-badge-num {
+  -moz-appearance: textfield;
+}
+
+/* Toast message notification */
+.ctlabs-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10010;
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: #f8fafc;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85em;
+  font-weight: 500;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: ctlabsToastIn 0.2s ease-out, ctlabsToastOut 0.25s ease-in 2.7s forwards;
+  pointer-events: none;
+}
+
+@keyframes ctlabsToastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes ctlabsToastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(12px); }
+}

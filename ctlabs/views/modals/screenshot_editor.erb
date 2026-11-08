@@ -1,0 +1,238 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/screenshot_editor.erb
+# Description : Screenshot & Picture Annotation Editor modal and Context Menu
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<!-- Image Right-Click Context Menu -->
+<div id="image-context-menu" class="ctlabs-context-menu" style="display: none; position: fixed; z-index: 10005; min-width: 230px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.7); padding: 4px 0; user-select: none;">
+  <div id="image-context-header" style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 700; border-bottom: 1px solid #334155; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px;">
+    <i class="far fa-image" style="color: #38bdf8;"></i>
+    <span id="image-context-filename" style="overflow: hidden; text-overflow: ellipsis;">Image</span>
+  </div>
+  <button type="button" id="image-context-edit-diagram" class="ctlabs-context-item" style="display: none; width: 100%; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+    <i class="fas fa-project-diagram" style="color: #38bdf8; width: 16px; text-align: center;"></i>
+    <span>Edit Graphviz Diagram</span>
+  </button>
+  <button type="button" id="image-context-annotate" class="ctlabs-context-item" style="display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+    <i class="fas fa-paint-brush" style="color: #10b981; width: 16px; text-align: center;"></i>
+    <span>Annotate / Edit Screenshot</span>
+  </button>
+  <button type="button" id="image-context-view-full" class="ctlabs-context-item" style="display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+    <i class="fas fa-search-plus" style="color: #f59e0b; width: 16px; text-align: center;"></i>
+    <span>View Full Size (Lightbox)</span>
+  </button>
+  <div style="height: 1px; background: #334155; margin: 4px 0;"></div>
+  <button type="button" id="image-context-copy-markdown" class="ctlabs-context-item" style="display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+    <i class="fas fa-link" style="color: #a855f7; width: 16px; text-align: center;"></i>
+    <span>Copy Markdown Link</span>
+  </button>
+  <button type="button" id="image-context-copy-url" class="ctlabs-context-item" style="display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer;">
+    <i class="fas fa-copy" style="color: #94a3b8; width: 16px; text-align: center;"></i>
+    <span>Copy Image URL</span>
+  </button>
+</div>
+
+<!-- Screenshot & Picture Annotation Editor Modal -->
+<div id="screenshot-editor-modal" class="w3-modal annotator-modal" style="display: none; z-index: 10003; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
+  <div class="w3-modal-content w3-round-large w3-card-4 annotator-modal-content" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);">
+    
+    <!-- Modal Header -->
+    <header class="annotator-header" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+      <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+        <h3 style="margin: 0; font-size: 1.05em; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 8px; white-space: nowrap;">
+          <i class="fas fa-paint-brush"></i> Screenshot Editor
+        </h3>
+        <span id="annotator-filename-badge" style="background: rgba(15, 23, 42, 0.8); border: 1px solid #475569; color: #cbd5e1; font-size: 0.78em; padding: 2px 8px; border-radius: 4px; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">
+          image.png
+        </span>
+        <span id="annotator-dims-badge" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; font-family: ui-monospace, monospace;">
+          0 &times; 0
+        </span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" id="annotator-close-x" class="w3-button w3-hover-red w3-round" style="background: transparent; color: #94a3b8; font-size: 1.2em; padding: 4px 10px; border-radius: 4px;" title="Close (Esc)">&times;</button>
+      </div>
+    </header>
+
+    <!-- Modal Toolbar -->
+    <div id="annotator-toolbar" class="annotator-toolbar" style="background: #1e293b; border-bottom: 1px solid #334155; padding: 6px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; flex: none;">
+      
+      <!-- Left side: Tools & Styling -->
+      <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+        
+        <!-- Tool selector button group -->
+        <div class="annotator-btn-group" style="display: inline-flex; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px;">
+          <button type="button" class="annotator-tool-btn active" data-tool="select" title="Select / Move elements or Pan stage (V)">
+            <i class="fas fa-mouse-pointer"></i><span>Select</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="arrow" title="Draw Arrow (A)">
+            <i class="fas fa-long-arrow-alt-right"></i><span>Arrow</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="rect" title="Draw Rectangle Box (R)">
+            <i class="far fa-square"></i><span>Box</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="ellipse" title="Draw Circle / Ellipse (O)">
+            <i class="far fa-circle"></i><span>Circle</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="highlight" title="Highlight text or area (H)">
+            <i class="fas fa-highlighter"></i><span>Highlight</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="pixelate" title="Blur / Pixelate sensitive area (B)">
+            <i class="fas fa-user-secret"></i><span>Pixelate</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="text" title="Add Text label (T)">
+            <i class="fas fa-font"></i><span>Text</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="badge" title="Numbered Step Badge (1, 2, 3...) (S)">
+            <i class="fas fa-list-ol"></i><span>Badge</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="pen" title="Freehand Pen (P)">
+            <i class="fas fa-pen"></i><span>Pen</span>
+          </button>
+          <button type="button" class="annotator-tool-btn" data-tool="crop" title="Crop image area (C)">
+            <i class="fas fa-crop-alt"></i><span>Crop</span>
+          </button>
+        </div>
+
+        <div class="annotator-divider"></div>
+
+        <!-- Color Palette -->
+        <div id="annotator-palette" style="display: inline-flex; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 3px 6px;">
+          <button type="button" class="annotator-color-swatch active" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#10b981" style="background-color: #10b981;" title="Green"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#38bdf8" style="background-color: #38bdf8;" title="Blue"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#a855f7" style="background-color: #a855f7;" title="Purple"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+          <button type="button" class="annotator-color-swatch" data-color="#0f172a" style="background-color: #0f172a; border: 1px solid #64748b;" title="Black"></button>
+        </div>
+
+        <!-- Stroke Width selector -->
+        <div class="annotator-btn-group" style="display: inline-flex; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px;">
+          <button type="button" class="annotator-stroke-btn" data-width="2" title="Thin stroke (2px)">
+            <span style="display: inline-block; width: 14px; height: 2px; background: currentColor; border-radius: 1px;"></span>
+          </button>
+          <button type="button" class="annotator-stroke-btn active" data-width="4" title="Medium stroke (4px)">
+            <span style="display: inline-block; width: 14px; height: 4px; background: currentColor; border-radius: 2px;"></span>
+          </button>
+          <button type="button" class="annotator-stroke-btn" data-width="8" title="Thick stroke (8px)">
+            <span style="display: inline-block; width: 14px; height: 8px; background: currentColor; border-radius: 2px;"></span>
+          </button>
+        </div>
+
+        <!-- Font Size selector (shows when Text or Badge is active): - <num> + -->
+        <div id="annotator-font-size-group" style="display: none; align-items: center; gap: 2px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 4px;">
+          <span style="font-size: 0.72em; color: #94a3b8; font-weight: 600; padding: 0 3px;" title="Font Size"><i class="fas fa-text-height"></i></span>
+          <button type="button" id="annotator-font-dec" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Decrease font size (&minus;)">&minus;</button>
+          <input type="number" id="annotator-font-size-input" min="8" max="72" value="13" style="width: 36px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #38bdf8; font-weight: 700; text-align: center; font-size: 0.82em; padding: 1px 2px; outline: none;" title="Font size (px)">
+          <button type="button" id="annotator-font-inc" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Increase font size (+)">+</button>
+        </div>
+
+        <!-- Step Badge Counter Controller (shows when Badge is active) -->
+        <div id="annotator-badge-group" style="display: none; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 6px;">
+          <span style="font-size: 0.74em; color: #94a3b8; font-weight: 600;" title="Next Step Badge Number">Step #:</span>
+          <button type="button" id="annotator-badge-dec" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Decrement step number">&minus;</button>
+          <input type="number" id="annotator-badge-num" min="1" max="999" value="1" style="width: 38px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #10b981; font-weight: 700; text-align: center; font-size: 0.8em; padding: 1px 2px; outline: none;" title="Current step badge number">
+          <button type="button" id="annotator-badge-inc" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Increment step number">+</button>
+          <button type="button" id="annotator-badge-reset" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Reset step number to 1"><i class="fas fa-undo" style="font-size: 0.68em;"></i></button>
+        </div>
+
+        <div class="annotator-divider"></div>
+
+        <!-- Undo / Redo / Delete / Reset -->
+        <div style="display: inline-flex; align-items: center; gap: 3px;">
+          <button type="button" id="annotator-undo-btn" class="annotator-action-btn" title="Undo (Ctrl+Z)" disabled>
+            <i class="fas fa-undo"></i>
+          </button>
+          <button type="button" id="annotator-redo-btn" class="annotator-action-btn" title="Redo (Ctrl+Y)" disabled>
+            <i class="fas fa-redo"></i>
+          </button>
+          <button type="button" id="annotator-rotate-btn" class="annotator-action-btn" title="Rotate selected element 45° ([ or ] to rotate)" style="color: #38bdf8; display: none;" disabled>
+            <i class="fas fa-redo-alt"></i>
+          </button>
+          <button type="button" id="annotator-delete-btn" class="annotator-action-btn" title="Delete selected element (Del / Backspace)" style="color: #ef4444; display: none;" disabled>
+            <i class="fas fa-trash-alt"></i>
+          </button>
+          <button type="button" id="annotator-reset-btn" class="annotator-action-btn" title="Reset all changes to original">
+            <i class="fas fa-rotate-left"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Right side: Zoom & Save actions -->
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        
+        <!-- Zoom Controls -->
+        <div style="display: inline-flex; align-items: center; gap: 2px; background: #0f172a; border: 1px solid #475569; border-radius: 20px; padding: 2px 6px;">
+          <button type="button" id="annotator-zoom-out" class="annotator-zoom-btn" title="Zoom out (−)">&minus;</button>
+          <button type="button" id="annotator-zoom-reset" class="annotator-zoom-btn" style="min-width: 46px; font-family: ui-monospace, monospace; font-size: 0.75em; font-weight: 600; color: #38bdf8;" title="Reset zoom (100%)">100%</button>
+          <button type="button" id="annotator-zoom-in" class="annotator-zoom-btn" title="Zoom in (+)">+</button>
+          <button type="button" id="annotator-zoom-fit" class="annotator-zoom-btn" style="padding: 0 8px; font-size: 0.75em; font-weight: 600;" title="Fit to view (F)">Fit</button>
+        </div>
+
+        <!-- Crop apply button (visible only in crop mode) -->
+        <button type="button" id="annotator-apply-crop-btn" class="w3-button w3-round" style="display: none; background: #f59e0b; color: #0f172a; font-size: 0.82em; font-weight: 700; padding: 5px 12px; align-items: center; gap: 6px;">
+          <i class="fas fa-check"></i> Apply Crop
+        </button>
+
+        <!-- Download PNG -->
+        <button type="button" id="annotator-download-btn" class="annotator-action-btn" title="Download annotated PNG to computer">
+          <i class="fas fa-download"></i>
+        </button>
+
+        <!-- Save As Copy -->
+        <button type="button" id="annotator-save-copy-btn" class="w3-button w3-round" style="background: #334155; color: #f8fafc; border: 1px solid #475569; font-size: 0.82em; font-weight: 600; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fas fa-copy" style="color: #38bdf8;"></i> Save as Copy
+        </button>
+
+        <!-- Save (Overwrite) -->
+        <button type="button" id="annotator-save-btn" class="w3-button w3-round" style="background: #10b981; color: #ffffff; font-size: 0.82em; font-weight: 700; padding: 5px 14px; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);">
+          <i class="fas fa-save"></i> Save (Overwrite)
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Modal Stage / Canvas Container -->
+    <div id="annotator-stage" class="annotator-stage" style="position: relative; flex: 1; min-height: 0; background: #0b1120; overflow: hidden; display: block; cursor: default; user-select: none; touch-action: none;">
+      
+      <!-- Checkerboard canvas viewport wrapper -->
+      <div id="annotator-viewport" class="annotator-viewport" style="position: absolute; left: 0; top: 0; margin: 0; transform-origin: 0 0; will-change: transform; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8); border: 1px solid #334155; background-color: #1e293b; background-image: linear-gradient(45deg, #182234 25%, transparent 25%), linear-gradient(-45deg, #182234 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #182234 75%), linear-gradient(-45deg, transparent 75%, #182234 75%); background-size: 20px 20px; background-position: 0 0, 0 10px, 10px -10px, -10px 0px;">
+        
+        <!-- Base canvas for image + committed annotations -->
+        <canvas id="annotator-base-canvas" style="display: block; position: absolute; left: 0; top: 0; pointer-events: none;"></canvas>
+
+        <!-- Overlay canvas for live drawing interactions -->
+        <canvas id="annotator-overlay-canvas" style="display: block; position: absolute; left: 0; top: 0; pointer-events: auto;"></canvas>
+
+        <!-- Text input container for inline text editing -->
+        <div id="annotator-text-wrapper" style="display: none; position: absolute; left: 0; top: 0; z-index: 10;">
+          <textarea id="annotator-text-input" placeholder="Type text here..." rows="1" style="background: rgba(15, 23, 42, 0.92); border: 2px solid #38bdf8; border-radius: 4px; color: #f8fafc; font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 700; padding: 4px 8px; outline: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5); resize: none; overflow: hidden;"></textarea>
+          <div style="font-size: 0.72em; color: #94a3b8; margin-top: 3px; background: rgba(15, 23, 42, 0.8); padding: 1px 6px; border-radius: 3px; display: inline-block;">
+            Press Enter or click outside to commit &bull; Esc to cancel
+          </div>
+        </div>
+
+        <!-- Crop box overlay -->
+        <div id="annotator-crop-box" style="display: none; position: absolute; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.12); pointer-events: none; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);"></div>
+
+      </div>
+
+    </div>
+
+    <!-- Modal Footer / Status Bar -->
+    <footer class="annotator-footer" style="background: #0f172a; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; padding: 6px 14px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.78em; color: #94a3b8; flex: none;">
+      <div id="annotator-hint" style="display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-info-circle" style="color: #38bdf8;"></i>
+        <span>Select a tool above. Click & drag on image. Hold Space to pan. Double-click or F to fit. Esc to close.</span>
+      </div>
+      <div id="annotator-status" style="font-weight: 600; color: #cbd5e1;"></div>
+    </footer>
+
+  </div>
+</div>

@@ -591,6 +591,42 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  post '/recordings/save-annotated-image' do
+    content_type :json
+    file = params[:file] || params[:image]
+    halt 400, { ok: false, error: 'No image provided' }.to_json unless file && file[:tempfile]
+
+    filename = params[:filename].to_s.strip
+    halt 400, { ok: false, error: 'No filename provided' }.to_json if filename.empty?
+
+    mode = params[:mode].to_s.downcase
+    mode = 'overwrite' unless %w[overwrite copy].include?(mode)
+
+    wk_slug = params[:walkthrough].to_s.strip
+    wk_slug = session[:walkthrough].to_s.strip if wk_slug.empty?
+
+    result = RecordingService.save_annotated_image(
+      file[:tempfile],
+      filename,
+      walkthrough: wk_slug,
+      mode: mode
+    )
+
+    halt 422, { ok: false, error: 'Failed to save annotated image' }.to_json unless result
+
+    cache_bust = Time.now.to_i
+    {
+      ok: true,
+      filename: result[:filename],
+      mode: result[:mode],
+      url: "/recordings/images/#{result[:filename]}?t=#{cache_bust}",
+      clean_url: "/recordings/images/#{result[:filename]}"
+    }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   post '/recordings/graphviz/preview' do
     content_type :json
     engine = params[:engine].to_s
@@ -642,6 +678,7 @@ class RecordingsController < BaseController
   end
 
   get '/recordings/images/:filename' do
+    headers 'Access-Control-Allow-Origin' => '*'
     path = RecordingService.image_path(params[:filename])
     halt 404, 'Image not found' unless path
 
@@ -650,8 +687,11 @@ class RecordingsController < BaseController
            when '.png'          then 'image/png'
            when '.jpg', '.jpeg' then 'image/jpeg'
            when '.gif'          then 'image/gif'
-           when '.svg'          then 'image/svg+xml'
+           when '.svg'
+             magic = (File.binread(path, 8) rescue '')
+             magic.start_with?("\x89PNG".b) ? 'image/png' : 'image/svg+xml'
            when '.webp'         then 'image/webp'
+           when '.jxl'          then 'image/jxl'
            else 'application/octet-stream'
            end
 
@@ -659,6 +699,7 @@ class RecordingsController < BaseController
   end
 
   get '/recordings/:walkthrough/images/:filename' do
+    headers 'Access-Control-Allow-Origin' => '*'
     path = RecordingService.image_path(params[:filename], walkthrough: params[:walkthrough])
     halt 404, 'Image not found' unless path
 
@@ -667,8 +708,11 @@ class RecordingsController < BaseController
            when '.png'          then 'image/png'
            when '.jpg', '.jpeg' then 'image/jpeg'
            when '.gif'          then 'image/gif'
-           when '.svg'          then 'image/svg+xml'
+           when '.svg'
+             magic = (File.binread(path, 8) rescue '')
+             magic.start_with?("\x89PNG".b) ? 'image/png' : 'image/svg+xml'
            when '.webp'         then 'image/webp'
+           when '.jxl'          then 'image/jxl'
            else 'application/octet-stream'
            end
 
@@ -680,6 +724,7 @@ class RecordingsController < BaseController
   end
 
   get '/recordings/:id' do
+    headers 'Access-Control-Allow-Origin' => '*'
     path = RecordingService.path_for(params[:id])
     halt 404, 'Recording not found' unless path
 
@@ -689,8 +734,11 @@ class RecordingsController < BaseController
              when '.png'          then 'image/png'
              when '.jpg', '.jpeg' then 'image/jpeg'
              when '.gif'          then 'image/gif'
-             when '.svg'          then 'image/svg+xml'
+             when '.svg'
+               magic = (File.binread(path, 8) rescue '')
+               magic.start_with?("\x89PNG".b) ? 'image/png' : 'image/svg+xml'
              when '.webp'         then 'image/webp'
+             when '.jxl'          then 'image/jxl'
              else 'application/octet-stream'
              end
       return send_file path, type: mime, disposition: 'inline'

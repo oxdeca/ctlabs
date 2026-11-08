@@ -18,6 +18,7 @@ require 'json'
 require 'time'
 require 'securerandom'
 require 'fileutils'
+require 'base64'
 
 class RecordingService
   DIR             = '/srv/ctlabs-server/recordings'
@@ -26,7 +27,7 @@ class RecordingService
   MD_EXT          = '.md'
   VIDEO_EXTS      = ['.webm', '.mp4'].freeze
   VIDEO_EXT       = '.webm'
-  IMAGE_EXTS      = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp'].freeze
+  IMAGE_EXTS      = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.jxl'].freeze
   DIAGRAM_EXTS    = ['.svg', '.png'].freeze
   DOT_EXT         = '.dot'
   IMAGE_REF_RE    = %r{(?<![\w.-])images/([a-zA-Z0-9_.-]+)}
@@ -84,10 +85,41 @@ class RecordingService
     FileUtils.mkdir_p(target_dir)
     target = File.join(target_dir, filename)
 
-    if tempfile_or_path.respond_to?(:path)
-      FileUtils.cp(tempfile_or_path.path, target)
+    if ext == '.svg'
+      raw_bytes = if tempfile_or_path.respond_to?(:path)
+                    File.binread(tempfile_or_path.path)
+                  elsif tempfile_or_path.respond_to?(:read)
+                    tempfile_or_path.rewind if tempfile_or_path.respond_to?(:rewind)
+                    tempfile_or_path.read
+                  else
+                    File.binread(tempfile_or_path.to_s)
+                  end
+
+      if raw_bytes.start_with?("\x89PNG".b)
+        w, h = raw_bytes[16, 8].unpack('NN') rescue [800, 600]
+        w = 800 if !w || w.zero?
+        h = 600 if !h || h.zero?
+        b64 = Base64.strict_encode64(raw_bytes)
+        svg_content = <<~SVG
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="#{w}" height="#{h}" viewBox="0 0 #{w} #{h}">
+            <image width="#{w}" height="#{h}" xlink:href="data:image/png;base64,#{b64}"/>
+          </svg>
+        SVG
+        File.binwrite(target, svg_content)
+      else
+        if tempfile_or_path.respond_to?(:path)
+          FileUtils.cp(tempfile_or_path.path, target)
+        else
+          FileUtils.cp(tempfile_or_path.to_s, target)
+        end
+      end
     else
-      FileUtils.cp(tempfile_or_path.to_s, target)
+      if tempfile_or_path.respond_to?(:path)
+        FileUtils.cp(tempfile_or_path.path, target)
+      else
+        FileUtils.cp(tempfile_or_path.to_s, target)
+      end
     end
     File.chmod(0644, target) rescue nil
 
@@ -100,6 +132,76 @@ class RecordingService
     end
 
     filename
+  end
+
+  def self.save_annotated_image(tempfile_or_path, original_filename, walkthrough: nil, mode: 'overwrite')
+    clean = File.basename(original_filename.to_s)
+    return nil if clean.empty? || clean.include?('..')
+
+    ext = File.extname(clean).downcase
+    ext = '.png' unless IMAGE_EXTS.include?(ext)
+
+    target_dir = images_dir_for(walkthrough)
+    FileUtils.mkdir_p(target_dir)
+
+    if mode == 'overwrite'
+      target = image_path(clean, walkthrough: walkthrough) || File.join(target_dir, clean)
+      out_filename = File.basename(target)
+    else
+      clean_base = File.basename(clean, ext).gsub(/[^a-zA-Z0-9_-]+/, '_')[0, 30]
+      clean_base = 'img' if clean_base.empty?
+      clean_base = clean_base.sub(/_annotated(_\d+)?\z/, '')
+      timestamp  = Time.now.strftime('%Y%m%d-%H%M%S')
+      out_filename = "#{clean_base}_annotated_#{timestamp}#{ext}"
+      target = File.join(target_dir, out_filename)
+    end
+
+    if ext == '.svg'
+      raw_bytes = if tempfile_or_path.respond_to?(:path)
+                    File.binread(tempfile_or_path.path)
+                  elsif tempfile_or_path.respond_to?(:read)
+                    tempfile_or_path.rewind if tempfile_or_path.respond_to?(:rewind)
+                    tempfile_or_path.read
+                  else
+                    File.binread(tempfile_or_path.to_s)
+                  end
+
+      if raw_bytes.start_with?("\x89PNG".b)
+        w, h = raw_bytes[16, 8].unpack('NN') rescue [800, 600]
+        w = 800 if !w || w.zero?
+        h = 600 if !h || h.zero?
+        b64 = Base64.strict_encode64(raw_bytes)
+        svg_content = <<~SVG
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="#{w}" height="#{h}" viewBox="0 0 #{w} #{h}">
+            <image width="#{w}" height="#{h}" xlink:href="data:image/png;base64,#{b64}"/>
+          </svg>
+        SVG
+        File.binwrite(target, svg_content)
+      else
+        if tempfile_or_path.respond_to?(:path)
+          FileUtils.cp(tempfile_or_path.path, target)
+        else
+          FileUtils.cp(tempfile_or_path.to_s, target)
+        end
+      end
+    else
+      if tempfile_or_path.respond_to?(:path)
+        FileUtils.cp(tempfile_or_path.path, target)
+      else
+        FileUtils.cp(tempfile_or_path.to_s, target)
+      end
+    end
+    File.chmod(0644, target) rescue nil
+
+    begin
+      ensure_images_dir
+      legacy_target = File.join(IMAGES_DIR, out_filename)
+      FileUtils.cp(target, legacy_target) unless target == legacy_target
+    rescue StandardError
+    end
+
+    { filename: out_filename, mode: mode }
   end
 
   def self.diagram_base_valid?(base)
