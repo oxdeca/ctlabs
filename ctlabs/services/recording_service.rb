@@ -123,12 +123,14 @@ class RecordingService
     end
     File.chmod(0644, target) rescue nil
 
-    # Keep a copy in global IMAGES_DIR for universal legacy fallback
-    begin
-      ensure_images_dir
-      legacy_target = File.join(IMAGES_DIR, filename)
-      FileUtils.cp(target, legacy_target) unless target == legacy_target
-    rescue StandardError
+    # Keep a copy in global IMAGES_DIR only when not scoped to a walkthrough
+    if walkthrough.to_s.strip.empty?
+      begin
+        ensure_images_dir
+        legacy_target = File.join(IMAGES_DIR, filename)
+        FileUtils.cp(target, legacy_target) unless target == legacy_target
+      rescue StandardError
+      end
     end
 
     filename
@@ -194,11 +196,13 @@ class RecordingService
     end
     File.chmod(0644, target) rescue nil
 
-    begin
-      ensure_images_dir
-      legacy_target = File.join(IMAGES_DIR, out_filename)
-      FileUtils.cp(target, legacy_target) unless target == legacy_target
-    rescue StandardError
+    if walkthrough.to_s.strip.empty?
+      begin
+        ensure_images_dir
+        legacy_target = File.join(IMAGES_DIR, out_filename)
+        FileUtils.cp(target, legacy_target) unless target == legacy_target
+      rescue StandardError
+      end
     end
 
     { filename: out_filename, mode: mode }
@@ -233,14 +237,16 @@ class RecordingService
     File.chmod(0644, target) rescue nil
     File.write(File.join(target_dir, "#{clean_base}#{DOT_EXT}"), source.to_s, mode: 'wb') unless source.nil?
 
-    begin
-      ensure_images_dir
-      [filename, "#{clean_base}#{DOT_EXT}"].each do |name|
-        src = File.join(target_dir, name)
-        dst = File.join(IMAGES_DIR, name)
-        FileUtils.cp(src, dst) if File.file?(src) && src != dst
+    if walkthrough.to_s.strip.empty?
+      begin
+        ensure_images_dir
+        [filename, "#{clean_base}#{DOT_EXT}"].each do |name|
+          src = File.join(target_dir, name)
+          dst = File.join(IMAGES_DIR, name)
+          FileUtils.cp(src, dst) if File.file?(src) && src != dst
+        end
+      rescue StandardError
       end
-    rescue StandardError
     end
 
     { 'filename' => filename, 'base' => clean_base }

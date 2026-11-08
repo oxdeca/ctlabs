@@ -591,6 +591,11 @@
       </div>
     </div>
 
+    <!-- Picture Inspector Hover Preview Popup -->
+    <div id="pic-inspector-hover-preview" style="display: none; position: fixed; z-index: 10005; pointer-events: none; background: #0f172a; border: 1px solid #475569; border-radius: 8px; padding: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.85); max-width: 340px; max-height: 260px;">
+      <img id="pic-inspector-hover-img" src="" alt="preview" style="display: block; max-width: 328px; max-height: 248px; object-fit: contain; border-radius: 4px;" />
+    </div>
+
     <!-- Graphviz Diagram Modal -->
     <div id="md-graphviz-modal" class="w3-modal" style="z-index: 10001; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
       <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
@@ -2424,11 +2429,14 @@
               : '';
             const thumb = item.missing
               ? '<div style="width:56px; height:42px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#ef4444;"><i class="fas fa-image-slash"></i></div>'
-              : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" style="width:56px; height:42px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b;" />`;
+              : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" class="pic-inspector-thumb" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Click to preview full size (hover for quick preview)" style="width:56px; height:42px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b; cursor:pointer;" />`;
             const detail = item.missing
               ? 'Referenced but file is missing'
               : (item.used ? 'Used in: ' + usedBy : 'Not referenced by any note');
             const globalTag = item.global_only ? ' <span style="color:#94a3b8; font-size:0.75em;">(global fallback)</span>' : '';
+            const previewBtn = item.missing
+              ? ''
+              : `<button type="button" class="pic-inspector-preview w3-button w3-round" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Preview full size in lightbox" style="background:#1e293b; border:1px solid #475569; color:#38bdf8; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-eye" style="margin-right:4px;"></i>Preview</button>`;
             const copyBtn = item.missing
               ? ''
               : `<button type="button" class="pic-inspector-copy w3-button w3-round" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown image link" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-link" style="color:#38bdf8; margin-right:4px;"></i>Copy link</button>`;
@@ -2451,12 +2459,46 @@
                 <div style="color:#94a3b8; font-size:0.78em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detail}</div>
               </div>
               <div style="color:#94a3b8; font-size:0.78em; white-space:nowrap;">${formatFileSize(item.size)}</div>
+              ${previewBtn}
               ${annotateBtn}
               ${copyBtn}
               ${editBtn}
               ${deleteBtn}
             </div>`;
           }).join('');
+          picInspectorList.querySelectorAll('.pic-inspector-thumb, .pic-inspector-preview').forEach(el => {
+            el.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const filename = el.getAttribute('data-filename');
+              const url = el.getAttribute('data-url');
+              if (!url) return;
+              const hoverBox = document.getElementById('pic-inspector-hover-preview');
+              if (hoverBox) hoverBox.style.display = 'none';
+              if (typeof openImageModal === 'function') {
+                openImageModal(url, filename, filename);
+              }
+            });
+          });
+          const hoverBox = document.getElementById('pic-inspector-hover-preview');
+          const hoverImg = document.getElementById('pic-inspector-hover-img');
+          if (hoverBox && hoverImg) {
+            picInspectorList.querySelectorAll('.pic-inspector-thumb').forEach(thumb => {
+              thumb.addEventListener('mouseenter', (e) => {
+                const url = thumb.getAttribute('data-url');
+                if (!url) return;
+                hoverImg.src = url;
+                hoverBox.style.display = 'block';
+                positionPicInspectorHover(e);
+              });
+              thumb.addEventListener('mousemove', (e) => {
+                positionPicInspectorHover(e);
+              });
+              thumb.addEventListener('mouseleave', () => {
+                hoverBox.style.display = 'none';
+                hoverImg.removeAttribute('src');
+              });
+            });
+          }
           picInspectorList.querySelectorAll('.pic-inspector-annotate').forEach(btn => {
             btn.addEventListener('click', () => {
               const filename = btn.getAttribute('data-filename');
@@ -2535,6 +2577,28 @@
           });
         }
 
+        function positionPicInspectorHover(e) {
+          const hoverBox = document.getElementById('pic-inspector-hover-preview');
+          if (!hoverBox || hoverBox.style.display === 'none') return;
+          const pad = 16;
+          let x = e.clientX + pad;
+          let y = e.clientY - 60;
+          const boxW = hoverBox.offsetWidth || 300;
+          const boxH = hoverBox.offsetHeight || 220;
+          if (x + boxW > window.innerWidth) x = e.clientX - boxW - pad;
+          if (y + boxH > window.innerHeight) y = window.innerHeight - boxH - pad;
+          if (y < pad) y = pad;
+          hoverBox.style.left = `${Math.max(pad, x)}px`;
+          hoverBox.style.top = `${Math.max(pad, y)}px`;
+        }
+
+        function hidePicInspectorHover() {
+          const hoverBox = document.getElementById('pic-inspector-hover-preview');
+          const hoverImg = document.getElementById('pic-inspector-hover-img');
+          if (hoverBox) hoverBox.style.display = 'none';
+          if (hoverImg) hoverImg.removeAttribute('src');
+        }
+
         if (picInspectorBtn) {
           picInspectorBtn.addEventListener('click', () => {
             if (picInspectorModal) picInspectorModal.style.display = 'block';
@@ -2544,6 +2608,7 @@
 
         window.addEventListener('keydown', (e) => {
           if (e.key === 'Escape' && picInspectorModal && picInspectorModal.style.display === 'block') {
+            hidePicInspectorHover();
             picInspectorModal.style.display = 'none';
           }
         });
@@ -3512,6 +3577,7 @@
           const body = new URLSearchParams();
           body.set('source', source);
           body.set('engine', engine);
+          body.set('walkthrough', activeWalkthrough || '');
 
           return fetch('/recordings/graphviz/preview', {
             method: 'POST',

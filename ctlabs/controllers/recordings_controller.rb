@@ -156,13 +156,35 @@ class RecordingsController < BaseController
         end
       end
 
+      # Scan companion .dot diagram sidecars for any additional images referenced in image="..."
+      sidecars_to_check = []
+      images_to_add.each_value do |img_path|
+        sc = File.join(File.dirname(img_path), "#{File.basename(img_path, '.*')}#{RecordingService::DOT_EXT}")
+        sidecars_to_check << sc if File.file?(sc)
+      end
+      wk_img_dir = RecordingService.ensure_images_dir(bundle[:slug])
+      Dir.glob(File.join(wk_img_dir, "*#{RecordingService::DOT_EXT}")).each do |sc|
+        sidecars_to_check << sc if File.file?(sc)
+      end
+
+      sidecars_to_check.uniq.each do |sc_path|
+        sc_src = File.read(sc_path, encoding: 'UTF-8') rescue ''
+        sc_src.scan(/\b(?:image|src)\s*=\s*(?:"([^"]+)"|'([^']+)'|([a-zA-Z0-9_.\-\/]+))/i).each do |matches|
+          ref = matches.compact.first.to_s.strip
+          next if ref.empty? || ref.start_with?('data:')
+          base_name = File.basename(ref)
+          p = RecordingService.image_path(base_name, walkthrough: bundle[:slug])
+          images_to_add[base_name] = p if p && File.file?(p)
+        end
+      end
+
       images_to_add.each do |img_name, img_path|
         zipfile.add("images/#{img_name}", img_path)
         sidecar = File.join(
           File.dirname(img_path),
           "#{File.basename(img_name, File.extname(img_name))}#{RecordingService::DOT_EXT}"
         )
-        if File.file?(sidecar)
+        if File.file?(sidecar) && !zipfile.find_entry("images/#{File.basename(sidecar)}")
           zipfile.add("images/#{File.basename(sidecar)}", sidecar)
         end
       end
@@ -336,7 +358,13 @@ class RecordingsController < BaseController
               data   = entry.get_input_stream.read
               node   = RecordingService.node_from_cast(data) ||
                        RecordingService.node_from_id(old_id)
-              id     = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_id(node)
+              id     = if conflict_action == 'overwrite' && !target_id.empty?
+                         target_id
+                       elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                         old_id
+                       else
+                         RecordingService.new_id(node)
+                       end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
               if conflict_action == 'rename' && !custom_name.empty?
@@ -362,7 +390,13 @@ class RecordingsController < BaseController
                 end
               end
 
-              id = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_markdown_id('note')
+              id = if conflict_action == 'overwrite' && !target_id.empty?
+                     target_id
+                   elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                     old_id
+                   else
+                     RecordingService.new_markdown_id('note')
+                   end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
               id_map[old_id] = id
@@ -372,7 +406,13 @@ class RecordingsController < BaseController
               imported << id
             elsif RecordingService::VIDEO_EXTS.include?(ext)
               old_id = clean_base
-              id     = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_video_id('screen')
+              id     = if conflict_action == 'overwrite' && !target_id.empty?
+                         target_id
+                       elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                         old_id
+                       else
+                         RecordingService.new_video_id('screen')
+                       end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{ext}"), entry.get_input_stream.read)
               id_map[old_id] = id
@@ -472,17 +512,63 @@ class RecordingsController < BaseController
             extracted_images.each do |img_name|
               src_img = File.join(RecordingService.ensure_images_dir, img_name)
               dst_img = File.join(wk_img_dir, img_name)
-              FileUtils.cp(src_img, dst_img) if File.file?(src_img) && !File.exist?(dst_img)
+              if File.file?(src_img) && src_img != dst_img
+                FileUtils.cp(src_img, dst_img) unless File.exist?(dst_img)
+                File.delete(src_img) rescue nil
+              end
             end
           rescue StandardError
           end
           selected_id = ordered.first unless ordered.empty?
         end
+
+        # Rewrite any step references (#step-<old_id>, step:<old_id>, /recordings/<old_id>)
+        # in markdown notes if any IDs were remapped
+        remapped = id_map.select do |k, v|
+          k != v && !k.to_s.empty? && !v.to_s.empty? && k =~ /\A[a-zA-Z0-9_-]+\z/
+        end
+        if remapped.any?
+          md_paths = []
+          if walkthrough && !walkthrough.empty?
+            target_dir = RecordingService.walkthrough_dir(walkthrough)
+            md_paths += Dir.glob(File.join(target_dir, "*#{RecordingService::MD_EXT}"))
+          end
+          imported.each do |rec_id|
+            p = RecordingService.path_for(rec_id)
+            md_paths << p if p && p.end_with?(RecordingService::MD_EXT)
+          end
+          md_paths.uniq.each do |md_file|
+            next unless File.file?(md_file)
+            content = File.read(md_file, encoding: 'UTF-8') rescue nil
+            next unless content
+            modified = false
+            remapped.each do |old_id, new_id|
+              pattern = /(#step-|step:|\/recordings\/)#{Regexp.escape(old_id)}(?:\.(cast|md|webm|mp4))?(?=[^a-zA-Z0-9_.-]|\z)/
+              new_content = content.gsub(pattern) do
+                prefix = $1
+                ext_part = $2 ? ".#{$2}" : ""
+                "#{prefix}#{new_id}#{ext_part}"
+              end
+              if new_content != content
+                content = new_content
+                modified = true
+              end
+            end
+            File.write(md_file, content, encoding: 'UTF-8') if modified
+          end
+        end
       elsif filename.end_with?(RecordingService::EXT)
         data = File.binread(f[:tempfile].path)
         node = RecordingService.node_from_cast(data) ||
                RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
-        id   = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_id(node)
+        old_id = File.basename(f[:filename].to_s, '.*')
+        id   = if conflict_action == 'overwrite' && !target_id.empty?
+                 target_id
+               elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                 old_id
+               else
+                 RecordingService.new_id(node)
+               end
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
 
         if conflict_action == 'rename' && !custom_name.empty?
@@ -514,12 +600,26 @@ class RecordingsController < BaseController
           end
         end
 
-        id = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_markdown_id('note')
+        old_id = File.basename(f[:filename].to_s, '.*')
+        id = if conflict_action == 'overwrite' && !target_id.empty?
+               target_id
+             elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+               old_id
+             else
+               RecordingService.new_markdown_id('note')
+             end
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
         imported << id
       elsif RecordingService::VIDEO_EXTS.include?(File.extname(filename))
         vext = File.extname(filename).downcase
-        id   = (conflict_action == 'overwrite' && !target_id.empty?) ? target_id : RecordingService.new_video_id('screen')
+        old_id = File.basename(f[:filename].to_s, '.*')
+        id = if conflict_action == 'overwrite' && !target_id.empty?
+               target_id
+             elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+               old_id
+             else
+               RecordingService.new_video_id('screen')
+             end
         File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), File.binread(f[:tempfile].path))
         base_name = if conflict_action == 'rename' && !custom_name.empty?
                       custom_name
@@ -630,7 +730,9 @@ class RecordingsController < BaseController
   post '/recordings/graphviz/preview' do
     content_type :json
     engine = params[:engine].to_s
-    result = GraphvizService.render(params[:source].to_s, format: 'svg', engine: engine)
+    wk = params[:walkthrough].to_s.strip
+    wk = session[:walkthrough].to_s.strip if wk.empty?
+    result = GraphvizService.render(params[:source].to_s, format: 'svg', engine: engine, walkthrough: wk)
     unless result[:ok]
       status 422
       return { ok: false, error: result[:error] }.to_json
@@ -655,7 +757,7 @@ class RecordingsController < BaseController
     wk = params[:walkthrough].to_s.strip
     wk = session[:walkthrough].to_s.strip if wk.empty?
 
-    result = GraphvizService.render(source, format: format, engine: engine)
+    result = GraphvizService.render(source, format: format, engine: engine, walkthrough: wk)
     unless result[:ok]
       status 422
       return { ok: false, error: result[:error] }.to_json

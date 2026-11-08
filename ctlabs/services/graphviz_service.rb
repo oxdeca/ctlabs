@@ -6,6 +6,8 @@
 
 require 'open3'
 require 'tmpdir'
+require 'base64'
+require 'fileutils'
 
 class GraphvizService
   MAX_SOURCE_BYTES = 256 * 1024
@@ -14,7 +16,18 @@ class GraphvizService
   ENGINES          = %w[dot neato fdp sfdp circo twopi osage patchwork].freeze
   MAX_ERROR_BYTES  = 4000
 
-  def self.render(source, format: 'svg', engine: 'dot')
+  IMAGE_ATTR_RE = /\b(?:image|src)\s*=\s*(?:"([^"]+)"|'([^']+)'|([a-zA-Z0-9_.\-\/]+))/i
+
+  IMAGE_MIME_TYPES = {
+    '.png'  => 'image/png',
+    '.jpg'  => 'image/jpeg',
+    '.jpeg' => 'image/jpeg',
+    '.gif'  => 'image/gif',
+    '.svg'  => 'image/svg+xml',
+    '.webp' => 'image/webp'
+  }.freeze
+
+  def self.render(source, format: 'svg', engine: 'dot', walkthrough: nil)
     fmt = format.to_s.downcase
     fmt = 'svg' unless FORMATS.include?(fmt)
 
@@ -26,9 +39,12 @@ class GraphvizService
     return { ok: false, error: 'Diagram source is too large' } if src.bytesize > MAX_SOURCE_BYTES
 
     Dir.mktmpdir('ctlabs-graphviz') do |dir|
+      staged_images = stage_referenced_images(src, dir, walkthrough: walkthrough)
+      processed_src = rewrite_dot_image_refs(src, staged_images)
+
       dot_path = File.join(dir, 'input.dot')
       out_path = File.join(dir, "output.#{fmt}")
-      File.write(dot_path, src)
+      File.write(dot_path, processed_src)
 
       _stdout, stderr, status = run_dot(dir, 'dot', "-K#{eng}", "-T#{fmt}", dot_path, '-o', out_path)
 
@@ -39,11 +55,89 @@ class GraphvizService
         return { ok: false, error: message[0, MAX_ERROR_BYTES].scrub }
       end
 
-      { ok: true, data: File.binread(out_path), format: fmt, engine: eng }
+      data = if fmt == 'svg'
+               inline_svg_images(File.read(out_path, encoding: 'UTF-8'), staged_images)
+             else
+               File.binread(out_path)
+             end
+
+      { ok: true, data: data, format: fmt, engine: eng }
     end
   rescue StandardError => e
     { ok: false, error: e.message }
   end
+
+  def self.stage_referenced_images(source, dir, walkthrough: nil)
+    staged = {}
+    source.scan(IMAGE_ATTR_RE).each do |matches|
+      ref = matches.compact.first.to_s.strip
+      next if ref.empty? || ref.start_with?('data:') || staged.key?(ref)
+
+      resolved = resolve_image_file(ref, walkthrough: walkthrough)
+      next unless resolved && File.file?(resolved)
+
+      safe_name = File.basename(resolved).gsub(/[^a-zA-Z0-9_.-]/, '_')
+      dest = File.join(dir, safe_name)
+      FileUtils.cp(resolved, dest) unless File.exist?(dest)
+
+      staged[ref] = { safe_name: safe_name, path: resolved }
+    end
+    staged
+  end
+  private_class_method :stage_referenced_images
+
+  def self.resolve_image_file(ref, walkthrough: nil)
+    clean_base = File.basename(ref)
+    if defined?(RecordingService)
+      found = RecordingService.image_path(clean_base, walkthrough: walkthrough)
+      return found if found && File.file?(found)
+    end
+
+    if File.file?(ref)
+      return File.expand_path(ref)
+    end
+
+    nil
+  end
+  private_class_method :resolve_image_file
+
+  def self.rewrite_dot_image_refs(source, staged)
+    return source if staged.empty?
+
+    modified = source.dup
+    staged.each do |original_ref, info|
+      next if original_ref == info[:safe_name]
+      modified.gsub!(/(\b(?:image|src)\s*=\s*)(["']?)#{Regexp.escape(original_ref)}\2/i) do
+        %(#{$1}#{$2}#{info[:safe_name]}#{$2})
+      end
+    end
+    modified
+  end
+  private_class_method :rewrite_dot_image_refs
+
+  def self.inline_svg_images(svg_content, staged)
+    return svg_content if staged.empty?
+
+    svg = svg_content.dup
+    images = {}
+    staged.each_value { |info| images[info[:safe_name]] = info[:path] }
+
+    images.each do |safe_name, path|
+      next unless File.file?(path)
+
+      ext = File.extname(path).downcase
+      mime = IMAGE_MIME_TYPES[ext] || 'application/octet-stream'
+      bytes = File.binread(path)
+      data_uri = "data:#{mime};base64,#{Base64.strict_encode64(bytes)}"
+
+      svg.gsub!(/(<image\b[^>]*\b(?:xlink:)?href=)(["'])#{Regexp.escape(safe_name)}\2/) do
+        q = $2
+        %(#{$1}#{q}#{data_uri}#{q} href=#{q}#{data_uri}#{q})
+      end
+    end
+    svg
+  end
+  private_class_method :inline_svg_images
 
   def self.run_dot(dir, *cmd)
     Open3.popen3(*cmd, chdir: dir) do |stdin, stdout, stderr, wait_thr|
