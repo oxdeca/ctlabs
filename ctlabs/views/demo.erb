@@ -4471,21 +4471,23 @@
 
         function formatGitDiff(text) {
           const lines = text.split('\n');
+          if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
           return lines.map((line) => {
             const escaped = escapeHtml(line);
+            const content = escaped || '&nbsp;';
             if (line.startsWith('+++') || line.startsWith('---')) {
-              return `<span style="color: #38bdf8; font-weight: bold;">${escaped}</span>`;
+              return `<div style="color: #38bdf8; font-weight: bold; min-height: 1.45em; padding: 0 4px;">${content}</div>`;
             } else if (line.startsWith('+')) {
-              return `<span style="color: #4ade80; background: rgba(74, 222, 128, 0.08); display: block;">${escaped}</span>`;
+              return `<div style="color: #4ade80; background: rgba(74, 222, 128, 0.1); min-height: 1.45em; padding: 0 4px;">${content}</div>`;
             } else if (line.startsWith('-')) {
-              return `<span style="color: #f87171; background: rgba(248, 113, 113, 0.08); display: block;">${escaped}</span>`;
+              return `<div style="color: #f87171; background: rgba(248, 113, 113, 0.1); min-height: 1.45em; padding: 0 4px;">${content}</div>`;
             } else if (line.startsWith('@@')) {
-              return `<span style="color: #c084fc; font-weight: bold; display: block; margin: 4px 0;">${escaped}</span>`;
+              return `<div style="color: #c084fc; font-weight: bold; margin: 6px 0 2px 0; min-height: 1.45em; padding: 0 4px;">${content}</div>`;
             } else if (line.startsWith('diff --git')) {
-              return `<span style="color: #facc15; font-weight: bold; border-top: 1px solid #334155; display: block; padding-top: 8px; margin-top: 8px;">${escaped}</span>`;
+              return `<div style="color: #facc15; font-weight: bold; border-top: 1px solid #334155; padding-top: 8px; margin-top: 10px; min-height: 1.45em; padding-left: 4px; padding-right: 4px;">${content}</div>`;
             }
-            return escaped;
-          }).join('\n');
+            return `<div style="min-height: 1.45em; padding: 0 4px;">${content}</div>`;
+          }).join('');
         }
 
         async function restoreGitVersion() {
