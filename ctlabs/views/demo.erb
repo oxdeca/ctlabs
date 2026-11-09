@@ -125,6 +125,9 @@
             <button type="button" id="delete-set-btn" title="Delete current walkthrough set" onclick="document.getElementById('delete-set-modal').style.display='block'" class="w3-button w3-small" style="background: #ef4444; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
               <i class="fas fa-trash-alt"></i>
             </button>
+            <button type="button" id="git-history-btn" title="Version History (Git revisions, diffs, snapshots &amp; restore)" onclick="openGitHistoryModal('<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>')" class="w3-button w3-small" style="background: #334155; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
+              <i class="fas fa-history"></i>
+            </button>
           </div>
 
           <form id="walkthrough-form" method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; margin: 0;">
@@ -401,33 +404,6 @@
                   <i class="fas fa-trash-alt"></i>
                 </button>
               </form>
-
-              <!-- Divider -->
-              <div id="md-settings-divider" style="width: 1px; height: 18px; background: #334155; margin: 0 4px; display: none;"></div>
-
-              <!-- 6. Settings (All the way to the right) -->
-              <div id="md-settings-wrapper" style="position: relative; display: none;">
-                <button type="button" id="md-settings-btn" title="Editor settings (Wrap Code, options)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-cog" style="color: #94a3b8;"></i>
-                </button>
-                <div id="md-settings-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
-                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
-                    Editor Settings
-                  </div>
-                  <label id="md-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                      <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap code blocks
-                    </span>
-                    <input type="checkbox" id="md-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
-                  </label>
-                  <label id="md-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                      <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
-                    </span>
-                    <input type="checkbox" id="md-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
-                  </label>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -462,6 +438,12 @@
                 <button type="button" id="md-graphviz-btn" title="Graphviz diagram editor (Ctrl+Shift+G)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-project-diagram" style="color: #38bdf8; font-size: 0.95em;"></i>
                   <span style="font-weight: 500;">Diagram</span>
+                </button>
+
+                <!-- Note Version History Button -->
+                <button type="button" id="md-git-history-btn" title="Note Version History (revisions, diffs &amp; restore)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-history" style="color: #38bdf8; font-size: 0.9em;"></i>
+                  <span style="font-weight: 500;">History</span>
                 </button>
 
                 <!-- Emoji Helper Dropdown -->
@@ -509,6 +491,30 @@
                     </div>
                     <span style="color: #64748b;">Ctrl+E</span>
                   </div>
+                </div>
+              </div>
+
+              <!-- Markdown Editor Settings Dropdown -->
+              <div id="md-settings-wrapper" style="position: relative; display: none;">
+                <button type="button" id="md-settings-btn" title="Editor settings (Wrap Code, options)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-cog" style="color: #94a3b8;"></i>
+                </button>
+                <div id="md-settings-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                    Editor Settings
+                  </div>
+                  <label id="md-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap code blocks
+                    </span>
+                    <input type="checkbox" id="md-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+                  </label>
+                  <label id="md-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
+                    </span>
+                    <input type="checkbox" id="md-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
+                  </label>
                 </div>
               </div>
             </div>
@@ -596,6 +602,66 @@
       <img id="pic-inspector-hover-img" src="" alt="preview" style="display: block; max-width: 328px; max-height: 248px; object-fit: contain; border-radius: 4px;" />
     </div>
 
+    <!-- Git Version History Modal -->
+    <div id="git-history-modal" class="w3-modal" style="z-index: 10002; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: 1100px; height: 88vh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-history"></i> Version History
+            <span id="git-history-scope-badge" style="font-size: 0.75em; background: #334155; color: #cbd5e1; padding: 2px 8px; border-radius: 12px; font-weight: 400;">Set: All</span>
+          </h3>
+          <span onclick="document.getElementById('git-history-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+
+        <!-- Snapshot Bar -->
+        <div style="background: #131d31; padding: 10px 18px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: none;">
+          <input type="text" id="git-snapshot-msg" placeholder="Snapshot description (e.g. Before refactoring steps)..." style="flex: 1; min-width: 220px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 12px; border-radius: 4px; font-size: 0.88em;" />
+          <button type="button" id="git-snapshot-btn" onclick="createGitSnapshot()" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fas fa-camera"></i> Save Snapshot
+          </button>
+          <button type="button" onclick="loadGitHistory()" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.85em; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;" title="Refresh history">
+            <i class="fas fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Body: Commits List & Diff Inspector -->
+        <div style="display: flex; flex: 1; min-height: 0; overflow: hidden;">
+          <!-- Left: Commits List -->
+          <div style="width: 380px; flex: none; border-right: 1px solid #334155; display: flex; flex-direction: column; background: #0f172a;">
+            <div style="padding: 8px 14px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">
+              Revisions Log
+            </div>
+            <div id="git-history-list" style="flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="color: #64748b; font-size: 0.85em; text-align: center; padding: 20px;">Loading revisions...</div>
+            </div>
+          </div>
+
+          <!-- Right: Diff Inspector -->
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #1e293b;">
+            <div id="git-diff-header" style="padding: 10px 16px; border-bottom: 1px solid #334155; background: #131d31; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+              <div>
+                <span id="git-diff-title" style="font-weight: 600; color: #f8fafc; font-size: 0.92em;">Select a revision to view diff</span>
+                <div id="git-diff-meta" style="color: #94a3b8; font-size: 0.78em; margin-top: 2px;"></div>
+              </div>
+              <div id="git-diff-actions" style="display: none; align-items: center; gap: 8px;">
+                <button type="button" id="git-restore-btn" onclick="restoreGitVersion()" class="w3-button w3-round" style="background: #eab308; color: #0f172a; font-size: 0.82em; padding: 4px 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+                  <i class="fas fa-undo"></i> Restore This Version
+                </button>
+              </div>
+            </div>
+            <div id="git-diff-body" style="flex: 1; overflow: auto; padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; line-height: 1.45; white-space: pre-wrap; color: #cbd5e1; background: #0b1120;">
+              <span style="color: #64748b;">Select a commit from the list on the left to inspect file changes and unified diffs.</span>
+            </div>
+          </div>
+        </div>
+
+        <footer style="padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+          <span style="color: #64748b; font-size: 0.8em;"><i class="fas fa-shield-alt"></i> Video files (.webm, .mp4) are excluded from git versioning</span>
+          <button type="button" onclick="document.getElementById('git-history-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
+        </footer>
+      </div>
+    </div>
+
     <!-- Graphviz Diagram Modal -->
     <div id="md-graphviz-modal" class="w3-modal" style="z-index: 10001; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
       <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
@@ -666,7 +732,7 @@
             </div>
           </div>
           <div id="md-graphviz-split-container" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; min-height: 0; position: relative;">
-            <div id="md-graphviz-source-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: none; box-sizing: border-box;">
+            <div id="md-graphviz-source-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: none; box-sizing: border-box; overflow: hidden;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex: none; gap: 8px; flex-wrap: wrap;">
                 <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <label for="md-graphviz-source" style="color: #f8fafc; font-size: 0.85em; font-weight: 600; margin: 0; margin-right: 2px;">DOT source</label>
@@ -692,8 +758,8 @@
                 </div>
                 <span style="color: #64748b; font-size: 0.75em;">Tab = indent &middot; Ctrl+S = save &middot; Ctrl+Enter = render</span>
               </div>
-              <div id="md-graphviz-editor-container" style="flex: 1; min-height: 100px; display: flex; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0f172a;">
-                <textarea id="md-graphviz-source" spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 100px; resize: none; background: #0f172a; border: none; color: #e2e8f0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; tab-size: 2; outline: none;"></textarea>
+              <div id="md-graphviz-editor-container" style="flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0f172a;">
+                <textarea id="md-graphviz-source" spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 0; resize: none; background: #0f172a; border: none; color: #e2e8f0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; tab-size: 2; outline: none;"></textarea>
               </div>
               <div id="md-graphviz-vim-status-bar" style="display: none; margin-top: 4px; padding: 3px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; flex: none;">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -1955,13 +2021,26 @@
             activeTab.style.borderColor = '#38bdf8';
           }
 
-          // The emoji picker and graphviz diagram editor insert content, so they are only visible while editing.
+          // The emoji picker, graphviz editor, note version history, and settings are only visible while in edit or split mode.
           if (mdEmojiWrapper) {
             mdEmojiWrapper.style.display = (mode === 'preview') ? 'none' : 'flex';
             if (mode === 'preview') toggleMdEmojiMenu(false);
           }
           if (mdGraphvizBtn) {
             mdGraphvizBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
+          }
+          if (mdGitHistoryBtn) {
+            mdGitHistoryBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
+          }
+          if (mdSettingsWrapper) {
+            mdSettingsWrapper.style.display = (mode === 'preview') ? 'none' : 'inline-block';
+            if (mode === 'preview' && mdSettingsMenu) {
+              mdSettingsMenu.style.display = 'none';
+              if (mdSettingsBtn) {
+                mdSettingsBtn.style.background = '#1e293b';
+                mdSettingsBtn.style.borderColor = '#475569';
+              }
+            }
           }
 
           const cm = getMdEditor();
@@ -3073,7 +3152,7 @@
               tabSize: 2,
               lineWrapping: mdGraphvizLineWrap,
               keyMap: mdGraphvizVimMode ? 'vim' : 'default',
-              viewportMargin: Infinity,
+              viewportMargin: 10,
               extraKeys: {
                 'Ctrl-S': () => saveAndInsertGraphviz(),
                 'Cmd-S': () => saveAndInsertGraphviz(),
@@ -3308,6 +3387,9 @@
               mdGraphvizPreviewPane.style.width = `calc(${100 - mdGraphvizSplitCol}% - 5px)`;
               mdGraphvizPreviewPane.style.flex = 'none';
             }
+          }
+          if (mdGraphvizCodeEditor) {
+            mdGraphvizCodeEditor.refresh();
           }
         }
 
@@ -4184,6 +4266,275 @@
             }
           }
         });
+
+        // --- Git Version History Management ---
+        let gitHistoryCurrentScope = { slug: null, path: null };
+        let gitHistoryCommits = [];
+        let gitHistorySelectedHash = null;
+
+        const gitHistoryModal = document.getElementById('git-history-modal');
+        const gitHistoryScopeBadge = document.getElementById('git-history-scope-badge');
+        const gitHistoryList = document.getElementById('git-history-list');
+        const gitSnapshotMsg = document.getElementById('git-snapshot-msg');
+        const gitDiffTitle = document.getElementById('git-diff-title');
+        const gitDiffMeta = document.getElementById('git-diff-meta');
+        const gitDiffActions = document.getElementById('git-diff-actions');
+        const gitDiffBody = document.getElementById('git-diff-body');
+        const mdGitHistoryBtn = document.getElementById('md-git-history-btn');
+
+        function openGitHistoryModal(slug, path) {
+          gitHistoryCurrentScope = {
+            slug: (slug && slug.trim()) ? slug.trim() : null,
+            path: (path && path.trim()) ? path.trim() : null
+          };
+
+          if (gitHistoryScopeBadge) {
+            if (gitHistoryCurrentScope.path) {
+              gitHistoryScopeBadge.textContent = 'File: ' + gitHistoryCurrentScope.path;
+            } else if (gitHistoryCurrentScope.slug) {
+              gitHistoryScopeBadge.textContent = 'Set: ' + gitHistoryCurrentScope.slug;
+            } else {
+              gitHistoryScopeBadge.textContent = 'Scope: All';
+            }
+          }
+
+          if (gitHistoryModal) {
+            gitHistoryModal.style.display = 'block';
+          }
+          if (gitSnapshotMsg) {
+            gitSnapshotMsg.value = '';
+          }
+          loadGitHistory();
+        }
+
+        const gitHistoryBtn = document.getElementById('git-history-btn');
+        if (gitHistoryBtn) {
+          gitHistoryBtn.addEventListener('click', () => {
+            const wk = (typeof activeWalkthrough !== 'undefined' && activeWalkthrough) ? activeWalkthrough : '<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>';
+            openGitHistoryModal(wk);
+          });
+        }
+
+        if (mdGitHistoryBtn) {
+          mdGitHistoryBtn.addEventListener('click', () => {
+            const wk = (typeof activeWalkthrough !== 'undefined' && activeWalkthrough) ? activeWalkthrough : '<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>';
+            const path = (typeof activeDataType !== 'undefined' && activeDataType === 'markdown' && activeId) ? (activeId + '.md') : null;
+            openGitHistoryModal(wk, path);
+          });
+        }
+
+        async function loadGitHistory() {
+          if (!gitHistoryList) return;
+          gitHistoryList.innerHTML = '<div style="color: #64748b; font-size: 0.85em; text-align: center; padding: 20px;">Loading revisions...</div>';
+          gitHistorySelectedHash = null;
+          if (gitDiffTitle) gitDiffTitle.textContent = 'Select a revision to view diff';
+          if (gitDiffMeta) gitDiffMeta.textContent = '';
+          if (gitDiffActions) gitDiffActions.style.display = 'none';
+          if (gitDiffBody) gitDiffBody.innerHTML = '<span style="color: #64748b;">Select a commit from the list on the left to inspect file changes and unified diffs.</span>';
+
+          try {
+            const params = new URLSearchParams();
+            if (gitHistoryCurrentScope.slug) params.set('slug', gitHistoryCurrentScope.slug);
+            if (gitHistoryCurrentScope.path) params.set('path', gitHistoryCurrentScope.path);
+            params.set('limit', '50');
+
+            const res = await fetch('/recordings/git/history?' + params.toString());
+            const data = await res.json();
+            if (!data.ok || !data.commits || data.commits.length === 0) {
+              gitHistoryList.innerHTML = '<div style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">No revisions found yet.</div>';
+              return;
+            }
+
+            gitHistoryCommits = data.commits;
+            renderGitHistoryList();
+            if (gitHistoryCommits.length > 0) {
+              showGitDiff(gitHistoryCommits[0].hash);
+            }
+          } catch (err) {
+            gitHistoryList.innerHTML = `<div style="color: #ef4444; font-size: 0.85em; text-align: center; padding: 20px;">Error loading history: ${escapeHtml(err.message)}</div>`;
+          }
+        }
+
+        function renderGitHistoryList() {
+          if (!gitHistoryList) return;
+          gitHistoryList.innerHTML = '';
+
+          gitHistoryCommits.forEach((commit) => {
+            const item = document.createElement('div');
+            item.className = 'git-commit-card';
+            item.dataset.hash = commit.hash;
+            const isSelected = (commit.hash === gitHistorySelectedHash);
+            item.style.cssText = `padding: 10px 12px; border-radius: 6px; background: ${isSelected ? '#1e293b' : '#131d31'}; border: 1px solid ${isSelected ? '#0284c7' : '#334155'}; cursor: pointer; transition: all 0.15s ease;`;
+
+            const headerRow = document.createElement('div');
+            headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+
+            const hashSpan = document.createElement('span');
+            hashSpan.style.cssText = 'font-family: ui-monospace, monospace; font-size: 0.78em; color: #38bdf8; font-weight: 700;';
+            hashSpan.textContent = commit.short_hash || commit.hash.substring(0, 7);
+
+            const dateSpan = document.createElement('span');
+            dateSpan.style.cssText = 'font-size: 0.72em; color: #94a3b8;';
+            dateSpan.textContent = (commit.date || '').substring(0, 19);
+
+            headerRow.appendChild(hashSpan);
+            headerRow.appendChild(dateSpan);
+
+            const msgDiv = document.createElement('div');
+            msgDiv.style.cssText = 'font-size: 0.84em; color: #f8fafc; font-weight: 500; margin-bottom: 6px; word-break: break-word; line-height: 1.35;';
+            msgDiv.textContent = commit.message || 'Commit ' + (commit.short_hash || '');
+
+            const footerRow = document.createElement('div');
+            footerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; font-size: 0.72em; color: #64748b;';
+
+            const authorSpan = document.createElement('span');
+            authorSpan.textContent = commit.author || 'ctlabs';
+
+            const countSpan = document.createElement('span');
+            const fileCount = Array.isArray(commit.files) ? commit.files.length : 0;
+            countSpan.textContent = fileCount + ' file' + (fileCount === 1 ? '' : 's');
+
+            footerRow.appendChild(authorSpan);
+            footerRow.appendChild(countSpan);
+
+            item.appendChild(headerRow);
+            item.appendChild(msgDiv);
+            item.appendChild(footerRow);
+
+            item.addEventListener('click', () => {
+              showGitDiff(commit.hash);
+            });
+
+            gitHistoryList.appendChild(item);
+          });
+        }
+
+        async function createGitSnapshot() {
+          const msg = (gitSnapshotMsg ? gitSnapshotMsg.value.trim() : '');
+          const btn = document.getElementById('git-snapshot-btn');
+          const origHtml = btn ? btn.innerHTML : '';
+          if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+          }
+
+          try {
+            const res = await fetch('/recordings/git/snapshot', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ message: msg })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              if (gitSnapshotMsg) gitSnapshotMsg.value = '';
+              loadGitHistory();
+            } else {
+              alert('Failed to save snapshot: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Failed to save snapshot: ' + err.message);
+          } finally {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = origHtml;
+            }
+          }
+        }
+
+        async function showGitDiff(hash) {
+          gitHistorySelectedHash = hash;
+          renderGitHistoryList();
+
+          const commit = gitHistoryCommits.find(c => c.hash === hash);
+          if (gitDiffTitle) gitDiffTitle.textContent = commit ? commit.message : ('Revision ' + hash.substring(0, 7));
+          if (gitDiffMeta) {
+            gitDiffMeta.textContent = commit ? `${commit.author} on ${commit.date} (${commit.hash})` : hash;
+          }
+          if (gitDiffActions) gitDiffActions.style.display = 'flex';
+          if (gitDiffBody) gitDiffBody.innerHTML = '<div style="color: #64748b; padding: 20px 0;">Loading diff...</div>';
+
+          try {
+            const res = await fetch('/recordings/git/diff/' + encodeURIComponent(hash));
+            const data = await res.json();
+            if (!data.ok) {
+              if (gitDiffBody) gitDiffBody.innerHTML = `<span style="color: #ef4444;">Error: ${escapeHtml(data.error || 'Failed to load diff')}</span>`;
+              return;
+            }
+
+            const rawDiff = data.diff || data.stat || 'No diff text available.';
+            const highlighted = formatGitDiff(rawDiff);
+            if (gitDiffBody) gitDiffBody.innerHTML = highlighted;
+          } catch (err) {
+            if (gitDiffBody) gitDiffBody.innerHTML = `<span style="color: #ef4444;">Error loading diff: ${escapeHtml(err.message)}</span>`;
+          }
+        }
+
+        function formatGitDiff(text) {
+          const lines = text.split('\n');
+          return lines.map((line) => {
+            const escaped = escapeHtml(line);
+            if (line.startsWith('+++') || line.startsWith('---')) {
+              return `<span style="color: #38bdf8; font-weight: bold;">${escaped}</span>`;
+            } else if (line.startsWith('+')) {
+              return `<span style="color: #4ade80; background: rgba(74, 222, 128, 0.08); display: block;">${escaped}</span>`;
+            } else if (line.startsWith('-')) {
+              return `<span style="color: #f87171; background: rgba(248, 113, 113, 0.08); display: block;">${escaped}</span>`;
+            } else if (line.startsWith('@@')) {
+              return `<span style="color: #c084fc; font-weight: bold; display: block; margin: 4px 0;">${escaped}</span>`;
+            } else if (line.startsWith('diff --git')) {
+              return `<span style="color: #facc15; font-weight: bold; border-top: 1px solid #334155; display: block; padding-top: 8px; margin-top: 8px;">${escaped}</span>`;
+            }
+            return escaped;
+          }).join('\n');
+        }
+
+        async function restoreGitVersion() {
+          if (!gitHistorySelectedHash) return;
+          const targetPath = gitHistoryCurrentScope.path || '';
+          const confirmMsg = targetPath
+            ? `Restore file '${targetPath}' to revision ${gitHistorySelectedHash.substring(0, 7)}?`
+            : `Restore walkthrough / files to revision ${gitHistorySelectedHash.substring(0, 7)}?`;
+
+          if (!confirm(confirmMsg)) return;
+
+          const btn = document.getElementById('git-restore-btn');
+          const origHtml = btn ? btn.innerHTML : '';
+          if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Restoring...';
+          }
+
+          try {
+            const res = await fetch('/recordings/git/restore', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                hash: gitHistorySelectedHash,
+                path: targetPath || '.',
+                message: `Restore version from ${gitHistorySelectedHash.substring(0, 7)}`
+              })
+            });
+            const data = await res.json();
+            if (data.ok) {
+              alert('Successfully restored version!');
+              window.location.reload();
+            } else {
+              alert('Restore failed: ' + (data.error || 'Unknown error'));
+            }
+          } catch (err) {
+            alert('Restore failed: ' + err.message);
+          } finally {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = origHtml;
+            }
+          }
+        }
+
+        window.openGitHistoryModal = openGitHistoryModal;
+        window.loadGitHistory = loadGitHistory;
+        window.createGitSnapshot = createGitSnapshot;
+        window.restoreGitVersion = restoreGitVersion;
 
         // --- In-app Step Links from Markdown ---
         // Notes can link to a step by its stable recording id:
@@ -6004,10 +6355,11 @@
             if (videoContainer) videoContainer.style.display = 'none';
             if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
             if (mdContainer) mdContainer.style.display = 'flex';
-            if (mdSettingsWrapper) mdSettingsWrapper.style.display = 'inline-block';
-            if (mdSettingsDivider) mdSettingsDivider.style.display = 'block';
+            if (mdSettingsWrapper) mdSettingsWrapper.style.display = (currentMdMode === 'preview') ? 'none' : 'inline-block';
+            if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload picture or import markdown / zip note (or drag & drop)';
             if (mdGraphvizBtn) mdGraphvizBtn.style.display = (currentMdMode === 'preview') ? 'none' : 'inline-flex';
+            if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = (currentMdMode === 'preview') ? 'none' : 'inline-flex';
             if (titleIcon) {
               titleIcon.className = 'fab fa-markdown';
               titleIcon.style.color = '#38bdf8';
@@ -6022,6 +6374,7 @@
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
             if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
+            if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = 'none';
             if (titleIcon) {
               titleIcon.className = 'fas fa-video';
               titleIcon.style.color = '#f43f5e';
@@ -6041,6 +6394,7 @@
             if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
             if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
             if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
+            if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = 'none';
             if (titleIcon) {
               titleIcon.className = 'fas fa-play-circle w3-text-green';
               titleIcon.style.color = '';

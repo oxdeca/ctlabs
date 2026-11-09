@@ -42,6 +42,7 @@ require_relative 'services/lab_repository'
 require_relative 'services/automation_service'
 require_relative 'services/image_service'
 require_relative 'services/graphviz_service'
+require_relative 'services/recording_git_service'
 require_relative 'services/terminal_service'
 
 # --- Load Controllers ---

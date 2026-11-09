@@ -19,6 +19,7 @@ require 'time'
 require 'securerandom'
 require 'fileutils'
 require 'base64'
+require_relative 'recording_git_service'
 
 class RecordingService
   DIR             = '/srv/ctlabs-server/recordings'
@@ -133,6 +134,8 @@ class RecordingService
       end
     end
 
+    RecordingGitService.commit("Save image '#{filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
+
     filename
   end
 
@@ -205,6 +208,8 @@ class RecordingService
       end
     end
 
+    RecordingGitService.commit("Save annotated image '#{out_filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
+
     { filename: out_filename, mode: mode }
   end
 
@@ -248,6 +253,8 @@ class RecordingService
       rescue StandardError
       end
     end
+
+    RecordingGitService.commit("Save diagram '#{clean_base}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
 
     { 'filename' => filename, 'base' => clean_base }
   end
@@ -417,6 +424,8 @@ class RecordingService
       global_sidecar = File.join(IMAGES_DIR, "#{sidecar_base}#{DOT_EXT}")
       File.delete(global_sidecar) if File.file?(global_sidecar)
     end
+
+    RecordingGitService.commit("Delete image '#{clean}' from '#{key}'") rescue nil
 
     true
   rescue SystemCallError
@@ -772,6 +781,7 @@ class RecordingService
       end
     end
     save_walkthroughs(wks) if changed
+    RecordingGitService.commit("Delete step '#{id}'") rescue nil
     true
   rescue SystemCallError
     false
@@ -833,6 +843,7 @@ class RecordingService
         lines.insert(first_non_empty_idx, new_heading + "\n")
         File.write(path, lines.join)
       end
+      RecordingGitService.commit("Update note '#{id}' title to '#{new_title}'", files: [path]) rescue nil
       return true
     end
 
@@ -872,6 +883,7 @@ class RecordingService
     lines[0] = JSON.generate(header) + "\n"
 
     File.write(path, lines.join)
+    RecordingGitService.commit("Update recording '#{id}' title to '#{title}'", files: [path]) rescue nil
     true
   rescue StandardError
     false
@@ -887,6 +899,7 @@ class RecordingService
     initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
     File.write(path, initial_content, encoding: 'UTF-8')
     add_to_walkthrough(slug, [id])
+    RecordingGitService.commit("Create note '#{clean_title}' (#{id}) in '#{slug}'", files: [path]) rescue nil
     id
   end
 
@@ -902,6 +915,7 @@ class RecordingService
     path = path_for(id)
     return false unless path && path.end_with?(MD_EXT)
     File.write(path, content.to_s, encoding: 'UTF-8')
+    RecordingGitService.commit("Update note '#{id}'", files: [path]) rescue nil
     true
   rescue StandardError
     false
@@ -1171,6 +1185,7 @@ class RecordingService
     clean = name.to_s.strip[0, NAME_MAX]
     entry['name'] = clean unless clean.empty?
     save_walkthrough(key, entry)
+    RecordingGitService.commit("Rename walkthrough '#{key}' to '#{entry['name']}'") rescue nil
     [key, entry['name'].to_s]
   end
 
@@ -1202,6 +1217,7 @@ class RecordingService
     }
     save_walkthrough(base, entry)
     wks[base] = entry
+    RecordingGitService.commit("Create walkthrough '#{clean}' (#{base})") rescue nil
     base
   end
 
@@ -1242,6 +1258,7 @@ class RecordingService
     entry['unintegrated_ids'] = unint - wanted
     entry.delete('excluded_ids')
     save_walkthrough(key, entry)
+    RecordingGitService.commit("Add steps to '#{key}'") rescue nil
     key
   end
 
@@ -1318,6 +1335,8 @@ class RecordingService
       create_walkthrough('Walkthrough 1')
     end
 
+    RecordingGitService.commit("Delete walkthrough '#{slug_str}'") rescue nil
+
     true
   end
 
@@ -1342,6 +1361,7 @@ class RecordingService
     entry.delete('excluded_ids')
 
     save_walkthrough(key, entry)
+    RecordingGitService.commit("Update step order in '#{key}'") rescue nil
     key
   end
 
@@ -1357,6 +1377,7 @@ class RecordingService
     entry.delete('excluded_ids')
 
     save_walkthrough(key, entry)
+    RecordingGitService.commit("Remove step '#{id}' from '#{key}'") rescue nil
     key
   end
 

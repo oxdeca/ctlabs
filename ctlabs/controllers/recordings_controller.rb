@@ -665,6 +665,8 @@ class RecordingsController < BaseController
       end
     end
 
+    RecordingGitService.commit("Import files#{walkthrough ? " into '#{walkthrough}'" : ''}") rescue nil
+
     { ok: true, count: imported.size, imported: imported, selected: (selected_id || imported.first), walkthrough: walkthrough }.to_json
   rescue StandardError => e
     status 500
@@ -1164,5 +1166,87 @@ class RecordingsController < BaseController
     meta_info = path ? RecordingService.meta(path) : {}
 
     { ok: true, id: params[:id], title: meta_info[:title] }.to_json
+  end
+
+  # --- Git Versioning Endpoints ---
+
+  get '/recordings/git/history' do
+    content_type :json
+    slug = params[:walkthrough] || params[:slug]
+    path = params[:path]
+    limit = params[:limit] || 40
+    commits = RecordingGitService.history(slug: slug, path: path, limit: limit)
+    { ok: true, commits: commits }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/recordings/git/diff/:hash' do
+    content_type :json
+    result = RecordingGitService.diff(params[:hash])
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/recordings/git/show' do
+    content_type :json
+    hash = params[:hash].to_s.strip
+    path = params[:path].to_s.strip
+    result = RecordingGitService.show_file(hash, path)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/git/snapshot' do
+    content_type :json
+    msg = params[:message].to_s.strip
+    msg = "Manual snapshot: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}" if msg.empty?
+    result = RecordingGitService.commit(msg)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/git/restore' do
+    content_type :json
+    hash = params[:hash].to_s.strip
+    path = params[:path].to_s.strip
+    msg = params[:message]
+    result = RecordingGitService.restore_file(hash, path, message: msg)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  get '/recordings/git/status' do
+    content_type :json
+    result = RecordingGitService.status
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
   end
 end
