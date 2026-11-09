@@ -1199,7 +1199,8 @@ class RecordingsController < BaseController
     content_type :json
     hash = params[:hash].to_s.strip
     path = params[:path].to_s.strip
-    result = RecordingGitService.show_file(hash, path)
+    slug = params[:walkthrough] || params[:slug]
+    result = RecordingGitService.show_file(hash, path, slug: slug)
     unless result[:ok]
       status 422
       return result.to_json
@@ -1229,8 +1230,9 @@ class RecordingsController < BaseController
     content_type :json
     hash = params[:hash].to_s.strip
     path = params[:path].to_s.strip
+    slug = params[:walkthrough] || params[:slug]
     msg = params[:message]
-    result = RecordingGitService.restore_file(hash, path, message: msg)
+    result = RecordingGitService.restore_file(hash, path, slug: slug, message: msg)
     unless result[:ok]
       status 422
       return result.to_json

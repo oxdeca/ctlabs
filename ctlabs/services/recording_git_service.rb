@@ -11,6 +11,7 @@
 require 'open3'
 require 'fileutils'
 require 'shellwords'
+require 'pathname'
 
 class RecordingGitService
   ROOT = File.expand_path('/srv/ctlabs-server/recordings')
@@ -117,8 +118,12 @@ class RecordingGitService
     args = ['log', "-n#{lim}", '--pretty=format:%H|%h|%an|%ae|%ad|%s', '--date=iso']
 
     if path && !path.strip.empty?
-      rel = relative_path(path)
-      args += ['--', rel] if rel
+      clean_path = path.strip
+      if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
+        clean_path = File.join(slug.strip, clean_path)
+      end
+      rel = relative_path(clean_path)
+      args += ['--', rel] if rel && rel != '.'
     elsif slug && !slug.strip.empty? && slug != 'default'
       args += ['--', slug]
     end
@@ -178,13 +183,17 @@ class RecordingGitService
     { ok: false, error: e.message }
   end
 
-  def self.show_file(hash, path)
+  def self.show_file(hash, path, slug: nil)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
     clean_hash = hash.to_s.strip
     return { ok: false, error: 'invalid hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
 
-    rel = relative_path(path)
+    clean_path = path.to_s.strip
+    if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
+      clean_path = File.join(slug.strip, clean_path)
+    end
+    rel = relative_path(clean_path)
     return { ok: false, error: 'invalid path' } unless rel
 
     out, err, status = run_git('show', "#{clean_hash}:#{rel}")
@@ -197,19 +206,26 @@ class RecordingGitService
     { ok: false, error: e.message }
   end
 
-  def self.restore_file(hash, path, message: nil)
+  def self.restore_file(hash, path, slug: nil, message: nil)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
     clean_hash = hash.to_s.strip
     return { ok: false, error: 'invalid hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
 
-    rel = relative_path(path)
+    clean_path = path.to_s.strip
+    if clean_path.empty? && slug && !slug.strip.empty? && slug != 'default'
+      clean_path = slug.strip
+    elsif slug && !slug.strip.empty? && slug != 'default' && clean_path != '.' && !clean_path.start_with?("#{slug.strip}/")
+      clean_path = File.join(slug.strip, clean_path)
+    end
+
+    rel = relative_path(clean_path)
     return { ok: false, error: 'invalid path' } unless rel
 
     _out, err, status = run_git('checkout', clean_hash, '--', rel)
     if status.exitstatus == 0
       msg = message || "Restore #{rel} from #{clean_hash[0..7]}"
-      commit(msg, files: [rel])
+      commit(msg, files: (rel == '.' ? nil : [rel]))
       { ok: true, restored: rel, hash: clean_hash }
     else
       { ok: false, error: err.strip }
@@ -239,9 +255,10 @@ class RecordingGitService
   def self.relative_path(path)
     p = path.to_s.strip
     return nil if p.empty?
+    return '.' if p == '.'
     p = p.sub(%r{\A#{Regexp.escape(ROOT)}/?}, '')
     # Prevent traversal
-    p = File.cleanpath(p)
+    p = Pathname.new(p).cleanpath.to_s
     return nil if p.start_with?('..')
     p
   end

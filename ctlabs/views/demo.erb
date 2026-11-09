@@ -4290,7 +4290,7 @@
 
           if (gitHistoryScopeBadge) {
             if (gitHistoryCurrentScope.path) {
-              gitHistoryScopeBadge.textContent = 'File: ' + gitHistoryCurrentScope.path;
+              gitHistoryScopeBadge.textContent = 'Note: ' + gitHistoryCurrentScope.path.split('/').pop();
             } else if (gitHistoryCurrentScope.slug) {
               gitHistoryScopeBadge.textContent = 'Set: ' + gitHistoryCurrentScope.slug;
             } else {
@@ -4318,8 +4318,9 @@
         if (mdGitHistoryBtn) {
           mdGitHistoryBtn.addEventListener('click', () => {
             const wk = (typeof activeWalkthrough !== 'undefined' && activeWalkthrough) ? activeWalkthrough : '<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>';
-            const path = (typeof activeDataType !== 'undefined' && activeDataType === 'markdown' && activeId) ? (activeId + '.md') : null;
-            openGitHistoryModal(wk, path);
+            const fileName = (typeof activeDataType !== 'undefined' && activeDataType === 'markdown' && activeId) ? (activeId + '.md') : null;
+            const filePath = (fileName && wk && wk !== 'default') ? (wk + '/' + fileName) : fileName;
+            openGitHistoryModal(wk, filePath);
           });
         }
 
@@ -4492,10 +4493,12 @@
 
         async function restoreGitVersion() {
           if (!gitHistorySelectedHash) return;
-          const targetPath = gitHistoryCurrentScope.path || '';
-          const confirmMsg = targetPath
-            ? `Restore file '${targetPath}' to revision ${gitHistorySelectedHash.substring(0, 7)}?`
-            : `Restore walkthrough / files to revision ${gitHistorySelectedHash.substring(0, 7)}?`;
+          const targetPath = gitHistoryCurrentScope.path || gitHistoryCurrentScope.slug || '.';
+          const confirmMsg = gitHistoryCurrentScope.path
+            ? `Restore note '${gitHistoryCurrentScope.path.split('/').pop()}' to revision ${gitHistorySelectedHash.substring(0, 7)}?`
+            : (gitHistoryCurrentScope.slug
+              ? `Restore walkthrough set '${gitHistoryCurrentScope.slug}' to revision ${gitHistorySelectedHash.substring(0, 7)}?`
+              : `Restore all files to revision ${gitHistorySelectedHash.substring(0, 7)}?`);
 
           if (!confirm(confirmMsg)) return;
 
@@ -4512,8 +4515,9 @@
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({
                 hash: gitHistorySelectedHash,
-                path: targetPath || '.',
-                message: `Restore version from ${gitHistorySelectedHash.substring(0, 7)}`
+                path: targetPath,
+                slug: gitHistoryCurrentScope.slug || '',
+                message: `Restore from ${gitHistorySelectedHash.substring(0, 7)}`
               })
             });
             const data = await res.json();
