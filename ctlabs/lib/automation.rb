@@ -26,6 +26,7 @@ require 'psych'
 require 'fileutils'
 require 'time'
 require 'cgi'
+require 'shellwords'
 require_relative '../services/lab_repository'
 
 module Automation
@@ -1430,6 +1431,13 @@ module Automation
     vars      = tf_cfg['vars'] || []
     var_args  = vars.map { |v| "-var '#{v}'" }.join(" ")
 
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+
+    # Cloud/terraform runs on the standalone controller (ctl-ctrl) for controller scope (@standalone),
+    # or on the lab's in-lab controller node (ansible) for lab scope.
+    exec_ctrl = @standalone ? ctl_ctrl_name : ctrl.name
+    exec_user = (exec_ctrl == ctl_ctrl_name) ? 'root' : (ctrl.respond_to?(:user) && ctrl.user ? ctrl.user : 'ansible')
+
     tf_base_host = tf_cfg['root_dir'].to_s.strip.empty? ? TF_DIR : tf_cfg['root_dir'].to_s.strip
     tf_base_ctl  = if tf_cfg['root_dir_ctl'].to_s.strip != ''
                      tf_cfg['root_dir_ctl'].to_s.strip
@@ -1442,10 +1450,10 @@ module Automation
                    end
 
     if tf_base_host != TF_DIR && File.directory?(tf_base_host)
-      has_dir = system("docker exec #{target_container} test -d #{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
+      has_dir = system("#{engine} exec #{exec_ctrl} test -d #{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
       unless has_dir
-        system("docker exec #{target_container} mkdir -p #{Shellwords.escape(File.dirname(tf_base_ctl))} 2>/dev/null")
-        system("docker cp #{Shellwords.escape(tf_base_host)} #{target_container}:#{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
+        system("#{engine} exec #{exec_ctrl} mkdir -p #{Shellwords.escape(File.dirname(tf_base_ctl))} 2>/dev/null")
+        system("#{engine} cp #{Shellwords.escape(tf_base_host)} #{exec_ctrl}:#{Shellwords.escape(tf_base_ctl)} 2>/dev/null")
       end
     end
 
@@ -1479,13 +1487,6 @@ module Automation
         terraform apply -auto-approve #{var_args}
       CMD
     end
-
-    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
-
-    # Cloud/terraform runs on the standalone controller (ctl-ctrl) for controller scope (@standalone),
-    # or on the lab's in-lab controller node (ansible) for lab scope.
-    exec_ctrl = @standalone ? ctl_ctrl_name : ctrl.name
-    exec_user = (exec_ctrl == ctl_ctrl_name) ? 'root' : (ctrl.respond_to?(:user) && ctrl.user ? ctrl.user : 'ansible')
 
     exec_env  = ""
     exec_home = GcpAuth.resolve_home_for(target_container: exec_ctrl, target_user: exec_user)
@@ -1647,8 +1648,34 @@ module Automation
           host_work_dir = "#{tf_base_host}/#{tf_work_dir}"
           state_file = workspace == 'default' ? "#{host_work_dir}/terraform.tfstate" : "#{host_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
 
+          state_source = nil
+          state_json = nil
+
           if File.exist?(state_file)
-            state_data = JSON.parse(File.read(state_file))
+            state_source = :host
+            state_json = File.read(state_file)
+          else
+            # Fallback: check inside the container if not found on the host
+            container_work_dir = "#{tf_base_ctl}/#{tf_work_dir}"
+            container_state_file = workspace == 'default' ? "#{container_work_dir}/terraform.tfstate" : "#{container_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+
+            if system("#{engine} exec #{exec_ctrl} test -f #{Shellwords.escape(container_state_file)} >/dev/null 2>&1")
+              state_source = :container
+              warn_lines = [
+                "[IP Harvest] ⚠️ NOTICE: terraform.tfstate was not found on host filesystem (#{state_file}).",
+                "[IP Harvest] ⚠️ Using container-local state from #{exec_ctrl}:#{container_state_file}.",
+                "[IP Harvest] ⚠️ CAUTION: Container-local state will be LOST if container '#{exec_ctrl}' is destroyed or recreated! Bind-mount this directory to the host for permanent persistence."
+              ]
+              warn_lines.each do |w|
+                @log.info w
+                File.open(log_path, 'a') { |f| f.puts w } if log_path
+              end
+              state_json = IO.popen("#{engine} exec #{exec_ctrl} cat #{Shellwords.escape(container_state_file)}", &:read)
+            end
+          end
+
+          if state_json && !state_json.strip.empty?
+            state_data = JSON.parse(state_json)
             live_yaml = YAML.load_file(@cfg_file)
             updates_made = false
 
@@ -1697,11 +1724,15 @@ module Automation
             # Write the updated IPs back to the base lab file
             if updates_made
               LabRepository.write_formatted_yaml(@cfg_file, live_yaml, @cfg_file)
-              @log.info "Successfully saved new IPs to lab YAML."
-              File.open(log_path, 'a') { |f| f.puts "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}" } if log_path
+              success_msg = "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}"
+              success_msg += " (harvested from container-local state on #{exec_ctrl})" if state_source == :container
+              @log.info success_msg
+              File.open(log_path, 'a') { |f| f.puts success_msg } if log_path
             end
           else
-            @log.info "No terraform.tfstate found at #{state_file}. Skipping IP harvest."
+            not_found_msg = "[IP Harvest] No terraform.tfstate found at #{state_file} on host or in container #{exec_ctrl}. Skipping IP harvest."
+            @log.info not_found_msg
+            File.open(log_path, 'a') { |f| f.puts not_found_msg } if log_path
           end
         rescue => e
           @log.error "Failed to harvest Terraform IPs: #{e.message}"
