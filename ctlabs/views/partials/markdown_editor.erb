@@ -57,27 +57,18 @@
           <div style="padding: 8px 10px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
             <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; padding: 3px 8px;">
               <i class="fas fa-search" style="color: #94a3b8; font-size: 0.8em;"></i>
-              <input type="text" id="md-emoji-search" placeholder="Search emojis (e.g. rocket, warn, check)..." style="background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.82em; width: 100%;" autocomplete="off" />
+              <input type="text" id="md-emoji-search" placeholder="Search GitHub emojis (e.g. octocat, shipit, rocket, +1)..." style="background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.82em; width: 100%;" autocomplete="off" />
               <button type="button" id="md-emoji-search-clear" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85em; display: none; padding: 0 4px;" title="Clear">&times;</button>
             </div>
 
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <div id="md-emoji-cat-tabs" style="display: flex; align-items: center; gap: 2px;">
-                <button type="button" class="md-emoji-cat-btn active" data-cat="all" title="Popular & Common" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: #0284c7; color: #fff; border: none; cursor: pointer;">⚡</button>
-                <button type="button" class="md-emoji-cat-btn" data-cat="status" title="Status & Alerts" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⚠️</button>
-                <button type="button" class="md-emoji-cat-btn" data-cat="tech" title="Tech & DevOps" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">🚀</button>
-                <button type="button" class="md-emoji-cat-btn" data-cat="people" title="People & Reactions" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">👍</button>
-                <button type="button" class="md-emoji-cat-btn" data-cat="symbols" title="Symbols & Objects" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⭐</button>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72em; color: #94a3b8; background: #090d16; padding: 2px 6px; border-radius: 4px; border: 1px solid #334155;">
-                <span>Insert:</span>
-                <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as :shortcode:">
-                  <input type="radio" name="md-emoji-insert-mode" value="code" checked style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> :code:
-                </label>
-                <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as unicode character">
-                  <input type="radio" name="md-emoji-insert-mode" value="char" style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> Char
-                </label>
+            <div style="display: flex; align-items: center; justify-content: flex-start; gap: 4px;">
+              <div id="md-emoji-cat-tabs" style="display: flex; align-items: center; gap: 3px; width: 100%;">
+                <button type="button" class="md-emoji-cat-btn active" data-cat="all" title="Popular & Common" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: #0284c7; color: #fff; border: none; cursor: pointer;">⚡ All</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="github" title="GitHub & Octocat" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">🐙 GitHub</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="status" title="Status & Alerts" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⚠️ Status</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="tech" title="Tech & DevOps" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">🚀 Tech</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="people" title="People & Reactions" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">👍 People</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="symbols" title="Symbols & Objects" style="padding: 2px 8px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⭐ Symbols</button>
               </div>
             </div>
           </div>
@@ -86,10 +77,10 @@
           </div>
 
           <div style="padding: 6px 10px; background: #0f172a; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.74em; color: #94a3b8;">
-            <div id="md-emoji-footer-preview" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
+            <div id="md-emoji-footer-preview" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 175px;">
               Hover emoji for code
             </div>
-            <span style="color: #64748b;">Ctrl+E</span>
+            <span style="color: #64748b; font-size: 0.88em; white-space: nowrap;">Click: Char · Right-click: :code:</span>
           </div>
         </div>
       </div>

@@ -34,6 +34,13 @@
   const mdGraphvizTabDotBadge = document.getElementById('md-graphviz-tab-dot-badge');
   const mdGraphvizBlocksBtn = document.getElementById('md-graphviz-blocks-btn');
   const mdGraphvizBlocksMenu = document.getElementById('md-graphviz-blocks-menu');
+  const mdGraphvizEmojiBtn = document.getElementById('md-graphviz-emoji-btn');
+  const mdGraphvizEmojiMenu = document.getElementById('md-graphviz-emoji-menu');
+  const mdGraphvizEmojiSearch = document.getElementById('md-graphviz-emoji-search');
+  const mdGraphvizEmojiSearchClear = document.getElementById('md-graphviz-emoji-search-clear');
+  const mdGraphvizEmojiGrid = document.getElementById('md-graphviz-emoji-grid');
+  const mdGraphvizEmojiFooterPreview = document.getElementById('md-graphviz-emoji-footer-preview');
+  const mdGraphvizEmojiCatBtns = document.querySelectorAll('.md-gv-emoji-cat-btn');
   const mdGraphvizDotContainer = document.getElementById('md-graphviz-dot-container');
   const mdGraphvizDotOutput = document.getElementById('md-graphviz-dot-output');
   const mdGraphvizDotUseBtn = document.getElementById('md-graphviz-dot-use-btn');
@@ -47,6 +54,22 @@
   const mdGraphvizFontFamily = document.getElementById('md-graphviz-font-family');
   const mdGraphvizWrapBtn = document.getElementById('md-graphviz-wrap-btn');
   const mdGraphvizVimBtn = document.getElementById('md-graphviz-vim-btn');
+  const mdGraphvizSettingsWrapper = document.getElementById('md-graphviz-settings-wrapper');
+  const mdGraphvizSettingsBtn = document.getElementById('md-graphviz-settings-btn');
+  const mdGraphvizSettingsMenu = document.getElementById('md-graphviz-settings-menu');
+  const mdGraphvizSettingWrapCheckbox = document.getElementById('md-graphviz-setting-wrap-checkbox');
+  const mdGraphvizSettingVimCheckbox = document.getElementById('md-graphviz-setting-vim-checkbox');
+  const mdGraphvizCustomBlocksContainer = document.getElementById('md-graphviz-custom-blocks-container');
+  const mdGraphvizBlockModal = document.getElementById('md-graphviz-block-modal');
+  const mdGraphvizBlockModalClose = document.getElementById('md-graphviz-block-modal-close');
+  const mdGraphvizBlockModalTitle = document.getElementById('md-graphviz-block-modal-title');
+  const mdGraphvizBlockName = document.getElementById('md-graphviz-block-name');
+  const mdGraphvizBlockCode = document.getElementById('md-graphviz-block-code');
+  const mdGraphvizBlockSnippet = document.getElementById('md-graphviz-block-snippet');
+  const mdGraphvizBlockDesc = document.getElementById('md-graphviz-block-desc');
+  const mdGraphvizBlockError = document.getElementById('md-graphviz-block-error');
+  const mdGraphvizBlockCancelBtn = document.getElementById('md-graphviz-block-cancel-btn');
+  const mdGraphvizBlockSaveBtn = document.getElementById('md-graphviz-block-save-btn');
   const mdGraphvizVimStatusBar = document.getElementById('md-graphviz-vim-status-bar');
   const mdGraphvizVimStatusMode = document.getElementById('md-graphviz-vim-status-mode');
   const mdGraphvizVimStatusKey = document.getElementById('md-graphviz-vim-status-key');
@@ -1207,10 +1230,270 @@
     });
   }
 
+  // --- Emoji List & Shortcode Dictionary ---
+  const MARKDOWN_EMOJI_LIST = [
+    // Status & Alerts (status)
+    { code: 'check', char: '✅', name: 'Check Mark', cat: 'status' },
+    { code: 'white_check_mark', char: '✅', name: 'White Check Mark', cat: 'status' },
+    { code: 'heavy_check_mark', char: '✔️', name: 'Heavy Check Mark', cat: 'status' },
+    { code: 'x', char: '❌', name: 'Cross Mark', cat: 'status' },
+    { code: 'cross_mark', char: '❌', name: 'Cross Mark', cat: 'status' },
+    { code: 'warning', char: '⚠️', name: 'Warning', cat: 'status' },
+    { code: 'sos', char: '🆘', name: 'SOS', cat: 'status' },
+    { code: 'stop_sign', char: '🛑', name: 'Stop Sign', cat: 'status' },
+    { code: 'no_entry', char: '⛔', name: 'No Entry', cat: 'status' },
+    { code: 'no_entry_sign', char: '🚫', name: 'Prohibited', cat: 'status' },
+    { code: 'bulb', char: '💡', name: 'Light Bulb / Idea', cat: 'status' },
+    { code: 'fire', char: '🔥', name: 'Fire / Critical', cat: 'status' },
+    { code: 'zap', char: '⚡', name: 'Lightning / Fast', cat: 'status' },
+    { code: 'hourglass', char: '⌛', name: 'Hourglass', cat: 'status' },
+    { code: 'hourglass_flowing_sand', char: '⏳', name: 'In Progress / Pending', cat: 'status' },
+    { code: 'construction', char: '🚧', name: 'Under Construction', cat: 'status' },
+    { code: 'radioactive', char: '☢️', name: 'Radioactive', cat: 'status' },
+    { code: 'biohazard', char: '☣️', name: 'Biohazard', cat: 'status' },
+    { code: 'green_circle', char: '🟢', name: 'Healthy / OK', cat: 'status' },
+    { code: 'red_circle', char: '🔴', name: 'Down / Error', cat: 'status' },
+    { code: 'yellow_circle', char: '🟡', name: 'Warning / Degraded', cat: 'status' },
+    { code: 'blue_circle', char: '🔵', name: 'Info / Notice', cat: 'status' },
+    { code: 'purple_circle', char: '🟣', name: 'Maintenance', cat: 'status' },
+    { code: 'orange_circle', char: '🟠', name: 'Attention', cat: 'status' },
+    { code: 'white_circle', char: '⚪', name: 'Idle / Standby', cat: 'status' },
+    { code: 'black_circle', char: '⚫', name: 'Offline / Stopped', cat: 'status' },
+    { code: 'question', char: '❓', name: 'Question', cat: 'status' },
+    { code: 'exclamation', char: '❗', name: 'Exclamation', cat: 'status' },
+    { code: 'grey_question', char: '❔', name: 'Grey Question', cat: 'status' },
+    { code: 'grey_exclamation', char: '❕', name: 'Grey Exclamation', cat: 'status' },
+    { code: 'bell', char: '🔔', name: 'Bell / Alert', cat: 'status' },
+    { code: 'no_bell', char: '🔕', name: 'Muted', cat: 'status' },
+    { code: 'mega', char: '📣', name: 'Megaphone / Announcement', cat: 'status' },
+    { code: 'loudspeaker', char: '📢', name: 'Loudspeaker', cat: 'status' },
+    { code: 'alarm_clock', char: '⏰', name: 'Alarm Clock', cat: 'status' },
+    { code: 'stopwatch', char: '⏱️', name: 'Stopwatch', cat: 'status' },
+    { code: 'timer_clock', char: '⏲️', name: 'Timer Clock', cat: 'status' },
+    { code: 'traffic_light', char: '🚦', name: 'Traffic Light', cat: 'status' },
+    { code: 'triangular_flag_on_post', char: '🚩', name: 'Flag', cat: 'status' },
+    { code: 'sparkles', char: '✨', name: 'Sparkles / New', cat: 'status' },
+    { code: 'tada', char: '🎉', name: 'Celebration / Done', cat: 'status' },
+    { code: 'eyes', char: '👀', name: 'Reviewing / Watching', cat: 'status' },
+    { code: 'mag', char: '🔍', name: 'Search / Inspect', cat: 'status' },
+    { code: 'pushpin', char: '📌', name: 'Pushpin / Note', cat: 'status' },
+    { code: 'bookmark', char: '🔖', name: 'Bookmark', cat: 'status' },
+    { code: 'shield', char: '🛡️', name: 'Shield / Protected', cat: 'status' },
+    { code: 'lock', char: '🔒', name: 'Locked / Secure', cat: 'status' },
+    { code: 'unlock', char: '🔓', name: 'Unlocked', cat: 'status' },
+    { code: 'key', char: '🔑', name: 'Key / Access', cat: 'status' },
+
+    // Tech & DevOps (tech)
+    { code: 'rocket', char: '🚀', name: 'Rocket / Deploy', cat: 'tech' },
+    { code: 'computer', char: '🖥️', name: 'Desktop / Workstation', cat: 'tech' },
+    { code: 'laptop', char: '💻', name: 'Laptop / Code', cat: 'tech' },
+    { code: 'server', char: '🗄️', name: 'Server / Node', cat: 'tech' },
+    { code: 'database', char: '🗃️', name: 'Database / Storage', cat: 'tech' },
+    { code: 'cloud', char: '☁️', name: 'Cloud Provider', cat: 'tech' },
+    { code: 'cloud_upload', char: '📤', name: 'Cloud Upload', cat: 'tech' },
+    { code: 'cloud_download', char: '📥', name: 'Cloud Download', cat: 'tech' },
+    { code: 'gear', char: '⚙️', name: 'Gear / Settings', cat: 'tech' },
+    { code: 'wrench', char: '🔧', name: 'Wrench / Config', cat: 'tech' },
+    { code: 'hammer', char: '🔨', name: 'Hammer / Build', cat: 'tech' },
+    { code: 'hammer_and_wrench', char: '🛠️', name: 'Tools / Maintenance', cat: 'tech' },
+    { code: 'package', char: '📦', name: 'Package / Artifact', cat: 'tech' },
+    { code: 'box', char: '🗳️', name: 'Box / Container', cat: 'tech' },
+    { code: 'floppy_disk', char: '💾', name: 'Floppy Disk / Save', cat: 'tech' },
+    { code: 'cd', char: '💿', name: 'CD / ISO', cat: 'tech' },
+    { code: 'dvd', char: '📀', name: 'DVD / Media', cat: 'tech' },
+    { code: 'terminal', char: '📟', name: 'Terminal / CLI', cat: 'tech' },
+    { code: 'keyboard', char: '⌨️', name: 'Keyboard', cat: 'tech' },
+    { code: 'mouse', char: '🖱️', name: 'Mouse', cat: 'tech' },
+    { code: 'printer', char: '🖨️', name: 'Printer', cat: 'tech' },
+    { code: 'globe_with_meridians', char: '🌐', name: 'Network / Web', cat: 'tech' },
+    { code: 'link', char: '🔗', name: 'Link / URL', cat: 'tech' },
+    { code: 'satellite', char: '🛰️', name: 'Satellite', cat: 'tech' },
+    { code: 'satellite_antenna', char: '📡', name: 'Antenna', cat: 'tech' },
+    { code: 'bug', char: '🐛', name: 'Bug / Defect', cat: 'tech' },
+    { code: 'ant', char: '🐜', name: 'Issue / Defect', cat: 'tech' },
+    { code: 'robot', char: '🤖', name: 'Robot / Bot', cat: 'tech' },
+    { code: 'microscope', char: '🔬', name: 'Telemetry / Inspect', cat: 'tech' },
+    { code: 'telescope', char: '🔭', name: 'Observability', cat: 'tech' },
+    { code: 'chart_with_upwards_trend', char: '📈', name: 'Trend Up / Scale', cat: 'tech' },
+    { code: 'chart_with_downwards_trend', char: '📉', name: 'Trend Down', cat: 'tech' },
+    { code: 'bar_chart', char: '📊', name: 'Bar Chart / Metrics', cat: 'tech' },
+    { code: 'clipboard', char: '📋', name: 'Clipboard / Task', cat: 'tech' },
+    { code: 'memo', char: '📝', name: 'Memo / Notes', cat: 'tech' },
+    { code: 'book', char: '📖', name: 'Book / Documentation', cat: 'tech' },
+    { code: 'books', char: '📚', name: 'Library / Docs', cat: 'tech' },
+    { code: 'file_folder', char: '📁', name: 'Folder', cat: 'tech' },
+    { code: 'open_file_folder', char: '📂', name: 'Open Folder', cat: 'tech' },
+    { code: 'page_facing_up', char: '📄', name: 'File / Document', cat: 'tech' },
+    { code: 'bookmark_tabs', char: '📑', name: 'Tabs / Spec', cat: 'tech' },
+    { code: 'wastebasket', char: '🗑️', name: 'Delete / Trash', cat: 'tech' },
+    { code: 'dna', char: '🧬', name: 'Pipeline / DNA', cat: 'tech' },
+    { code: 'recycle', char: '♻️', name: 'Recycle / Refactor', cat: 'tech' },
+    { code: 'plug', char: '🔌', name: 'Plugin / Adapter', cat: 'tech' },
+    { code: 'battery', char: '🔋', name: 'Battery / Capacity', cat: 'tech' },
+    { code: 'control_knobs', char: '🎛️', name: 'Sliders / Knobs', cat: 'tech' },
+    { code: 'joystick', char: '🕹️', name: 'Controller', cat: 'tech' },
+    { code: 'radio', char: '📻', name: 'Radio / Broadcast', cat: 'tech' },
+
+    // People & Reactions (people)
+    { code: 'thumbsup', char: '👍', name: 'Thumbs Up / LGTM', cat: 'people' },
+    { code: '+1', char: '👍', name: 'Plus One', cat: 'people' },
+    { code: 'thumbsdown', char: '👎', name: 'Thumbs Down', cat: 'people' },
+    { code: '-1', char: '👎', name: 'Minus One', cat: 'people' },
+    { code: 'clap', char: '👏', name: 'Clap / Kudos', cat: 'people' },
+    { code: 'wave', char: '👋', name: 'Wave / Hello', cat: 'people' },
+    { code: 'raised_hands', char: '🙌', name: 'Raised Hands', cat: 'people' },
+    { code: 'raising_hand', char: '🙋', name: 'Hand Raised', cat: 'people' },
+    { code: 'pray', char: '🙏', name: 'Please / Thanks', cat: 'people' },
+    { code: 'handshake', char: '🤝', name: 'Handshake', cat: 'people' },
+    { code: 'muscle', char: '💪', name: 'Muscle / Strong', cat: 'people' },
+    { code: 'point_right', char: '👉', name: 'Point Right', cat: 'people' },
+    { code: 'point_left', char: '👈', name: 'Point Left', cat: 'people' },
+    { code: 'point_up', char: '👆', name: 'Point Up', cat: 'people' },
+    { code: 'point_down', char: '👇', name: 'Point Down', cat: 'people' },
+    { code: 'ok_hand', char: '👌', name: 'OK Hand', cat: 'people' },
+    { code: 'v', char: '✌️', name: 'Victory / Peace', cat: 'people' },
+    { code: 'crossed_fingers', char: '🤞', name: 'Fingers Crossed', cat: 'people' },
+    { code: 'salute', char: '🫡', name: 'Salute', cat: 'people' },
+    { code: 'smile', char: '😄', name: 'Smile', cat: 'people' },
+    { code: 'grin', char: '😁', name: 'Grin', cat: 'people' },
+    { code: 'joy', char: '😂', name: 'Joy / Laugh', cat: 'people' },
+    { code: 'sweat_smile', char: '😅', name: 'Phew / Relief', cat: 'people' },
+    { code: 'sunglasses', char: '😎', name: 'Cool', cat: 'people' },
+    { code: 'nerd_face', char: '🤓', name: 'Nerd', cat: 'people' },
+    { code: 'thinking', char: '🤔', name: 'Thinking', cat: 'people' },
+    { code: 'monocle_face', char: '🧐', name: 'Inspecting', cat: 'people' },
+    { code: 'facepalm', char: '🤦', name: 'Facepalm', cat: 'people' },
+    { code: 'shrug', char: '🤷', name: 'Shrug', cat: 'people' },
+    { code: 'partying_face', char: '🥳', name: 'Party / Milestone', cat: 'people' },
+    { code: 'exploding_head', char: '🤯', name: 'Mind Blown', cat: 'people' },
+    { code: 'scream', char: '😱', name: 'Shocked', cat: 'people' },
+    { code: 'sleeping', char: '😴', name: 'Inactive / Sleeping', cat: 'people' },
+    { code: 'heart', char: '❤️', name: 'Heart', cat: 'people' },
+    { code: 'blue_heart', char: '💙', name: 'Blue Heart', cat: 'people' },
+    { code: 'green_heart', char: '💚', name: 'Green Heart', cat: 'people' },
+    { code: 'sparkling_heart', char: '💖', name: 'Sparkling Heart', cat: 'people' },
+    { code: 'broken_heart', char: '💔', name: 'Broken Heart', cat: 'people' },
+    { code: '100', char: '💯', name: '100% / Perfect', cat: 'people' },
+    { code: 'star_struck', char: '🤩', name: 'Star-Struck', cat: 'people' },
+    { code: 'skull', char: '💀', name: 'Skull / Fatal', cat: 'people' },
+    { code: 'ghost', char: '👻', name: 'Ghost', cat: 'people' },
+    { code: 'alien', char: '👽', name: 'Alien', cat: 'people' },
+
+    // Symbols & Objects (symbols)
+    { code: 'star', char: '⭐', name: 'Star', cat: 'symbols' },
+    { code: 'star2', char: '🌟', name: 'Glowing Star', cat: 'symbols' },
+    { code: 'boom', char: '💥', name: 'Collision / Boom', cat: 'symbols' },
+    { code: 'gem', char: '💎', name: 'Gem / Quality', cat: 'symbols' },
+    { code: 'crystal_ball', char: '🔮', name: 'Prediction', cat: 'symbols' },
+    { code: 'trophy', char: '🏆', name: 'Trophy', cat: 'symbols' },
+    { code: 'medal', char: '🏅', name: 'Medal', cat: 'symbols' },
+    { code: 'first_place', char: '🥇', name: 'First Place', cat: 'symbols' },
+    { code: 'dart', char: '🎯', name: 'Target / Direct Hit', cat: 'symbols' },
+    { code: 'crown', char: '👑', name: 'Crown / Leader', cat: 'symbols' },
+    { code: 'label', char: '🏷️', name: 'Tag / Label', cat: 'symbols' },
+    { code: 'paperclip', char: '📎', name: 'Paperclip / Attachment', cat: 'symbols' },
+    { code: 'round_pushpin', char: '📍', name: 'Map Pin / Location', cat: 'symbols' },
+    { code: 'triangular_ruler', char: '📐', name: 'Architecture / Ruler', cat: 'symbols' },
+    { code: 'straight_ruler', char: '📏', name: 'Measurement', cat: 'symbols' },
+    { code: 'compass', char: '🧭', name: 'Compass / Guidance', cat: 'symbols' },
+    { code: 'nut_and_bolt', char: '🔩', name: 'Nut & Bolt', cat: 'symbols' },
+    { code: 'anchor', char: '⚓', name: 'Anchor', cat: 'symbols' },
+    { code: 'infinity', char: '♾️', name: 'Infinity', cat: 'symbols' },
+    { code: 'arrow_right', char: '➡️', name: 'Arrow Right', cat: 'symbols' },
+    { code: 'arrow_left', char: '⬅️', name: 'Arrow Left', cat: 'symbols' },
+    { code: 'arrow_up', char: '⬆️', name: 'Arrow Up', cat: 'symbols' },
+    { code: 'arrow_down', char: '⬇️', name: 'Arrow Down', cat: 'symbols' },
+    { code: 'arrow_upper_right', char: '↗️', name: 'Arrow Up-Right', cat: 'symbols' },
+    { code: 'arrow_lower_right', char: '↘️', name: 'Arrow Down-Right', cat: 'symbols' },
+    { code: 'arrows_counterclockwise', char: '🔄', name: 'Sync / Reload', cat: 'symbols' },
+    { code: 'arrow_forward', char: '▶️', name: 'Play / Forward', cat: 'symbols' },
+    { code: 'pause_button', char: '⏸️', name: 'Pause', cat: 'symbols' },
+    { code: 'stop_button', char: '⏹️', name: 'Stop', cat: 'symbols' },
+    { code: 'record_button', char: '⏺️', name: 'Record', cat: 'symbols' },
+    { code: 'repeat', char: '🔁', name: 'Loop / Repeat', cat: 'symbols' },
+    { code: 'shuffle', char: '🔀', name: 'Shuffle / Balance', cat: 'symbols' },
+    { code: 'hash', char: '#️⃣', name: 'Hash / Number', cat: 'symbols' },
+    { code: 'zero', char: '0️⃣', name: 'Zero', cat: 'symbols' },
+    { code: 'one', char: '1️⃣', name: 'One', cat: 'symbols' },
+    { code: 'two', char: '2️⃣', name: 'Two', cat: 'symbols' },
+    { code: 'three', char: '3️⃣', name: 'Three', cat: 'symbols' },
+    { code: 'four', char: '4️⃣', name: 'Four', cat: 'symbols' },
+    { code: 'five', char: '5️⃣', name: 'Five', cat: 'symbols' },
+    { code: 'six', char: '6️⃣', name: 'Six', cat: 'symbols' },
+    { code: 'seven', char: '7️⃣', name: 'Seven', cat: 'symbols' },
+    { code: 'eight', char: '8️⃣', name: 'Eight', cat: 'symbols' },
+    { code: 'nine', char: '9️⃣', name: 'Nine', cat: 'symbols' },
+    { code: 'keycap_ten', char: '🔟', name: 'Ten', cat: 'symbols' },
+    { code: 'plus', char: '➕', name: 'Plus', cat: 'symbols' },
+    { code: 'minus', char: '➖', name: 'Minus', cat: 'symbols' },
+    { code: 'heavy_division_sign', char: '➗', name: 'Divide', cat: 'symbols' },
+    { code: 'ballot_box_with_check', char: '☑️', name: 'Checkbox', cat: 'symbols' },
+    { code: 'checkered_flag', char: '🏁', name: 'Finish / Release', cat: 'symbols' },
+    { code: 'speech_balloon', char: '💬', name: 'Comment', cat: 'symbols' },
+    { code: 'thought_balloon', char: '💭', name: 'Thought', cat: 'symbols' }
+  ];
+
+  let mdEmojiMap = null;
+  function getEmojiMap() {
+    if (typeof window !== 'undefined' && window.GITHUB_EMOJI_MAP) {
+      return window.GITHUB_EMOJI_MAP;
+    }
+    if (!mdEmojiMap) {
+      mdEmojiMap = {};
+      const list = getEmojiList();
+      list.forEach(item => {
+        mdEmojiMap[item.code] = item.char;
+      });
+    }
+    return mdEmojiMap;
+  }
+
+  function getEmojiList() {
+    if (typeof window !== 'undefined' && Array.isArray(window.GITHUB_EMOJI_LIST) && window.GITHUB_EMOJI_LIST.length > 0) {
+      return window.GITHUB_EMOJI_LIST;
+    }
+    return MARKDOWN_EMOJI_LIST;
+  }
+
+  function replaceEmojiShortcodes(text) {
+    if (typeof window !== 'undefined' && typeof window.replaceGitHubEmojis === 'function') {
+      return window.replaceGitHubEmojis(text);
+    }
+    if (typeof window !== 'undefined' && typeof window.replaceEmojiShortcodes === 'function' && window.replaceEmojiShortcodes !== replaceEmojiShortcodes) {
+      return window.replaceEmojiShortcodes(text);
+    }
+    if (!text) return text;
+    const map = getEmojiMap();
+    const codeBlocks = [];
+    let cbIdx = 0;
+    // Protect fenced code blocks (```...```) and inline code (`...`)
+    let processed = text.replace(/(```[\s\S]*?```)/g, (m) => {
+      const ph = `__MD_EMOJI_CB_${cbIdx++}__`;
+      codeBlocks.push({ ph, val: m });
+      return ph;
+    });
+    processed = processed.replace(/(`[^`\n]+`)/g, (m) => {
+      const ph = `__MD_EMOJI_CB_${cbIdx++}__`;
+      codeBlocks.push({ ph, val: m });
+      return ph;
+    });
+    // Replace :code: with emoji char if known
+    processed = processed.replace(/:([a-zA-Z0-9_+-]+):/g, (match, code) => {
+      const lower = code.toLowerCase();
+      return map[code] || map[lower] || match;
+    });
+    // Restore code blocks
+    for (let i = codeBlocks.length - 1; i >= 0; i--) {
+      processed = processed.replace(codeBlocks[i].ph, codeBlocks[i].val);
+    }
+    return processed;
+  }
+
   // --- Emoji Picker ---
   function toggleMdEmojiMenu(open) {
     if (!mdEmojiMenu) return;
-    const shouldOpen = (open !== undefined) ? open : (mdEmojiMenu.style.display === 'none');
+    const isClosed = !mdEmojiMenu.style.display || mdEmojiMenu.style.display === 'none';
+    const shouldOpen = (open !== undefined) ? open : isClosed;
     mdEmojiMenu.style.display = shouldOpen ? 'flex' : 'none';
     if (shouldOpen) {
       if (mdEmojiSearch) {
@@ -1222,9 +1505,10 @@
   }
 
   function renderEmojiGrid(cat = 'all', query = '') {
-    if (!mdEmojiGrid || typeof MARKDOWN_EMOJI_LIST === 'undefined') return;
+    const list = getEmojiList();
+    if (!mdEmojiGrid || !list) return;
     const cleanQuery = query.trim().toLowerCase();
-    const filtered = MARKDOWN_EMOJI_LIST.filter(item => {
+    const filtered = list.filter(item => {
       if (cat !== 'all' && item.cat !== cat) return false;
       if (cleanQuery) {
         return item.code.toLowerCase().includes(cleanQuery) || item.name.toLowerCase().includes(cleanQuery);
@@ -1237,8 +1521,14 @@
       return;
     }
 
-    mdEmojiGrid.innerHTML = filtered.map(item => {
-      return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char}</button>`;
+    // Limit initial unsearched rendering for smooth DOM performance if viewing all
+    const displayItems = cleanQuery ? filtered : filtered.slice(0, 320);
+
+    mdEmojiGrid.innerHTML = displayItems.map(item => {
+      const visual = item.img
+        ? `<img src="${item.img}" width="22" height="22" alt=":${item.code}:" style="pointer-events: none; border-radius: 2px; vertical-align: middle;">`
+        : (item.char || '');
+      return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-img="${item.img || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${visual}</button>`;
     }).join('');
 
     mdEmojiGrid.querySelectorAll('.md-emoji-cell').forEach(cell => {
@@ -1247,13 +1537,13 @@
           mdEmojiFooterPreview.textContent = `:${cell.getAttribute('data-code')}: — ${cell.getAttribute('data-name')}`;
         }
       });
-      cell.addEventListener('click', (e) => {
+      const handleInsert = (e, forceCode) => {
+        e.preventDefault();
         e.stopPropagation();
         const code = cell.getAttribute('data-code');
         const ch = cell.getAttribute('data-char');
-        const modeRadio = document.querySelector('input[name="md-emoji-insert-mode"]:checked');
-        const insertMode = modeRadio ? modeRadio.value : 'code';
-        const snippet = (insertMode === 'char') ? ch : `:${code}:`;
+        // Left-click inserts character (or :code: if custom image/no char). Right-click inserts :code:.
+        const snippet = (forceCode || !ch) ? `:${code}:` : ch;
 
         if (currentMdMode === 'preview') setMdMode('split');
         const cm = getMdEditor();
@@ -1269,7 +1559,10 @@
         }
         onMarkdownContentChanged();
         toggleMdEmojiMenu(false);
-      });
+      };
+
+      cell.addEventListener('click', (e) => handleInsert(e, false));
+      cell.addEventListener('contextmenu', (e) => handleInsert(e, true));
     });
   }
 
@@ -1408,10 +1701,17 @@
     k8s_pod: '<%= k8s_pod("api_pod", name: "API Service", namespace: "prod", ip: "10.244.1.5") %>',
     table_node: '<%= table_node("metrics", title: "Node Metrics", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
     badge: '<%= badge("status", "HEALTHY", color: "#22c55e") %>',
-    cluster: `<%= cluster_start("app_tier", label: "Application Tier (10.0.1.0/24)", color: "#38bdf8") %>
+    cluster: `<% cluster("app_tier", label: "Application Tier (10.0.1.0/24)", color: "#38bdf8") do %>
   <%= host("app01", name: "App 01", ip: "10.0.1.11") %>
   <%= host("app02", name: "App 02", ip: "10.0.1.12") %>
-<%= cluster_end %>`,
+<% end %>`,
+    nested_cluster: `<% cluster("vpc", label: "Virtual Private Cloud (VPC)", color: "#38bdf8") do %>
+  <%= host("gw01", name: "NAT Gateway", ip: "10.0.0.1") %>
+  <% cluster("private_subnet", label: "Private Subnet (10.0.1.0/24)", color: "#10b981") do %>
+    <%= host("app01", name: "App 01", ip: "10.0.1.10") %>
+    <%= database("db01", name: "Internal DB", ip: "10.0.1.20") %>
+  <% end %>
+<% end %>`,
     link: '<%= link("src_id", "dst_id", label: "10 Gbps") %>',
     links: '<%= links("rtr1", "app01", "app02") %>',
     chain: '<%= chain("client", "fw1", "rtr1", "app01") %>',
@@ -1677,6 +1977,10 @@
       }
     }
 
+    if (mdGraphvizSettingWrapCheckbox) {
+      mdGraphvizSettingWrapCheckbox.checked = mdGraphvizLineWrap;
+    }
+
     if (mdGraphvizCodeEditor) {
       mdGraphvizCodeEditor.setOption('lineWrapping', mdGraphvizLineWrap);
       mdGraphvizCodeEditor.refresh();
@@ -1703,6 +2007,10 @@
       }
     }
 
+    if (mdGraphvizSettingVimCheckbox) {
+      mdGraphvizSettingVimCheckbox.checked = mdGraphvizVimMode;
+    }
+
     if (mdGraphvizVimStatusBar) {
       mdGraphvizVimStatusBar.style.display = mdGraphvizVimMode ? 'flex' : 'none';
     }
@@ -1719,6 +2027,21 @@
           mdGraphvizCodeEditor.setOption('keyMap', 'default');
         }
       }
+    }
+  }
+
+  function toggleGraphvizSettingsMenu(open) {
+    if (!mdGraphvizSettingsMenu) return;
+    const isClosed = !mdGraphvizSettingsMenu.style.display || mdGraphvizSettingsMenu.style.display === 'none';
+    const shouldOpen = (open !== undefined) ? open : isClosed;
+    mdGraphvizSettingsMenu.style.display = shouldOpen ? 'block' : 'none';
+    if (shouldOpen) {
+      if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+      if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
+      if (mdGraphvizSettingWrapCheckbox) mdGraphvizSettingWrapCheckbox.checked = !!mdGraphvizLineWrap;
+      if (mdGraphvizSettingVimCheckbox) mdGraphvizSettingVimCheckbox.checked = !!mdGraphvizVimMode;
+      if (mdGraphvizFontFamily) mdGraphvizFontFamily.value = mdGraphvizFont;
+      if (mdGraphvizFontSizeLabel) mdGraphvizFontSizeLabel.textContent = `${mdGraphvizFontSize}px`;
     }
   }
 
@@ -1780,7 +2103,7 @@
   }
 
   function insertGraphvizSnippet(snippetKey) {
-    const text = MD_GRAPHVIZ_SNIPPETS[snippetKey];
+    const text = MD_GRAPHVIZ_SNIPPETS[snippetKey] || snippetKey;
     if (!text) return;
 
     if (mdGraphvizActiveTab !== 'source') {
@@ -1802,6 +2125,480 @@
     }
 
     if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+  }
+
+  function escapeHtmlAttr(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  let mdGraphvizGlobalBlocks = [];
+
+  function finalizeDocBlock(rawLines) {
+    let code = rawLines.join('\n').trim();
+    code = code.replace(/^<%\s*/, '').replace(/\s*%>$/, '').trim();
+
+    const firstLine = rawLines[0] || '';
+    const defMatch = firstLine.match(/def\s+([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*\(([^)]*)\)|\s+([^\n;#]+))?/);
+    if (!defMatch) return null;
+
+    const name = defMatch[1];
+    const rawArgs = (defMatch[2] || defMatch[3] || '').trim();
+
+    let snippetArgs = '';
+    if (rawArgs) {
+      const paramParts = rawArgs.split(',').map(p => p.trim()).filter(Boolean);
+      const exampleArgs = paramParts.map(p => {
+        if (p.includes(':')) {
+          const [k, v] = p.split(':').map(s => s.trim());
+          return v ? `${k}: ${v}` : `${k}: "val"`;
+        }
+        return `"id"`;
+      });
+      snippetArgs = exampleArgs.join(', ');
+    } else {
+      snippetArgs = '"id"';
+    }
+
+    return {
+      name,
+      args: rawArgs,
+      code,
+      snippet: `<%= ${name}(${snippetArgs}) %>`,
+      isDocument: true
+    };
+  }
+
+  function scanDocumentCustomBlocks(source) {
+    if (!source || !source.includes('def ')) return [];
+    const blocks = [];
+    const lines = source.split('\n');
+    let currentBlock = null;
+    let depth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!currentBlock) {
+        if (/(?:<%\s*|^\s*)def\s+[a-zA-Z_][a-zA-Z0-9_]*/.test(line)) {
+          currentBlock = [line];
+          depth = 1;
+          const afterDef = line.replace(/^(?:.*?def\s+[a-zA-Z_][a-zA-Z0-9_]*)/, '');
+          if (/\bend\b/.test(afterDef)) {
+            const b = finalizeDocBlock(currentBlock);
+            if (b) blocks.push(b);
+            currentBlock = null;
+            depth = 0;
+          }
+        }
+      } else {
+        currentBlock.push(line);
+        if (/\b(?:def|do|if|unless|case|begin|class|module)\b/.test(line)) depth++;
+        if (/\bend\b/.test(line)) depth--;
+        if (depth <= 0 || (/%>\s*$/.test(line) && line.includes('end'))) {
+          const b = finalizeDocBlock(currentBlock);
+          if (b) blocks.push(b);
+          currentBlock = null;
+          depth = 0;
+        }
+      }
+    }
+
+    if (currentBlock) {
+      const b = finalizeDocBlock(currentBlock);
+      if (b) blocks.push(b);
+    }
+
+    return blocks;
+  }
+
+  async function fetchGlobalCustomBlocks() {
+    try {
+      const res = await fetch('/recordings/graphviz/custom_blocks');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.blocks) {
+          mdGraphvizGlobalBlocks = data.blocks;
+          renderGraphvizBlocksMenu();
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch global custom blocks:', e);
+    }
+  }
+
+  function renderGraphvizBlocksMenu() {
+    if (!mdGraphvizCustomBlocksContainer) return;
+
+    const source = getGraphvizEditorValue();
+    const docBlocks = scanDocumentCustomBlocks(source);
+    const globalBlocks = mdGraphvizGlobalBlocks || [];
+
+    if (docBlocks.length === 0 && globalBlocks.length === 0) {
+      mdGraphvizCustomBlocksContainer.innerHTML = `
+        <div style="padding: 6px 12px; font-size: 0.75em; color: #64748b; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b;">
+          <span>No custom blocks</span>
+          <button type="button" class="md-gv-add-custom-block-btn" style="background: transparent; border: 1px solid #38bdf8; color: #38bdf8; border-radius: 3px; padding: 1px 6px; font-size: 0.9em; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#0369a1'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='#38bdf8';">+ New Global</button>
+        </div>
+      `;
+      wireCustomBlockActions();
+      return;
+    }
+
+    let html = '';
+
+    if (docBlocks.length > 0) {
+      html += `
+        <div style="padding: 4px 10px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #c084fc; font-weight: 700; background: #1e293b; display: flex; justify-content: space-between; align-items: center;">
+          <span>In-Document Blocks</span>
+          <span style="font-size: 0.85em; color: #94a3b8; font-weight: normal;">&lt;% def ... %&gt;</span>
+        </div>
+      `;
+      docBlocks.forEach(b => {
+        html += `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 4px 12px; border-bottom: 1px solid #1e293b;">
+            <button type="button" class="md-gv-custom-snippet-item" data-snippet="${escapeHtmlAttr(b.snippet)}" title="Insert ${escapeHtmlAttr(b.snippet)}" style="display: flex; align-items: center; gap: 8px; flex: 1; text-align: left; background: transparent; border: none; color: #e2e8f0; cursor: pointer; font-size: 0.82em; padding: 3px 0; overflow: hidden;">
+              <span style="color: #c084fc; font-weight: 600;">🧩 ${escapeHtmlAttr(b.name)}</span>
+              <code style="font-size: 0.8em; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtmlAttr(b.snippet)}</code>
+            </button>
+            <button type="button" class="md-gv-promote-doc-block-btn" data-name="${escapeHtmlAttr(b.name)}" data-code="${escapeHtmlAttr(b.code)}" data-snippet="${escapeHtmlAttr(b.snippet)}" title="Save as Global Custom Block" style="background: transparent; border: 1px solid #475569; color: #38bdf8; border-radius: 3px; padding: 2px 6px; font-size: 0.75em; cursor: pointer; white-space: nowrap; margin-left: 6px; transition: all 0.15s;" onmouseover="this.style.background='#0369a1'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='#38bdf8';">
+              <i class="fas fa-globe"></i> Save Global
+            </button>
+          </div>
+        `;
+      });
+    }
+
+    if (globalBlocks.length > 0 || docBlocks.length > 0) {
+      html += `
+        <div style="padding: 4px 10px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #4ade80; font-weight: 700; background: #1e293b; display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
+          <span>Global Blocks</span>
+          <button type="button" class="md-gv-add-custom-block-btn" style="background: transparent; border: 1px solid #22c55e; color: #4ade80; border-radius: 3px; padding: 1px 6px; font-size: 0.85em; cursor: pointer; transition: all 0.15s;" onmouseover="this.style.background='#15803d'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='#4ade80';">+ New</button>
+        </div>
+      `;
+      if (globalBlocks.length === 0) {
+        html += `<div style="padding: 6px 12px; font-size: 0.75em; color: #64748b;">No global blocks yet</div>`;
+      } else {
+        globalBlocks.forEach(b => {
+          const snip = b.snippet || `<%= ${b.name}("id") %>`;
+          html += `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 4px 12px; border-bottom: 1px solid #1e293b;">
+              <button type="button" class="md-gv-custom-snippet-item" data-snippet="${escapeHtmlAttr(snip)}" title="${escapeHtmlAttr(b.description || snip)}" style="display: flex; align-items: center; gap: 8px; flex: 1; text-align: left; background: transparent; border: none; color: #e2e8f0; cursor: pointer; font-size: 0.82em; padding: 3px 0; overflow: hidden;">
+                <span style="color: #4ade80; font-weight: 600;">📦 ${escapeHtmlAttr(b.name)}</span>
+                <code style="font-size: 0.8em; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtmlAttr(snip)}</code>
+              </button>
+              <div style="display: flex; align-items: center; gap: 4px; margin-left: 6px;">
+                <button type="button" class="md-gv-edit-global-block-btn" data-name="${escapeHtmlAttr(b.name)}" title="Edit global block" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; font-size: 0.8em;" onmouseover="this.style.color='#38bdf8';" onmouseout="this.style.color='#94a3b8';"><i class="fas fa-edit"></i></button>
+                <button type="button" class="md-gv-delete-global-block-btn" data-name="${escapeHtmlAttr(b.name)}" title="Delete global block" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; font-size: 0.8em;" onmouseover="this.style.color='#ef4444';" onmouseout="this.style.color='#94a3b8';"><i class="fas fa-trash-alt"></i></button>
+              </div>
+            </div>
+          `;
+        });
+      }
+    }
+
+    mdGraphvizCustomBlocksContainer.innerHTML = html;
+    wireCustomBlockActions();
+  }
+
+  function wireCustomBlockActions() {
+    if (!mdGraphvizCustomBlocksContainer) return;
+
+    mdGraphvizCustomBlocksContainer.querySelectorAll('.md-gv-custom-snippet-item').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        insertGraphvizSnippet(btn.dataset.snippet);
+      });
+    });
+
+    mdGraphvizCustomBlocksContainer.querySelectorAll('.md-gv-promote-doc-block-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openCustomBlockModal({
+          name: btn.dataset.name,
+          code: btn.dataset.code,
+          snippet: btn.dataset.snippet,
+          description: 'In-document custom block'
+        });
+      });
+    });
+
+    mdGraphvizCustomBlocksContainer.querySelectorAll('.md-gv-add-custom-block-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openCustomBlockModal(null);
+      });
+    });
+
+    mdGraphvizCustomBlocksContainer.querySelectorAll('.md-gv-edit-global-block-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const blockName = btn.dataset.name;
+        const block = (mdGraphvizGlobalBlocks || []).find(b => b.name === blockName);
+        openCustomBlockModal(block || { name: blockName });
+      });
+    });
+
+    mdGraphvizCustomBlocksContainer.querySelectorAll('.md-gv-delete-global-block-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteCustomBlockGlobally(btn.dataset.name);
+      });
+    });
+  }
+
+  function openCustomBlockModal(block = null) {
+    if (!mdGraphvizBlockModal) return;
+    if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+
+    if (mdGraphvizBlockError) {
+      mdGraphvizBlockError.style.display = 'none';
+      mdGraphvizBlockError.textContent = '';
+    }
+
+    if (block) {
+      if (mdGraphvizBlockModalTitle) mdGraphvizBlockModalTitle.textContent = block.isDocument ? 'Save In-Document Block to Global' : 'Edit Global Custom Block';
+      if (mdGraphvizBlockName) {
+        mdGraphvizBlockName.value = block.name || '';
+        mdGraphvizBlockName.readOnly = false;
+      }
+      if (mdGraphvizBlockCode) mdGraphvizBlockCode.value = block.code || '';
+      if (mdGraphvizBlockSnippet) mdGraphvizBlockSnippet.value = block.snippet || '';
+      if (mdGraphvizBlockDesc) mdGraphvizBlockDesc.value = block.description || block.desc || '';
+    } else {
+      if (mdGraphvizBlockModalTitle) mdGraphvizBlockModalTitle.textContent = 'Create New Global Custom Block';
+      if (mdGraphvizBlockName) {
+        mdGraphvizBlockName.value = '';
+        mdGraphvizBlockName.readOnly = false;
+      }
+      if (mdGraphvizBlockCode) mdGraphvizBlockCode.value = 'def my_block(id, label: nil)\n  host(id, name: label || id, icon: "💻")\nend';
+      if (mdGraphvizBlockSnippet) mdGraphvizBlockSnippet.value = '<%= my_block("srv1") %>';
+      if (mdGraphvizBlockDesc) mdGraphvizBlockDesc.value = '';
+    }
+
+    mdGraphvizBlockModal.style.display = 'block';
+    setTimeout(() => {
+      if (mdGraphvizBlockName && !mdGraphvizBlockName.value) {
+        mdGraphvizBlockName.focus();
+      } else if (mdGraphvizBlockCode) {
+        mdGraphvizBlockCode.focus();
+      }
+    }, 50);
+  }
+
+  function closeCustomBlockModal() {
+    if (mdGraphvizBlockModal) mdGraphvizBlockModal.style.display = 'none';
+  }
+
+  async function saveCustomBlockGlobally() {
+    const name = mdGraphvizBlockName ? mdGraphvizBlockName.value.trim() : '';
+    const code = mdGraphvizBlockCode ? mdGraphvizBlockCode.value.trim() : '';
+    const snippet = mdGraphvizBlockSnippet ? mdGraphvizBlockSnippet.value.trim() : '';
+    const description = mdGraphvizBlockDesc ? mdGraphvizBlockDesc.value.trim() : '';
+
+    if (!name) {
+      if (mdGraphvizBlockError) {
+        mdGraphvizBlockError.textContent = 'Block name is required (e.g. app_tier, k8s_service).';
+        mdGraphvizBlockError.style.display = 'block';
+      }
+      if (mdGraphvizBlockName) mdGraphvizBlockName.focus();
+      return;
+    }
+
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+      if (mdGraphvizBlockError) {
+        mdGraphvizBlockError.textContent = 'Invalid block name: must be a valid Ruby identifier (letters, digits, underscores).';
+        mdGraphvizBlockError.style.display = 'block';
+      }
+      if (mdGraphvizBlockName) mdGraphvizBlockName.focus();
+      return;
+    }
+
+    if (!code) {
+      if (mdGraphvizBlockError) {
+        mdGraphvizBlockError.textContent = 'Ruby implementation code is required.';
+        mdGraphvizBlockError.style.display = 'block';
+      }
+      if (mdGraphvizBlockCode) mdGraphvizBlockCode.focus();
+      return;
+    }
+
+    if (mdGraphvizBlockSaveBtn) {
+      mdGraphvizBlockSaveBtn.disabled = true;
+      mdGraphvizBlockSaveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+
+    try {
+      const res = await fetch('/recordings/graphviz/custom_blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, code, snippet, description })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        if (mdGraphvizBlockError) {
+          mdGraphvizBlockError.textContent = data.error || 'Failed to save block';
+          mdGraphvizBlockError.style.display = 'block';
+        }
+        return;
+      }
+
+      if (data.blocks) {
+        mdGraphvizGlobalBlocks = data.blocks;
+      } else {
+        await fetchGlobalCustomBlocks();
+      }
+
+      closeCustomBlockModal();
+      renderGraphvizBlocksMenu();
+      if (mdGraphvizStatus) {
+        mdGraphvizStatus.textContent = `Saved global block: ${name}`;
+        mdGraphvizStatus.style.color = '#4ade80';
+      }
+    } catch (err) {
+      if (mdGraphvizBlockError) {
+        mdGraphvizBlockError.textContent = err.message || 'Network error saving block';
+        mdGraphvizBlockError.style.display = 'block';
+      }
+    } finally {
+      if (mdGraphvizBlockSaveBtn) {
+        mdGraphvizBlockSaveBtn.disabled = false;
+        mdGraphvizBlockSaveBtn.innerHTML = '<i class="fas fa-save"></i> Save Global Block';
+      }
+    }
+  }
+
+  async function deleteCustomBlockGlobally(name) {
+    if (!name) return;
+    if (!confirm(`Delete global custom block "${name}"? Templates relying on it may fail to render.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/recordings/graphviz/custom_blocks/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        if (data.blocks) {
+          mdGraphvizGlobalBlocks = data.blocks;
+        } else {
+          await fetchGlobalCustomBlocks();
+        }
+        renderGraphvizBlocksMenu();
+        if (mdGraphvizStatus) {
+          mdGraphvizStatus.textContent = `Deleted global block: ${name}`;
+          mdGraphvizStatus.style.color = '#38bdf8';
+        }
+      } else {
+        alert(data.error || 'Failed to delete custom block');
+      }
+    } catch (e) {
+      alert('Error deleting custom block: ' + e.message);
+    }
+  }
+
+  function insertGraphvizEmoji(snippet) {
+    if (!snippet) return;
+    if (mdGraphvizActiveTab !== 'source') {
+      setGraphvizActiveTab('source');
+    }
+
+    if (mdGraphvizCodeEditor) {
+      mdGraphvizCodeEditor.replaceSelection(snippet, 'end');
+      mdGraphvizCodeEditor.focus();
+    } else if (mdGraphvizSource) {
+      const start = mdGraphvizSource.selectionStart || 0;
+      const end = mdGraphvizSource.selectionEnd || 0;
+      const current = mdGraphvizSource.value;
+      mdGraphvizSource.value = current.substring(0, start) + snippet + current.substring(end);
+      mdGraphvizSource.selectionStart = mdGraphvizSource.selectionEnd = start + snippet.length;
+      mdGraphvizSource.focus();
+    }
+
+    if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
+    scheduleGraphvizPreview();
+  }
+
+  function toggleGraphvizEmojiMenu(open) {
+    if (!mdGraphvizEmojiMenu) return;
+    const isClosed = !mdGraphvizEmojiMenu.style.display || mdGraphvizEmojiMenu.style.display === 'none';
+    const shouldOpen = (open !== undefined) ? open : isClosed;
+    mdGraphvizEmojiMenu.style.display = shouldOpen ? 'flex' : 'none';
+    if (shouldOpen) {
+      if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+      if (mdGraphvizEmojiSearch) {
+        mdGraphvizEmojiSearch.value = '';
+        if (mdGraphvizEmojiSearchClear) mdGraphvizEmojiSearchClear.style.display = 'none';
+        setTimeout(() => mdGraphvizEmojiSearch.focus(), 30);
+      }
+      mdGraphvizEmojiCatBtns.forEach(b => {
+        const isAll = b.getAttribute('data-cat') === 'all';
+        b.classList.toggle('active', isAll);
+        b.style.background = isAll ? '#0284c7' : 'transparent';
+        b.style.color = isAll ? '#fff' : '#94a3b8';
+      });
+      renderGraphvizEmojiGrid('all', '');
+    }
+  }
+
+  function renderGraphvizEmojiGrid(cat = 'all', query = '') {
+    const list = getEmojiList();
+    if (!mdGraphvizEmojiGrid || !list) return;
+    const cleanQuery = query.trim().toLowerCase();
+    const filtered = list.filter(item => {
+      if (cat !== 'all' && item.cat !== cat) return false;
+      if (cleanQuery) {
+        return item.code.toLowerCase().includes(cleanQuery) || item.name.toLowerCase().includes(cleanQuery);
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis</div>';
+      return;
+    }
+
+    const displayItems = cleanQuery ? filtered : filtered.slice(0, 320);
+
+    mdGraphvizEmojiGrid.innerHTML = displayItems.map(item => {
+      const visual = item.img
+        ? `<img src="${item.img}" width="22" height="22" alt=":${item.code}:" style="pointer-events: none; border-radius: 2px; vertical-align: middle;">`
+        : (item.char || '');
+      return `<button type="button" class="md-gv-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-img="${item.img || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${visual}</button>`;
+    }).join('');
+
+    mdGraphvizEmojiGrid.querySelectorAll('.md-gv-emoji-cell').forEach(cell => {
+      cell.addEventListener('mouseenter', () => {
+        if (mdGraphvizEmojiFooterPreview) {
+          mdGraphvizEmojiFooterPreview.textContent = `:${cell.getAttribute('data-code')}: — ${cell.getAttribute('data-name')}`;
+        }
+      });
+
+      const handleGraphvizEmojiInsert = (e, asCode) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const code = cell.getAttribute('data-code');
+        const ch = cell.getAttribute('data-char');
+        const img = cell.getAttribute('data-img');
+        const snippet = (asCode || !ch || img) ? `:${code}:` : ch;
+
+        insertGraphvizEmoji(snippet);
+        toggleGraphvizEmojiMenu(false);
+      };
+
+      cell.addEventListener('click', (e) => handleGraphvizEmojiInsert(e, false));
+      cell.addEventListener('contextmenu', (e) => handleGraphvizEmojiInsert(e, true));
+    });
   }
 
   function setGraphvizPreviewBg(bg) {
@@ -1952,6 +2749,8 @@
         foldGutter: true,
         foldOptions: { scanUp: true },
         extraKeys: {
+          'Ctrl-E': () => toggleGraphvizEmojiMenu(),
+          'Cmd-E': () => toggleGraphvizEmojiMenu(),
           'Ctrl-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
           'Cmd-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
           'Ctrl-S': () => saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false }),
@@ -2556,6 +3355,10 @@
     mdGraphvizPanY = 0;
     setGraphvizPreview(null);
     setGraphvizActiveTab('source');
+    if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+    if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
+    if (mdGraphvizSettingsMenu) mdGraphvizSettingsMenu.style.display = 'none';
+    fetchGlobalCustomBlocks();
 
     if (initialBase) {
       if (mdGraphvizName) mdGraphvizName.value = initialBase;
@@ -2642,6 +3445,12 @@
       return;
     }
 
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+      e.preventDefault();
+      toggleGraphvizEmojiMenu();
+      return;
+    }
+
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       renderGraphviz();
@@ -2662,12 +3471,19 @@
     if (mdGraphvizBlocksBtn && mdGraphvizBlocksMenu) {
       mdGraphvizBlocksBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
+        if (mdGraphvizSettingsMenu) mdGraphvizSettingsMenu.style.display = 'none';
         const isOpen = mdGraphvizBlocksMenu.style.display === 'block';
-        mdGraphvizBlocksMenu.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+          renderGraphvizBlocksMenu();
+          mdGraphvizBlocksMenu.style.display = 'block';
+        } else {
+          mdGraphvizBlocksMenu.style.display = 'none';
+        }
       });
 
       document.addEventListener('click', (e) => {
-        if (mdGraphvizBlocksMenu && !mdGraphvizBlocksMenu.contains(e.target) && e.target !== mdGraphvizBlocksBtn) {
+        if (mdGraphvizBlocksMenu && !mdGraphvizBlocksMenu.contains(e.target) && e.target !== mdGraphvizBlocksBtn && !mdGraphvizBlocksBtn.contains(e.target)) {
           mdGraphvizBlocksMenu.style.display = 'none';
         }
       });
@@ -2678,6 +3494,103 @@
           e.preventDefault();
           e.stopPropagation();
           insertGraphvizSnippet(item.dataset.snippet);
+        }
+      });
+    }
+
+    if (mdGraphvizSettingsBtn && mdGraphvizSettingsMenu) {
+      mdGraphvizSettingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleGraphvizSettingsMenu();
+      });
+
+      document.addEventListener('click', (e) => {
+        if (mdGraphvizSettingsMenu && mdGraphvizSettingsMenu.style.display !== 'none') {
+          if (!mdGraphvizSettingsMenu.contains(e.target) && e.target !== mdGraphvizSettingsBtn && !mdGraphvizSettingsBtn.contains(e.target)) {
+            toggleGraphvizSettingsMenu(false);
+          }
+        }
+      });
+    }
+
+    if (mdGraphvizSettingWrapCheckbox) {
+      mdGraphvizSettingWrapCheckbox.addEventListener('change', (e) => {
+        setGraphvizLineWrap(e.target.checked);
+      });
+    }
+
+    if (mdGraphvizSettingVimCheckbox) {
+      mdGraphvizSettingVimCheckbox.addEventListener('change', (e) => {
+        setGraphvizVimMode(e.target.checked);
+      });
+    }
+
+    if (mdGraphvizBlockModalClose) {
+      mdGraphvizBlockModalClose.addEventListener('click', closeCustomBlockModal);
+    }
+    if (mdGraphvizBlockCancelBtn) {
+      mdGraphvizBlockCancelBtn.addEventListener('click', closeCustomBlockModal);
+    }
+    if (mdGraphvizBlockSaveBtn) {
+      mdGraphvizBlockSaveBtn.addEventListener('click', saveCustomBlockGlobally);
+    }
+    if (mdGraphvizBlockModal) {
+      mdGraphvizBlockModal.addEventListener('click', (e) => {
+        if (e.target === mdGraphvizBlockModal) closeCustomBlockModal();
+      });
+    }
+
+    if (mdGraphvizEmojiBtn && mdGraphvizEmojiMenu) {
+      mdGraphvizEmojiBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+        toggleGraphvizEmojiMenu();
+      });
+
+      if (mdGraphvizEmojiSearch) {
+        mdGraphvizEmojiSearch.addEventListener('input', () => {
+          const val = mdGraphvizEmojiSearch.value;
+          if (mdGraphvizEmojiSearchClear) mdGraphvizEmojiSearchClear.style.display = val ? 'inline-block' : 'none';
+          const activeTab = document.querySelector('.md-gv-emoji-cat-btn.active');
+          const cat = activeTab ? activeTab.getAttribute('data-cat') : 'all';
+          renderGraphvizEmojiGrid(cat, val);
+        });
+      }
+
+      if (mdGraphvizEmojiSearchClear) {
+        mdGraphvizEmojiSearchClear.addEventListener('click', () => {
+          if (mdGraphvizEmojiSearch) {
+            mdGraphvizEmojiSearch.value = '';
+            mdGraphvizEmojiSearch.focus();
+          }
+          mdGraphvizEmojiSearchClear.style.display = 'none';
+          const activeTab = document.querySelector('.md-gv-emoji-cat-btn.active');
+          const cat = activeTab ? activeTab.getAttribute('data-cat') : 'all';
+          renderGraphvizEmojiGrid(cat, '');
+        });
+      }
+
+      mdGraphvizEmojiCatBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          mdGraphvizEmojiCatBtns.forEach(b => {
+            b.classList.remove('active');
+            b.style.background = 'transparent';
+            b.style.color = '#94a3b8';
+          });
+          btn.classList.add('active');
+          btn.style.background = '#0284c7';
+          btn.style.color = '#fff';
+          const cat = btn.getAttribute('data-cat') || 'all';
+          const query = mdGraphvizEmojiSearch ? mdGraphvizEmojiSearch.value : '';
+          renderGraphvizEmojiGrid(cat, query);
+        });
+      });
+
+      document.addEventListener('click', (e) => {
+        if (mdGraphvizEmojiMenu && mdGraphvizEmojiMenu.style.display !== 'none') {
+          if (!mdGraphvizEmojiMenu.contains(e.target) && e.target !== mdGraphvizEmojiBtn && !mdGraphvizEmojiBtn.contains(e.target)) {
+            toggleGraphvizEmojiMenu(false);
+          }
         }
       });
     }
@@ -3722,7 +4635,9 @@
       mdAutoSaveInterval = ms;
       updateMdAutosaveUI();
     },
-    toggleEmoji: toggleMdEmojiMenu
+    toggleEmoji: toggleMdEmojiMenu,
+    emojis: MARKDOWN_EMOJI_LIST,
+    replaceEmojiShortcodes: replaceEmojiShortcodes
   };
 
   window.addEventListener('beforeunload', () => {
@@ -3755,6 +4670,8 @@
   window.promptAndCommitNote = promptAndCommitNote;
   window.onMarkdownContentChanged = onMarkdownContentChanged;
   window.toggleMdEmojiMenu = toggleMdEmojiMenu;
+  window.MARKDOWN_EMOJI_LIST = window.GITHUB_EMOJI_LIST || MARKDOWN_EMOJI_LIST;
+  window.replaceEmojiShortcodes = window.replaceGitHubEmojis || window.replaceEmojiShortcodes || replaceEmojiShortcodes;
 
   try {
     Object.defineProperty(window, 'mdIsDirty', {

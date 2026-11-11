@@ -8,6 +8,7 @@ require 'open3'
 require 'tmpdir'
 require 'base64'
 require 'fileutils'
+require 'json'
 require_relative 'graphviz_template_engine'
 
 class GraphvizService
@@ -16,6 +17,17 @@ class GraphvizService
   FORMATS          = %w[svg png].freeze
   ENGINES          = %w[dot neato fdp sfdp circo twopi osage patchwork].freeze
   MAX_ERROR_BYTES  = 4000
+
+  EMOJI_MAP_FILE = File.expand_path('../config/emoji_map.json', __dir__)
+  EMOJI_MAP      = File.file?(EMOJI_MAP_FILE) ? JSON.parse(File.read(EMOJI_MAP_FILE)) : {}.freeze
+
+  def self.expand_emoji_shortcodes(text)
+    return text if text.nil? || EMOJI_MAP.empty?
+    text.to_s.gsub(/:([a-zA-Z0-9_+-]+):/) do |match|
+      code = $1
+      EMOJI_MAP[code] || EMOJI_MAP[code.downcase] || match
+    end
+  end
 
   IMAGE_ATTR_RE = /\b(?:image|src)\s*=\s*(?:"([^"]+)"|'([^']+)'|([a-zA-Z0-9_.\-\/]+))/i
 
@@ -46,6 +58,8 @@ class GraphvizService
       dot_source = tpl_result[:dot].to_s
       return { ok: false, error: 'Template generated empty DOT output' } if dot_source.strip.empty?
     end
+
+    dot_source = expand_emoji_shortcodes(dot_source)
 
     Dir.mktmpdir('ctlabs-graphviz') do |dir|
       staged_images = stage_referenced_images(dot_source, dir, walkthrough: walkthrough)

@@ -740,6 +740,57 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  # ---------------------------------------------------------------------------
+  # Graphviz Custom Building Blocks
+  # ---------------------------------------------------------------------------
+  get '/recordings/graphviz/custom_blocks' do
+    content_type :json
+    { ok: true, blocks: GraphvizCustomBlocksService.all }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/graphviz/custom_blocks' do
+    content_type :json
+    payload = begin
+      request.body.rewind
+      body_content = request.body.read
+      if body_content && !body_content.strip.empty?
+        JSON.parse(body_content)
+      else
+        params
+      end
+    rescue JSON::ParserError
+      params
+    end
+
+    result = GraphvizCustomBlocksService.save(payload)
+    unless result[:ok]
+      status 422
+      return { ok: false, error: result[:error] }.to_json
+    end
+
+    { ok: true, block: result[:block], blocks: result[:blocks] }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  delete '/recordings/graphviz/custom_blocks/:name' do
+    content_type :json
+    result = GraphvizCustomBlocksService.delete(params[:name])
+    unless result[:ok]
+      status 404
+      return { ok: false, error: result[:error] }.to_json
+    end
+
+    { ok: true, blocks: result[:blocks] }.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   post '/recordings/graphviz/preview' do
     content_type :json
     engine = params[:engine].to_s

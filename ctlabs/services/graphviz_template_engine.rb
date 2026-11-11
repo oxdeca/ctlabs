@@ -5,6 +5,7 @@
 # -----------------------------------------------------------------------------
 
 require 'erb'
+require_relative 'graphviz_custom_blocks_service'
 
 class GraphvizTemplateContext
   def h(str)
@@ -130,14 +131,34 @@ class GraphvizTemplateContext
     "  }\n"
   end
 
-  def cluster(id, label: nil, nodes: [], color: '#475569', fillcolor: '#131d31', &block)
-    res = cluster_start(id, label: label, color: color, fillcolor: fillcolor)
+  def cluster(id, label: nil, nodes: [], color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled', &block)
+    header = cluster_start(id, label: label, color: color, fillcolor: fillcolor, fontcolor: fontcolor, style: style)
+    footer = cluster_end
+
     if block_given?
-      res << yield.to_s << "\n"
-    elsif nodes.is_a?(Array)
+      erbout = begin
+        eval('_erbout', block.binding)
+      rescue NameError
+        nil
+      end
+
+      if erbout
+        erbout << header
+        yield
+        erbout << footer
+        ''
+      else
+        res = header.dup
+        res << yield.to_s << "\n"
+        res << footer
+      end
+    elsif nodes.is_a?(Array) && !nodes.empty?
+      res = header.dup
       res << nodes.join("\n") << "\n"
+      res << footer
+    else
+      header + footer
     end
-    res << cluster_end
   end
 end
 
@@ -149,9 +170,13 @@ class GraphvizTemplateEngine
 
   def self.render(source)
     ctx = GraphvizTemplateContext.new
+    GraphvizCustomBlocksService.load_into(ctx) if defined?(GraphvizCustomBlocksService)
     binding_ctx = ctx.instance_eval { binding }
 
-    erb = ERB.new(source.to_s, trim_mode: '-')
+    # Normalize <%= ... do %> to <% ... do %> so ERB allows block helpers with either tag
+    clean_source = source.to_s.gsub(/<%=\s*(.*?\bdo(?:\s*\|.*?\|)?)\s*%>/, '<% \1 %>')
+
+    erb = ERB.new(clean_source, trim_mode: '-')
     erb.filename = '(template)'
 
     compiled = erb.result(binding_ctx)
