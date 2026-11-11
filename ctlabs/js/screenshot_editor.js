@@ -575,11 +575,45 @@
   function drawArrow(ctx, x1, y1, x2, y2, color, strokeWidth) {
     const dx = x2 - x1;
     const dy = y2 - y1;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    const dist = Math.hypot(dx, dy);
     if (dist < 4) return;
 
-    const angle = Math.atan2(dy, dx);
-    const headLen = Math.max(14, strokeWidth * 3.4);
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const px = -uy;
+    const py = ux;
+
+    // Proportional arrowhead sizing based on strokeWidth
+    let headLen = Math.max(14, strokeWidth * 3.2 + 5);
+    let headWidth = Math.max(10, strokeWidth * 2.6 + 5);
+
+    // Keep head proportional on short arrows
+    const maxHeadLen = dist * 0.65;
+    if (headLen > maxHeadLen) {
+      const scale = maxHeadLen / headLen;
+      headLen = maxHeadLen;
+      headWidth *= scale;
+    }
+
+    const halfWidth = headWidth / 2;
+    const notchIndent = headLen * 0.22;
+
+    // Arrowhead base center and notch points along shaft axis
+    const bx = x2 - ux * headLen;
+    const by = y2 - uy * headLen;
+    const nx = bx + ux * notchIndent;
+    const ny = by + uy * notchIndent;
+
+    // Wing points
+    const w1x = bx + px * halfWidth;
+    const w1y = by + py * halfWidth;
+    const w2x = bx - px * halfWidth;
+    const w2y = by - py * halfWidth;
+
+    // Terminate shaft inside arrowhead so round cap is buried in fill, never poking past tip
+    const shaftOverlap = Math.min(notchIndent + 2, headLen * 0.4);
+    const shaftEndX = bx + ux * shaftOverlap;
+    const shaftEndY = by + uy * shaftOverlap;
 
     ctx.save();
     ctx.strokeStyle = color;
@@ -588,27 +622,18 @@
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Main arrow shaft
+    // Main arrow shaft (from start to base/notch overlap)
     ctx.beginPath();
     ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.lineTo(shaftEndX, shaftEndY);
     ctx.stroke();
 
-    // Solid triangular arrowhead
+    // Solid triangular arrowhead with sharp tip at (x2, y2)
     ctx.beginPath();
     ctx.moveTo(x2, y2);
-    ctx.lineTo(
-      x2 - headLen * Math.cos(angle - Math.PI / 6.5),
-      y2 - headLen * Math.sin(angle - Math.PI / 6.5)
-    );
-    ctx.lineTo(
-      x2 - headLen * 0.75 * Math.cos(angle),
-      y2 - headLen * 0.75 * Math.sin(angle)
-    );
-    ctx.lineTo(
-      x2 - headLen * Math.cos(angle + Math.PI / 6.5),
-      y2 - headLen * Math.sin(angle + Math.PI / 6.5)
-    );
+    ctx.lineTo(w1x, w1y);
+    ctx.lineTo(nx, ny);
+    ctx.lineTo(w2x, w2y);
     ctx.closePath();
     ctx.fill();
 
@@ -1987,7 +2012,18 @@
       overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
       if (activeTool === 'arrow') {
-        drawArrow(overlayCtx, dragStart.x, dragStart.y, pt.x, pt.y, activeColor, activeStrokeWidth);
+        let ax = pt.x;
+        let ay = pt.y;
+        if (e && e.shiftKey) {
+          const dx = ax - dragStart.x;
+          const dy = ay - dragStart.y;
+          const dist = Math.hypot(dx, dy);
+          let ang = Math.atan2(dy, dx);
+          ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
+          ax = Math.round(dragStart.x + Math.cos(ang) * dist);
+          ay = Math.round(dragStart.y + Math.sin(ang) * dist);
+        }
+        drawArrow(overlayCtx, dragStart.x, dragStart.y, ax, ay, activeColor, activeStrokeWidth);
       } else if (activeTool === 'rect') {
         drawRect(overlayCtx, dragStart.x, dragStart.y, pt.x, pt.y, activeColor, activeStrokeWidth);
       } else if (activeTool === 'ellipse') {
@@ -2090,16 +2126,27 @@
       let newAnn = null;
 
       if (activeTool === 'arrow') {
-        const dx = pt.x - dragStart.x;
-        const dy = pt.y - dragStart.y;
-        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+        let ax = pt.x;
+        let ay = pt.y;
+        if (e && e.shiftKey) {
+          const dx = ax - dragStart.x;
+          const dy = ay - dragStart.y;
+          const dist = Math.hypot(dx, dy);
+          let ang = Math.atan2(dy, dx);
+          ang = Math.round(ang / (Math.PI / 12)) * (Math.PI / 12);
+          ax = Math.round(dragStart.x + Math.cos(ang) * dist);
+          ay = Math.round(dragStart.y + Math.sin(ang) * dist);
+        }
+        const dx = ax - dragStart.x;
+        const dy = ay - dragStart.y;
+        if (Math.hypot(dx, dy) > 5) {
           newAnn = {
             id: generateId('arrow'),
             type: 'arrow',
             x1: dragStart.x,
             y1: dragStart.y,
-            x2: pt.x,
-            y2: pt.y,
+            x2: ax,
+            y2: ay,
             color: activeColor,
             strokeWidth: activeStrokeWidth
           };

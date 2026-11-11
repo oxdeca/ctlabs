@@ -1,0 +1,148 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/graphviz_editor.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<!-- Graphviz Diagram Modal -->
+<div id="md-graphviz-modal" class="w3-modal" style="z-index: 10001; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+    <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+      <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;"><i class="fas fa-project-diagram"></i> Graphviz Diagram</h3>
+      <span onclick="document.getElementById('md-graphviz-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+    </header>
+    <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: none;">
+        <div style="flex: 1 1 200px; min-width: 160px;">
+          <label for="md-graphviz-name" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Diagram name</label>
+          <input type="text" id="md-graphviz-name" placeholder="diagram" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" />
+        </div>
+        <div style="flex: 1 1 200px; min-width: 160px;">
+          <label for="md-graphviz-existing" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Edit saved diagram</label>
+          <select id="md-graphviz-existing" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+            <option value="">New diagram</option>
+          </select>
+        </div>
+        <div style="flex: 0 1 160px; min-width: 130px;">
+          <label for="md-graphviz-engine" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Layout engine</label>
+          <select id="md-graphviz-engine" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+            <option value="dot" selected>dot (hierarchical)</option>
+            <option value="neato">neato (spring model)</option>
+            <option value="fdp">fdp (force-directed)</option>
+            <option value="sfdp">sfdp (large graphs)</option>
+            <option value="circo">circo (circular)</option>
+            <option value="twopi">twopi (radial)</option>
+            <option value="osage">osage (clustered)</option>
+            <option value="patchwork">patchwork (treemap)</option>
+          </select>
+        </div>
+        <div style="flex: 0 1 180px; min-width: 150px;">
+          <label for="md-graphviz-template" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Insert template</label>
+          <select id="md-graphviz-template" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
+            <option value="">Select template…</option>
+            <option value="flowchart_lr">Flowchart (LR)</option>
+            <option value="flowchart_tb">Flowchart (TB)</option>
+            <option value="network">Network Topology</option>
+            <option value="state_machine">State Machine</option>
+            <option value="records">Data Structures / Record</option>
+          </select>
+        </div>
+        <div style="flex: 0 0 auto;">
+          <label for="md-graphviz-bg" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Preview BG</label>
+          <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box; gap: 4px;">
+            <button type="button" id="md-graphviz-bg-white" title="White background" style="width: 26px; height: 26px; border-radius: 3px; border: 2px solid #38bdf8; background: #ffffff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+            <button type="button" id="md-graphviz-bg-slate" title="Slate dark background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+            <button type="button" id="md-graphviz-bg-checker" title="Transparent checkerboard background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 8px 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+            <label title="Custom color picker" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin: 0; background: #334155;">
+              <i class="fas fa-eye-dropper" style="font-size: 11px; color: #94a3b8; pointer-events: none;"></i>
+              <input type="color" id="md-graphviz-bg-picker" value="#ffffff" style="opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;" />
+            </label>
+          </div>
+        </div>
+        <div style="flex: 0 0 auto;">
+          <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Panes</label>
+          <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box;">
+            <button type="button" id="md-graphviz-layout-side" title="Side by side: Source left, Preview right" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: #0284c7; color: #ffffff; font-weight: 600;">
+              <i class="fas fa-columns"></i>
+              <span>Left / Right</span>
+            </button>
+            <button type="button" id="md-graphviz-layout-stack" title="Stacked: Preview top, Source bottom" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: transparent; color: #94a3b8; font-weight: 400;">
+              <i class="fas fa-bars"></i>
+              <span>Top / Bottom</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div id="md-graphviz-split-container" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; min-height: 0; position: relative;">
+        <div id="md-graphviz-source-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: none; box-sizing: border-box; overflow: hidden;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex: none; gap: 8px; flex-wrap: wrap;">
+            <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <label for="md-graphviz-source" style="color: #f8fafc; font-size: 0.85em; font-weight: 600; margin: 0; margin-right: 2px;">DOT source</label>
+              <select id="md-graphviz-font-family" title="Font family" style="height: 26px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 0 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
+                <option value="courier" selected>Courier</option>
+                <option value="mono">System Monospace</option>
+                <option value="consolas">Consolas / SFMono</option>
+                <option value="fira">Fira Code</option>
+              </select>
+              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 26px; box-sizing: border-box;">
+                <button type="button" id="md-graphviz-font-dec" title="Decrease editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">&minus;</button>
+                <span id="md-graphviz-font-size-label" style="min-width: 32px; text-align: center; font-size: 0.75em; color: #38bdf8; font-family: monospace; font-weight: 600; user-select: none;">13px</span>
+                <button type="button" id="md-graphviz-font-inc" title="Increase editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">+</button>
+              </div>
+              <button type="button" id="md-graphviz-wrap-btn" title="Toggle line wrap mode" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+                <i class="fas fa-align-left" style="font-size: 0.85em;"></i>
+                <span>Wrap</span>
+              </button>
+              <button type="button" id="md-graphviz-vim-btn" title="Toggle Vi / Vim keybindings" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+                <i class="fas fa-terminal" style="font-size: 0.85em;"></i>
+                <span>Vim</span>
+              </button>
+            </div>
+            <span style="color: #64748b; font-size: 0.75em;">Tab = indent &middot; Ctrl+S = save &middot; Ctrl+Enter = render</span>
+          </div>
+          <div id="md-graphviz-editor-container" style="flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0f172a;">
+            <textarea id="md-graphviz-source" spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 0; resize: none; background: #0f172a; border: none; color: #e2e8f0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; tab-size: 2; outline: none;"></textarea>
+          </div>
+          <div id="md-graphviz-vim-status-bar" style="display: none; margin-top: 4px; padding: 3px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; flex: none;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="md-graphviz-vim-status-mode" style="font-weight: 700; color: #22c55e; letter-spacing: 0.5px;">-- NORMAL --</span>
+              <span id="md-graphviz-vim-status-key" style="color: #cbd5e1;"></span>
+            </div>
+            <span style="color: #64748b; font-size: 0.85em;">:w save &bull; :wq save &amp; insert &bull; :q close &bull; Esc normal mode</span>
+          </div>
+        </div>
+        <div id="md-graphviz-splitter" title="Drag to resize panes (double-click to reset 50/50)" style="flex: none; display: flex; align-items: center; justify-content: center; background: #1e293b; transition: background 0.15s ease; user-select: none; touch-action: none; z-index: 5;">
+          <i id="md-graphviz-splitter-grip" class="fas fa-grip-vertical" style="color: #64748b; font-size: 10px; pointer-events: none;"></i>
+        </div>
+        <div id="md-graphviz-preview-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: 1; box-sizing: border-box;">
+          <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px; flex: none;">Preview <span style="color: #64748b; font-weight: 400;">(live &mdash; drag to pan, scroll to zoom)</span></label>
+          <div id="md-graphviz-preview" style="position: relative; flex: 1; min-height: 120px; box-sizing: border-box; border: 1px solid #334155; border-radius: 6px; background: #ffffff; overflow: hidden; cursor: grab; touch-action: none; user-select: none;">
+            <span id="md-graphviz-preview-empty" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.85em; pointer-events: none;">Render to preview</span>
+            <img id="md-graphviz-preview-img" alt="Graphviz preview" draggable="false" style="display: none; position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; max-height: none; user-select: none; -webkit-user-drag: none; will-change: transform;" />
+            <div style="position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 2;">
+              <button type="button" id="md-graphviz-zoom-out" title="Zoom out" style="width: 28px; height: 28px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">&minus;</button>
+              <button type="button" id="md-graphviz-zoom-reset" title="Reset to 100%" style="min-width: 48px; height: 28px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 0.75em; line-height: 1;">100%</button>
+              <button type="button" id="md-graphviz-zoom-in" title="Zoom in" style="width: 28px; height: 28px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 1em; line-height: 1; display: inline-flex; align-items: center; justify-content: center;">+</button>
+              <button type="button" id="md-graphviz-zoom-fit" title="Fit diagram to view" style="height: 28px; padding: 0 9px; border-radius: 4px; border: 1px solid #475569; background: rgba(15, 23, 42, 0.9); color: #e2e8f0; cursor: pointer; font-size: 0.75em; line-height: 1;">Fit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="md-graphviz-error" style="display: none; color: #fca5a5; background: #450a0a; border: 1px solid #7f1d1d; border-radius: 6px; padding: 8px 10px; font-size: 0.82em; white-space: pre-wrap; max-height: 120px; overflow: auto;"></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" id="md-graphviz-delete-btn" class="w3-button w3-round" style="display: none; background: #7f1d1d; color: #fecaca; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-trash-alt"></i> Delete Diagram</button>
+          <span id="md-graphviz-status" style="color: #94a3b8; font-size: 0.8em;"></span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" id="md-graphviz-download-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-download"></i> Download SVG</button>
+          <button type="button" id="md-graphviz-render-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-play"></i> Render</button>
+          <button type="button" id="md-graphviz-save-new-btn" class="w3-button w3-round" style="display: none; background: #334155; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-copy"></i> Save as New</button>
+          <button type="button" id="md-graphviz-insert-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i id="md-graphviz-insert-icon" class="fas fa-plus"></i> <span id="md-graphviz-insert-text">Save &amp; Insert</span></button>
+          <button type="button" id="md-graphviz-close-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600;">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -165,6 +165,57 @@ class RecordingGitService
     []
   end
 
+  def self.diff_working(path: nil, slug: nil)
+    return { ok: false, error: 'git not available' } unless ensure_repo!
+
+    args = ['diff', 'HEAD']
+    stat_args = ['diff', '--stat', 'HEAD']
+    if path && !path.strip.empty?
+      clean_path = path.strip
+      if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
+        clean_path = File.join(slug.strip, clean_path)
+      end
+      rel = relative_path(clean_path)
+      if rel && rel != '.'
+        args += ['--', rel]
+        stat_args += ['--', rel]
+      end
+    elsif slug && !slug.strip.empty? && slug != 'default'
+      args += ['--', slug.strip]
+      stat_args += ['--', slug.strip]
+    end
+
+    stat_out, _err, _st = run_git(*stat_args)
+    patch_out, err, st = run_git(*args)
+    if st.exitstatus == 0
+      { ok: true, hash: 'working', stat: stat_out, diff: patch_out }
+    else
+      { ok: false, error: err.strip }
+    end
+  rescue StandardError => e
+    { ok: false, error: e.message }
+  end
+
+  def self.discard_working(path, slug: nil)
+    return { ok: false, error: 'git not available' } unless ensure_repo!
+
+    clean_path = path.to_s.strip
+    if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
+      clean_path = File.join(slug.strip, clean_path)
+    end
+    rel = relative_path(clean_path)
+    return { ok: false, error: 'invalid path' } unless rel && rel != '.'
+
+    _out, err, st = run_git('checkout', 'HEAD', '--', rel)
+    if st.exitstatus == 0
+      { ok: true, discarded: rel }
+    else
+      { ok: false, error: err.strip }
+    end
+  rescue StandardError => e
+    { ok: false, error: e.message }
+  end
+
   def self.diff(hash)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 

@@ -8,6 +8,17 @@ require 'zip'
 require 'tempfile'
 
 class RecordingsController < BaseController
+  helpers do
+    def json_or_form_params
+      if request.media_type == 'application/json'
+        body = request.body.read
+        request.body.rewind if request.body.respond_to?(:rewind)
+        return (JSON.parse(body) rescue {})
+      end
+      params
+    end
+  end
+
   # The Walkthrough page lives at /demo (MainController); these routes only
   # deal with the cast files themselves.
 
@@ -1149,17 +1160,25 @@ class RecordingsController < BaseController
     halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
 
     body = request.body.read
+    commit_flag = false
+    commit_msg = nil
+
     content = if request.media_type == 'application/json'
                 begin
-                  JSON.parse(body)['content'].to_s
+                  parsed = JSON.parse(body)
+                  commit_flag = (parsed['commit'] == true || parsed['commit'] == 'true')
+                  commit_msg = parsed['message'].to_s if parsed['message']
+                  parsed['content'].to_s
                 rescue StandardError
                   params[:content].to_s
                 end
               else
+                commit_flag = (params[:commit] == 'true')
+                commit_msg = params[:message].to_s if params[:message]
                 params[:content] || body
               end
 
-    ok = RecordingService.update_content(params[:id], content)
+    ok = RecordingService.update_content(params[:id], content, commit: commit_flag, commit_message: commit_msg)
     halt 500, { ok: false, error: 'Failed to save content' }.to_json unless ok
 
     path = RecordingService.path_for(params[:id])
@@ -1184,7 +1203,11 @@ class RecordingsController < BaseController
 
   get '/recordings/git/diff/:hash' do
     content_type :json
-    result = RecordingGitService.diff(params[:hash])
+    result = if params[:hash] == 'working' || params[:hash] == 'workdir'
+               RecordingGitService.diff_working(path: params[:path], slug: params[:walkthrough] || params[:slug])
+             else
+               RecordingGitService.diff(params[:hash])
+             end
     unless result[:ok]
       status 422
       return result.to_json
@@ -1211,11 +1234,68 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  post '/recordings/git/commit' do
+    content_type :json
+    p = json_or_form_params
+    msg = (p[:message] || p['message']).to_s.strip
+    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    path = (p[:path] || p['path']).to_s.strip
+    msg = "Manual commit: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}" if msg.empty?
+    files = nil
+    if !path.empty?
+      clean_path = path
+      if slug && !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
+        clean_path = File.join(slug, clean_path)
+      end
+      files = [clean_path]
+    elsif slug && !slug.empty? && slug != 'default'
+      files = [slug]
+    end
+    result = RecordingGitService.commit(msg, files: files)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   post '/recordings/git/snapshot' do
     content_type :json
-    msg = params[:message].to_s.strip
+    p = json_or_form_params
+    msg = (p[:message] || p['message']).to_s.strip
+    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    path = (p[:path] || p['path']).to_s.strip
     msg = "Manual snapshot: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}" if msg.empty?
-    result = RecordingGitService.commit(msg)
+    files = nil
+    if !path.empty?
+      clean_path = path
+      if slug && !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
+        clean_path = File.join(slug, clean_path)
+      end
+      files = [clean_path]
+    elsif slug && !slug.empty? && slug != 'default'
+      files = [slug]
+    end
+    result = RecordingGitService.commit(msg, files: files)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  post '/recordings/git/discard' do
+    content_type :json
+    p = json_or_form_params
+    path = (p[:path] || p['path']).to_s.strip
+    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    result = RecordingGitService.discard_working(path, slug: slug)
     unless result[:ok]
       status 422
       return result.to_json
@@ -1228,10 +1308,11 @@ class RecordingsController < BaseController
 
   post '/recordings/git/restore' do
     content_type :json
-    hash = params[:hash].to_s.strip
-    path = params[:path].to_s.strip
-    slug = params[:walkthrough] || params[:slug]
-    msg = params[:message]
+    p = json_or_form_params
+    hash = (p[:hash] || p['hash']).to_s.strip
+    path = (p[:path] || p['path']).to_s.strip
+    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    msg = p[:message] || p['message']
     result = RecordingGitService.restore_file(hash, path, slug: slug, message: msg)
     unless result[:ok]
       status 422

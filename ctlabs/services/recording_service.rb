@@ -911,11 +911,15 @@ class RecordingService
     nil
   end
 
-  def self.update_content(id, content)
+  def self.update_content(id, content, commit: false, commit_message: nil)
     path = path_for(id)
     return false unless path && path.end_with?(MD_EXT)
     File.write(path, content.to_s, encoding: 'UTF-8')
-    RecordingGitService.commit("Update note '#{id}'", files: [path]) rescue nil
+    if commit
+      msg = commit_message.to_s.strip
+      msg = "Update note '#{id}'" if msg.empty?
+      RecordingGitService.commit(msg, files: [path]) rescue nil
+    end
     true
   rescue StandardError
     false

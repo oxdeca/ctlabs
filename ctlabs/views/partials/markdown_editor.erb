@@ -1,0 +1,159 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/partials/markdown_editor.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<!-- Markdown Step Container -->
+<div id="md-container" style="flex: 1; min-height: 0; display: none; flex-direction: column; background: #0f172a;">
+  <div id="md-editor-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155;">
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <button type="button" id="md-tab-preview" class="md-mode-tab active" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #38bdf8; background: #0284c7; color: #ffffff; cursor: pointer; font-weight: 500;">
+        <i class="fas fa-eye" style="margin-right: 4px;"></i> Preview
+      </button>
+      <button type="button" id="md-tab-edit" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
+        <i class="fas fa-edit" style="margin-right: 4px;"></i> Edit
+      </button>
+      <button type="button" id="md-tab-split" class="md-mode-tab" style="padding: 4px 12px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; cursor: pointer; font-weight: 500;">
+        <i class="fas fa-columns" style="margin-right: 4px;"></i> Split
+      </button>
+    </div>
+
+    <!-- Editor Actions (Diagram, Save, Commit, History, Emoji & Settings) -->
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <!-- Graphviz Diagram Editor -->
+      <button type="button" id="md-graphviz-btn" title="Graphviz diagram editor (Ctrl+Shift+G)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+        <i class="fas fa-project-diagram" style="color: #38bdf8; font-size: 0.95em;"></i>
+        <span style="font-weight: 500;">Diagram</span>
+      </button>
+
+      <!-- Note Save Button (Disk) -->
+      <button type="button" id="md-save-btn" title="Save note to disk (Ctrl+S)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+        <i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i>
+        <span id="md-save-btn-text" style="font-weight: 500;">Save</span>
+      </button>
+
+      <!-- Note Git Commit Button -->
+      <button type="button" id="md-git-commit-btn" title="Commit note changes to Git (Ctrl+Shift+C)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+        <i class="fas fa-code-branch" style="color: #10b981; font-size: 0.9em;"></i>
+        <span style="font-weight: 500;">Commit</span>
+      </button>
+
+      <!-- Note Version History Button -->
+      <button type="button" id="md-git-history-btn" title="Note Version History (revisions, diffs &amp; restore)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+        <i class="fas fa-history" style="color: #38bdf8; font-size: 0.9em;"></i>
+        <span style="font-weight: 500;">History</span>
+      </button>
+
+      <!-- Emoji Helper Dropdown -->
+      <div id="md-emoji-wrapper" style="position: relative; display: flex; align-items: center; gap: 6px;">
+        <button type="button" id="md-emoji-btn" title="Insert Emoji (:shortcode: or character, Ctrl+E)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+          <span style="font-size: 1.1em; line-height: 1;">😃</span>
+          <span style="font-weight: 500;">Emoji</span>
+        </button>
+
+        <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 340px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: hidden;">
+          <div style="padding: 8px 10px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; padding: 3px 8px;">
+              <i class="fas fa-search" style="color: #94a3b8; font-size: 0.8em;"></i>
+              <input type="text" id="md-emoji-search" placeholder="Search emojis (e.g. rocket, warn, check)..." style="background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.82em; width: 100%;" autocomplete="off" />
+              <button type="button" id="md-emoji-search-clear" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.85em; display: none; padding: 0 4px;" title="Clear">&times;</button>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <div id="md-emoji-cat-tabs" style="display: flex; align-items: center; gap: 2px;">
+                <button type="button" class="md-emoji-cat-btn active" data-cat="all" title="Popular & Common" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: #0284c7; color: #fff; border: none; cursor: pointer;">⚡</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="status" title="Status & Alerts" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⚠️</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="tech" title="Tech & DevOps" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">🚀</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="people" title="People & Reactions" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">👍</button>
+                <button type="button" class="md-emoji-cat-btn" data-cat="symbols" title="Symbols & Objects" style="padding: 2px 7px; border-radius: 4px; font-size: 0.85em; background: transparent; color: #94a3b8; border: none; cursor: pointer;">⭐</button>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 4px; font-size: 0.72em; color: #94a3b8; background: #090d16; padding: 2px 6px; border-radius: 4px; border: 1px solid #334155;">
+                <span>Insert:</span>
+                <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as :shortcode:">
+                  <input type="radio" name="md-emoji-insert-mode" value="code" checked style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> :code:
+                </label>
+                <label style="cursor: pointer; display: inline-flex; align-items: center; gap: 2px; color: #cbd5e1;" title="Insert as unicode character">
+                  <input type="radio" name="md-emoji-insert-mode" value="char" style="margin: 0; cursor: pointer; accent-color: #38bdf8;" /> Char
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div id="md-emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 8px; max-height: 220px; overflow-y: auto; background: #131d31;">
+          </div>
+
+          <div style="padding: 6px 10px; background: #0f172a; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.74em; color: #94a3b8;">
+            <div id="md-emoji-footer-preview" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">
+              Hover emoji for code
+            </div>
+            <span style="color: #64748b;">Ctrl+E</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Markdown Editor Settings Dropdown -->
+      <div id="md-settings-wrapper" style="position: relative; display: none;">
+        <button type="button" id="md-settings-btn" title="Editor settings (Wrap Code, options)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+          <i class="fas fa-cog" style="color: #94a3b8;"></i>
+        </button>
+        <div id="md-settings-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 230px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+          <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+            Editor Settings
+          </div>
+          <label id="md-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap code blocks
+            </span>
+            <input type="checkbox" id="md-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+          </label>
+          <label id="md-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+            <span style="display: flex; align-items: center; gap: 8px;">
+              <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
+            </span>
+            <input type="checkbox" id="md-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
+          </label>
+          <div style="padding: 8px 12px; border-top: 1px solid #334155; margin-top: 4px;">
+            <div style="font-size: 0.82em; color: #cbd5e1; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-clock" style="color: #38bdf8; width: 14px; text-align: center;"></i> Auto-save interval
+            </div>
+            <select id="md-setting-autosave-select" style="width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 4px 6px; font-size: 0.82em; outline: none; cursor: pointer;">
+              <option value="0" selected>Off (Manual save only)</option>
+              <option value="2000">2 seconds (Fast)</option>
+              <option value="5000">5 seconds</option>
+              <option value="15000">15 seconds</option>
+              <option value="30000">30 seconds</option>
+              <option value="60000">1 minute</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="md-content-area" style="flex: 1; min-height: 0; display: flex; overflow: hidden;">
+    <!-- Edit Pane -->
+    <div id="md-edit-pane" style="flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; border-right: none;">
+      <div style="flex: 1; min-height: 0; position: relative;">
+        <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, monospace !important; font-size: 0.8em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
+      </div>
+      <!-- Vim Mode Status Bar -->
+      <div id="md-vim-status-bar" style="display: none; padding: 4px 12px; background: #0f172a; border-top: 1px solid #334155; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="md-vim-status-mode" style="font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">-- NORMAL --</span>
+          <span id="md-vim-status-key" style="color: #cbd5e1;"></span>
+        </div>
+        <span style="color: #64748b; font-size: 0.9em;">:w save &bull; Esc normal mode</span>
+      </div>
+    </div>
+    <!-- Middle Resizer Bar (Split Mode) -->
+    <div id="md-splitter" title="Drag left/right to resize panes (double-click to reset 50/50)" style="display: none; width: 8px; background: #0b1120; border-left: 1px solid #334155; border-right: 1px solid #334155; cursor: col-resize; flex: none; align-items: center; justify-content: center; user-select: none; touch-action: none; transition: background 0.15s ease, border-color 0.15s ease; z-index: 10;">
+      <div class="v-grip-handle" style="width: 2px; height: 32px; background: #64748b; border-radius: 2px; transition: background 0.15s; pointer-events: none;"></div>
+    </div>
+    <!-- Preview Pane -->
+    <div id="md-preview-pane" class="markdown-body" style="flex: 1; min-width: 0; height: 100%; overflow-y: auto; padding: 24px 32px; color: #e2e8f0; line-height: 1.65; box-sizing: border-box;">
+    </div>
+  </div>
+</div>
