@@ -434,6 +434,84 @@
     }
   }
 
+  function ensureCodeMirrorFoldHelpers() {
+    if (typeof CodeMirror === 'undefined' || !CodeMirror.helpers || !CodeMirror.helpers.fold) return;
+    try {
+      if (CodeMirror.helpers.fold.markdown && !CodeMirror.helpers.fold.gfm) {
+        if (CodeMirror.helpers.fold.combine && CodeMirror.helpers.fold.brace && CodeMirror.helpers.fold.indent) {
+          CodeMirror.registerHelper('fold', 'gfm', CodeMirror.helpers.fold.combine(
+            CodeMirror.helpers.fold.markdown,
+            CodeMirror.helpers.fold.brace,
+            CodeMirror.helpers.fold.indent
+          ));
+        } else {
+          CodeMirror.registerHelper('fold', 'gfm', CodeMirror.helpers.fold.markdown);
+        }
+      }
+      if (CodeMirror.helpers.fold.brace && !CodeMirror.helpers.fold.dot) {
+        if (CodeMirror.helpers.fold.combine && CodeMirror.helpers.fold.comment && CodeMirror.helpers.fold.indent) {
+          CodeMirror.registerHelper('fold', 'dot', CodeMirror.helpers.fold.combine(
+            CodeMirror.helpers.fold.brace,
+            CodeMirror.helpers.fold.comment,
+            CodeMirror.helpers.fold.indent
+          ));
+        } else {
+          CodeMirror.registerHelper('fold', 'dot', CodeMirror.helpers.fold.brace);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to configure CodeMirror fold helpers:', e);
+    }
+  }
+
+  function ensureCodeMirrorVimFoldBindings() {
+    if (typeof CodeMirror === 'undefined' || !CodeMirror.Vim) return;
+    try {
+      if (CodeMirror.Vim._foldBindingsRegistered) return;
+      CodeMirror.Vim.defineAction('toggleFold', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: true });
+      });
+      CodeMirror.Vim.defineAction('fold', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: true }, 'fold');
+      });
+      CodeMirror.Vim.defineAction('unfold', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: false }, 'unfold');
+      });
+      CodeMirror.Vim.defineAction('foldAll', (cm) => {
+        if (CodeMirror.commands && CodeMirror.commands.foldAll) CodeMirror.commands.foldAll(cm);
+      });
+      CodeMirror.Vim.defineAction('unfoldAll', (cm) => {
+        if (CodeMirror.commands && CodeMirror.commands.unfoldAll) CodeMirror.commands.unfoldAll(cm);
+      });
+
+      CodeMirror.Vim.mapCommand('za', 'action', 'toggleFold');
+      CodeMirror.Vim.mapCommand('zo', 'action', 'unfold');
+      CodeMirror.Vim.mapCommand('zc', 'action', 'fold');
+      CodeMirror.Vim.mapCommand('zM', 'action', 'foldAll');
+      CodeMirror.Vim.mapCommand('zR', 'action', 'unfoldAll');
+
+      CodeMirror.Vim.defineEx('fold', 'fold', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: true }, 'fold');
+      });
+      CodeMirror.Vim.defineEx('unfold', 'unfold', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: false }, 'unfold');
+      });
+      CodeMirror.Vim.defineEx('foldtoggle', 'za', (cm) => {
+        if (typeof cm.foldCode === 'function') cm.foldCode(cm.getCursor(), { scanUp: true });
+      });
+      CodeMirror.Vim.defineEx('foldall', 'zM', (cm) => {
+        if (CodeMirror.commands && CodeMirror.commands.foldAll) CodeMirror.commands.foldAll(cm);
+      });
+      CodeMirror.Vim.defineEx('unfoldall', 'zR', (cm) => {
+        if (CodeMirror.commands && CodeMirror.commands.unfoldAll) CodeMirror.commands.unfoldAll(cm);
+      });
+
+      CodeMirror.Vim._foldBindingsRegistered = true;
+    } catch (e) {
+      console.warn('Failed to register Vim fold bindings:', e);
+    }
+  }
+
   function getMdEditor() {
     if (mdCodeEditor) return mdCodeEditor;
     if (typeof CodeMirror === 'undefined') return null;
@@ -441,6 +519,7 @@
     if (!ta) return null;
 
     try {
+      ensureCodeMirrorFoldHelpers();
       const modeConfig = {
         name: (typeof CodeMirror.overlayMode === 'function') ? 'gfm' : 'markdown',
         highlightFormatting: true,
@@ -467,7 +546,12 @@
         tabSize: 2,
         lineWrapping: true,
         viewportMargin: Infinity,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        foldGutter: true,
+        foldOptions: { scanUp: true },
         extraKeys: {
+          'Ctrl-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
+          'Cmd-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
           'Ctrl-S': () => saveMarkdownContent(false),
           'Cmd-S': () => saveMarkdownContent(false),
           'Ctrl-E': () => toggleMdEmojiMenu(),
@@ -487,16 +571,17 @@
       });
 
       if (typeof CodeMirror !== 'undefined' && CodeMirror.Vim) {
+        ensureCodeMirrorVimFoldBindings();
         CodeMirror.Vim.defineEx('write', 'w', (cm) => {
           if (cm && typeof window.mdGraphvizCodeEditor !== 'undefined' && cm === window.mdGraphvizCodeEditor) {
-            if (typeof saveAndInsertGraphviz === 'function') saveAndInsertGraphviz({ saveAsNew: false });
+            if (typeof saveAndInsertGraphviz === 'function') saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false });
           } else {
             saveMarkdownContent(false);
           }
         });
         CodeMirror.Vim.defineEx('wq', 'wq', (cm) => {
           if (cm && typeof window.mdGraphvizCodeEditor !== 'undefined' && cm === window.mdGraphvizCodeEditor) {
-            if (typeof saveAndInsertGraphviz === 'function') saveAndInsertGraphviz({ saveAsNew: false });
+            if (typeof saveAndInsertGraphviz === 'function') saveAndInsertGraphviz({ saveAsNew: false, closeAfter: true });
           } else {
             saveMarkdownContent(false);
           }
@@ -1041,7 +1126,9 @@
       doc.replaceRange(block, cursor);
       const newPos = cm.posFromIndex(cmIndex + prefix.length + offset);
       cm.setCursor(newPos);
-      cm.focus();
+      if (!mdGraphvizModal || mdGraphvizModal.style.display !== 'block') {
+        if (typeof cm.focus === 'function') cm.focus();
+      }
       if (mdTextarea) mdTextarea.value = cm.getValue();
     } else if (mdTextarea) {
       const start = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionStart !== undefined ? mdTextarea.selectionStart : mdTextarea.value.length);
@@ -1055,7 +1142,9 @@
       mdTextarea.value = before + block + after;
       const newPos = start + prefix.length + offset;
       mdTextarea.selectionStart = mdTextarea.selectionEnd = newPos;
-      mdTextarea.focus();
+      if (!mdGraphvizModal || mdGraphvizModal.style.display !== 'block') {
+        if (typeof mdTextarea.focus === 'function') mdTextarea.focus();
+      }
     }
 
     onMarkdownContentChanged();
@@ -1615,11 +1704,15 @@
     }
   }
 
-  // Register mode early if CodeMirror is already present
+  // Register mode and fold helpers early if CodeMirror is already present
   ensureGraphvizDotMode();
+  ensureCodeMirrorFoldHelpers();
+  ensureCodeMirrorVimFoldBindings();
 
   function initGraphvizCodeEditor() {
     ensureGraphvizDotMode();
+    ensureCodeMirrorFoldHelpers();
+    ensureCodeMirrorVimFoldBindings();
     if (mdGraphvizCodeEditor) {
       if (mdGraphvizCodeEditor.getOption('mode') !== 'dot') {
         mdGraphvizCodeEditor.setOption('mode', 'dot');
@@ -1639,9 +1732,14 @@
         lineWrapping: mdGraphvizLineWrap,
         keyMap: mdGraphvizVimMode ? 'vim' : 'default',
         viewportMargin: 10,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        foldGutter: true,
+        foldOptions: { scanUp: true },
         extraKeys: {
-          'Ctrl-S': () => saveAndInsertGraphviz(),
-          'Cmd-S': () => saveAndInsertGraphviz(),
+          'Ctrl-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
+          'Cmd-Q': (cm) => cm.foldCode(cm.getCursor(), { scanUp: true }),
+          'Ctrl-S': () => saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false }),
+          'Cmd-S': () => saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false }),
           'Ctrl-Enter': () => renderGraphviz(),
           'Cmd-Enter': () => renderGraphviz(),
           'Tab': (cm) => {
@@ -2022,7 +2120,7 @@
       if (seq !== mdGraphvizRenderSeq) return false;
       if (data.ok && data.svg) {
         setGraphvizPreview(data.svg);
-        if (mdGraphvizStatus) mdGraphvizStatus.textContent = silent ? '' : 'Preview ready';
+        if (!silent && mdGraphvizStatus) mdGraphvizStatus.textContent = 'Preview ready';
         return true;
       }
       setGraphvizError(data.error || 'Failed to render diagram.');
@@ -2044,6 +2142,7 @@
 
   function saveAndInsertGraphviz(options = {}) {
     const saveAsNew = !!options.saveAsNew;
+    const closeAfter = !!options.closeAfter;
     const source = getGraphvizEditorValue();
     if (!source.trim()) {
       setGraphvizError('Enter some DOT source first.');
@@ -2114,8 +2213,34 @@
         insertMarkdownBlock(`![${name}](${data.url})`, cm ? cm.getCursor() : null);
       }
 
-      if (mdGraphvizModal) mdGraphvizModal.style.display = 'none';
-      if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+      if (data.base) {
+        if (mdGraphvizExisting) mdGraphvizExisting.value = data.base;
+        if (mdGraphvizName) mdGraphvizName.value = data.base;
+        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
+        if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
+        if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Update';
+        if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-save';
+        loadGraphvizSources(data.base);
+      }
+
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (mdGraphvizStatus) {
+        mdGraphvizStatus.textContent = `Saved (${timeStr})`;
+        mdGraphvizStatus.style.color = '#38bdf8';
+      }
+
+      renderGraphviz({ silent: true });
+
+      if (closeAfter && mdGraphvizModal) {
+        mdGraphvizModal.style.display = 'none';
+        if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
+      } else {
+        if (mdGraphvizCodeEditor && typeof mdGraphvizCodeEditor.focus === 'function') {
+          mdGraphvizCodeEditor.focus();
+        } else if (mdGraphvizSource && typeof mdGraphvizSource.focus === 'function') {
+          mdGraphvizSource.focus();
+        }
+      }
     })
     .catch(err => {
       setGraphvizError('Save failed: ' + (err.message || 'network error'));
@@ -2287,7 +2412,7 @@
 
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
-      saveAndInsertGraphviz();
+      saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false });
       return;
     }
 
@@ -2351,6 +2476,18 @@
     }
     if (mdGraphvizInsertBtn) {
       mdGraphvizInsertBtn.addEventListener('click', () => saveAndInsertGraphviz({ saveAsNew: false }));
+    }
+    if (mdGraphvizModal) {
+      mdGraphvizModal.addEventListener('keydown', (e) => {
+        if (e.defaultPrevented) return;
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false });
+        } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          renderGraphviz();
+        }
+      });
     }
     if (mdGraphvizCloseBtn) {
       mdGraphvizCloseBtn.addEventListener('click', () => {
@@ -3274,6 +3411,8 @@
     insertBlock: insertMarkdownBlock,
     uploadImage: uploadAndInsertImage,
     openGraphviz: openGraphvizModal,
+    initGraphvizEditor: initGraphvizCodeEditor,
+    saveGraphviz: saveAndInsertGraphviz,
     openGitHistory: openGitHistoryModal,
     loadGitHistory: loadGitHistory,
     showGitDiff: showGitDiff,
@@ -3308,6 +3447,7 @@
   window.insertMarkdownBlock = insertMarkdownBlock;
   window.uploadAndInsertImage = uploadAndInsertImage;
   window.openGraphvizModal = openGraphvizModal;
+  window.saveAndInsertGraphviz = saveAndInsertGraphviz;
   window.openGitHistoryModal = openGitHistoryModal;
   window.loadGitHistory = loadGitHistory;
   window.showGitDiff = showGitDiff;

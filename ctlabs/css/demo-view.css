@@ -274,6 +274,47 @@
   border-right: 1px solid #334155 !important;
 }
 
+/* CodeMirror Fold Gutter & Markers - Dark Material-Ocean styling */
+.CodeMirror-foldgutter {
+  width: 14px;
+}
+.CodeMirror-foldgutter-open,
+.CodeMirror-foldgutter-folded {
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+  line-height: 1;
+}
+.CodeMirror-foldgutter-open:hover,
+.CodeMirror-foldgutter-folded:hover {
+  color: #38bdf8;
+}
+.CodeMirror-foldgutter-folded:after {
+  content: "\25B8";
+  color: #38bdf8;
+  font-weight: 700;
+}
+.CodeMirror-foldmarker {
+  color: #38bdf8 !important;
+  background-color: #1e293b !important;
+  border: 1px solid #0284c7 !important;
+  border-radius: 3px !important;
+  padding: 1px 6px !important;
+  font-size: 0.75em !important;
+  font-family: inherit !important;
+  line-height: 1 !important;
+  text-shadow: none !important;
+  cursor: pointer !important;
+  margin: 0 4px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+}
+.CodeMirror-foldmarker:hover {
+  background-color: #0369a1 !important;
+  color: #f0f9ff !important;
+}
+
 /* Rich Markdown Syntax Highlighting in Editor (Headers, Formatting, Code Fences, Links, Lists) */
 #md-edit-pane .cm-header { font-weight: 700; color: #82aaff !important; }
 #md-edit-pane .cm-header-1 { font-size: 1.3em; color: #89ddff !important; }
