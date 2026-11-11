@@ -751,7 +751,7 @@ class RecordingsController < BaseController
       return { ok: false, error: result[:error] }.to_json
     end
 
-    { ok: true, svg: result[:data].dup.force_encoding('UTF-8') }.to_json
+    { ok: true, svg: result[:data].dup.force_encoding('UTF-8'), dot: result[:dot] }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
@@ -785,7 +785,8 @@ class RecordingsController < BaseController
       ok:       true,
       filename: saved['filename'],
       base:     saved['base'],
-      url:      "/recordings/images/#{saved['filename']}"
+      url:      "/recordings/images/#{saved['filename']}",
+      dot:      result[:dot]
     }.to_json
   rescue StandardError => e
     status 500

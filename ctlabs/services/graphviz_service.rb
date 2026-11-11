@@ -8,6 +8,7 @@ require 'open3'
 require 'tmpdir'
 require 'base64'
 require 'fileutils'
+require_relative 'graphviz_template_engine'
 
 class GraphvizService
   MAX_SOURCE_BYTES = 256 * 1024
@@ -38,9 +39,17 @@ class GraphvizService
     return { ok: false, error: 'Diagram source is empty' } if src.strip.empty?
     return { ok: false, error: 'Diagram source is too large' } if src.bytesize > MAX_SOURCE_BYTES
 
+    dot_source = src
+    if GraphvizTemplateEngine.template?(src)
+      tpl_result = GraphvizTemplateEngine.render(src)
+      return tpl_result unless tpl_result[:ok]
+      dot_source = tpl_result[:dot].to_s
+      return { ok: false, error: 'Template generated empty DOT output' } if dot_source.strip.empty?
+    end
+
     Dir.mktmpdir('ctlabs-graphviz') do |dir|
-      staged_images = stage_referenced_images(src, dir, walkthrough: walkthrough)
-      processed_src = rewrite_dot_image_refs(src, staged_images)
+      staged_images = stage_referenced_images(dot_source, dir, walkthrough: walkthrough)
+      processed_src = rewrite_dot_image_refs(dot_source, staged_images)
 
       dot_path = File.join(dir, 'input.dot')
       out_path = File.join(dir, "output.#{fmt}")
@@ -61,7 +70,7 @@ class GraphvizService
                File.binread(out_path)
              end
 
-      { ok: true, data: data, format: fmt, engine: eng }
+      { ok: true, data: data, dot: dot_source, format: fmt, engine: eng }
     end
   rescue StandardError => e
     { ok: false, error: e.message }

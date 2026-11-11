@@ -29,6 +29,16 @@
   const mdGraphvizExisting = document.getElementById('md-graphviz-existing');
   const mdGraphvizEngine = document.getElementById('md-graphviz-engine');
   const mdGraphvizTemplate = document.getElementById('md-graphviz-template');
+  const mdGraphvizTabSource = document.getElementById('md-graphviz-tab-source');
+  const mdGraphvizTabDot = document.getElementById('md-graphviz-tab-dot');
+  const mdGraphvizTabDotBadge = document.getElementById('md-graphviz-tab-dot-badge');
+  const mdGraphvizBlocksBtn = document.getElementById('md-graphviz-blocks-btn');
+  const mdGraphvizBlocksMenu = document.getElementById('md-graphviz-blocks-menu');
+  const mdGraphvizDotContainer = document.getElementById('md-graphviz-dot-container');
+  const mdGraphvizDotOutput = document.getElementById('md-graphviz-dot-output');
+  const mdGraphvizDotUseBtn = document.getElementById('md-graphviz-dot-use-btn');
+  const mdGraphvizDotCopyBtn = document.getElementById('md-graphviz-dot-copy-btn');
+  const mdGraphvizDotCopyText = document.getElementById('md-graphviz-dot-copy-text');
   const mdGraphvizSource = document.getElementById('md-graphviz-source');
   const mdGraphvizEditorContainer = document.getElementById('md-graphviz-editor-container');
   const mdGraphvizFontDec = document.getElementById('md-graphviz-font-dec');
@@ -1376,17 +1386,141 @@
     if (!isNaN(savedRow) && savedRow >= 15 && savedRow <= 85) mdGraphvizSplitRow = savedRow;
   } catch (e) {}
 
-  const MD_GRAPHVIZ_DEFAULT = `digraph G {
-  rankdir=LR;
-  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#475569", fontname="sans-serif", fontcolor="#0f172a"];
-  edge [color="#64748b"];
+  let mdGraphvizActiveTab = 'source';
+  let mdGraphvizLastDot = '';
 
-  A [label="Start"];
-  B [label="Next step"];
-  A -> B;
+  const MD_GRAPHVIZ_DEFAULT = `digraph G {
+  <%= graph_header("My Diagram", rankdir: "LR") %>
+
+  <%= host("h1", name: "Host 1", ip: "192.168.1.10") %>
+  <%= host("h2", name: "Host 2", ip: "192.168.1.11") %>
+  <%= link("h1", "h2", label: "sync") %>
 }`;
 
+  const MD_GRAPHVIZ_SNIPPETS = {
+    host: '<%= host("web1", name: "Web Server", ip: "192.168.1.10") %>',
+    router: '<%= router("rtr1", name: "Core Router", ip: "10.0.0.1") %>',
+    switch: '<%= switch("sw1", name: "Access Switch", subtitle: "VLAN 10") %>',
+    firewall: '<%= firewall("fw1", name: "Edge Firewall", ip: "203.0.113.1") %>',
+    gateway: '<%= gateway("gw1", name: "NAT Gateway", ip: "192.168.1.1") %>',
+    cloud: '<%= cloud("inet", name: "Internet / WAN", subtitle: "Public Cloud") %>',
+    database: '<%= database("db1", name: "Primary DB", ip: "10.0.2.10", engine: "PostgreSQL 16") %>',
+    k8s_pod: '<%= k8s_pod("api_pod", name: "API Service", namespace: "prod", ip: "10.244.1.5") %>',
+    table_node: '<%= table_node("metrics", title: "Node Metrics", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
+    badge: '<%= badge("status", "HEALTHY", color: "#22c55e") %>',
+    cluster: `<%= cluster_start("app_tier", label: "Application Tier (10.0.1.0/24)", color: "#38bdf8") %>
+  <%= host("app01", name: "App 01", ip: "10.0.1.11") %>
+  <%= host("app02", name: "App 02", ip: "10.0.1.12") %>
+<%= cluster_end %>`,
+    link: '<%= link("src_id", "dst_id", label: "10 Gbps") %>',
+    links: '<%= links("rtr1", "app01", "app02") %>',
+    chain: '<%= chain("client", "fw1", "rtr1", "app01") %>',
+    loop: `<% (1..3).each do |i| %>
+  <%= host("node0" + i.to_s, name: "Node " + i.to_s, ip: "10.0.1." + (10 + i).to_s) %>
+<% end %>`,
+    condition: `<% if true %>
+  <%= badge("env", "PRODUCTION", color: "#ef4444") %>
+<% else %>
+  <%= badge("env", "STAGING", color: "#f59e0b") %>
+<% end %>`,
+    header: '<%= graph_header("Network Topology", rankdir: "LR") %>'
+  };
+
   const MD_GRAPHVIZ_TEMPLATES = {
+    erb_enterprise: `digraph EnterpriseNetwork {
+  <%= graph_header("Enterprise Network Architecture", rankdir: "TB") %>
+
+  <%= cloud("wan", name: "Internet / WAN", subtitle: "BGP AS 65000") %>
+  <%= firewall("edge_fw", name: "Perimeter Firewall", ip: "203.0.113.1") %>
+  <%= router("core_rtr", name: "Core Router", ip: "10.0.0.1") %>
+
+  <%= cluster_start("dmz", label: "DMZ (10.0.1.0/24)", color: "#f59e0b") %>
+    <%= gateway("proxy", name: "Reverse Proxy / LB", ip: "10.0.1.5") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("app_tier", label: "Application Tier (10.0.2.0/24)", color: "#38bdf8") %>
+    <% (1..2).each do |i| %>
+      <%= host("web0" + i.to_s, name: "Web App 0" + i.to_s, ip: "10.0.2.1" + i.to_s) %>
+    <% end %>
+  <%= cluster_end %>
+
+  <%= cluster_start("data_tier", label: "Data Tier (10.0.3.0/24)", color: "#ec4899") %>
+    <%= database("pg01", name: "Primary DB", ip: "10.0.3.10", engine: "PostgreSQL 16") %>
+    <%= database("redis01", name: "Cache", ip: "10.0.3.11", engine: "Redis 7") %>
+  <%= cluster_end %>
+
+  <%= link("wan", "edge_fw") %>
+  <%= link("edge_fw", "core_rtr") %>
+  <%= link("core_rtr", "proxy") %>
+  <%= links("proxy", "web01", "web02") %>
+  <%= links("web01", "pg01", "redis01") %>
+  <%= links("web02", "pg01", "redis01") %>
+}`,
+    erb_k8s: `digraph KubernetesCluster {
+  <%= graph_header("Kubernetes Cluster Topology", rankdir: "LR") %>
+
+  <%= gateway("ingress", name: "Ingress Controller", ip: "192.168.10.50") %>
+
+  <%= cluster_start("prod_ns", label: "Namespace: production", color: "#38bdf8") %>
+    <%= k8s_pod("frontend", name: "frontend-deploy", namespace: "production", ip: "10.244.1.15") %>
+    <%= k8s_pod("api", name: "api-service", namespace: "production", ip: "10.244.2.22") %>
+    <%= database("db", name: "postgres-statefulset", ip: "10.244.3.4", engine: "Postgres 16") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("monitoring_ns", label: "Namespace: monitoring", color: "#a855f7") %>
+    <%= k8s_pod("prom", name: "prometheus-k8s", namespace: "monitoring") %>
+    <%= k8s_pod("grafana", name: "grafana", namespace: "monitoring") %>
+  <%= cluster_end %>
+
+  <%= link("ingress", "frontend", label: "/app") %>
+  <%= link("ingress", "grafana", label: "/grafana") %>
+  <%= link("frontend", "api", label: "gRPC") %>
+  <%= link("api", "db", label: "SQL") %>
+  <%= links("prom", "frontend", "api", "db") %>
+}`,
+    erb_microservices: `digraph MicroservicesSystem {
+  <%= graph_header("Microservices Architecture", rankdir: "TB") %>
+
+  <%= gateway("apigw", name: "API Gateway (Kong)", ip: "10.0.0.10") %>
+
+  <%= cluster_start("services", label: "Microservices", color: "#38bdf8") %>
+    <%= host("auth_svc", name: "Auth Service", subtitle: "Go / JWT") %>
+    <%= host("user_svc", name: "User Service", subtitle: "Node.js") %>
+    <%= host("order_svc", name: "Order Service", subtitle: "Rust") %>
+  <%= cluster_end %>
+
+  <%= switch("event_bus", name: "Kafka Event Bus", subtitle: "Cluster") %>
+
+  <%= cluster_start("storage", label: "Datastores", color: "#ec4899") %>
+    <%= database("auth_redis", name: "Token Cache", engine: "Redis") %>
+    <%= database("user_db", name: "Users DB", engine: "PostgreSQL") %>
+    <%= database("order_db", name: "Orders DB", engine: "PostgreSQL") %>
+  <%= cluster_end %>
+
+  <%= links("apigw", "auth_svc", "user_svc", "order_svc") %>
+  <%= link("auth_svc", "auth_redis") %>
+  <%= link("user_svc", "user_db") %>
+  <%= link("order_svc", "order_db") %>
+  <%= links("event_bus", "user_svc", "order_svc") %>
+}`,
+    erb_dynamic_loop: `digraph DynamicCluster {
+  <%= graph_header("Dynamic Server Farm", rankdir: "TB") %>
+
+  <%= router("lb01", name: "HAProxy Load Balancer", ip: "10.10.0.1") %>
+
+  <%= cluster_start("nodes", label: "Computed Worker Nodes", color: "#10b981") %>
+    <% 1.upto(4) do |i| %>
+      <%= host("node_0" + i.to_s, name: "Worker 0" + i.to_s, ip: "10.10.1." + (20 + i).to_s, subtitle: (i == 1 ? "Leader" : "Follower")) %>
+    <% end %>
+  <%= cluster_end %>
+
+  <%= database("shared_storage", name: "NFS / S3 Storage", engine: "ZFS Pool") %>
+
+  <% 1.upto(4) do |i| %>
+    <%= link("lb01", "node_0" + i.to_s) %>
+    <%= link("node_0" + i.to_s, "shared_storage", style: "dashed") %>
+  <% end %>
+}`,
     flowchart_lr: `digraph flowchart_lr {
   rankdir=LR;
   node [shape=box, style="rounded,filled", fillcolor="#f1f5f9", color="#475569", fontname="sans-serif", fontcolor="#0f172a"];
@@ -1586,6 +1720,88 @@
         }
       }
     }
+  }
+
+  function setGraphvizActiveTab(tab) {
+    mdGraphvizActiveTab = (tab === 'dot') ? 'dot' : 'source';
+    if (mdGraphvizTabSource) {
+      if (mdGraphvizActiveTab === 'source') {
+        mdGraphvizTabSource.style.background = '#0284c7';
+        mdGraphvizTabSource.style.color = '#ffffff';
+        mdGraphvizTabSource.style.fontWeight = '600';
+      } else {
+        mdGraphvizTabSource.style.background = 'transparent';
+        mdGraphvizTabSource.style.color = '#94a3b8';
+        mdGraphvizTabSource.style.fontWeight = '500';
+      }
+    }
+    if (mdGraphvizTabDot) {
+      if (mdGraphvizActiveTab === 'dot') {
+        mdGraphvizTabDot.style.background = '#0284c7';
+        mdGraphvizTabDot.style.color = '#ffffff';
+        mdGraphvizTabDot.style.fontWeight = '600';
+      } else {
+        mdGraphvizTabDot.style.background = 'transparent';
+        mdGraphvizTabDot.style.color = '#94a3b8';
+        mdGraphvizTabDot.style.fontWeight = '500';
+      }
+    }
+
+    if (mdGraphvizActiveTab === 'dot') {
+      if (mdGraphvizEditorContainer) mdGraphvizEditorContainer.style.display = 'none';
+      if (mdGraphvizDotContainer) mdGraphvizDotContainer.style.display = 'flex';
+      if (mdGraphvizVimStatusBar) mdGraphvizVimStatusBar.style.display = 'none';
+      updateGraphvizDotDisplay();
+    } else {
+      if (mdGraphvizEditorContainer) mdGraphvizEditorContainer.style.display = 'flex';
+      if (mdGraphvizDotContainer) mdGraphvizDotContainer.style.display = 'none';
+      if (mdGraphvizVimMode && mdGraphvizVimStatusBar) mdGraphvizVimStatusBar.style.display = 'flex';
+      if (mdGraphvizCodeEditor) {
+        mdGraphvizCodeEditor.refresh();
+        mdGraphvizCodeEditor.focus();
+      }
+    }
+  }
+
+  function updateGraphvizDotDisplay() {
+    if (!mdGraphvizDotOutput) return;
+    if (mdGraphvizLastDot && mdGraphvizLastDot.trim()) {
+      mdGraphvizDotOutput.textContent = mdGraphvizLastDot;
+      if (mdGraphvizTabDotBadge) mdGraphvizTabDotBadge.style.display = 'inline-block';
+    } else {
+      const src = getGraphvizEditorValue();
+      if (src.includes('<%')) {
+        mdGraphvizDotOutput.textContent = '// Press Render (Ctrl+Enter) to compile ERB template into DOT';
+      } else {
+        mdGraphvizDotOutput.textContent = src || '// No DOT code';
+      }
+      if (mdGraphvizTabDotBadge) mdGraphvizTabDotBadge.style.display = 'none';
+    }
+  }
+
+  function insertGraphvizSnippet(snippetKey) {
+    const text = MD_GRAPHVIZ_SNIPPETS[snippetKey];
+    if (!text) return;
+
+    if (mdGraphvizActiveTab !== 'source') {
+      setGraphvizActiveTab('source');
+    }
+
+    if (mdGraphvizCodeEditor) {
+      const doc = mdGraphvizCodeEditor.getDoc();
+      const cursor = doc.getCursor();
+      doc.replaceRange(text + '\n', cursor);
+      mdGraphvizCodeEditor.focus();
+    } else if (mdGraphvizSource) {
+      const start = mdGraphvizSource.selectionStart || 0;
+      const end = mdGraphvizSource.selectionEnd || 0;
+      const current = mdGraphvizSource.value;
+      mdGraphvizSource.value = current.substring(0, start) + text + '\n' + current.substring(end);
+      mdGraphvizSource.selectionStart = mdGraphvizSource.selectionEnd = start + text.length + 1;
+      mdGraphvizSource.focus();
+    }
+
+    if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
   }
 
   function setGraphvizPreviewBg(bg) {
@@ -2120,6 +2336,10 @@
       if (seq !== mdGraphvizRenderSeq) return false;
       if (data.ok && data.svg) {
         setGraphvizPreview(data.svg);
+        if (data.dot) {
+          mdGraphvizLastDot = data.dot;
+          updateGraphvizDotDisplay();
+        }
         if (!silent && mdGraphvizStatus) mdGraphvizStatus.textContent = 'Preview ready';
         return true;
       }
@@ -2221,6 +2441,11 @@
         if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Update';
         if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-save';
         loadGraphvizSources(data.base);
+      }
+
+      if (data.dot) {
+        mdGraphvizLastDot = data.dot;
+        updateGraphvizDotDisplay();
       }
 
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -2330,6 +2555,7 @@
     mdGraphvizPanX = 0;
     mdGraphvizPanY = 0;
     setGraphvizPreview(null);
+    setGraphvizActiveTab('source');
 
     if (initialBase) {
       if (mdGraphvizName) mdGraphvizName.value = initialBase;
@@ -2426,6 +2652,78 @@
   function setupGraphvizEditor() {
     if (mdGraphvizBtn) {
       mdGraphvizBtn.addEventListener('click', () => openGraphvizModal());
+    }
+    if (mdGraphvizTabSource) {
+      mdGraphvizTabSource.addEventListener('click', () => setGraphvizActiveTab('source'));
+    }
+    if (mdGraphvizTabDot) {
+      mdGraphvizTabDot.addEventListener('click', () => setGraphvizActiveTab('dot'));
+    }
+    if (mdGraphvizBlocksBtn && mdGraphvizBlocksMenu) {
+      mdGraphvizBlocksBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = mdGraphvizBlocksMenu.style.display === 'block';
+        mdGraphvizBlocksMenu.style.display = isOpen ? 'none' : 'block';
+      });
+
+      document.addEventListener('click', (e) => {
+        if (mdGraphvizBlocksMenu && !mdGraphvizBlocksMenu.contains(e.target) && e.target !== mdGraphvizBlocksBtn) {
+          mdGraphvizBlocksMenu.style.display = 'none';
+        }
+      });
+
+      mdGraphvizBlocksMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.md-gv-snippet-item');
+        if (item && item.dataset.snippet) {
+          e.preventDefault();
+          e.stopPropagation();
+          insertGraphvizSnippet(item.dataset.snippet);
+        }
+      });
+    }
+    if (mdGraphvizDotUseBtn) {
+      mdGraphvizDotUseBtn.addEventListener('click', () => {
+        const text = mdGraphvizLastDot || (mdGraphvizDotOutput ? mdGraphvizDotOutput.textContent : '');
+        if (!text || !text.trim() || text.trim().startsWith('//')) {
+          setGraphvizError('No compiled DOT code available yet. Click Render first.');
+          return;
+        }
+
+        const currentSource = getGraphvizEditorValue();
+        if (currentSource.includes('<%')) {
+          if (!confirm('Replace your ERB template with the compiled DOT code? You will be editing static DOT from now on.')) {
+            return;
+          }
+        }
+
+        setGraphvizEditorValue(text);
+        setGraphvizActiveTab('source');
+        if (mdGraphvizStatus) {
+          mdGraphvizStatus.textContent = 'Switched to editable DOT';
+          mdGraphvizStatus.style.color = '#38bdf8';
+        }
+        renderGraphviz({ silent: true });
+        if (mdGraphvizCodeEditor) {
+          mdGraphvizCodeEditor.focus();
+        } else if (mdGraphvizSource) {
+          mdGraphvizSource.focus();
+        }
+      });
+    }
+    if (mdGraphvizDotCopyBtn) {
+      mdGraphvizDotCopyBtn.addEventListener('click', () => {
+        const text = mdGraphvizLastDot || (mdGraphvizDotOutput ? mdGraphvizDotOutput.textContent : '');
+        if (!text) return;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            if (mdGraphvizDotCopyText) {
+              const old = mdGraphvizDotCopyText.textContent;
+              mdGraphvizDotCopyText.textContent = 'Copied!';
+              setTimeout(() => { mdGraphvizDotCopyText.textContent = old; }, 1500);
+            }
+          }).catch(() => {});
+        }
+      });
     }
     if (mdGraphvizExisting) {
       mdGraphvizExisting.addEventListener('change', () => {

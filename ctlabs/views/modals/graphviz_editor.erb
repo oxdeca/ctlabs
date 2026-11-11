@@ -37,15 +37,23 @@
             <option value="patchwork">patchwork (treemap)</option>
           </select>
         </div>
-        <div style="flex: 0 1 180px; min-width: 150px;">
+        <div style="flex: 0 1 200px; min-width: 170px;">
           <label for="md-graphviz-template" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Insert template</label>
           <select id="md-graphviz-template" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
             <option value="">Select template…</option>
-            <option value="flowchart_lr">Flowchart (LR)</option>
-            <option value="flowchart_tb">Flowchart (TB)</option>
-            <option value="network">Network Topology</option>
-            <option value="state_machine">State Machine</option>
-            <option value="records">Data Structures / Record</option>
+            <optgroup label="ERB Topology Templates (Building Blocks)">
+              <option value="erb_enterprise">Enterprise Network (ERB)</option>
+              <option value="erb_k8s">Kubernetes Cluster (ERB)</option>
+              <option value="erb_microservices">Microservices &amp; DBs (ERB)</option>
+              <option value="erb_dynamic_loop">Dynamic Hosts Loop (ERB)</option>
+            </optgroup>
+            <optgroup label="Classic DOT Templates">
+              <option value="flowchart_lr">Flowchart (LR)</option>
+              <option value="flowchart_tb">Flowchart (TB)</option>
+              <option value="network">Network Topology</option>
+              <option value="state_machine">State Machine</option>
+              <option value="records">Data Structures / Record</option>
+            </optgroup>
           </select>
         </div>
         <div style="flex: 0 0 auto;">
@@ -78,32 +86,101 @@
         <div id="md-graphviz-source-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: none; box-sizing: border-box; overflow: hidden;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex: none; gap: 8px; flex-wrap: wrap;">
             <div style="display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-              <label for="md-graphviz-source" style="color: #f8fafc; font-size: 0.85em; font-weight: 600; margin: 0; margin-right: 2px;">DOT source</label>
-              <select id="md-graphviz-font-family" title="Font family" style="height: 26px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 0 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
+              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 28px; box-sizing: border-box;">
+                <button type="button" id="md-graphviz-tab-source" title="Edit source template" style="padding: 2px 8px; font-size: 0.78em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; height: 22px; background: #0284c7; color: #ffffff; font-weight: 600; transition: all 0.15s;">
+                  <i class="fas fa-edit"></i>
+                  <span>Source (ERB)</span>
+                </button>
+                <button type="button" id="md-graphviz-tab-dot" title="View compiled Graphviz DOT code" style="padding: 2px 8px; font-size: 0.78em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; height: 22px; background: transparent; color: #94a3b8; font-weight: 500; transition: all 0.15s;">
+                  <i class="fas fa-code"></i>
+                  <span>Generated DOT</span>
+                  <span id="md-graphviz-tab-dot-badge" style="display: none; font-size: 0.7em; padding: 0 4px; border-radius: 8px; background: #0369a1; color: #e0f2fe; margin-left: 2px;">ready</span>
+                </button>
+              </div>
+
+              <!-- Building Blocks / Snippet Dropdown -->
+              <div style="position: relative; display: inline-block;">
+                <button type="button" id="md-graphviz-blocks-btn" title="Insert DSL building block snippet" style="height: 28px; padding: 0 9px; border-radius: 4px; border: 1px solid #0284c7; background: #0369a1; color: #ffffff; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; transition: background 0.15s;">
+                  <i class="fas fa-cubes"></i>
+                  <span>Blocks</span>
+                  <i class="fas fa-caret-down" style="font-size: 0.75em;"></i>
+                </button>
+                <div id="md-graphviz-blocks-menu" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 4px; min-width: 260px; max-height: 420px; overflow-y: auto; background: #0f172a; border: 1px solid #334155; border-radius: 6px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6); z-index: 100; padding: 4px 0; font-size: 0.8em;">
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b;">Network &amp; Hardware</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="host" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">💻 Host / Server</span><code style="font-size:0.85em; color:#94a3b8;">host(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="router" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#f59e0b;">🔀 Router</span><code style="font-size:0.85em; color:#94a3b8;">router(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="switch" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#10b981;">🎛️ Switch</span><code style="font-size:0.85em; color:#94a3b8;">switch(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="firewall" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#ef4444;">🛡️ Firewall</span><code style="font-size:0.85em; color:#94a3b8;">firewall(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="gateway" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#a855f7;">🚪 Gateway</span><code style="font-size:0.85em; color:#94a3b8;">gateway(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="cloud" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#0ea5e9;">☁️ Cloud / WAN</span><code style="font-size:0.85em; color:#94a3b8;">cloud(...)</code></button>
+
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 4px;">Workloads &amp; Data</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="database" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#ec4899;">🗄️ Database</span><code style="font-size:0.85em; color:#94a3b8;">database(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="k8s_pod" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">☸️ K8s Pod</span><code style="font-size:0.85em; color:#94a3b8;">k8s_pod(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="table_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">📊 Table Record</span><code style="font-size:0.85em; color:#94a3b8;">table_node(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="badge" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">🏷️ Pill Badge</span><code style="font-size:0.85em; color:#94a3b8;">badge(...)</code></button>
+
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 4px;">Clusters &amp; Edges</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="cluster" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>📦 Cluster / Subgraph</span><code style="font-size:0.85em; color:#94a3b8;">cluster_start...</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="link" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>➡️ Single Link</span><code style="font-size:0.85em; color:#94a3b8;">link(a, b)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="links" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🔀 Multi Links</span><code style="font-size:0.85em; color:#94a3b8;">links(from, *to)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="chain" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🔗 Chain</span><code style="font-size:0.85em; color:#94a3b8;">chain(a, b, c)</code></button>
+
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 4px;">ERB Loops &amp; Logic</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="loop" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🔁 Loop (.each)</span><code style="font-size:0.85em; color:#94a3b8;">&lt;% ...each %&gt;</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="condition" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>❓ Condition (if/else)</span><code style="font-size:0.85em; color:#94a3b8;">&lt;% if ... %&gt;</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="header" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🎨 Graph Header</span><code style="font-size:0.85em; color:#94a3b8;">graph_header(...)</code></button>
+                </div>
+              </div>
+
+              <select id="md-graphviz-font-family" title="Font family" style="height: 28px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 0 6px; border-radius: 4px; font-size: 0.78em; cursor: pointer;">
                 <option value="courier" selected>Courier</option>
                 <option value="mono">System Monospace</option>
                 <option value="consolas">Consolas / SFMono</option>
                 <option value="fira">Fira Code</option>
               </select>
-              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 26px; box-sizing: border-box;">
+              <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 28px; box-sizing: border-box;">
                 <button type="button" id="md-graphviz-font-dec" title="Decrease editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">&minus;</button>
                 <span id="md-graphviz-font-size-label" style="min-width: 32px; text-align: center; font-size: 0.75em; color: #38bdf8; font-family: monospace; font-weight: 600; user-select: none;">13px</span>
                 <button type="button" id="md-graphviz-font-inc" title="Increase editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">+</button>
               </div>
-              <button type="button" id="md-graphviz-wrap-btn" title="Toggle line wrap mode" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+              <button type="button" id="md-graphviz-wrap-btn" title="Toggle line wrap mode" style="height: 28px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
                 <i class="fas fa-align-left" style="font-size: 0.85em;"></i>
                 <span>Wrap</span>
               </button>
-              <button type="button" id="md-graphviz-vim-btn" title="Toggle Vi / Vim keybindings" style="height: 26px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+              <button type="button" id="md-graphviz-vim-btn" title="Toggle Vi / Vim keybindings" style="height: 28px; padding: 0 8px; border-radius: 4px; border: 1px solid #475569; background: #0f172a; color: #94a3b8; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
                 <i class="fas fa-terminal" style="font-size: 0.85em;"></i>
                 <span>Vim</span>
               </button>
             </div>
             <span style="color: #64748b; font-size: 0.75em;">Tab = indent &middot; Ctrl+S = save &middot; Ctrl+Enter = render</span>
           </div>
+
+          <!-- Main editor container (Source Template) -->
           <div id="md-graphviz-editor-container" style="flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0f172a;">
             <textarea id="md-graphviz-source" spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 0; resize: none; background: #0f172a; border: none; color: #e2e8f0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; line-height: 1.45; tab-size: 2; outline: none;"></textarea>
           </div>
+
+          <!-- Compiled Generated DOT container -->
+          <div id="md-graphviz-dot-container" style="display: none; flex: 1 1 0%; min-height: 0; flex-direction: column; position: relative; border: 1px solid #475569; border-radius: 6px; overflow: hidden; background: #0b1120;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: #0f172a; border-bottom: 1px solid #334155; flex: none;">
+              <span style="color: #94a3b8; font-size: 0.78em; font-family: monospace; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-code" style="color: #38bdf8;"></i> Compiled Graphviz DOT output
+              </span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" id="md-graphviz-dot-use-btn" title="Replace ERB template with compiled DOT code so you can edit the DOT source directly" style="height: 24px; padding: 0 9px; border-radius: 3px; border: 1px solid #0284c7; background: #0284c7; color: #ffffff; font-size: 0.75em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 600; transition: all 0.15s;">
+                  <i class="fas fa-edit"></i>
+                  <span>Use as Source</span>
+                </button>
+                <button type="button" id="md-graphviz-dot-copy-btn" title="Copy compiled DOT to clipboard" style="height: 24px; padding: 0 9px; border-radius: 3px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; font-size: 0.75em; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s;">
+                  <i class="fas fa-copy"></i>
+                  <span id="md-graphviz-dot-copy-text">Copy DOT</span>
+                </button>
+              </div>
+            </div>
+            <pre id="md-graphviz-dot-output" style="margin: 0; padding: 10px 12px; flex: 1; min-height: 0; overflow: auto; font-family: 'Courier New', Courier, monospace; font-size: 12.5px; line-height: 1.45; color: #e2e8f0; white-space: pre; user-select: text; background: #0b1120;"></pre>
+          </div>
+
           <div id="md-graphviz-vim-status-bar" style="display: none; margin-top: 4px; padding: 3px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; flex: none;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span id="md-graphviz-vim-status-mode" style="font-weight: 700; color: #22c55e; letter-spacing: 0.5px;">-- NORMAL --</span>
