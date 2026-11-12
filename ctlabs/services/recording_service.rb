@@ -226,10 +226,11 @@ class RecordingService
     ext = '.svg' unless DIAGRAM_EXTS.include?(ext)
 
     clean_base = base.to_s.strip
-    unless diagram_base_valid?(clean_base)
-      clean_base = File.basename(original_name.to_s, '.*').gsub(/[^a-zA-Z0-9_-]+/, '_')[0, 40]
-      clean_base = 'graph' if clean_base.empty?
-      clean_base = "#{clean_base}_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{SecureRandom.hex(3)}"
+    clean_base = '' unless diagram_base_valid?(clean_base)
+
+    if clean_base.empty?
+      clean_base = File.basename(original_name.to_s, '.*').gsub(/[^a-zA-Z0-9_.-]+/, '_').strip[0, 60]
+      clean_base = 'diagram' if clean_base.empty?
     end
 
     filename   = "#{clean_base}#{ext}"
@@ -1193,17 +1194,21 @@ class RecordingService
     [key, entry['name'].to_s]
   end
 
-  def self.create_walkthrough(name, recording_ids: [], unintegrated_ids: [], unique: false)
+  def self.create_walkthrough(name, recording_ids: [], unintegrated_ids: [], unique: false, overwrite: false, slug: nil)
     wks   = load_walkthroughs
     clean = name.to_s.strip[0, NAME_MAX]
     clean = 'New Walkthrough' if clean.empty?
-    base  = slug_for(clean)
+    base  = slug.to_s.strip.empty? ? slug_for(clean) : slug_for(slug)
 
     if wks.key?(base)
-      return base unless unique
-
-      base = "#{base}_#{SecureRandom.hex(3)}"
-      base = "#{base}_#{SecureRandom.hex(3)}" while wks.key?(base)
+      if overwrite
+        # Proceed with overwriting base walkthrough entry
+      elsif unique
+        base = "#{base}_#{SecureRandom.hex(3)}"
+        base = "#{base}_#{SecureRandom.hex(3)}" while wks.key?(base)
+      else
+        return base
+      end
     end
 
     recs   = Array(recording_ids).map(&:to_s).uniq
@@ -1217,11 +1222,11 @@ class RecordingService
       'name'             => clean,
       'recording_ids'    => recs,
       'unintegrated_ids' => unints,
-      'created_at'       => Time.now.to_f
+      'created_at'       => (overwrite && wks[base] && wks[base]['created_at']) || Time.now.to_f
     }
     save_walkthrough(base, entry)
     wks[base] = entry
-    RecordingGitService.commit("Create walkthrough '#{clean}' (#{base})") rescue nil
+    RecordingGitService.commit("#{overwrite ? 'Update' : 'Create'} walkthrough '#{clean}' (#{base})") rescue nil
     base
   end
 

@@ -3169,7 +3169,10 @@
     }
 
     let name = (mdGraphvizName && mdGraphvizName.value.trim()) || 'diagram';
-    const base = saveAsNew ? '' : ((mdGraphvizExisting && mdGraphvizExisting.value) || '');
+    let base = saveAsNew ? '' : ((mdGraphvizExisting && mdGraphvizExisting.value) || '');
+    if (base && name && name !== base) {
+      base = name;
+    }
     const engine = (mdGraphvizEngine && mdGraphvizEngine.value) || 'dot';
 
     if (saveAsNew && mdGraphvizExisting && mdGraphvizExisting.value) {

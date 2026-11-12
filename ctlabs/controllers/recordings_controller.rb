@@ -248,8 +248,36 @@ class RecordingsController < BaseController
 
         if fext == '.zip'
           Zip::File.open(f[:tempfile].path) do |zipfile|
-            has_manifest = zipfile.any? { |e| File.basename(e.name) == RecordingService::MANIFEST }
-            next if has_manifest # walkthrough package with manifest creates its own new unique set
+            manifest_entry = zipfile.find { |e| [RecordingService::MANIFEST, 'manifest.json'].include?(File.basename(e.name)) }
+            if manifest_entry
+              manifest_data = begin
+                JSON.parse(manifest_entry.get_input_stream.read)
+              rescue StandardError
+                nil
+              end
+              if manifest_data.is_a?(Hash) && !manifest_data['name'].to_s.strip.empty?
+                set_name = manifest_data['name'].to_s.strip
+                wks = RecordingService.load_walkthroughs
+                slug = RecordingService.slug_for(set_name)
+                matched_wk = wks.find do |k, v|
+                  k.to_s.downcase == slug.downcase || v['name'].to_s.strip.downcase == set_name.downcase
+                end
+                if matched_wk
+                  matched_slug = matched_wk[0]
+                  matched_title = matched_wk[1]['name'].to_s.strip
+                  matched_title = set_name if matched_title.empty?
+                  duplicate_info = {
+                    filename: fname,
+                    existing_id: matched_slug,
+                    existing_title: matched_title,
+                    suggested_name: "#{matched_title} (1)",
+                    is_walkthrough: true
+                  }
+                  break
+                end
+              end
+              next
+            end
             zipfile.each do |entry|
               next if entry.name.start_with?('__MACOSX/') || entry.name.include?('/.') || (entry.respond_to?(:directory?) && entry.directory?)
               e_ext = File.extname(entry.name).downcase
@@ -326,7 +354,8 @@ class RecordingsController < BaseController
           filename: duplicate_info[:filename],
           existing_id: duplicate_info[:existing_id],
           existing_title: duplicate_info[:existing_title],
-          suggested_name: duplicate_info[:suggested_name]
+          suggested_name: duplicate_info[:suggested_name],
+          is_walkthrough: !!duplicate_info[:is_walkthrough]
         }.to_json
       end
     end
@@ -347,17 +376,18 @@ class RecordingsController < BaseController
         manifest = nil
 
         Zip::File.open(f[:tempfile].path) do |zipfile|
+          m_entry = zipfile.find { |e| [RecordingService::MANIFEST, 'manifest.json'].include?(File.basename(e.name)) }
+          if m_entry
+            manifest = begin
+              JSON.parse(m_entry.get_input_stream.read)
+            rescue StandardError
+              nil
+            end
+          end
+
           zipfile.each do |entry|
             base = File.basename(entry.name)
-
-            if base == RecordingService::MANIFEST
-              manifest = begin
-                JSON.parse(entry.get_input_stream.read)
-              rescue StandardError
-                nil
-              end
-              next
-            end
+            next if [RecordingService::MANIFEST, 'manifest.json'].include?(base)
 
             next if entry.name.start_with?('__MACOSX/') || entry.name.include?('/.') || (entry.respond_to?(:directory?) && entry.directory?)
 
@@ -369,16 +399,24 @@ class RecordingsController < BaseController
               data   = entry.get_input_stream.read
               node   = RecordingService.node_from_cast(data) ||
                        RecordingService.node_from_id(old_id)
-              id     = if conflict_action == 'overwrite' && !target_id.empty?
+              id     = if manifest.nil? && conflict_action == 'overwrite' && !target_id.empty?
                          target_id
-                       elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                       elsif old_id =~ /\A[a-zA-Z0-9_.-]+\z/ && (!RecordingService.path_for(old_id) || (manifest && conflict_action == 'overwrite' && !target_id.empty? && (ep = RecordingService.path_for(old_id)) && File.dirname(ep) == RecordingService.walkthrough_dir(target_id)))
                          old_id
                        else
-                         RecordingService.new_id(node)
+                         cand = old_id.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+                         cand = 'recording' if cand.empty?
+                         c_id = cand
+                         cnt = 1
+                         while RecordingService.path_for(c_id)
+                           c_id = "#{cand}_#{cnt}"
+                           cnt += 1
+                         end
+                         c_id
                        end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
-              if conflict_action == 'rename' && !custom_name.empty?
+              if manifest.nil? && conflict_action == 'rename' && !custom_name.empty?
                 RecordingService.set_title(id, custom_name)
               end
               id_map[old_id] = id
@@ -393,7 +431,7 @@ class RecordingsController < BaseController
               # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
               data   = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
 
-              if conflict_action == 'rename' && !custom_name.empty?
+              if manifest.nil? && conflict_action == 'rename' && !custom_name.empty?
                 if data =~ /\A(\s*#+\s*)([^\n]+)/
                   data = data.sub(/\A(\s*#+\s*)([^\n]+)/, "\\1#{custom_name}")
                 else
@@ -401,12 +439,20 @@ class RecordingsController < BaseController
                 end
               end
 
-              id = if conflict_action == 'overwrite' && !target_id.empty?
+              id = if manifest.nil? && conflict_action == 'overwrite' && !target_id.empty?
                      target_id
-                   elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                   elsif old_id =~ /\A[a-zA-Z0-9_.-]+\z/ && (!RecordingService.path_for(old_id) || (manifest && conflict_action == 'overwrite' && !target_id.empty? && (ep = RecordingService.path_for(old_id)) && File.dirname(ep) == RecordingService.walkthrough_dir(target_id)))
                      old_id
                    else
-                     RecordingService.new_markdown_id('note')
+                     cand = old_id.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+                     cand = 'note' if cand.empty?
+                     c_id = cand
+                     cnt = 1
+                     while RecordingService.path_for(c_id)
+                       c_id = "#{cand}_#{cnt}"
+                       cnt += 1
+                     end
+                     c_id
                    end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
@@ -417,12 +463,20 @@ class RecordingsController < BaseController
               imported << id
             elsif RecordingService::VIDEO_EXTS.include?(ext)
               old_id = clean_base
-              id     = if conflict_action == 'overwrite' && !target_id.empty?
+              id     = if manifest.nil? && conflict_action == 'overwrite' && !target_id.empty?
                          target_id
-                       elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
+                       elsif old_id =~ /\A[a-zA-Z0-9_.-]+\z/ && (!RecordingService.path_for(old_id) || (manifest && conflict_action == 'overwrite' && !target_id.empty? && (ep = RecordingService.path_for(old_id)) && File.dirname(ep) == RecordingService.walkthrough_dir(target_id)))
                          old_id
                        else
-                         RecordingService.new_video_id('screen')
+                         cand = old_id.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+                         cand = 'screen' if cand.empty?
+                         c_id = cand
+                         cnt = 1
+                         while RecordingService.path_for(c_id)
+                           c_id = "#{cand}_#{cnt}"
+                           cnt += 1
+                         end
+                         c_id
                        end
 
               File.binwrite(File.join(RecordingService::DIR, "#{id}#{ext}"), entry.get_input_stream.read)
@@ -431,7 +485,7 @@ class RecordingsController < BaseController
               id_map[base] = id
               id_map[base.downcase] = id
               imported << id
-            elsif ext == '.json' && !base.start_with?('_') && base != RecordingService::MANIFEST
+            elsif ext == '.json' && !base.start_with?('_') && base != RecordingService::MANIFEST && base != 'manifest.json'
               old_id = clean_base
               pending_sidecars[old_id] = entry.get_input_stream.read
             elsif ext == RecordingService::DOT_EXT && (entry.name.start_with?('images/') || entry.name.include?('/images/'))
@@ -474,7 +528,7 @@ class RecordingsController < BaseController
         pending_sidecars.each do |old_id, json_str|
           new_id = id_map[old_id] || id_map[old_id.downcase]
           if new_id
-            if conflict_action == 'rename' && !custom_name.empty?
+            if manifest.nil? && conflict_action == 'rename' && !custom_name.empty?
               begin
                 parsed = JSON.parse(json_str)
                 parsed['title'] = custom_name if parsed.is_a?(Hash)
@@ -502,13 +556,36 @@ class RecordingsController < BaseController
           remaining = imported - ordered - unint_ordered
           unint_ordered += remaining
 
+          target_wk_name = manifest['name'].to_s.strip
+          target_wk_slug = nil
+
+          if conflict_action == 'overwrite' && !target_id.empty?
+            target_wk_slug = target_id
+          elsif conflict_action == 'rename' && !custom_name.empty?
+            target_wk_name = custom_name
+            target_wk_slug = RecordingService.slug_for(custom_name)
+          else
+            target_wk_slug = RecordingService.slug_for(target_wk_name)
+          end
+
           walkthrough = RecordingService.create_walkthrough(
-            manifest['name'],
+            target_wk_name,
             recording_ids: ordered,
             unintegrated_ids: unint_ordered,
-            unique: true
+            unique: false,
+            overwrite: (conflict_action == 'overwrite'),
+            slug: target_wk_slug
           )
           target_dir = RecordingService.walkthrough_dir(walkthrough)
+
+          if conflict_action == 'overwrite'
+            existing_step_files = Dir.glob(File.join(target_dir, "*")).reject do |p|
+              bn = File.basename(p)
+              bn == RecordingService::MANIFEST || bn == 'images'
+            end
+            existing_step_files.each { |p| FileUtils.rm_rf(p) rescue nil }
+          end
+
           (ordered + unint_ordered).each do |rec_id|
             p = RecordingService.path_for(rec_id)
             if p && File.file?(p) && File.dirname(p) != target_dir
@@ -572,15 +649,44 @@ class RecordingsController < BaseController
         data = File.binread(f[:tempfile].path)
         node = RecordingService.node_from_cast(data) ||
                RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
-        old_id = File.basename(f[:filename].to_s, '.*')
-        id   = if conflict_action == 'overwrite' && !target_id.empty?
-                 target_id
-               elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
-                 old_id
-               else
-                 RecordingService.new_id(node)
+        orig_base = File.basename(f[:filename].to_s, '.*').strip
+        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+        clean_base = 'recording' if clean_base.empty?
+
+        id = if conflict_action == 'overwrite' && !target_id.empty?
+               target_id
+             elsif conflict_action == 'rename' && !custom_name.empty?
+               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+               cand = 'recording' if cand.empty?
+               c_id = cand
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{cand}_#{cnt}"
+                 cnt += 1
                end
-        File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+               c_id
+             elsif !RecordingService.path_for(clean_base)
+               clean_base
+             else
+               c_id = clean_base
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{clean_base}_#{cnt}"
+                 cnt += 1
+               end
+               c_id
+             end
+
+        wk_target = params[:walkthrough].to_s.strip
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        FileUtils.mkdir_p(target_dir)
+
+        dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
+                      existing_p
+                    else
+                      File.join(target_dir, "#{id}#{RecordingService::EXT}")
+                    end
+        File.binwrite(dest_path, data)
 
         if conflict_action == 'rename' && !custom_name.empty?
           RecordingService.set_title(id, custom_name)
@@ -588,7 +694,7 @@ class RecordingsController < BaseController
           begin
             header_json = JSON.parse(data.to_s.lines.first)
             if header_json.is_a?(Hash) && header_json['title'].to_s.strip.empty?
-              base_name = File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+              base_name = orig_base.tr('_-', ' ').strip
               RecordingService.set_title(id, base_name) unless base_name.empty?
             end
           rescue StandardError
@@ -603,39 +709,100 @@ class RecordingsController < BaseController
         # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
         data = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
 
+        orig_base = File.basename(f[:filename].to_s, '.*').strip
+        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+        clean_base = 'note' if clean_base.empty?
+
         if conflict_action == 'rename' && !custom_name.empty?
           if data =~ /\A(\s*#+\s*)([^\n]+)/
             data = data.sub(/\A(\s*#+\s*)([^\n]+)/, "\\1#{custom_name}")
           else
             data = "# #{custom_name}\n\n" + data
           end
+        elsif data !~ /\A\s*#+\s*/ && !orig_base.empty?
+          data = "# #{orig_base.tr('_-', ' ')}\n\n" + data
         end
 
-        old_id = File.basename(f[:filename].to_s, '.*')
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
-             elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
-               old_id
+             elsif conflict_action == 'rename' && !custom_name.empty?
+               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+               cand = 'note' if cand.empty?
+               c_id = cand
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{cand}_#{cnt}"
+                 cnt += 1
+               end
+               c_id
+             elsif !RecordingService.path_for(clean_base)
+               clean_base
              else
-               RecordingService.new_markdown_id('note')
+               c_id = clean_base
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{clean_base}_#{cnt}"
+                 cnt += 1
+               end
+               c_id
              end
-        File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+
+        wk_target = params[:walkthrough].to_s.strip
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        FileUtils.mkdir_p(target_dir)
+
+        dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
+                      existing_p
+                    else
+                      File.join(target_dir, "#{id}#{RecordingService::MD_EXT}")
+                    end
+
+        File.binwrite(dest_path, data)
         imported << id
       elsif RecordingService::VIDEO_EXTS.include?(File.extname(filename))
         vext = File.extname(filename).downcase
-        old_id = File.basename(f[:filename].to_s, '.*')
+        orig_base = File.basename(f[:filename].to_s, '.*').strip
+        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+        clean_base = 'video' if clean_base.empty?
+
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
-             elsif conflict_action != 'rename' && old_id =~ /\A[a-zA-Z0-9_-]+\z/ && !RecordingService.path_for(old_id)
-               old_id
+             elsif conflict_action == 'rename' && !custom_name.empty?
+               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
+               cand = 'video' if cand.empty?
+               c_id = cand
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{cand}_#{cnt}"
+                 cnt += 1
+               end
+               c_id
+             elsif !RecordingService.path_for(clean_base)
+               clean_base
              else
-               RecordingService.new_video_id('screen')
+               c_id = clean_base
+               cnt = 1
+               while RecordingService.path_for(c_id)
+                 c_id = "#{clean_base}_#{cnt}"
+                 cnt += 1
+               end
+               c_id
              end
-        File.binwrite(File.join(RecordingService::DIR, "#{id}#{vext}"), File.binread(f[:tempfile].path))
+
+        wk_target = params[:walkthrough].to_s.strip
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        FileUtils.mkdir_p(target_dir)
+
+        dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
+                      existing_p
+                    else
+                      File.join(target_dir, "#{id}#{vext}")
+                    end
+        File.binwrite(dest_path, File.binread(f[:tempfile].path))
         base_name = if conflict_action == 'rename' && !custom_name.empty?
                       custom_name
                     else
-                      File.basename(f[:filename].to_s, '.*').tr('_-', ' ').strip
+                      orig_base.tr('_-', ' ').strip
                     end
         base_name = 'Browser Recording' if base_name.empty?
         meta = {
@@ -644,7 +811,8 @@ class RecordingsController < BaseController
           'created_at' => Time.now.to_i,
           'type'       => 'video'
         }
-        File.write(File.join(RecordingService::DIR, "#{id}.json"), JSON.pretty_generate(meta))
+        meta_dest = dest_path.sub(/#{Regexp.escape(vext)}\z/, '.json')
+        File.write(meta_dest, JSON.pretty_generate(meta))
         imported << id
       elsif RecordingService::IMAGE_EXTS.include?(File.extname(filename))
         last_saved_image = RecordingService.save_image(f[:tempfile], filename, walkthrough: params[:walkthrough].to_s)

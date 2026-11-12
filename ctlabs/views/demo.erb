@@ -1969,8 +1969,16 @@ if (metaForm) {
               lastConflictInfo = data;
               const dupModal = document.getElementById('duplicate-import-modal');
               const dupNameSpan = document.getElementById('duplicate-existing-name-span');
+              const dupMsg = document.getElementById('duplicate-modal-msg');
               const dupInput = document.getElementById('duplicate-rename-input');
               if (dupNameSpan) dupNameSpan.textContent = `“${data.existing_title || data.filename}”`;
+              if (dupMsg) {
+                if (data.is_walkthrough) {
+                  dupMsg.innerHTML = `A walkthrough set named <strong style="color: #38bdf8;">“${data.existing_title || data.filename}”</strong> already exists.`;
+                } else {
+                  dupMsg.innerHTML = `A step or file matching <strong id="duplicate-existing-name-span" style="color: #38bdf8;">“${data.existing_title || data.filename}”</strong> already exists in this walkthrough set.`;
+                }
+              }
               if (dupInput) {
                 dupInput.value = data.suggested_name || ((data.existing_title || data.filename) + ' (1)');
                 setTimeout(() => { dupInput.focus(); dupInput.select(); }, 80);
