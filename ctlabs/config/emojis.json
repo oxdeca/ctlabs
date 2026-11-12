@@ -1,0 +1,1094 @@
+[
+  {
+    "code": "+1",
+    "char": "👍",
+    "name": "Thumbs Up",
+    "cat": "popular"
+  },
+  {
+    "code": "-1",
+    "char": "👎",
+    "name": "Thumbs Down",
+    "cat": "popular"
+  },
+  {
+    "code": "thumbsup",
+    "char": "👍",
+    "name": "Thumbs Up",
+    "cat": "popular"
+  },
+  {
+    "code": "thumbsdown",
+    "char": "👎",
+    "name": "Thumbs Down",
+    "cat": "popular"
+  },
+  {
+    "code": "rocket",
+    "char": "🚀",
+    "name": "Rocket / Launch",
+    "cat": "popular"
+  },
+  {
+    "code": "tada",
+    "char": "🎉",
+    "name": "Party Popper / Tada",
+    "cat": "popular"
+  },
+  {
+    "code": "sparkles",
+    "char": "✨",
+    "name": "Sparkles",
+    "cat": "popular"
+  },
+  {
+    "code": "fire",
+    "char": "🔥",
+    "name": "Fire / Hot",
+    "cat": "popular"
+  },
+  {
+    "code": "zap",
+    "char": "⚡",
+    "name": "Zap / Lightning / Fast",
+    "cat": "popular"
+  },
+  {
+    "code": "star",
+    "char": "⭐",
+    "name": "Star",
+    "cat": "popular"
+  },
+  {
+    "code": "star2",
+    "char": "🌟",
+    "name": "Glowing Star",
+    "cat": "popular"
+  },
+  {
+    "code": "heart",
+    "char": "❤️",
+    "name": "Red Heart",
+    "cat": "popular"
+  },
+  {
+    "code": "eyes",
+    "char": "👀",
+    "name": "Eyes / Looking",
+    "cat": "popular"
+  },
+  {
+    "code": "100",
+    "char": "💯",
+    "name": "Hundred Points",
+    "cat": "popular"
+  },
+  {
+    "code": "bulb",
+    "char": "💡",
+    "name": "Light Bulb / Idea",
+    "cat": "popular"
+  },
+  {
+    "code": "memo",
+    "char": "📝",
+    "name": "Memo / Note",
+    "cat": "popular"
+  },
+  {
+    "code": "smile",
+    "char": "😄",
+    "name": "Grinning Face",
+    "cat": "popular"
+  },
+  {
+    "code": "thinking",
+    "char": "🤔",
+    "name": "Thinking Face",
+    "cat": "popular"
+  },
+  {
+    "code": "wave",
+    "char": "👋",
+    "name": "Waving Hand",
+    "cat": "popular"
+  },
+  {
+    "code": "raised_hands",
+    "char": "🙌",
+    "name": "Raised Hands / Celebrate",
+    "cat": "popular"
+  },
+  {
+    "code": "clap",
+    "char": "👏",
+    "name": "Clapping Hands",
+    "cat": "popular"
+  },
+  {
+    "code": "ok_hand",
+    "char": "👌",
+    "name": "OK Hand",
+    "cat": "popular"
+  },
+  {
+    "code": "octocat",
+    "char": "🐙",
+    "name": "Octocat / GitHub",
+    "cat": "github"
+  },
+  {
+    "code": "shipit",
+    "char": "🐿️",
+    "name": "Ship It Squirrel",
+    "cat": "github"
+  },
+  {
+    "code": "copilot",
+    "char": "🤖",
+    "name": "GitHub Copilot / Bot",
+    "cat": "github"
+  },
+  {
+    "code": "check",
+    "char": "✅",
+    "name": "Check Mark",
+    "cat": "status"
+  },
+  {
+    "code": "white_check_mark",
+    "char": "✅",
+    "name": "White Check Mark",
+    "cat": "status"
+  },
+  {
+    "code": "heavy_check_mark",
+    "char": "✔️",
+    "name": "Heavy Check Mark",
+    "cat": "status"
+  },
+  {
+    "code": "x",
+    "char": "❌",
+    "name": "Cross Mark",
+    "cat": "status"
+  },
+  {
+    "code": "negative_squared_cross_mark",
+    "char": "❎",
+    "name": "Squared Cross",
+    "cat": "status"
+  },
+  {
+    "code": "warning",
+    "char": "⚠️",
+    "name": "Warning",
+    "cat": "status"
+  },
+  {
+    "code": "alert",
+    "char": "🚨",
+    "name": "Alert / Siren",
+    "cat": "status"
+  },
+  {
+    "code": "rotating_light",
+    "char": "🚨",
+    "name": "Rotating Light",
+    "cat": "status"
+  },
+  {
+    "code": "stop_sign",
+    "char": "🛑",
+    "name": "Stop Sign",
+    "cat": "status"
+  },
+  {
+    "code": "no_entry",
+    "char": "⛔",
+    "name": "No Entry",
+    "cat": "status"
+  },
+  {
+    "code": "no_entry_sign",
+    "char": "🚫",
+    "name": "Prohibited",
+    "cat": "status"
+  },
+  {
+    "code": "bell",
+    "char": "🔔",
+    "name": "Bell / Notification",
+    "cat": "status"
+  },
+  {
+    "code": "bell_slash",
+    "char": "🔕",
+    "name": "Muted Bell",
+    "cat": "status"
+  },
+  {
+    "code": "hourglass",
+    "char": "⌛",
+    "name": "Hourglass / In Progress",
+    "cat": "status"
+  },
+  {
+    "code": "hourglass_flowing_sand",
+    "char": "⏳",
+    "name": "Hourglass Running",
+    "cat": "status"
+  },
+  {
+    "code": "construction",
+    "char": "🚧",
+    "name": "Under Construction",
+    "cat": "status"
+  },
+  {
+    "code": "radioactive",
+    "char": "☢️",
+    "name": "Radioactive",
+    "cat": "status"
+  },
+  {
+    "code": "biohazard",
+    "char": "☣️",
+    "name": "Biohazard",
+    "cat": "status"
+  },
+  {
+    "code": "green_circle",
+    "char": "🟢",
+    "name": "Green Circle / Online",
+    "cat": "status"
+  },
+  {
+    "code": "red_circle",
+    "char": "🔴",
+    "name": "Red Circle / Offline",
+    "cat": "status"
+  },
+  {
+    "code": "yellow_circle",
+    "char": "🟡",
+    "name": "Yellow Circle / Degraded",
+    "cat": "status"
+  },
+  {
+    "code": "blue_circle",
+    "char": "🔵",
+    "name": "Blue Circle / Info",
+    "cat": "status"
+  },
+  {
+    "code": "white_circle",
+    "char": "⚪",
+    "name": "White Circle",
+    "cat": "status"
+  },
+  {
+    "code": "black_circle",
+    "char": "⚫",
+    "name": "Black Circle",
+    "cat": "status"
+  },
+  {
+    "code": "large_green_circle",
+    "char": "🟢",
+    "name": "Large Green Circle",
+    "cat": "status"
+  },
+  {
+    "code": "large_blue_circle",
+    "char": "🔵",
+    "name": "Large Blue Circle",
+    "cat": "status"
+  },
+  {
+    "code": "heavy_plus_sign",
+    "char": "➕",
+    "name": "Plus / Add",
+    "cat": "status"
+  },
+  {
+    "code": "heavy_minus_sign",
+    "char": "➖",
+    "name": "Minus / Remove",
+    "cat": "status"
+  },
+  {
+    "code": "heavy_multiplication_x",
+    "char": "✖️",
+    "name": "Multiply / Close",
+    "cat": "status"
+  },
+  {
+    "code": "boom",
+    "char": "💥",
+    "name": "Boom / Collision",
+    "cat": "status"
+  },
+  {
+    "code": "collision",
+    "char": "💥",
+    "name": "Collision",
+    "cat": "status"
+  },
+  {
+    "code": "shield",
+    "char": "🛡️",
+    "name": "Shield / Secure",
+    "cat": "status"
+  },
+  {
+    "code": "bricks",
+    "char": "🧱",
+    "name": "Bricks / Blocks / Building",
+    "cat": "tech"
+  },
+  {
+    "code": "server",
+    "char": "🖥️",
+    "name": "Server / Host / Node",
+    "cat": "tech"
+  },
+  {
+    "code": "host",
+    "char": "💻",
+    "name": "Host / Laptop",
+    "cat": "tech"
+  },
+  {
+    "code": "database",
+    "char": "🗄️",
+    "name": "Database / Storage",
+    "cat": "tech"
+  },
+  {
+    "code": "db",
+    "char": "🗄️",
+    "name": "Database Alias",
+    "cat": "tech"
+  },
+  {
+    "code": "firewall",
+    "char": "🛡️",
+    "name": "Firewall / WAF",
+    "cat": "tech"
+  },
+  {
+    "code": "router",
+    "char": "🔀",
+    "name": "Router / Routing",
+    "cat": "tech"
+  },
+  {
+    "code": "switch",
+    "char": "🎛️",
+    "name": "Switch / Controls",
+    "cat": "tech"
+  },
+  {
+    "code": "gateway",
+    "char": "🚪",
+    "name": "Gateway",
+    "cat": "tech"
+  },
+  {
+    "code": "cloud",
+    "char": "☁️",
+    "name": "Cloud / WAN",
+    "cat": "tech"
+  },
+  {
+    "code": "k8s",
+    "char": "☸️",
+    "name": "Kubernetes / K8s",
+    "cat": "tech"
+  },
+  {
+    "code": "kubernetes",
+    "char": "☸️",
+    "name": "Kubernetes Alias",
+    "cat": "tech"
+  },
+  {
+    "code": "docker",
+    "char": "🐳",
+    "name": "Docker / Container",
+    "cat": "tech"
+  },
+  {
+    "code": "pod",
+    "char": "☸️",
+    "name": "Pod / K8s Pod",
+    "cat": "tech"
+  },
+  {
+    "code": "terminal",
+    "char": "💻",
+    "name": "Terminal / Console",
+    "cat": "tech"
+  },
+  {
+    "code": "computer",
+    "char": "💻",
+    "name": "Computer",
+    "cat": "tech"
+  },
+  {
+    "code": "laptop",
+    "char": "💻",
+    "name": "Laptop",
+    "cat": "tech"
+  },
+  {
+    "code": "desktop_computer",
+    "char": "🖥️",
+    "name": "Desktop Computer",
+    "cat": "tech"
+  },
+  {
+    "code": "lock",
+    "char": "🔒",
+    "name": "Locked / SSL / Secret",
+    "cat": "tech"
+  },
+  {
+    "code": "unlock",
+    "char": "🔓",
+    "name": "Unlocked / Open",
+    "cat": "tech"
+  },
+  {
+    "code": "key",
+    "char": "🔑",
+    "name": "Key / SSH / Token",
+    "cat": "tech"
+  },
+  {
+    "code": "old_key",
+    "char": "🗝️",
+    "name": "Old Key",
+    "cat": "tech"
+  },
+  {
+    "code": "network",
+    "char": "🌐",
+    "name": "Network / Global",
+    "cat": "tech"
+  },
+  {
+    "code": "globe_with_meridians",
+    "char": "🌐",
+    "name": "Globe / Internet",
+    "cat": "tech"
+  },
+  {
+    "code": "link",
+    "char": "🔗",
+    "name": "Link / Hyperlink",
+    "cat": "tech"
+  },
+  {
+    "code": "cpu",
+    "char": "🧠",
+    "name": "CPU / Processor",
+    "cat": "tech"
+  },
+  {
+    "code": "ram",
+    "char": "💾",
+    "name": "RAM / Memory",
+    "cat": "tech"
+  },
+  {
+    "code": "cable",
+    "char": "🔌",
+    "name": "Cable / Connection",
+    "cat": "tech"
+  },
+  {
+    "code": "plug",
+    "char": "🔌",
+    "name": "Electric Plug",
+    "cat": "tech"
+  },
+  {
+    "code": "electric_plug",
+    "char": "🔌",
+    "name": "Electric Plug Alias",
+    "cat": "tech"
+  },
+  {
+    "code": "battery",
+    "char": "🔋",
+    "name": "Battery",
+    "cat": "tech"
+  },
+  {
+    "code": "satellite",
+    "char": "🛰️",
+    "name": "Satellite",
+    "cat": "tech"
+  },
+  {
+    "code": "satellite_antenna",
+    "char": "📡",
+    "name": "Satellite Dish / Antenna",
+    "cat": "tech"
+  },
+  {
+    "code": "gear",
+    "char": "⚙️",
+    "name": "Gear / Settings / Config",
+    "cat": "tech"
+  },
+  {
+    "code": "gears",
+    "char": "⚙️",
+    "name": "Gears",
+    "cat": "tech"
+  },
+  {
+    "code": "wrench",
+    "char": "🔧",
+    "name": "Wrench / Maintenance",
+    "cat": "tech"
+  },
+  {
+    "code": "hammer_and_wrench",
+    "char": "🛠️",
+    "name": "Tools / DevOps",
+    "cat": "tech"
+  },
+  {
+    "code": "hammer",
+    "char": "🔨",
+    "name": "Hammer",
+    "cat": "tech"
+  },
+  {
+    "code": "toolbox",
+    "char": "🧰",
+    "name": "Toolbox",
+    "cat": "tech"
+  },
+  {
+    "code": "nut_and_bolt",
+    "char": "🔩",
+    "name": "Nut and Bolt",
+    "cat": "tech"
+  },
+  {
+    "code": "package",
+    "char": "📦",
+    "name": "Package / RPM / Deb",
+    "cat": "tech"
+  },
+  {
+    "code": "box",
+    "char": "📦",
+    "name": "Box / Container",
+    "cat": "tech"
+  },
+  {
+    "code": "inbox_tray",
+    "char": "📥",
+    "name": "Inbox / Receive",
+    "cat": "tech"
+  },
+  {
+    "code": "outbox_tray",
+    "char": "📤",
+    "name": "Outbox / Send",
+    "cat": "tech"
+  },
+  {
+    "code": "bug",
+    "char": "🐛",
+    "name": "Bug / Defect",
+    "cat": "tech"
+  },
+  {
+    "code": "ant",
+    "char": "🐜",
+    "name": "Ant",
+    "cat": "tech"
+  },
+  {
+    "code": "floppy_disk",
+    "char": "💾",
+    "name": "Floppy Disk / Save",
+    "cat": "tech"
+  },
+  {
+    "code": "cd",
+    "char": "💿",
+    "name": "CD / ISO / Media",
+    "cat": "tech"
+  },
+  {
+    "code": "dvd",
+    "char": "📀",
+    "name": "DVD / Optical Disk",
+    "cat": "tech"
+  },
+  {
+    "code": "file_folder",
+    "char": "📁",
+    "name": "Folder / Directory",
+    "cat": "tech"
+  },
+  {
+    "code": "open_file_folder",
+    "char": "📂",
+    "name": "Open Folder",
+    "cat": "tech"
+  },
+  {
+    "code": "card_index_dividers",
+    "char": "🗂️",
+    "name": "Index Dividers",
+    "cat": "tech"
+  },
+  {
+    "code": "page_facing_up",
+    "char": "📄",
+    "name": "Document / Page",
+    "cat": "tech"
+  },
+  {
+    "code": "page_with_curl",
+    "char": "📃",
+    "name": "Page with Curl",
+    "cat": "tech"
+  },
+  {
+    "code": "scroll",
+    "char": "📜",
+    "name": "Scroll / Script",
+    "cat": "tech"
+  },
+  {
+    "code": "clipboard",
+    "char": "📋",
+    "name": "Clipboard",
+    "cat": "tech"
+  },
+  {
+    "code": "bookmark_tabs",
+    "char": "📑",
+    "name": "Bookmark Tabs",
+    "cat": "tech"
+  },
+  {
+    "code": "bookmark",
+    "char": "🔖",
+    "name": "Bookmark",
+    "cat": "tech"
+  },
+  {
+    "code": "label",
+    "char": "🏷️",
+    "name": "Label / Tag",
+    "cat": "tech"
+  },
+  {
+    "code": "tag",
+    "char": "🏷️",
+    "name": "Tag Alias",
+    "cat": "tech"
+  },
+  {
+    "code": "bar_chart",
+    "char": "📊",
+    "name": "Bar Chart / Metrics",
+    "cat": "tech"
+  },
+  {
+    "code": "chart_with_upwards_trend",
+    "char": "📈",
+    "name": "Chart Upwards / Telemetry",
+    "cat": "tech"
+  },
+  {
+    "code": "chart_with_downwards_trend",
+    "char": "📉",
+    "name": "Chart Downwards",
+    "cat": "tech"
+  },
+  {
+    "code": "mag",
+    "char": "🔍",
+    "name": "Search / Magnifier",
+    "cat": "tech"
+  },
+  {
+    "code": "mag_right",
+    "char": "🔎",
+    "name": "Search Right",
+    "cat": "tech"
+  },
+  {
+    "code": "microscope",
+    "char": "🔬",
+    "name": "Microscope / Deep Dive",
+    "cat": "tech"
+  },
+  {
+    "code": "telescope",
+    "char": "🔭",
+    "name": "Telescope / Observability",
+    "cat": "tech"
+  },
+  {
+    "code": "compass",
+    "char": "🧭",
+    "name": "Compass / Navigation",
+    "cat": "tech"
+  },
+  {
+    "code": "test_tube",
+    "char": "🧪",
+    "name": "Test Tube / QA",
+    "cat": "tech"
+  },
+  {
+    "code": "radio",
+    "char": "📻",
+    "name": "Radio / Broadcast",
+    "cat": "tech"
+  },
+  {
+    "code": "robot",
+    "char": "🤖",
+    "name": "Robot / Automation / AI",
+    "cat": "people"
+  },
+  {
+    "code": "technologist",
+    "char": "🧑‍💻",
+    "name": "Technologist / Engineer",
+    "cat": "people"
+  },
+  {
+    "code": "man_technologist",
+    "char": "👨‍💻",
+    "name": "Man Technologist",
+    "cat": "people"
+  },
+  {
+    "code": "woman_technologist",
+    "char": "👩‍💻",
+    "name": "Woman Technologist",
+    "cat": "people"
+  },
+  {
+    "code": "detective",
+    "char": "🕵️",
+    "name": "Detective / Security Auditor",
+    "cat": "people"
+  },
+  {
+    "code": "construction_worker",
+    "char": "👷",
+    "name": "Builder / Infra Engineer",
+    "cat": "people"
+  },
+  {
+    "code": "guard",
+    "char": "💂",
+    "name": "Guard / SecOps",
+    "cat": "people"
+  },
+  {
+    "code": "bust_in_silhouette",
+    "char": "👤",
+    "name": "User / Account",
+    "cat": "people"
+  },
+  {
+    "code": "busts_in_silhouette",
+    "char": "👥",
+    "name": "Users / Team",
+    "cat": "people"
+  },
+  {
+    "code": "user",
+    "char": "👤",
+    "name": "User Alias",
+    "cat": "people"
+  },
+  {
+    "code": "admin",
+    "char": "🧙",
+    "name": "Admin / Wizard",
+    "cat": "people"
+  },
+  {
+    "code": "team",
+    "char": "👥",
+    "name": "Team Alias",
+    "cat": "people"
+  },
+  {
+    "code": "arrow_right",
+    "char": "➡️",
+    "name": "Arrow Right",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_left",
+    "char": "⬅️",
+    "name": "Arrow Left",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_up",
+    "char": "⬆️",
+    "name": "Arrow Up",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_down",
+    "char": "⬇️",
+    "name": "Arrow Down",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_upper_right",
+    "char": "↗️",
+    "name": "Arrow Up Right",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_lower_right",
+    "char": "↘️",
+    "name": "Arrow Down Right",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_upper_left",
+    "char": "↖️",
+    "name": "Arrow Up Left",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_lower_left",
+    "char": "↙️",
+    "name": "Arrow Down Left",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrow_forward",
+    "char": "▶️",
+    "name": "Forward / Play",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrows_counterclockwise",
+    "char": "🔄",
+    "name": "Reload / Cycle",
+    "cat": "symbols"
+  },
+  {
+    "code": "arrows_clockwise",
+    "char": "🔃",
+    "name": "Clockwise Arrows",
+    "cat": "symbols"
+  },
+  {
+    "code": "recycle",
+    "char": "♻️",
+    "name": "Recycle / Reuse",
+    "cat": "symbols"
+  },
+  {
+    "code": "repeat",
+    "char": "🔁",
+    "name": "Repeat / Loop",
+    "cat": "symbols"
+  },
+  {
+    "code": "fast_forward",
+    "char": "⏩",
+    "name": "Fast Forward",
+    "cat": "symbols"
+  },
+  {
+    "code": "rewind",
+    "char": "⏪",
+    "name": "Rewind",
+    "cat": "symbols"
+  },
+  {
+    "code": "hash",
+    "char": "#️⃣",
+    "name": "Hash / Number",
+    "cat": "symbols"
+  },
+  {
+    "code": "zero",
+    "char": "0️⃣",
+    "name": "Zero",
+    "cat": "symbols"
+  },
+  {
+    "code": "one",
+    "char": "1️⃣",
+    "name": "One",
+    "cat": "symbols"
+  },
+  {
+    "code": "two",
+    "char": "2️⃣",
+    "name": "Two",
+    "cat": "symbols"
+  },
+  {
+    "code": "three",
+    "char": "3️⃣",
+    "name": "Three",
+    "cat": "symbols"
+  },
+  {
+    "code": "four",
+    "char": "4️⃣",
+    "name": "Four",
+    "cat": "symbols"
+  },
+  {
+    "code": "five",
+    "char": "5️⃣",
+    "name": "Five",
+    "cat": "symbols"
+  },
+  {
+    "code": "information_source",
+    "char": "ℹ️",
+    "name": "Information",
+    "cat": "symbols"
+  },
+  {
+    "code": "info",
+    "char": "ℹ️",
+    "name": "Info Alias",
+    "cat": "symbols"
+  },
+  {
+    "code": "grey_question",
+    "char": "❔",
+    "name": "Question Mark",
+    "cat": "symbols"
+  },
+  {
+    "code": "question",
+    "char": "❓",
+    "name": "Question Mark Red",
+    "cat": "symbols"
+  },
+  {
+    "code": "grey_exclamation",
+    "char": "❕",
+    "name": "Exclamation Mark",
+    "cat": "symbols"
+  },
+  {
+    "code": "heavy_exclamation_mark",
+    "char": "❗",
+    "name": "Exclamation Red",
+    "cat": "symbols"
+  },
+  {
+    "code": "speech_balloon",
+    "char": "💬",
+    "name": "Speech / Comment",
+    "cat": "symbols"
+  },
+  {
+    "code": "thought_balloon",
+    "char": "💭",
+    "name": "Thought Bubble",
+    "cat": "symbols"
+  },
+  {
+    "code": "triangular_flag_on_post",
+    "char": "🚩",
+    "name": "Flag / Milestone",
+    "cat": "symbols"
+  },
+  {
+    "code": "white_flag",
+    "char": "🏳️",
+    "name": "White Flag",
+    "cat": "symbols"
+  },
+  {
+    "code": "black_flag",
+    "char": "🏴",
+    "name": "Black Flag",
+    "cat": "symbols"
+  },
+  {
+    "code": "pin",
+    "char": "📌",
+    "name": "Pushpin",
+    "cat": "symbols"
+  },
+  {
+    "code": "pushpin",
+    "char": "📍",
+    "name": "Round Pushpin",
+    "cat": "symbols"
+  },
+  {
+    "code": "paperclip",
+    "char": "📎",
+    "name": "Paperclip / Attachment",
+    "cat": "symbols"
+  },
+  {
+    "code": "paperclips",
+    "char": "🖇️",
+    "name": "Linked Paperclips",
+    "cat": "symbols"
+  },
+  {
+    "code": "triangular_ruler",
+    "char": "📐",
+    "name": "Triangular Ruler / Layout",
+    "cat": "symbols"
+  },
+  {
+    "code": "straight_ruler",
+    "char": "📏",
+    "name": "Straight Ruler / Size",
+    "cat": "symbols"
+  },
+  {
+    "code": "point_right",
+    "char": "👉",
+    "name": "Point Right",
+    "cat": "symbols"
+  },
+  {
+    "code": "point_left",
+    "char": "👈",
+    "name": "Point Left",
+    "cat": "symbols"
+  },
+  {
+    "code": "point_up",
+    "char": "👆",
+    "name": "Point Up",
+    "cat": "symbols"
+  },
+  {
+    "code": "point_down",
+    "char": "👇",
+    "name": "Point Down",
+    "cat": "symbols"
+  }
+]

@@ -78,6 +78,33 @@ class GraphvizTemplateContext
     %(#{safe_id(id)} [shape=box, style="rounded,filled", color="#{color}", fillcolor="#{bg}", fontcolor="#{color}", fontsize="12", label=#{h(text).inspect}];\n)
   end
 
+  def same_rank(*nodes)
+    rank_group('same', *nodes)
+  end
+
+  def rank_group(rank_type, *nodes)
+    flat = nodes.flatten.map { |n| safe_id(n) }
+    return '' if flat.empty?
+    "{ rank=#{rank_type}; #{flat.join('; ')}; }\n"
+  end
+
+  def spacer(id, width: 0.1, height: 0.1)
+    %(#{safe_id(id)} [style=invis, shape=point, width=#{width}, height=#{height}, label=""];\n)
+  end
+
+  def invis_edge(from, to, minlen: 2, weight: 1)
+    attrs = ['style=invis']
+    attrs << "minlen=#{minlen}" if minlen
+    attrs << "weight=#{weight}" if weight
+    "#{safe_id(from)} -> #{safe_id(to)} [#{attrs.join(', ')}];\n"
+  end
+
+  def stack_vertical(*nodes, minlen: 2)
+    flat = nodes.flatten
+    return '' if flat.size < 2
+    flat.each_cons(2).map { |a, b| invis_edge(a, b, minlen: minlen, weight: 10) }.join
+  end
+
   def table_node(id, title: nil, rows: [], icon: '📊', color: '#38bdf8', fillcolor: '#0f172a')
     rows_html = rows.map do |r|
       k, v = r.is_a?(Array) ? r : [r.to_s, '']

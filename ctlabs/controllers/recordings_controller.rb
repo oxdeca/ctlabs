@@ -909,6 +909,23 @@ class RecordingsController < BaseController
   end
 
   # ---------------------------------------------------------------------------
+  # Unified Emoji Dictionary (Curated for Markdown & Graphviz)
+  # ---------------------------------------------------------------------------
+  get '/recordings/emojis' do
+    content_type :json
+    cache_control :public, max_age: 86400
+    emoji_file = File.expand_path('../config/emojis.json', __dir__)
+    if File.file?(emoji_file)
+      File.read(emoji_file)
+    else
+      '[]'
+    end
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
+  # ---------------------------------------------------------------------------
   # Graphviz Custom Building Blocks
   # ---------------------------------------------------------------------------
   get '/recordings/graphviz/custom_blocks' do

@@ -18,8 +18,17 @@ class GraphvizService
   ENGINES          = %w[dot neato fdp sfdp circo twopi osage patchwork].freeze
   MAX_ERROR_BYTES  = 4000
 
-  EMOJI_MAP_FILE = File.expand_path('../config/emoji_map.json', __dir__)
-  EMOJI_MAP      = File.file?(EMOJI_MAP_FILE) ? JSON.parse(File.read(EMOJI_MAP_FILE)) : {}.freeze
+  EMOJI_FILE = File.expand_path('../config/emojis.json', __dir__)
+  EMOJI_MAP  = begin
+    map = {}
+    if File.file?(EMOJI_FILE)
+      list = JSON.parse(File.read(EMOJI_FILE)) rescue []
+      list.each do |item|
+        map[item['code']] = item['char'] if item['code'] && item['char']
+      end
+    end
+    map.freeze
+  end
 
   def self.expand_emoji_shortcodes(text)
     return text if text.nil? || EMOJI_MAP.empty?
