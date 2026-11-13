@@ -50,7 +50,7 @@
 
           <div class="w3-col m6 w3-margin-bottom">
             <label>Node Type</label>
-            <select id="edit-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateKindOptions) window.updateKindOptions(this.value, 'edit-kind'); if(window.updateNodeFormFields) window.updateNodeFormFields(this.value, document.getElementById('edit-plane').value); window.updateDynamicLabels && window.updateDynamicLabels();">
+            <select id="edit-type" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.applyNodeConstraints) window.applyNodeConstraints();">
               <option value="" disabled selected>-- Select Type --</option>
               <option value="host">Host</option>
               <option value="switch">Switch</option>
@@ -62,22 +62,22 @@
           </div>
 
           <div class="w3-col m6 w3-margin-bottom">
-            <label>Provider</label>
-            <select id="edit-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="window.updateDynamicLabels && window.updateDynamicLabels();">
+            <label id="lbl-provider">Placement</label>
+            <select id="edit-provider" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.applyNodeConstraints) window.applyNodeConstraints();">
               <option value="local" selected>🐳 Local (Docker)</option>
-              <option value="external">☁️ External / VPN</option>
+              <option value="external">☁️ External (SSH)</option>
               <option value="gcp">☁️ Google Cloud (GCP)</option>
               <option value="aws">☁️ AWS</option>
               <option value="azure">☁️ Azure</option>
-              <option value="openvpn">🛡️ OpenVPN Gateway</option>
-              <option value="wireguard">🛡️ WireGuard Gateway</option>
-              <option value="ipsec">🛡️ IPSec Gateway</option>
+              <option value="openvpn">🛡️ OpenVPN</option>
+              <option value="wireguard">🛡️ WireGuard</option>
+              <option value="ipsec">🛡️ IPSec</option>
             </select>
           </div>
 
           <div class="w3-col m6 w3-margin-bottom std-field">
             <label>Network Plane</label>
-            <select id="edit-plane" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.updateNodeFormFields) window.updateNodeFormFields(document.getElementById('edit-type').value, this.value); window.updateDynamicLabels && window.updateDynamicLabels();">
+            <select id="edit-plane" class="w3-select w3-small w3-round w3-hover-text-light-green" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" onchange="if(window.applyNodeConstraints) window.applyNodeConstraints();">
               <option value="data" selected>Data Plane (Default)</option>
               <option value="mgmt">Management Plane</option>
               <option value="edge">Edge Plane (Public / Internet)</option>
@@ -87,10 +87,12 @@
 
           <div class="w3-col m6 w3-margin-bottom std-field" id="div-profile">
             <label>Profile</label>
-            <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="Double-click to select profile..." style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" oninput="if(window.refreshNicContainerMode) window.refreshNicContainerMode();" onchange="if(window.refreshNicContainerMode) window.refreshNicContainerMode();">
+            <input type="text" id="edit-kind" list="node-profiles-list" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. linux, ovs, frr" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; height: 32px;" oninput="if(window.refreshNicContainerMode) window.refreshNicContainerMode();" onchange="if(window.refreshNicContainerMode) window.refreshNicContainerMode();">
             <datalist id="node-profiles-list"></datalist>
             <script>window.rawProfilesData = <%= (info_hash[:images] || []).to_json %>;</script>
           </div>
+
+          <div class="w3-col m12" id="node-choice-hint" style="color: #94a3b8; font-size: 0.75em; margin: -8px 0 8px 0;"></div>
 
           <div class="w3-col m6 w3-margin-bottom std-field" id="div-eth0">
             <label id="lbl-eth0">Mgmt IP (eth0)</label>

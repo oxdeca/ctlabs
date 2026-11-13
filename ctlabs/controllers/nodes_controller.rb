@@ -88,6 +88,7 @@ class NodesController < BaseController
       raise "Node '#{node_name}' already exists!" if existing_node
 
       new_node = Node.parse_form_data(params)
+      Node.validate_combination!(new_node)
       Node.validate_profile!(new_node, yaml)
       Node.sync_to_terraform!(node_name, new_node, yaml, params[:cloud_vm_yaml])
       target_plane = new_node['plane'] || 'data'
@@ -133,7 +134,12 @@ class NodesController < BaseController
       data = YAML.load_file(lab_path)
 
       node_cfg = Node.parse_form_data(params)
+      Node.validate_combination!(node_cfg)
       Node.validate_profile!(node_cfg, data)
+      # Mirror the /node/new path: a gcp node must be spliced into the
+      # terraform config.yml before add_adhoc_node backgrounds the apply,
+      # otherwise the apply has nothing to create.
+      Node.sync_to_terraform!(node_name, node_cfg, data, params[:cloud_vm_yaml])
 
       nic_switches = Node.parse_nic_switches(params)
       primary_nic  = Lab.primary_nic_for(node_cfg)
@@ -202,6 +208,7 @@ class NodesController < BaseController
         new_cfg = YAML.safe_load(params[:yaml_data])
       end
 
+      Node.validate_combination!(new_cfg)
       Node.validate_profile!(new_cfg, full_yaml)
       Node.sync_to_terraform!(node_name, new_cfg, full_yaml, params[:cloud_vm_yaml])
 

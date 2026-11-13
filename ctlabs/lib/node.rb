@@ -398,6 +398,52 @@ class Node
     raise "Schema Error: Profile '#{profile}' is not defined for type '#{type}'. Please create it in the global config/profiles.yml file or override it in this lab."
   end
 
+  # Canonical type -> allowed placements (providers) and planes. Mirrors the Add
+  # Node dialog matrix in js/nodes.js (window.NODE_MATRIX); keep the two in sync.
+  # A switch/controller is always a local container; only hosts, routers and
+  # gateways can be cloud VMs or external SSH hosts; a tunnel is a VPN protocol.
+  TYPE_PROVIDERS = {
+    'host'       => %w[local gcp aws azure external],
+    'switch'     => %w[local],
+    'router'     => %w[local gcp aws azure external],
+    'gateway'    => %w[local gcp aws azure external],
+    'controller' => %w[local],
+    'tunnel'     => %w[openvpn wireguard ipsec]
+  }.freeze
+
+  TYPE_PLANES = {
+    'host'       => %w[data mgmt edge transit],
+    'switch'     => %w[data mgmt edge transit],
+    'router'     => %w[data mgmt edge transit],
+    'gateway'    => %w[edge transit],
+    'controller' => %w[mgmt],
+    'tunnel'     => %w[transit]
+  }.freeze
+
+  # ---------------------------------------------------------------------------
+  # Reject nonsensical type/provider/plane combinations (e.g. type=host with
+  # provider=ipsec). Unknown/custom types are left alone for forward
+  # compatibility - only the types the dialog offers are constrained.
+  # ---------------------------------------------------------------------------
+  def self.validate_combination!(node_cfg)
+    type     = (node_cfg['type'] || 'host').to_s.downcase
+    provider = (node_cfg['provider'] || 'local').to_s.downcase
+    plane    = node_cfg['plane'].to_s.strip
+    plane    = (type == 'controller' ? 'mgmt' : 'data') if plane.empty?
+
+    providers = TYPE_PROVIDERS[type]
+    return if providers.nil? # unknown/custom type - don't second-guess it
+
+    unless providers.include?(provider)
+      raise "Schema Error: provider '#{provider}' is not valid for node type '#{type}' (allowed: #{providers.join(', ')})."
+    end
+
+    planes = TYPE_PLANES[type] || []
+    unless planes.include?(plane)
+      raise "Schema Error: plane '#{plane}' is not valid for node type '#{type}' (allowed: #{planes.join(', ')})."
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Helper: Sync Node to Terraform config.yml (Text-Based) - Moved from LabHelper
   # ---------------------------------------------------------------------------

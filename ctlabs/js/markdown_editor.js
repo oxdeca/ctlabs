@@ -1540,6 +1540,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     switch: '<%= switch("sw1", name: "Access Switch", subtitle: "VLAN 10") %>',
     firewall: '<%= firewall("fw1", name: "Edge Firewall", ip: "203.0.113.1") %>',
     gateway: '<%= gateway("gw1", name: "NAT Gateway", ip: "192.168.1.1") %>',
+    loadbalancer: '<%= loadbalancer("lb1", name: "Load Balancer", ip: "192.168.1.1") %>',
     cloud: '<%= cloud("inet", name: "Internet / WAN", subtitle: "Public Cloud") %>',
     database: '<%= database("db1", name: "Primary DB", ip: "10.0.2.10", engine: "PostgreSQL 16") %>',
     k8s_pod: '<%= k8s_pod("api_pod", name: "API Service", namespace: "prod", ip: "10.244.1.5") %>',
@@ -1579,7 +1580,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
   <%= router("core_rtr", name: "Core Router", ip: "10.0.0.1") %>
 
   <%= cluster_start("dmz", label: "DMZ (10.0.1.0/24)", color: "#f59e0b") %>
-    <%= gateway("proxy", name: "Reverse Proxy / LB", ip: "10.0.1.5") %>
+    <%= loadbalancer("proxy", name: "Reverse Proxy / LB", ip: "10.0.1.5") %>
   <%= cluster_end %>
 
   <%= cluster_start("app_tier", label: "Application Tier (10.0.2.0/24)", color: "#38bdf8") %>

@@ -1639,105 +1639,17 @@ module Automation
       @log.info msg.strip
       File.open(log_path, 'a') { |f| f.puts msg } if log_path
 
-      # ONLY harvest IPs if this was an 'apply' action
+      # Only harvest IPs on an 'apply' - see #harvest_terraform_ips.
       if action == 'apply'
-        begin
-          @log.info "Harvesting provisioned IPs from terraform.tfstate..."
-          
-          # Handle Workspace paths correctly
-          host_work_dir = "#{tf_base_host}/#{tf_work_dir}"
-          state_file = workspace == 'default' ? "#{host_work_dir}/terraform.tfstate" : "#{host_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
-
-          state_source = nil
-          state_json = nil
-
-          if File.exist?(state_file)
-            state_source = :host
-            state_json = File.read(state_file)
-          else
-            # Fallback: check inside the container if not found on the host
-            container_work_dir = "#{tf_base_ctl}/#{tf_work_dir}"
-            container_state_file = workspace == 'default' ? "#{container_work_dir}/terraform.tfstate" : "#{container_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
-
-            if system("#{engine} exec #{exec_ctrl} test -f #{Shellwords.escape(container_state_file)} >/dev/null 2>&1")
-              state_source = :container
-              warn_lines = [
-                "[IP Harvest] ⚠️ NOTICE: terraform.tfstate was not found on host filesystem (#{state_file}).",
-                "[IP Harvest] ⚠️ Using container-local state from #{exec_ctrl}:#{container_state_file}.",
-                "[IP Harvest] ⚠️ CAUTION: Container-local state will be LOST if container '#{exec_ctrl}' is destroyed or recreated! Bind-mount this directory to the host for permanent persistence."
-              ]
-              warn_lines.each do |w|
-                @log.info w
-                File.open(log_path, 'a') { |f| f.puts w } if log_path
-              end
-              state_json = IO.popen("#{engine} exec #{exec_ctrl} cat #{Shellwords.escape(container_state_file)}", &:read)
-            end
-          end
-
-          if state_json && !state_json.strip.empty?
-            state_data = JSON.parse(state_json)
-            live_yaml = YAML.load_file(@cfg_file)
-            updates_made = false
-
-            (state_data['resources'] || []).each do |res|
-              # Target GCP Compute Instances
-              if res['type'] == 'google_compute_instance'
-                (res['instances'] || []).each do |inst|
-                  attrs = inst['attributes'] || {}
-                  vm_name = attrs['name']
-                  
-                  next unless vm_name
-
-                  # Extract IPs from GCP network interface schema
-                  nic = attrs['network_interface']&.first || {}
-                  priv_ip = nic['network_ip']
-                  pub_ip  = nic.dig('access_config', 0, 'nat_ip') rescue nil
-
-                  # Find the node in the modern planes schema
-                  vm_topology = live_yaml['topology']&.first || {}
-                  target = nil
-
-                  vm_topology['planes'].each do |_, p_data|
-                    if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
-                      target = p_data['nodes'][vm_name]
-                      break
-                    end
-                  end
-
-                  if target && (priv_ip || pub_ip)
-                    target['nics'] ||= {}
-                    target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
-                    target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
-                    if pub_ip
-                      target['term'] = "ssh://ansible@#{pub_ip}"
-                    end
-                    updates_made = true
-                    
-                    log_msg = "Mapped Terraform IPs for #{vm_name}: eth0=#{pub_ip || 'none'}, eth1=#{priv_ip || 'none'}"
-                    @log.info log_msg
-                    File.open(log_path, 'a') { |f| f.puts "[IP Harvest] #{log_msg}" } if log_path
-                  end
-                end
-              end
-            end
-
-            # Write the updated IPs back to the base lab file
-            if updates_made
-              LabRepository.write_formatted_yaml(@cfg_file, live_yaml, @cfg_file)
-              success_msg = "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}"
-              success_msg += " (harvested from container-local state on #{exec_ctrl})" if state_source == :container
-              @log.info success_msg
-              File.open(log_path, 'a') { |f| f.puts success_msg } if log_path
-            end
-          else
-            not_found_msg = "[IP Harvest] No terraform.tfstate found at #{state_file} on host or in container #{exec_ctrl}. Skipping IP harvest."
-            @log.info not_found_msg
-            File.open(log_path, 'a') { |f| f.puts not_found_msg } if log_path
-          end
-        rescue => e
-          @log.error "Failed to harvest Terraform IPs: #{e.message}"
-          File.open(log_path, 'a') { |f| f.puts "⚠️ IP Harvest failed: #{e.message}" } if log_path
-        end
+        harvest_terraform_ips(
+          tf_base_host: tf_base_host,
+          tf_work_dir:  tf_work_dir,
+          tf_base_ctl:  tf_base_ctl,
+          workspace:    workspace,
+          engine:       engine,
+          exec_ctrl:    exec_ctrl,
+          log_path:     log_path
+        )
       end
     else
       msg = "\n⚠️ Terraform execution failed.\n"
@@ -1745,6 +1657,113 @@ module Automation
       File.open(log_path, 'a') { |f| f.puts msg } if log_path
       raise "Terraform process returned a non-zero exit code."
     end
+  end
+
+  # Harvest provisioned GCP VM addresses from a terraform state file and write
+  # them back into this lab's YAML. This is the SINGLE canonical harvest: it is
+  # called by #run_terraform (the `up` terraform phase) and by
+  # Lab#add_adhoc_node's background provisioning, so the two can never drift.
+  #
+  # Reads the state from the host path when present, else from inside the
+  # execution controller (container-local fallback). Returns true if any node
+  # was updated.
+  def harvest_terraform_ips(tf_base_host:, tf_work_dir:, tf_base_ctl:, workspace:,
+                            engine:, exec_ctrl:, log_path: nil)
+    @log.info "Harvesting provisioned IPs from terraform.tfstate..."
+
+    host_work_dir = "#{tf_base_host}/#{tf_work_dir}"
+    state_file = workspace == 'default' ? "#{host_work_dir}/terraform.tfstate" : "#{host_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+
+    state_source = nil
+    state_json = nil
+
+    if File.exist?(state_file)
+      state_source = :host
+      state_json = File.read(state_file)
+    else
+      # Fallback: check inside the container if not found on the host
+      container_work_dir = "#{tf_base_ctl}/#{tf_work_dir}"
+      container_state_file = workspace == 'default' ? "#{container_work_dir}/terraform.tfstate" : "#{container_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+
+      if system("#{engine} exec #{exec_ctrl} test -f #{Shellwords.escape(container_state_file)} >/dev/null 2>&1")
+        state_source = :container
+        warn_lines = [
+          "[IP Harvest] ⚠️ NOTICE: terraform.tfstate was not found on host filesystem (#{state_file}).",
+          "[IP Harvest] ⚠️ Using container-local state from #{exec_ctrl}:#{container_state_file}.",
+          "[IP Harvest] ⚠️ CAUTION: Container-local state will be LOST if container '#{exec_ctrl}' is destroyed or recreated! Bind-mount this directory to the host for permanent persistence."
+        ]
+        warn_lines.each do |w|
+          @log.info w
+          File.open(log_path, 'a') { |f| f.puts w } if log_path
+        end
+        state_json = IO.popen("#{engine} exec #{exec_ctrl} cat #{Shellwords.escape(container_state_file)}", &:read)
+      end
+    end
+
+    updates_made = false
+
+    if state_json && !state_json.strip.empty?
+      state_data = JSON.parse(state_json)
+      live_yaml = YAML.load_file(@cfg_file)
+
+      (state_data['resources'] || []).each do |res|
+        # Target GCP Compute Instances
+        next unless res['type'] == 'google_compute_instance'
+
+        (res['instances'] || []).each do |inst|
+          attrs = inst['attributes'] || {}
+          vm_name = attrs['name']
+          next unless vm_name
+
+          # Extract IPs from GCP network interface schema
+          nic = attrs['network_interface']&.first || {}
+          priv_ip = nic['network_ip']
+          pub_ip  = nic.dig('access_config', 0, 'nat_ip') rescue nil
+
+          # Find the node in the modern planes schema
+          vm_topology = live_yaml['topology']&.first || {}
+          target = nil
+
+          (vm_topology['planes'] || {}).each do |_, p_data|
+            if p_data && p_data['nodes'] && p_data['nodes'][vm_name]
+              target = p_data['nodes'][vm_name]
+              break
+            end
+          end
+
+          next unless target && (priv_ip || pub_ip)
+
+          target['nics'] ||= {}
+          target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
+          target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
+          target['term'] = "ssh://ansible@#{pub_ip}" if pub_ip
+          updates_made = true
+
+          log_msg = "Mapped Terraform IPs for #{vm_name}: eth0=#{pub_ip || 'none'}, eth1=#{priv_ip || 'none'}"
+          @log.info log_msg
+          File.open(log_path, 'a') { |f| f.puts "[IP Harvest] #{log_msg}" } if log_path
+        end
+      end
+
+      # Write the updated IPs back to the base lab file
+      if updates_made
+        LabRepository.write_formatted_yaml(@cfg_file, live_yaml, @cfg_file)
+        success_msg = "[IP Harvest] ✅ Successfully saved new IPs to #{@relative_path}"
+        success_msg += " (harvested from container-local state on #{exec_ctrl})" if state_source == :container
+        @log.info success_msg
+        File.open(log_path, 'a') { |f| f.puts success_msg } if log_path
+      end
+    else
+      not_found_msg = "[IP Harvest] No terraform.tfstate found at #{state_file} on host or in container #{exec_ctrl}. Skipping IP harvest."
+      @log.info not_found_msg
+      File.open(log_path, 'a') { |f| f.puts not_found_msg } if log_path
+    end
+
+    updates_made
+  rescue => e
+    @log.error "Failed to harvest Terraform IPs: #{e.message}"
+    File.open(log_path, 'a') { |f| f.puts "⚠️ IP Harvest failed: #{e.message}" } if log_path
+    false
   end
 
   # Streams the command's output to $stdout AND (when log_file_path is given)

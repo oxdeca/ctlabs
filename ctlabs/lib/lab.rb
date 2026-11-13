@@ -1504,8 +1504,11 @@ class Lab
 
   # Mounts the keys into a specific container via Docker Exec
   def inject_ssh_key_to_node(node, priv_key, pub_key_path, pub_key)
-    # Skip remote hosts since we don't have local docker exec access to them
-    return if ['rhost', 'external', 'gateway'].include?(node.type)
+    # Skip remote hosts (cloud VMs and external SSH hosts) since we don't have
+    # local docker exec access to them. Guard on remote? (provider-aware), not
+    # only type: a `provider: external` router is still a remote host and must
+    # be reached over SSH, not docker exec. Local gateways stay skipped too.
+    return if node.remote? || node.type.to_s == 'gateway'
 
     # The lab's own controller gets the key (it runs the playbook / SSHes to
     # nodes). When the persistent controller is up it ALSO gets the key, so the
@@ -1715,7 +1718,6 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
         ctrl_name = ctrl.name
         tf_dir = node_cfg['terraform']['work_dir'] || '.'
         workspace = node_cfg['terraform']['workspace'] || 'default'
-        lab_file = @cfg_file
 
         # Detach the execution from the HTTP request thread!
         Thread.new do
@@ -1743,31 +1745,34 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
             `#{engine} exec #{v_env}#{ctrl_name} bash -c '#{tf_cmd}'`
 
-            # 2. Fetch the JSON output
-            tf_output_json = `#{engine} exec #{v_env}#{ctrl_name} bash -c 'cd #{Automation::TF_DIR_CTL}/#{tf_dir} && terraform output -json provisioned_vms'`.strip
-            vms_out = JSON.parse(tf_output_json)
-
-            # 3. Safely update the YAML file with the new IPs
-            if vms_out[node_name]
-              pub_ip = vms_out[node_name]['public_ip']
-              priv_ip = vms_out[node_name]['private_ip']
-
-              @log.info "[BG-TASK] Mapped Terraform IPs for #{node_name}: eth0=#{pub_ip}, eth1=#{priv_ip}"
-
-              # Read and update the file directly to avoid memory race conditions with the live lab
-              if File.exist?(lab_file)
-                live_yaml = YAML.load_file(lab_file)
-                
-                # Navigate through the schema safely to find the node
-                target = live_yaml['topology'][0]['nodes'][node_name]
-                if target
-                  target['nics'] ||= {}
-                  target['nics']['eth0'] = "#{pub_ip}/32" if pub_ip
-                  target['nics']['eth1'] = "#{priv_ip}/24" if priv_ip
-                  LabRepository.write_formatted_yaml(lab_file, live_yaml, lab_file)
-                end
-              end
+            unless $?.success?
+              raise "terraform apply failed for #{node_name}; skipping IP harvest"
             end
+
+            # 2. Harvest the provisioned IPs from the terraform state. Reuse
+            #    the canonical state-based harvest from #run_terraform: the old
+            #    `terraform output -json provisioned_vms` referenced an output
+            #    the vm module never defines, so the write-back always failed.
+            tf_cfg       = node_cfg['terraform'] || {}
+            tf_base_host = tf_cfg['root_dir'].to_s.strip.empty? ? Automation::TF_DIR : tf_cfg['root_dir'].to_s.strip
+            tf_base_ctl  = if tf_cfg['root_dir_ctl'].to_s.strip != ''
+                             tf_cfg['root_dir_ctl'].to_s.strip
+                           elsif tf_base_host == Automation::TF_DIR
+                             Automation::TF_DIR_CTL
+                           elsif tf_base_host.start_with?('/srv/ctlabs/')
+                             tf_base_host
+                           else
+                             tf_base_host
+                           end
+
+            harvest_terraform_ips(
+              tf_base_host: tf_base_host,
+              tf_work_dir:  tf_dir,
+              tf_base_ctl:  tf_base_ctl,
+              workspace:    workspace,
+              engine:       engine,
+              exec_ctrl:    ctrl_name
+            )
           rescue => e
             @log.write("[BG-TASK] Terraform auto-provisioning failed: #{e.message}", "error")
           end
@@ -1878,7 +1883,11 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       @log.info "Starting Nodes:"
       # The lab ALWAYS runs its own in-lab controller (it is created and
       # destroyed with the lab); ctl-ctrl is a separate persistent node.
-      @nodes.each(&:run)
+      # Remote nodes (cloud VMs, external SSH hosts) are provisioned/reached
+      # elsewhere -- docker-run only the local nodes, mirroring the ad-hoc path
+      # (`node.run unless is_remote`) so a saved lab with an external endpoint
+      # does not spawn a phantom local container on start.
+      @nodes.each { |node| node.run unless node.remote? }
 
       @log.info "Starting Links:"
       # When the persistent controller is up, additionally wire it onto the

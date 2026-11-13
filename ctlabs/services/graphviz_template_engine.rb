@@ -60,6 +60,10 @@ class GraphvizTemplateContext
     node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
   end
 
+  def loadbalancer(id, name: nil, ip: nil, subtitle: nil, icon: '⚖️', color: '#a855f7', fillcolor: '#0f172a')
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  end
+
   def cloud(id, name: nil, subtitle: nil, icon: '☁️', color: '#0ea5e9', fillcolor: '#0f172a')
     node(id, name: name, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
   end

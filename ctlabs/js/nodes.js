@@ -307,91 +307,128 @@ window.collectNicRows = function() {
     return rows;
 };
 
+// ---------------------------------------------------------------------------
+// Node type / placement / plane matrix
 //
-window.updateNodeFormFields = function(nodeType, nodePlane) {
-    const switchSelect   = document.getElementById('edit-switch');
-    const ipInput        = document.getElementById('edit-ip');
-    const gwInput        = document.getElementById('edit-gw');
-    const planeSelect    = document.getElementById('edit-plane');
-    const providerSelect = document.getElementById('edit-provider');
+// These fields are not independent. A host can be a local container, a cloud VM
+// or an existing SSH host, but a switch or controller is always a local
+// container; a tunnel is only ever a VPN protocol. Filtering here (and the same
+// matrix in Node.validate_combination!) keeps the dialog from offering
+// nonsensical combinations such as type=host + provider=ipsec.
+// ---------------------------------------------------------------------------
+window.NODE_MATRIX = {
+    host:       { providers: ['local', 'gcp', 'aws', 'azure', 'external'], planes: ['data', 'mgmt', 'edge', 'transit'], defaultProvider: 'local',   defaultPlane: 'data' },
+    switch:     { providers: ['local'],                                     planes: ['data', 'mgmt', 'edge', 'transit'], defaultProvider: 'local',   defaultPlane: 'data' },
+    router:     { providers: ['local', 'gcp', 'aws', 'azure', 'external'], planes: ['data', 'mgmt', 'edge', 'transit'], defaultProvider: 'local',   defaultPlane: 'data' },
+    gateway:    { providers: ['local', 'gcp', 'aws', 'azure', 'external'], planes: ['edge', 'transit'],                  defaultProvider: 'local',   defaultPlane: 'edge' },
+    controller: { providers: ['local'],                                     planes: ['mgmt'],                             defaultProvider: 'local',   defaultPlane: 'mgmt' },
+    tunnel:     { providers: ['openvpn', 'wireguard', 'ipsec'],             planes: ['transit'],                          defaultProvider: 'openvpn', defaultPlane: 'transit' }
+};
 
-    if (!switchSelect || !ipInput || !gwInput) return;
+window.PROVIDER_LABELS = {
+    local: '🐳 Local (Docker)',
+    external: '☁️ External (SSH)',
+    gcp: '☁️ Google Cloud (GCP)',
+    aws: '☁️ AWS',
+    azure: '☁️ Azure',
+    openvpn: '🛡️ OpenVPN',
+    wireguard: '🛡️ WireGuard',
+    ipsec: '🛡️ IPSec'
+};
 
-    if (!nodePlane) {
-        nodePlane = planeSelect ? planeSelect.value : 'data';
-    }
+window.PLANE_LABELS = {
+    data: 'Data Plane (Default)',
+    mgmt: 'Management Plane',
+    edge: 'Edge Plane (Public / Internet)',
+    transit: 'Transit Plane (VPN / Tunnels)'
+};
 
-    const provider = providerSelect ? providerSelect.value : 'local';
+window.nodeRules = function(type) {
+    return window.NODE_MATRIX[type] || window.NODE_MATRIX.host;
+};
 
-    const switchContainer = switchSelect.closest('.w3-col');
-    const ipContainer     = ipInput.closest('.w3-col');
-    const gwContainer     = gwInput.closest('.w3-col');
+// Rebuild a <select> from an allowed list, keeping the current value when it is
+// still allowed and otherwise falling back to the type's default.
+window.rebuildConstrainedSelect = function(select, allowed, labels, fallback) {
+    if (!select) return;
+    const current = select.value;
+    const keep = allowed.includes(current) ? current : (fallback || allowed[0]);
+    select.innerHTML = '';
+    allowed.forEach(value => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = labels[value] || value;
+        select.appendChild(opt);
+    });
+    select.value = keep;
+};
 
-    const switchLabel = switchContainer ? switchContainer.querySelector('label') : null;
-    const ipLabel     = ipContainer ? ipContainer.querySelector('label') : null;
-    const gwLabel     = gwContainer ? gwContainer.querySelector('label') : null;
+// Refill the profile datalist with the kinds defined for this type. Provider is
+// only used to narrow profiles that explicitly declare one; the shipped
+// profiles are provider-less and therefore usable by local and cloud nodes
+// alike (e.g. `router.frr` for a GCP gateway).
+window.refreshProfileOptions = function(type, provider) {
+    const input = document.getElementById('edit-kind');
+    const list  = document.getElementById('node-profiles-list');
+    if (!input || !list) return;
 
-    let primaryNic = 'eth1';
-    if (nodeType === 'controller' || nodePlane === 'mgmt') primaryNic = 'eth0';
-    if (provider !== 'local') primaryNic = 'tun0';
+    const kinds = [...new Set((window.rawProfilesData || [])
+        .filter(p => p.type === type)
+        .filter(p => !p.provider || p.provider === 'local' || p.provider === provider)
+        .map(p => p.kind)
+        .filter(Boolean))].sort();
 
-    let targetType = 'switches';
-    let labelText = `Connect to Switch (${primaryNic})`;
-    let showIpGw = true;
-    let ipLabelText = 'Data IP / Public IP Address';
-    let gwLabelText = 'Gateway (gw)';
-
-    if (nodeType === 'switch') {
-        targetType = 'routers';
-        labelText = `Connect to Router (${primaryNic})`;
-        showIpGw = false;
-    } 
-    
-    // Cloud / External Overrides
-    if (provider !== 'local') {
-        targetType = 'routers';
-        labelText = `Connect to Router (${primaryNic})`;
-        showIpGw = true;
-        ipLabelText = `Tunnel / Data IP (${primaryNic})`;
-        gwLabelText = 'Public Mgmt IP (for SSH)';
-    }
-
-    if (switchLabel) switchLabel.innerHTML = labelText;
-    if (ipLabel) ipLabel.innerHTML = ipLabelText;
-    if (gwLabel) gwLabel.innerHTML = gwLabelText;
-
-    if (ipContainer) ipContainer.style.display = showIpGw ? 'block' : 'none';
-    if (gwContainer) gwContainer.style.display = showIpGw ? 'block' : 'none';
-
-    if (!showIpGw) {
-        ipInput.value = '';
-        gwInput.value = '';
-    }
-
-    switchSelect.innerHTML = '<option value="" selected>-- None (Mgmt Only) --</option>';
-    let optionsList = [];
-    if (typeof window.getLabData === 'function') {
-        optionsList = window.getLabData(targetType) || [];
-    }
-
-    optionsList.forEach(opt => {
-        if (opt === window.currentEditNode) return;
-
-        if (nodePlane === 'mgmt') {
-            if (targetType === 'routers') {
-                if (opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
-            } else {
-                if (opt === 'sw0' || opt === 'ro0') switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
-            }
-        } else {
-            if (opt !== 'sw0' && opt !== 'ro0') {
-                switchSelect.innerHTML += `<option value="${opt}">${opt}</option>`;
-            }
-        }
+    list.innerHTML = '';
+    kinds.forEach(k => {
+        const opt = document.createElement('option');
+        opt.value = k;
+        list.appendChild(opt);
     });
 
-    if (window.populateNicSwitchOptions) window.populateNicSwitchOptions();
+    const current = input.value.trim();
+    if (current && !kinds.includes(current)) input.value = '';
 };
+
+// Single entry point for every type/provider/plane change (and for opening the
+// modal). Keeps the three selects mutually consistent, then lets
+// updateDynamicLabels() do the field visibility / gateway layout work.
+window.applyNodeConstraints = function() {
+    const typeEl     = document.getElementById('edit-type');
+    const providerEl = document.getElementById('edit-provider');
+    const planeEl    = document.getElementById('edit-plane');
+    if (!typeEl || !providerEl || !planeEl) return;
+
+    const type  = typeEl.value || 'host';
+    const rules = window.nodeRules(type);
+
+    window.rebuildConstrainedSelect(providerEl, rules.providers, window.PROVIDER_LABELS, rules.defaultProvider);
+    window.rebuildConstrainedSelect(planeEl, rules.planes, window.PLANE_LABELS, rules.defaultPlane);
+
+    const providerLabel = document.getElementById('lbl-provider');
+    if (providerLabel) providerLabel.innerText = (type === 'tunnel') ? 'VPN Protocol' : 'Placement';
+
+    window.refreshProfileOptions(type, providerEl.value);
+
+    const hint = document.getElementById('node-choice-hint');
+    if (hint) {
+        if (type === 'tunnel') {
+            hint.innerHTML = '<i class="fas fa-info-circle"></i> Tunnel objects are configuration-only; the tunnel itself is built by the openvpn/wireguard role on the gateway/router nodes.';
+        } else if (providerEl.value === 'local') {
+            hint.innerHTML = '<i class="fas fa-info-circle"></i> Runs as a local container on this host.';
+        } else if (['gcp', 'aws', 'azure'].includes(providerEl.value)) {
+            hint.innerHTML = '<i class="fas fa-info-circle"></i> Provisioned as a cloud VM by Terraform (see the <b>Cloud VM</b> tab); IPs are harvested from state.';
+        } else if (providerEl.value === 'external') {
+            hint.innerHTML = '<i class="fas fa-info-circle"></i> An existing host reached over SSH — ctlabs does not create or destroy it.';
+        } else {
+            hint.innerHTML = '';
+        }
+    }
+
+    if (window.updateDynamicLabels) window.updateDynamicLabels();
+};
+
+// Backwards-compatible alias for the old call sites.
+window.updateNodeFormFields = function() { window.applyNodeConstraints(); };
 
 window.updateDynamicLabels = function() {
     const typeEl = document.getElementById('edit-type');
@@ -404,8 +441,9 @@ window.updateDynamicLabels = function() {
 
     const isVPN = (type === 'tunnel') && ['openvpn', 'wireguard', 'ipsec'].includes(provider);
     
-    // Consolidated into a single, clean declaration
-    const isCloud = ['gcp', 'aws', 'azure', 'external'].includes(provider);
+    // Only real cloud VMs get the Terraform "Cloud VM" tab; an external SSH
+    // host is not provisioned (or destroyed) by ctlabs.
+    const isCloud = ['gcp', 'aws', 'azure'].includes(provider);
 
     // Swap the NIC section between the standard table and the gateway layout.
     if (window.refreshGatewayEditor) window.refreshGatewayEditor();
@@ -443,17 +481,6 @@ window.updateDynamicLabels = function() {
         pnm.innerText = (provider !== 'local') ? 'tun0'
                       : (type === 'controller' || planeVal === 'mgmt') ? 'eth0'
                       : 'eth1';
-    }
-
-    const profileList = document.getElementById('node-profiles-list');
-    if (profileList && window.rawProfilesData) {
-        profileList.innerHTML = '';
-        const filteredProfiles = window.rawProfilesData.filter(p => p.provider === provider || (!p.provider && provider === 'local'));
-
-        const uniqueKinds = [...new Set(filteredProfiles.map(p => p.kind))].sort();
-        uniqueKinds.forEach(k => {
-            if (k) profileList.innerHTML += `<option value="${k}">${k}</option>`;
-        });
     }
 
     if (window.refreshGatewayEditor) window.refreshGatewayEditor();
@@ -506,10 +533,17 @@ window.editNodeConfig = async function(labName, nodeName) {
             const nodeProvider = nodeObj.provider || 'local';
 
             document.getElementById('edit-type').value = nodeType;
+
+            // Rebuild the provider/plane options for this type *before* applying
+            // the node's saved values: a previous edit may have narrowed the
+            // selects (e.g. a switch leaves only "local"), which would otherwise
+            // swallow a saved provider/plane that has no matching option yet.
+            if (typeof window.applyNodeConstraints === 'function') window.applyNodeConstraints();
+
             const providerEl = document.getElementById('edit-provider');
             if (providerEl) providerEl.value = nodeProvider;
             const planeEl = document.getElementById('edit-plane');
-            if(planeEl) planeEl.value = nodePlane;
+            if (planeEl) planeEl.value = nodePlane;
 
             // Trigger the UI Context safely
             if (typeof window.updateDynamicLabels === 'function') {
@@ -532,8 +566,7 @@ window.editNodeConfig = async function(labName, nodeName) {
             }
 
             try {
-                if (typeof window.updateNodeFormFields === 'function') window.updateNodeFormFields(nodeType, nodePlane);
-                if (typeof window.updateKindOptions === 'function') window.updateKindOptions(nodeType, 'edit-kind');
+                if (typeof window.applyNodeConstraints === 'function') window.applyNodeConstraints();
             } catch (e) { console.error("UI Setup Error:", e); }
 
             document.getElementById('edit-info').value = nodeObj.info || '';
@@ -759,11 +792,15 @@ window.openAddNodeModal = function(labPath) {
     if (window.clearNicRows) window.clearNicRows();
     if (window.clearGatewayRouterRows) window.clearGatewayRouterRows();
 
-    const planeEl = document.getElementById('edit-plane');
-    if (planeEl) planeEl.value = 'data';
-    
+    // Start every new node from the most common setup (a local host on the
+    // data plane); applyNodeConstraints() then narrows the provider/plane/
+    // profile choices to whatever is valid for the selected type.
+    const typeEl = document.getElementById('edit-type');
+    if (typeEl) typeEl.value = 'host';
     const providerEl = document.getElementById('edit-provider');
     if (providerEl) providerEl.value = 'local';
+    const planeEl = document.getElementById('edit-plane');
+    if (planeEl) planeEl.value = 'data';
 
     document.getElementById('node-yaml-editor').value = '';
     if (window.cmEditors && window.cmEditors['node-yaml-editor']) {
@@ -773,10 +810,8 @@ window.openAddNodeModal = function(labPath) {
     document.getElementById('edit-node-name').disabled = false;
     document.getElementById('node-editor-result').style.display = 'none';
 
-    if (typeof window.updateDynamicLabels === 'function') window.updateDynamicLabels();
     if (window.refreshNicContainerMode) window.refreshNicContainerMode();
-    window.updateNodeFormFields('', 'data');
-    if (window.populateNicSwitchOptions) window.populateNicSwitchOptions();
+    if (window.applyNodeConstraints) window.applyNodeConstraints();
     document.getElementById('defaultTab').click();
     document.getElementById('node-editor-modal').style.display = 'block';
 };
