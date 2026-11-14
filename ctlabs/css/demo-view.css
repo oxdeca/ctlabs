@@ -123,15 +123,28 @@
 #record-dropdown-btn:hover {
   background: #0369a1 !important;
 }
+.sidebar-action-btn, .sidebar-icon-btn {
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.sidebar-action-btn:hover, #new-repo-btn:hover, #new-set-btn:hover, #rename-set-toggle-btn:hover, #sidebar-collapse-btn:hover {
+  background: #334155 !important;
+  border-color: #64748b !important;
+  color: #ffffff !important;
+}
+#delete-set-btn:hover {
+  background: #ef4444 !important;
+  border-color: #f87171 !important;
+  color: #ffffff !important;
+}
 
-@container sidebar-container (max-width: 360px) {
+@container sidebar-container (max-width: 300px) {
   .sidebar-btn-label {
     display: none !important;
   }
   .sidebar-btn-group {
     gap: 3px !important;
   }
-  #record-dropdown-btn, #import-btn, #export-btn, #new-set-btn {
+  #record-dropdown-btn, #import-btn, #export-btn, #new-repo-btn, #new-set-btn, #git-remote-btn, #git-history-btn {
     padding-left: 6px !important;
     padding-right: 6px !important;
   }
@@ -157,7 +170,10 @@
 .sidebar-compact #record-dropdown-btn,
 .sidebar-compact #import-btn,
 .sidebar-compact #export-btn,
-.sidebar-compact #new-set-btn {
+.sidebar-compact #new-repo-btn,
+.sidebar-compact #new-set-btn,
+.sidebar-compact #git-remote-btn,
+.sidebar-compact #git-history-btn {
   padding-left: 6px !important;
   padding-right: 6px !important;
 }
@@ -353,7 +369,8 @@
 }
 
 /* Graphviz Editor CodeMirror Full-Height & Scroll Fix */
-#md-graphviz-editor-container .CodeMirror {
+#md-graphviz-editor-container .CodeMirror,
+#md-graphviz-dot-container .CodeMirror {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -361,7 +378,8 @@
   border-radius: 0 !important;
   box-sizing: border-box !important;
 }
-#md-graphviz-editor-container .CodeMirror-scroll {
+#md-graphviz-editor-container .CodeMirror-scroll,
+#md-graphviz-dot-container .CodeMirror-scroll {
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -369,6 +387,7 @@
   overflow-y: auto !important;
   overflow-x: auto !important;
 }
-#md-graphviz-editor-container .CodeMirror-sizer {
+#md-graphviz-editor-container .CodeMirror-sizer,
+#md-graphviz-dot-container .CodeMirror-sizer {
   min-height: 0 !important;
 }

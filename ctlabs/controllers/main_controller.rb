@@ -58,6 +58,17 @@ class MainController < BaseController
 #  end
 
   get '/demo' do
+    requested_repo = params[:repo].to_s.strip
+    if !requested_repo.empty? && RecordingService.respond_to?(:switch_repository)
+      if RecordingService.switch_repository(requested_repo)
+        session.delete(:walkthrough)
+      end
+    end
+
+    @repositories = RecordingService.respond_to?(:repositories_summary) ? RecordingService.repositories_summary : []
+    @active_repo = RecordingService.respond_to?(:active_repo) ? RecordingService.active_repo : 'default'
+    @active_repo_name = RecordingService.respond_to?(:active_repo_name) ? RecordingService.active_repo_name : 'Local Workspace'
+
     @walkthroughs = RecordingService.load_walkthroughs
     requested = params[:walkthrough].to_s
     # Coming back via the nav link (no ?walkthrough=) should reopen the set the

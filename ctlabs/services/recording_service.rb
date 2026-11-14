@@ -22,8 +22,12 @@ require 'base64'
 require_relative 'recording_git_service'
 
 class RecordingService
-  DIR             = '/srv/ctlabs-server/recordings'
-  IMAGES_DIR      = File.join(DIR, 'images')
+  BASE_DIR        = '/srv/ctlabs-server/recordings'
+  DIR             = BASE_DIR
+  IMAGES_DIR      = File.join(BASE_DIR, 'images')
+  REPOS_BASE_DIR  = '/srv/ctlabs-server/walkthrough-repos'
+  REPOS_MANIFEST  = File.join(REPOS_BASE_DIR, '_repos.json')
+  REPO_SLUG_RE    = /\A[a-zA-Z0-9_-]{1,120}\z/
   EXT             = '.cast'
   MD_EXT          = '.md'
   VIDEO_EXTS      = ['.webm', '.mp4'].freeze
@@ -39,22 +43,246 @@ class RecordingService
   NAME_MAX        = 80
   TAIL_BYTES      = 8192
 
+  @repo_mutex = Mutex.new
+
+  # --- Repository Container Management (Multiple Sets per Repository) --------
+
+  def self.valid_repo_slug?(slug)
+    s = slug.to_s.strip
+    !s.empty? && !s.include?('..') && !!(s =~ REPO_SLUG_RE)
+  end
+
+  def self.repo_slug_for(name)
+    s = name.to_s.strip.downcase.gsub(/[^a-z0-9_-]+/, '_').gsub(/\A_+|_+\z/, '')[0, 80]
+    s.empty? ? "repo_#{SecureRandom.hex(3)}" : s
+  end
+
+  def self.repo_dir(repo_slug = nil)
+    target = repo_slug.to_s.strip
+    target = active_repo if target.empty?
+    return BASE_DIR if target == 'default' || !valid_repo_slug?(target)
+
+    File.join(REPOS_BASE_DIR, target)
+  end
+
+  def self.dir
+    repo_dir(active_repo)
+  end
+
+  def self.images_dir
+    File.join(dir, 'images')
+  end
+
+  def self.load_repositories
+    FileUtils.mkdir_p(BASE_DIR) unless Dir.exist?(BASE_DIR)
+    FileUtils.mkdir_p(REPOS_BASE_DIR) unless Dir.exist?(REPOS_BASE_DIR)
+
+    parsed = if File.file?(REPOS_MANIFEST)
+               begin
+                 JSON.parse(File.read(REPOS_MANIFEST))
+               rescue StandardError
+                 nil
+               end
+             end
+    parsed = {} unless parsed.is_a?(Hash)
+
+    repos = parsed['repos'].is_a?(Hash) ? parsed['repos'].dup : {}
+    repos['default'] ||= {
+      'name'       => 'Local Workspace',
+      'created_at' => (File.mtime(BASE_DIR).to_f rescue Time.now.to_f)
+    }
+
+    # Auto-discover any repository directory under REPOS_BASE_DIR
+    begin
+      Dir.children(REPOS_BASE_DIR).sort.each do |entry|
+        next if entry.start_with?('.', '_')
+        next unless valid_repo_slug?(entry)
+        p = File.join(REPOS_BASE_DIR, entry)
+        next unless File.directory?(p)
+
+        repos[entry] ||= {
+          'name'       => entry.tr('_-', ' '),
+          'created_at' => (File.mtime(p).to_f rescue Time.now.to_f)
+        }
+      end
+    rescue StandardError
+    end
+
+    # Remove stale entries whose directories no longer exist
+    repos.keys.each do |rslug|
+      next if rslug == 'default'
+      repos.delete(rslug) unless File.directory?(File.join(REPOS_BASE_DIR, rslug))
+    end
+
+    active = parsed['active'].to_s.strip
+    active = 'default' if active.empty? || !repos.key?(active)
+
+    state = { 'active' => active, 'repos' => repos }
+    if parsed['active'] != active || parsed['repos'] != repos
+      save_repositories(state)
+    end
+    state
+  end
+
+  def self.save_repositories(state)
+    FileUtils.mkdir_p(REPOS_BASE_DIR) unless Dir.exist?(REPOS_BASE_DIR)
+    File.write(REPOS_MANIFEST, JSON.pretty_generate(state))
+  rescue StandardError
+    nil
+  end
+
+  def self.active_repo
+    load_repositories['active']
+  rescue StandardError
+    'default'
+  end
+
+  def self.active_repo_name
+    state = load_repositories
+    active = state['active']
+    entry = state.dig('repos', active) || {}
+    name = entry['name'].to_s.strip
+    name.empty? ? active : name
+  rescue StandardError
+    'Local Workspace'
+  end
+
+  def self.repository_set_count(repo_slug)
+    rdir = repo_dir(repo_slug)
+    return 0 unless File.directory?(rdir)
+
+    Dir.children(rdir).count do |entry|
+      p = File.join(rdir, entry)
+      File.directory?(p) && !entry.start_with?('.', '_') && entry != 'images'
+    end
+  rescue StandardError
+    0
+  end
+
+  def self.repositories_summary
+    state = load_repositories
+    active = state['active']
+    state['repos'].map do |rslug, info|
+      rdir = repo_dir(rslug)
+      remote_url = nil
+      branch = nil
+      if defined?(WalkthroughGitService) && File.directory?(File.join(rdir, '.git'))
+        remote_url = WalkthroughGitService.redact_url(WalkthroughGitService.remote_url_for_dir(rdir)) rescue nil
+        branch = WalkthroughGitService.current_branch_for_dir(rdir) rescue nil
+      end
+      {
+        'slug'       => rslug,
+        'name'       => (info['name'].to_s.strip.empty? ? rslug : info['name'].to_s.strip),
+        'active'     => (rslug == active),
+        'set_count'  => repository_set_count(rslug),
+        'remote'     => remote_url,
+        'branch'     => branch,
+        'created_at' => info['created_at']
+      }
+    end
+  end
+
+  def self.switch_repository(repo_slug)
+    clean = repo_slug.to_s.strip
+    return false if clean.empty?
+
+    state = load_repositories
+    return false unless state['repos'].key?(clean)
+
+    state['active'] = clean
+    save_repositories(state)
+    ensure_dir
+    RecordingGitService.ensure_repo! if defined?(RecordingGitService)
+    load_walkthroughs
+    true
+  end
+
+  def self.register_repository(repo_slug, name: nil, switch: true)
+    clean_slug = (repo_slug.to_s.strip == 'default') ? 'default' : repo_slug_for(repo_slug)
+    rdir = repo_dir(clean_slug)
+    FileUtils.mkdir_p(rdir)
+
+    state = load_repositories
+    display_name = name.to_s.strip[0, NAME_MAX]
+    display_name = (clean_slug == 'default' ? 'Local Workspace' : clean_slug) if display_name.empty?
+
+    state['repos'][clean_slug] = {
+      'name'       => display_name,
+      'created_at' => (state.dig('repos', clean_slug, 'created_at') || Time.now.to_f)
+    }
+    state['active'] = clean_slug if switch
+    save_repositories(state)
+    clean_slug
+  end
+
+  def self.create_repository(name, slug: nil, switch: true)
+    clean_name = name.to_s.strip[0, NAME_MAX]
+    clean_name = 'New Repository' if clean_name.empty?
+    base_slug  = slug.to_s.strip.empty? ? repo_slug_for(clean_name) : repo_slug_for(slug)
+    base_slug  = "repo_#{base_slug}" if base_slug == 'default'
+
+    state = load_repositories
+    candidate = base_slug
+    idx = 2
+    while state['repos'].key?(candidate) || File.exist?(repo_dir(candidate))
+      candidate = "#{base_slug}_#{idx}"
+      idx += 1
+    end
+
+    register_repository(candidate, name: clean_name, switch: switch)
+    if switch
+      RecordingGitService.ensure_repo! if defined?(RecordingGitService)
+      load_walkthroughs
+      RecordingGitService.commit("Initialize repository '#{clean_name}' (#{candidate})") rescue nil
+    end
+    candidate
+  end
+
+  def self.rename_repository(repo_slug, new_name)
+    clean_slug = repo_slug.to_s.strip
+    clean_slug = active_repo if clean_slug.empty?
+    state = load_repositories
+    return nil unless state['repos'].key?(clean_slug)
+
+    clean_name = new_name.to_s.strip[0, NAME_MAX]
+    state['repos'][clean_slug]['name'] = clean_name unless clean_name.empty?
+    save_repositories(state)
+    [clean_slug, state['repos'][clean_slug]['name']]
+  end
+
+  def self.delete_repository(repo_slug)
+    clean_slug = repo_slug.to_s.strip
+    return false if clean_slug.empty? || clean_slug == 'default'
+
+    state = load_repositories
+    return false unless state['repos'].key?(clean_slug)
+
+    rdir = repo_dir(clean_slug)
+    FileUtils.rm_rf(rdir) if File.directory?(rdir) && rdir.start_with?(REPOS_BASE_DIR + '/')
+
+    state['repos'].delete(clean_slug)
+    state['active'] = 'default' if state['active'] == clean_slug
+    save_repositories(state)
+    true
+  end
+
   def self.ensure_dir
-    Dir.mkdir(DIR, 0755) unless Dir.exist?(DIR)
-    DIR
+    d = dir
+    FileUtils.mkdir_p(d) unless Dir.exist?(d)
+    d
   rescue SystemCallError
-    DIR
+    dir
   end
 
   def self.walkthrough_dir(slug)
-    ensure_dir
+    d = ensure_dir
     clean = slug_for(slug.to_s)
-    File.join(DIR, clean)
+    File.join(d, clean)
   end
 
   def self.ensure_images_dir(slug = nil)
     ensure_dir
-    target = slug ? File.join(walkthrough_dir(slug), 'images') : IMAGES_DIR
+    target = slug ? File.join(walkthrough_dir(slug), 'images') : images_dir
     FileUtils.mkdir_p(target) unless Dir.exist?(target)
     target
   rescue SystemCallError
@@ -124,17 +352,17 @@ class RecordingService
     end
     File.chmod(0644, target) rescue nil
 
-    # Keep a copy in global IMAGES_DIR only when not scoped to a walkthrough
+    # Keep a copy in global images_dir only when not scoped to a walkthrough
     if walkthrough.to_s.strip.empty?
       begin
         ensure_images_dir
-        legacy_target = File.join(IMAGES_DIR, filename)
+        legacy_target = File.join(images_dir, filename)
         FileUtils.cp(target, legacy_target) unless target == legacy_target
       rescue StandardError
       end
     end
 
-    RecordingGitService.commit("Save image '#{filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
+    RecordingGitService.commit("Save image '#{filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}", files: [target], slug: walkthrough) rescue nil
 
     filename
   end
@@ -202,13 +430,13 @@ class RecordingService
     if walkthrough.to_s.strip.empty?
       begin
         ensure_images_dir
-        legacy_target = File.join(IMAGES_DIR, out_filename)
+        legacy_target = File.join(images_dir, out_filename)
         FileUtils.cp(target, legacy_target) unless target == legacy_target
       rescue StandardError
       end
     end
 
-    RecordingGitService.commit("Save annotated image '#{out_filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
+    RecordingGitService.commit("Save annotated image '#{out_filename}'#{walkthrough ? " in '#{walkthrough}'" : ''}", files: [target], slug: walkthrough) rescue nil
 
     { filename: out_filename, mode: mode }
   end
@@ -248,14 +476,17 @@ class RecordingService
         ensure_images_dir
         [filename, "#{clean_base}#{DOT_EXT}"].each do |name|
           src = File.join(target_dir, name)
-          dst = File.join(IMAGES_DIR, name)
+          dst = File.join(images_dir, name)
           FileUtils.cp(src, dst) if File.file?(src) && src != dst
         end
       rescue StandardError
       end
     end
 
-    RecordingGitService.commit("Save diagram '#{clean_base}'#{walkthrough ? " in '#{walkthrough}'" : ''}") rescue nil
+    dot_target = File.join(target_dir, "#{clean_base}#{DOT_EXT}")
+    commit_files = [target]
+    commit_files << dot_target if File.file?(dot_target)
+    RecordingGitService.commit("Save diagram '#{clean_base}'#{walkthrough ? " in '#{walkthrough}'" : ''}", files: commit_files, slug: walkthrough) rescue nil
 
     { 'filename' => filename, 'base' => clean_base }
   end
@@ -308,7 +539,7 @@ class RecordingService
     end
 
     # 2. Check all walkthrough images directories
-    Dir.glob(File.join(DIR, '*', 'images', clean)).each do |p|
+    Dir.glob(File.join(dir, '*', 'images', clean)).each do |p|
       return p if File.file?(p)
     end
 
@@ -422,11 +653,11 @@ class RecordingService
     File.delete(scoped_sidecar) if File.file?(scoped_sidecar)
 
     unless other_sets_reference_image?(clean, except_slug: key)
-      global_sidecar = File.join(IMAGES_DIR, "#{sidecar_base}#{DOT_EXT}")
+      global_sidecar = File.join(images_dir, "#{sidecar_base}#{DOT_EXT}")
       File.delete(global_sidecar) if File.file?(global_sidecar)
     end
 
-    RecordingGitService.commit("Delete image '#{clean}' from '#{key}'") rescue nil
+    RecordingGitService.commit("Delete image '#{clean}' from '#{key}'", files: [path, scoped_sidecar], slug: key) rescue nil
 
     true
   rescue SystemCallError
@@ -465,9 +696,10 @@ class RecordingService
       candidate_dirs << walkthrough_dir(walkthrough)
     end
 
+    cur_dir = dir
     all_set_dirs = begin
-      Dir.children(DIR).filter_map do |d|
-        p = File.join(DIR, d)
+      Dir.children(cur_dir).filter_map do |d|
+        p = File.join(cur_dir, d)
         p if File.directory?(p) && !d.start_with?('.', '_') && d != 'images'
       end
     rescue StandardError
@@ -475,7 +707,7 @@ class RecordingService
     end
 
     candidate_dirs.concat(all_set_dirs)
-    candidate_dirs << DIR
+    candidate_dirs << cur_dir
     candidate_dirs.uniq!
 
     # Direct match if extension already provided
@@ -513,7 +745,8 @@ class RecordingService
     path = id_or_path.to_s.include?('/') ? id_or_path.to_s : path_for(id_or_path)
     if path && File.exist?(path)
       parent = File.dirname(path)
-      if parent != DIR && parent.start_with?(DIR)
+      cur_dir = dir
+      if parent != cur_dir && parent.start_with?(cur_dir)
         slug = File.basename(parent)
         return slug unless slug == 'images'
       end
@@ -547,15 +780,15 @@ class RecordingService
   end
 
   def self.all_disk_files(slug = nil)
-    ensure_dir
+    cur_dir = ensure_dir
     patterns = if slug
-                 dir = walkthrough_dir(slug)
-                 [File.join(dir, "*#{EXT}"), File.join(dir, "*#{MD_EXT}")] +
-                   VIDEO_EXTS.map { |ext| File.join(dir, "*#{ext}") }
+                 sdir = walkthrough_dir(slug)
+                 [File.join(sdir, "*#{EXT}"), File.join(sdir, "*#{MD_EXT}")] +
+                   VIDEO_EXTS.map { |ext| File.join(sdir, "*#{ext}") }
                else
-                 [File.join(DIR, '*', "*#{EXT}"), File.join(DIR, '*', "*#{MD_EXT}"),
-                  File.join(DIR, "*#{EXT}"), File.join(DIR, "*#{MD_EXT}")] +
-                   VIDEO_EXTS.flat_map { |ext| [File.join(DIR, '*', "*#{ext}"), File.join(DIR, "*#{ext}")] }
+                 [File.join(cur_dir, '*', "*#{EXT}"), File.join(cur_dir, '*', "*#{MD_EXT}"),
+                  File.join(cur_dir, "*#{EXT}"), File.join(cur_dir, "*#{MD_EXT}")] +
+                   VIDEO_EXTS.flat_map { |ext| [File.join(cur_dir, '*', "*#{ext}"), File.join(cur_dir, "*#{ext}")] }
                end
     patterns.flat_map { |pat| Dir.glob(pat) }
             .reject { |p| File.basename(p).start_with?('_') }
@@ -646,7 +879,7 @@ class RecordingService
       id   = File.basename(path, ext)
       size = File.size(path)
       meta_file = File.join(File.dirname(path), "#{id}.json")
-      meta_file = File.join(DIR, "#{id}.json") unless File.file?(meta_file)
+      meta_file = File.join(dir, "#{id}.json") unless File.file?(meta_file)
       meta_data = {}
       if File.file?(meta_file)
         begin
@@ -755,14 +988,14 @@ class RecordingService
   def self.delete(id)
     path = path_for(id)
     return false unless path
-    dir = File.dirname(path)
+    fdir = File.dirname(path)
     File.delete(path) rescue nil
 
     # Clean up sidecar metadata if present
     base_id = File.basename(path, File.extname(path))
-    sidecar = File.join(dir, "#{base_id}.json")
+    sidecar = File.join(fdir, "#{base_id}.json")
     File.delete(sidecar) if File.file?(sidecar)
-    root_sidecar = File.join(DIR, "#{base_id}.json")
+    root_sidecar = File.join(dir, "#{base_id}.json")
     File.delete(root_sidecar) if File.file?(root_sidecar)
 
     # Clean up references across all walkthrough sets
@@ -900,7 +1133,7 @@ class RecordingService
     initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
     File.write(path, initial_content, encoding: 'UTF-8')
     add_to_walkthrough(slug, [id])
-    RecordingGitService.commit("Create note '#{clean_title}' (#{id}) in '#{slug}'", files: [path]) rescue nil
+    RecordingGitService.commit("Create note '#{clean_title}' (#{id}) in '#{slug}'", files: [path, File.join(target_dir, MANIFEST)], slug: slug) rescue nil
     id
   end
 
@@ -928,8 +1161,8 @@ class RecordingService
 
   # Saves the drag-and-drop custom order array to an index file
   def self.reorder!(ordered_ids)
-    ensure_dir
-    order_file = File.join(DIR, '_order.json')
+    cur_dir = ensure_dir
+    order_file = File.join(cur_dir, '_order.json')
     File.write(order_file, JSON.generate(ordered_ids))
     true
   rescue StandardError
@@ -938,11 +1171,11 @@ class RecordingService
 
   # Lists recordings ordered by saved drag-and-drop sequence, falling back to newest first
   def self.list
-    ensure_dir
+    cur_dir = ensure_dir
     files = all_disk_files
     recs = files.filter_map { |path| meta(path) }
 
-    order_file = File.join(DIR, '_order.json')
+    order_file = File.join(cur_dir, '_order.json')
     if File.file?(order_file)
       begin
         ordered_ids = JSON.parse(File.read(order_file))
@@ -978,7 +1211,8 @@ class RecordingService
   end
 
   def self.migrate_to_folder_hierarchy!
-    legacy_file = File.join(ensure_dir, LEGACY_MANIFEST)
+    cur_dir = ensure_dir
+    legacy_file = File.join(cur_dir, LEGACY_MANIFEST)
     return unless File.file?(legacy_file)
 
     data = begin
@@ -989,20 +1223,20 @@ class RecordingService
     return unless data.is_a?(Hash) && !data.empty?
 
     data.each do |slug, entry|
-      wk_dir = File.join(DIR, slug)
+      wk_dir = File.join(cur_dir, slug)
       wk_images_dir = File.join(wk_dir, 'images')
       FileUtils.mkdir_p(wk_images_dir)
 
       all_ids = (Array(entry['recording_ids']) + Array(entry['unintegrated_ids'])).map(&:to_s).uniq
       all_ids.each do |id|
         [EXT, MD_EXT, *VIDEO_EXTS].each do |ext|
-          src = File.join(DIR, "#{id}#{ext}")
+          src = File.join(cur_dir, "#{id}#{ext}")
           if File.file?(src)
             dst = File.join(wk_dir, "#{id}#{ext}")
             FileUtils.mv(src, dst) unless src == dst
 
             # Move sidecar if exists
-            sidecar_src = File.join(DIR, "#{id}.json")
+            sidecar_src = File.join(cur_dir, "#{id}.json")
             if File.file?(sidecar_src)
               FileUtils.mv(sidecar_src, File.join(wk_dir, "#{id}.json"))
             end
@@ -1012,7 +1246,7 @@ class RecordingService
               content = File.read(dst) rescue ''
               imgs = content.scan(%r{(?:(?:recordings?/+)+|/)?images/([a-zA-Z0-9_.-]+)}).flatten.uniq
               imgs.each do |img|
-                img_src = File.join(DIR, 'images', img)
+                img_src = File.join(cur_dir, 'images', img)
                 if File.file?(img_src)
                   FileUtils.cp(img_src, File.join(wk_images_dir, img)) rescue nil
                 end
@@ -1033,17 +1267,17 @@ class RecordingService
       File.write(File.join(wk_dir, MANIFEST), JSON.pretty_generate(manifest))
     end
 
-    # Move any remaining orphan files in root DIR into the first walkthrough set
+    # Move any remaining orphan files in root cur_dir into the first walkthrough set
     first_slug = data.keys.first
     if first_slug
-      first_dir = File.join(DIR, first_slug)
+      first_dir = File.join(cur_dir, first_slug)
       first_manifest = File.join(first_dir, MANIFEST)
       first_data = JSON.parse(File.read(first_manifest)) rescue nil
 
       if first_data
-        orphan_files = (Dir.glob(File.join(DIR, "*#{EXT}")) +
-                        Dir.glob(File.join(DIR, "*#{MD_EXT}")) +
-                        VIDEO_EXTS.flat_map { |ext| Dir.glob(File.join(DIR, "*#{ext}")) })
+        orphan_files = (Dir.glob(File.join(cur_dir, "*#{EXT}")) +
+                        Dir.glob(File.join(cur_dir, "*#{MD_EXT}")) +
+                        VIDEO_EXTS.flat_map { |ext| Dir.glob(File.join(cur_dir, "*#{ext}")) })
                        .reject { |p| File.basename(p).start_with?('_') }
 
         orphan_ids = []
@@ -1052,7 +1286,7 @@ class RecordingService
           oid = File.basename(p, ext)
           dst = File.join(first_dir, "#{oid}#{ext}")
           FileUtils.mv(p, dst) rescue nil
-          sidecar = File.join(DIR, "#{oid}.json")
+          sidecar = File.join(cur_dir, "#{oid}.json")
           FileUtils.mv(sidecar, File.join(first_dir, "#{oid}.json")) if File.file?(sidecar)
           orphan_ids << oid
         end
@@ -1069,14 +1303,14 @@ class RecordingService
   end
 
   def self.load_walkthroughs
-    ensure_dir
-    migrate_to_folder_hierarchy! if File.file?(File.join(DIR, LEGACY_MANIFEST))
+    cur_dir = ensure_dir
+    migrate_to_folder_hierarchy! if File.file?(File.join(cur_dir, LEGACY_MANIFEST))
 
     data = {}
     # Scan subdirectories that contain _walkthrough.json
     slug_dirs = begin
-      Dir.children(DIR).select do |entry|
-        p = File.join(DIR, entry)
+      Dir.children(cur_dir).select do |entry|
+        p = File.join(cur_dir, entry)
         File.directory?(p) && !entry.start_with?('.', '_') && entry != 'images'
       end.sort
     rescue StandardError
@@ -1084,7 +1318,7 @@ class RecordingService
     end
 
     slug_dirs.each do |slug|
-      manifest_file = File.join(DIR, slug, MANIFEST)
+      manifest_file = File.join(cur_dir, slug, MANIFEST)
       if File.file?(manifest_file)
         begin
           parsed = JSON.parse(File.read(manifest_file))
@@ -1104,7 +1338,7 @@ class RecordingService
       unless data.key?(slug)
         manifest_data = {
           'name'             => slug.tr('_-', ' ').capitalize,
-          'created_at'       => File.mtime(File.join(DIR, slug)).to_f,
+          'created_at'       => File.mtime(File.join(cur_dir, slug)).to_f,
           'recording_ids'    => [],
           'unintegrated_ids' => []
         }
@@ -1190,7 +1424,7 @@ class RecordingService
     clean = name.to_s.strip[0, NAME_MAX]
     entry['name'] = clean unless clean.empty?
     save_walkthrough(key, entry)
-    RecordingGitService.commit("Rename walkthrough '#{key}' to '#{entry['name']}'") rescue nil
+    RecordingGitService.commit("Rename walkthrough '#{key}' to '#{entry['name']}'", files: [File.join(walkthrough_dir(key), MANIFEST)], slug: key) rescue nil
     [key, entry['name'].to_s]
   end
 
@@ -1226,7 +1460,7 @@ class RecordingService
     }
     save_walkthrough(base, entry)
     wks[base] = entry
-    RecordingGitService.commit("#{overwrite ? 'Update' : 'Create'} walkthrough '#{clean}' (#{base})") rescue nil
+    RecordingGitService.commit("#{overwrite ? 'Update' : 'Create'} walkthrough '#{clean}' (#{base})", files: [File.join(wk_dir, MANIFEST)], slug: base) rescue nil
     base
   end
 
@@ -1267,7 +1501,7 @@ class RecordingService
     entry['unintegrated_ids'] = unint - wanted
     entry.delete('excluded_ids')
     save_walkthrough(key, entry)
-    RecordingGitService.commit("Add steps to '#{key}'") rescue nil
+    RecordingGitService.commit("Add steps to '#{key}'", slug: key) rescue nil
     key
   end
 
@@ -1330,13 +1564,13 @@ class RecordingService
     slug_str = slug.to_s
     return false unless wks.key?(slug_str)
 
-    dir = walkthrough_dir(slug_str)
+    wdir = walkthrough_dir(slug_str)
     if delete_recordings
-      FileUtils.rm_rf(dir) if File.directory?(dir)
+      FileUtils.rm_rf(wdir) if File.directory?(wdir)
     else
-      if File.directory?(dir)
-        archived_dir = File.join(DIR, "_archived_#{slug_str}_#{Time.now.strftime('%Y%m%d_%H%M%S')}")
-        FileUtils.mv(dir, archived_dir) rescue nil
+      if File.directory?(wdir)
+        archived_dir = File.join(dir, "_archived_#{slug_str}_#{Time.now.strftime('%Y%m%d_%H%M%S')}")
+        FileUtils.mv(wdir, archived_dir) rescue nil
       end
     end
 
@@ -1370,7 +1604,7 @@ class RecordingService
     entry.delete('excluded_ids')
 
     save_walkthrough(key, entry)
-    RecordingGitService.commit("Update step order in '#{key}'") rescue nil
+    RecordingGitService.commit("Update step order in '#{key}'", files: [File.join(walkthrough_dir(key), MANIFEST)], slug: key) rescue nil
     key
   end
 
@@ -1386,7 +1620,7 @@ class RecordingService
     entry.delete('excluded_ids')
 
     save_walkthrough(key, entry)
-    RecordingGitService.commit("Remove step '#{id}' from '#{key}'") rescue nil
+    RecordingGitService.commit("Remove step '#{id}' from '#{key}'", files: [File.join(walkthrough_dir(key), MANIFEST)], slug: key) rescue nil
     key
   end
 

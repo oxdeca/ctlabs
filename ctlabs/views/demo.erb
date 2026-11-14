@@ -38,19 +38,112 @@
             </div>
           </div>
 
-          <div class="sidebar-header-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #334155; min-width: 0; position: relative; z-index: 60;">
-            <div style="font-weight: 600; color: #f8fafc; display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <!-- Section 0: Active Repository Control Bar -->
+          <div id="repository-panel" style="display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #334155; background: #0b1120; min-width: 0; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0;">
+              <div style="font-weight: 600; color: #cbd5e1; font-size: 0.76em; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap;">
+                <i class="fas fa-code-branch" style="color: #14b8a6; flex-shrink: 0;"></i>
+                <span class="sidebar-title-text" style="overflow: hidden; text-overflow: ellipsis;">Repository</span>
+              </div>
+              <div class="sidebar-btn-group" style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <button type="button" id="new-repo-btn" title="Create or Clone a Repository" onclick="WalkthroughGit.open('<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>', true)" class="sidebar-icon-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 0.74em; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                  <i class="fas fa-plus" style="color: #14b8a6; font-size: 0.85em;"></i><span class="sidebar-btn-label">Repo</span>
+                </button>
+                <button type="button" id="git-remote-btn" title="Manage Repository &amp; Git Remote Sync (fetch, pull, push, clone)" onclick="WalkthroughGit.open('<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>')" class="sidebar-icon-btn" style="background: #1e293b; color: #14b8a6; border: 1px solid #475569; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 0.74em; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                  <i class="fas fa-sync-alt" style="font-size: 0.85em;"></i><span class="sidebar-btn-label">Git</span>
+                </button>
+                <!-- Collapse Sidebar Button -->
+                <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" class="sidebar-icon-btn" style="background: transparent; color: #94a3b8; padding: 2px 7px; border-radius: 4px; font-size: 0.78em; border: 1px solid #334155; cursor: pointer; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <i class="fas fa-chevron-left"></i>
+                </button>
+              </div>
+            </div>
+            <select id="repo-select" onchange="window.location.href='/demo?repo=' + encodeURIComponent(this.value);" title="Active walkthrough repository (switch to work on another repository's sets)" style="width: 100%; min-width: 0; background: #131d31; border: 1px solid #334155; color: #f8fafc; padding: 5px 10px; border-radius: 5px; font-size: 0.83em; font-weight: 500; cursor: pointer; box-sizing: border-box;">
+              <% (@repositories || []).each do |repo| %>
+                <option value="<%= ERB::Util.html_escape(repo['slug']) %>"<%= ' selected' if repo['active'] || repo['slug'] == @active_repo %>>
+                  <%= ERB::Util.html_escape(repo['name'] || repo['slug']) %> (<%= repo['set_count'].to_i %> set<%= repo['set_count'].to_i == 1 ? '' : 's' %>)
+                </option>
+              <% end %>
+            </select>
+          </div>
+
+          <!-- Section 1: Walkthrough Set Control Panel -->
+          <div id="walkthrough-set-panel" style="display: flex; flex-direction: column; gap: 7px; padding: 10px 12px; border-bottom: 1px solid #334155; background: #0f172a; min-width: 0; flex-shrink: 0;">
+            <!-- Set Header & Set Management Actions -->
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0;">
+              <div style="font-weight: 600; color: #cbd5e1; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; white-space: nowrap;">
+                <i class="fas fa-folder-open" style="color: #38bdf8; flex-shrink: 0;"></i>
+                <span class="sidebar-title-text" style="overflow: hidden; text-overflow: ellipsis;">Walkthrough Set</span>
+              </div>
+              <div class="sidebar-btn-group" style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <!-- New Set Button -->
+                <form method="post" action="/walkthroughs/create" style="margin: 0; display: inline-flex;">
+                  <input type="hidden" name="name" id="new-set-name" />
+                  <button type="button" id="new-set-btn" title="Create a new walkthrough set in this repository" class="sidebar-icon-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.76em; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                    <i class="fas fa-plus" style="color: #38bdf8; font-size: 0.85em;"></i><span class="sidebar-btn-label">New Set</span>
+                  </button>
+                </form>
+                <!-- Rename Set Toggle Button -->
+                <button type="button" id="rename-set-toggle-btn" title="Rename current walkthrough set" class="sidebar-icon-btn" style="background: #1e293b; color: #cbd5e1; border: 1px solid #475569; padding: 3px 7px; border-radius: 4px; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-pen"></i>
+                </button>
+                <!-- Delete Set Button -->
+                <button type="button" id="delete-set-btn" title="Delete current walkthrough set" onclick="document.getElementById('delete-set-modal').style.display='block'" class="sidebar-icon-btn" style="background: rgba(239, 68, 68, 0.14); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); padding: 3px 7px; border-radius: 4px; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Full-Width Set Selector Dropdown -->
+            <select id="walkthrough-select" onchange="window.location.href='/demo?walkthrough=' + encodeURIComponent(this.value);" style="width: 100%; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 6px 10px; border-radius: 5px; font-size: 0.86em; font-weight: 500; cursor: pointer; box-sizing: border-box;">
+              <% (@walkthroughs || {}).each do |slug, data| %>
+                <option value="<%= ERB::Util.html_escape(slug) %>"<%= ' selected' if slug == @active_walkthrough %>>
+                  <%= ERB::Util.html_escape(data['name'] || slug) %> (<%= Array(data['recording_ids']).size %>)
+                </option>
+              <% end %>
+            </select>
+
+            <!-- Collapsible Inline Rename Drawer -->
+            <form id="walkthrough-form" method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: none; align-items: center; gap: 6px; padding: 6px 8px; background: #131d31; border: 1px solid #334155; border-radius: 5px; margin: 0;">
+              <input type="hidden" name="recording" id="walkthrough-form-recording" value="<%= ERB::Util.html_escape(@selected_recording.to_s) %>" />
+              <input type="text" id="walkthrough-name" name="name" value="<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>" placeholder="Walkthrough set name..." maxlength="<%= RecordingService::NAME_MAX %>" title="Name of this walkthrough set (kept when exporting/importing the ZIP)" style="flex: 1; min-width: 0; background: #0f172a; border: 1px solid #38bdf8; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.84em; outline: none;" />
+              <button type="submit" title="Save walkthrough name" style="background: #38bdf8; color: #0f172a; border: none; padding: 4px 9px; border-radius: 4px; font-weight: 600; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <i class="fas fa-check"></i> Save
+              </button>
+              <button type="button" id="rename-set-cancel-btn" title="Cancel rename" style="background: #334155; color: #cbd5e1; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.78em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="fas fa-times"></i>
+              </button>
+            </form>
+
+            <!-- Set Toolbar (History, Import, Export) -->
+            <div class="set-toolbar-grid" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px;">
+              <button type="button" id="git-history-btn" title="Version History (Git revisions, diffs, snapshots &amp; restore)" onclick="openGitHistoryModal('<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>')" class="sidebar-action-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 6px; border-radius: 4px; font-weight: 500; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; overflow: hidden;">
+                <i class="fas fa-history" style="color: #38bdf8;"></i><span class="sidebar-btn-label">History</span>
+              </button>
+              <button type="button" id="import-btn" title="Import recordings or ZIP archive" class="sidebar-action-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 6px; border-radius: 4px; font-weight: 500; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; overflow: hidden;">
+                <i class="fas fa-upload" style="color: #94a3b8;"></i><span class="sidebar-btn-label">Import</span>
+              </button>
+              <input type="file" id="import-file-input" accept=".zip,.cast,.md,.webm,.mp4" multiple style="display: none;" />
+              <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" class="sidebar-action-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 6px; border-radius: 4px; font-weight: 500; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; overflow: hidden;">
+                <i class="fas fa-file-archive" style="color: #94a3b8;"></i><span class="sidebar-btn-label">Export</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Steps Header & Add Step Menu -->
+          <div class="sidebar-header-row" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; border-bottom: 1px solid #334155; background: #0e1726; min-width: 0; position: relative; z-index: 60; flex-shrink: 0;">
+            <div style="font-weight: 600; color: #cbd5e1; font-size: 0.82em; text-transform: uppercase; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px; min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
               <i class="fas fa-record-vinyl w3-text-red" style="flex-shrink: 0;"></i>
               <span class="sidebar-title-text" style="overflow: hidden; text-overflow: ellipsis;">Steps</span>
-              <span id="set-count" style="color: #94a3b8; font-size: 0.8em; font-weight: normal; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 10px; flex-shrink: 0;"><%= (@recordings || []).size %></span>
+              <span id="set-count" style="color: #94a3b8; font-size: 0.9em; font-weight: 400; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 10px; flex-shrink: 0;"><%= (@recordings || []).size %></span>
             </div>
             <div class="sidebar-btn-group" style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
               <!-- Add Step Dropdown -->
               <div class="step-dropdown-wrapper" style="position: relative; display: inline-block; z-index: 70;">
-                <button type="button" id="record-dropdown-btn" title="Add step (Terminal Cast, Screen Video, Note)" style="background: #0284c7; color: #ffffff; padding: 3px 9px; border-radius: 4px; font-size: 0.8em; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); white-space: nowrap; transition: background 0.15s ease;">
-                  <i class="fas fa-plus-circle" style="color: #ffffff; font-size: 0.85em;"></i><span class="sidebar-btn-label"> Add</span> <i class="fas fa-caret-down" style="font-size: 0.85em; opacity: 0.85;"></i>
+                <button type="button" id="record-dropdown-btn" title="Add step (Terminal Cast, Screen Video, Note)" style="background: #0284c7; color: #ffffff; padding: 3px 10px; border-radius: 4px; font-size: 0.78em; font-weight: 600; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); white-space: nowrap; transition: background 0.15s ease;">
+                  <i class="fas fa-plus-circle" style="color: #ffffff; font-size: 0.85em;"></i><span class="sidebar-btn-label"> Add Step</span> <i class="fas fa-caret-down" style="font-size: 0.85em; opacity: 0.85;"></i>
                 </button>
-                <div id="record-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 220px; max-width: calc(100vw - 20px); background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden;">
+                <div id="record-dropdown-menu" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; left: auto; width: 220px; max-width: calc(100vw - 20px); background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden;">
                   <!-- Terminal Cast Option -->
                   <button type="button" id="record-cast-btn" style="width: 100%; text-align: left; background: transparent; border: none; padding: 9px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #f8fafc; transition: background 0.15s ease;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
                     <div style="width: 28px; height: 28px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; color: #10b981; flex-shrink: 0; font-size: 0.95em;">
@@ -87,56 +180,8 @@
                   </form>
                 </div>
               </div>
-
-              <!-- Import Button & Hidden File Input -->
-              <button type="button" id="import-btn" title="Import recordings or ZIP archive" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-                <i class="fas fa-upload"></i><span class="sidebar-btn-label"> Import</span>
-              </button>
-              <input type="file" id="import-file-input" accept=".zip,.cast,.md,.webm,.mp4" multiple style="display: none;" />
-
-              <!-- Export Download Button -->
-              <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-                <i class="fas fa-file-archive"></i><span class="sidebar-btn-label"> Export</span>
-              </button>
-
-              <!-- Collapse Sidebar Button -->
-              <button type="button" id="sidebar-collapse-btn" title="Collapse sidebar" style="background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; border: 1px solid #475569; cursor: pointer; margin-left: 2px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                <i class="fas fa-chevron-left"></i>
-              </button>
             </div>
           </div>
-
-          <!-- Walkthrough Set Selector -->
-          <div style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; min-width: 0;">
-            <label for="walkthrough-select" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;"><i class="fas fa-layer-group" style="margin-right: 2px;"></i> Set</label>
-            <select id="walkthrough-select" onchange="window.location.href='/demo?walkthrough=' + encodeURIComponent(this.value);" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; cursor: pointer;">
-              <% (@walkthroughs || {}).each do |slug, data| %>
-                <option value="<%= ERB::Util.html_escape(slug) %>"<%= ' selected' if slug == @active_walkthrough %>>
-                  <%= ERB::Util.html_escape(data['name'] || slug) %> (<%= Array(data['recording_ids']).size %>)
-                </option>
-              <% end %>
-            </select>
-            <!-- New Set Button -->
-            <form method="post" action="/walkthroughs/create" style="margin: 0;">
-              <input type="hidden" name="name" id="new-set-name" />
-              <button type="button" id="new-set-btn" title="Create a new walkthrough set" class="w3-button w3-small" style="background: #334155; color: #f8fafc; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 3px;">
-                <i class="fas fa-plus"></i><span class="sidebar-btn-label"> New</span>
-              </button>
-            </form>
-            <button type="button" id="delete-set-btn" title="Delete current walkthrough set" onclick="document.getElementById('delete-set-modal').style.display='block'" class="w3-button w3-small" style="background: #ef4444; color: #ffffff; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
-              <i class="fas fa-trash-alt"></i>
-            </button>
-            <button type="button" id="git-history-btn" title="Version History (Git revisions, diffs, snapshots &amp; restore)" onclick="openGitHistoryModal('<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>')" class="w3-button w3-small" style="background: #334155; color: #38bdf8; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em; cursor: pointer;">
-              <i class="fas fa-history"></i>
-            </button>
-          </div>
-
-          <form id="walkthrough-form" method="post" action="/walkthroughs/<%= ERB::Util.url_encode(@active_walkthrough.to_s) %>/rename" style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-bottom: 1px solid #334155; background: #0f172a; margin: 0;">
-            <input type="hidden" name="recording" id="walkthrough-form-recording" value="<%= ERB::Util.html_escape(@selected_recording.to_s) %>" />
-            <label for="walkthrough-name" style="color: #94a3b8; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;">Name</label>
-            <input type="text" id="walkthrough-name" name="name" value="<%= ERB::Util.html_escape(@walkthrough_name.to_s) %>" maxlength="<%= RecordingService::NAME_MAX %>" title="Name of this walkthrough set (kept when exporting/importing the ZIP)" style="flex: 1; min-width: 0; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em;" />
-            <button type="submit" title="Save walkthrough name" class="w3-button w3-small" style="background: #38bdf8; color: #0f172a; padding: 3px 8px; border-radius: 4px; font-weight: 600; font-size: 0.8em;"><i class="fas fa-save"></i></button>
-          </form>
 
           <div id="recs-list" style="flex: 1; min-height: 80px; overflow-y: auto;">
             <% recs = (@recordings || []) %>
@@ -173,7 +218,7 @@
                          else
                            RecordingService::EXT
                          end
-                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
+                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService.dir, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
@@ -273,7 +318,7 @@
                          else
                            RecordingService::EXT
                          end
-                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService::DIR, "#{r[:id]}#{fext}")
+                  fpath = r[:path] || RecordingService.path_for(r[:id]) || File.join(RecordingService.dir, "#{r[:id]}#{fext}")
                   fsize = File.exist?(fpath) ? File.size(fpath) : 0
                   size_str = RecordingService.size_label(fsize)
                   node_str = if is_md
@@ -480,6 +525,8 @@
     </div>
 
     <%= erb :'modals/git_history' %>
+
+    <%= erb :'modals/walkthrough_git' %>
 
     <%= erb :'modals/graphviz_editor' %>
 
@@ -949,6 +996,7 @@
     <script src="/js/jxl_polyfill.js"></script>
     <script src="/js/screenshot_editor.js"></script>
     <script src="/js/markdown_editor.js"></script>
+    <script src="/js/walkthrough_git.js"></script>
     <script>
       (function() {
         const activeWalkthrough = <%= @active_walkthrough.to_s.to_json %>;
@@ -3871,21 +3919,56 @@ if (metaForm) {
         }
 
         const wtNameInput = document.getElementById('walkthrough-name');
+        const wtForm = document.getElementById('walkthrough-form');
+        const renameSetToggleBtn = document.getElementById('rename-set-toggle-btn');
+        const renameSetCancelBtn = document.getElementById('rename-set-cancel-btn');
+        const initialWtName = wtNameInput ? wtNameInput.value : '';
+
+        function updateWtSelectLabel(nameVal) {
+          const wtSelect = document.getElementById('walkthrough-select');
+          if (wtSelect) {
+            const opt = wtSelect.querySelector(`option[value="${CSS.escape(activeWalkthrough)}"]`);
+            if (opt) {
+              const setItems = recsList.querySelectorAll('.rec-item-wrapper').length;
+              const val = (nameVal || '').trim() || opt.value;
+              opt.textContent = `${val} (${setItems})`;
+            }
+          }
+        }
+
         if (wtNameInput) {
           wtNameInput.addEventListener('input', () => {
-            const wtSelect = document.getElementById('walkthrough-select');
-            if (wtSelect) {
-              const opt = wtSelect.querySelector(`option[value="${CSS.escape(activeWalkthrough)}"]`);
-              if (opt) {
-                const setItems = recsList.querySelectorAll('.rec-item-wrapper').length;
-                const val = wtNameInput.value.trim() || opt.value;
-                opt.textContent = `${val} (${setItems})`;
-              }
+            updateWtSelectLabel(wtNameInput.value);
+          });
+          wtNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && renameSetCancelBtn) {
+              e.preventDefault();
+              renameSetCancelBtn.click();
             }
           });
         }
 
-        const wtForm = document.getElementById('walkthrough-form');
+        if (renameSetToggleBtn && wtForm) {
+          renameSetToggleBtn.addEventListener('click', () => {
+            const isHidden = (wtForm.style.display === 'none' || !wtForm.style.display);
+            wtForm.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden && wtNameInput) {
+              wtNameInput.focus();
+              wtNameInput.select();
+            }
+          });
+        }
+
+        if (renameSetCancelBtn && wtForm) {
+          renameSetCancelBtn.addEventListener('click', () => {
+            if (wtNameInput) {
+              wtNameInput.value = initialWtName;
+              updateWtSelectLabel(initialWtName);
+            }
+            wtForm.style.display = 'none';
+          });
+        }
+
         if (wtForm) {
           wtForm.addEventListener('submit', () => {
             const formRecInput = document.getElementById('walkthrough-form-recording');

@@ -1457,10 +1457,11 @@
 
   // --- Graphviz Diagram Editor ---
   let mdGraphvizCodeEditor = null;
+  let mdGraphvizDotEditor = null;
   let mdGraphvizFontSize = 13;
   let mdGraphvizFont = 'courier';
   let mdGraphvizBg = 'white';
-  let mdGraphvizLineWrap = false;
+  let mdGraphvizLineWrap = true;
   let mdGraphvizVimMode = false;
   let mdGraphvizPreviewUrl = null;
   let mdGraphvizCurrentSvg = '';
@@ -1832,6 +1833,15 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     } else if (mdGraphvizSource) {
       mdGraphvizSource.wrap = mdGraphvizLineWrap ? 'soft' : 'off';
     }
+
+    if (mdGraphvizDotEditor) {
+      mdGraphvizDotEditor.setOption('lineWrapping', mdGraphvizLineWrap);
+      mdGraphvizDotEditor.refresh();
+    }
+    if (mdGraphvizDotOutput) {
+      mdGraphvizDotOutput.wrap = mdGraphvizLineWrap ? 'soft' : 'off';
+      mdGraphvizDotOutput.style.whiteSpace = mdGraphvizLineWrap ? 'pre-wrap' : 'pre';
+    }
   }
 
   function setGraphvizVimMode(enabled) {
@@ -1919,7 +1929,11 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       if (mdGraphvizEditorContainer) mdGraphvizEditorContainer.style.display = 'none';
       if (mdGraphvizDotContainer) mdGraphvizDotContainer.style.display = 'flex';
       if (mdGraphvizVimStatusBar) mdGraphvizVimStatusBar.style.display = 'none';
+      initGraphvizDotEditor();
       updateGraphvizDotDisplay();
+      if (mdGraphvizDotEditor) {
+        setTimeout(() => mdGraphvizDotEditor.refresh(), 10);
+      }
     } else {
       if (mdGraphvizEditorContainer) mdGraphvizEditorContainer.style.display = 'flex';
       if (mdGraphvizDotContainer) mdGraphvizDotContainer.style.display = 'none';
@@ -1933,17 +1947,29 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
 
   function updateGraphvizDotDisplay() {
     if (!mdGraphvizDotOutput) return;
+    let displayDot = '';
     if (mdGraphvizLastDot && mdGraphvizLastDot.trim()) {
-      mdGraphvizDotOutput.textContent = mdGraphvizLastDot;
+      displayDot = mdGraphvizLastDot;
       if (mdGraphvizTabDotBadge) mdGraphvizTabDotBadge.style.display = 'inline-block';
     } else {
       const src = getGraphvizEditorValue();
       if (src.includes('<%')) {
-        mdGraphvizDotOutput.textContent = '// Press Render (Ctrl+Enter) to compile ERB template into DOT';
+        displayDot = '// Press Render (Ctrl+Enter) to compile ERB template into DOT';
       } else {
-        mdGraphvizDotOutput.textContent = src || '// No DOT code';
+        displayDot = src || '// No DOT code';
       }
       if (mdGraphvizTabDotBadge) mdGraphvizTabDotBadge.style.display = 'none';
+    }
+
+    mdGraphvizDotOutput.value = displayDot;
+    mdGraphvizDotOutput.textContent = displayDot;
+    if (mdGraphvizDotEditor) {
+      if (mdGraphvizDotEditor.getValue() !== displayDot) {
+        mdGraphvizDotEditor.setValue(displayDot);
+      }
+      if (mdGraphvizActiveTab === 'dot') {
+        mdGraphvizDotEditor.refresh();
+      }
     }
   }
 
@@ -2097,7 +2123,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         mdGraphvizBlockName.value = '';
         mdGraphvizBlockName.readOnly = false;
       }
-      if (mdGraphvizBlockCode) mdGraphvizBlockCode.value = 'def my_block(id, label: nil)\n  host(id, name: label || id, icon: "💻")\nend';
+      if (mdGraphvizBlockCode) mdGraphvizBlockCode.value = 'def my_block(id, label: nil, **attr)\n  host(id, name: label || id, icon: "💻", **attr)\nend';
       if (mdGraphvizBlockSnippet) mdGraphvizBlockSnippet.value = '<%= my_block("srv1") %>';
       if (mdGraphvizBlockDesc) mdGraphvizBlockDesc.value = '';
     }
@@ -2365,18 +2391,24 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     if (mdGraphvizFontSizeLabel) mdGraphvizFontSizeLabel.textContent = `${mdGraphvizFontSize}px`;
     if (mdGraphvizFontFamily) mdGraphvizFontFamily.value = mdGraphvizFont;
 
-    if (mdGraphvizCodeEditor) {
-      const wrapper = mdGraphvizCodeEditor.getWrapperElement();
+    [mdGraphvizCodeEditor, mdGraphvizDotEditor].forEach(ed => {
+      if (!ed) return;
+      const wrapper = ed.getWrapperElement();
       if (wrapper) {
         wrapper.style.fontSize = `${mdGraphvizFontSize}px`;
         wrapper.style.fontFamily = fontStack;
         const cmLines = wrapper.querySelectorAll('.CodeMirror-line, .CodeMirror-linenumber, .CodeMirror-lines');
         cmLines.forEach(el => { el.style.fontFamily = fontStack; });
       }
-      mdGraphvizCodeEditor.refresh();
-    } else if (mdGraphvizSource) {
+      ed.refresh();
+    });
+    if (mdGraphvizSource) {
       mdGraphvizSource.style.fontSize = `${mdGraphvizFontSize}px`;
       mdGraphvizSource.style.fontFamily = fontStack;
+    }
+    if (mdGraphvizDotOutput) {
+      mdGraphvizDotOutput.style.fontSize = `${mdGraphvizFontSize}px`;
+      mdGraphvizDotOutput.style.fontFamily = fontStack;
     }
   }
 
@@ -2401,18 +2433,20 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     try {
       CodeMirror.defineSimpleMode('dot', {
         start: [
-          // Keywords & graph declarations
-          { regex: /\b(?:strict|digraph|graph|subgraph|node|edge)\b/i, token: 'keyword' },
-          // Common Graphviz attribute names
-          { regex: /\b(?:label|shape|style|fillcolor|color|bgcolor|pencolor|fontname|fontcolor|fontsize|rankdir|compound|dir|arrowhead|arrowsize|penwidth|weight|len|rank|same|min|max|headport|tailport|margin|width|height|fixedsize|nodesep|ranksep|splines|overlap|layout|size|ratio|dpi|id|tooltip|href|target)\b/i, token: 'builtin' },
+          // ERB tags
+          { regex: /<%=?|%>/, token: 'meta' },
+          // Keywords & graph declarations (+ common Ruby/DSL keywords inside ERB)
+          { regex: /\b(?:strict|digraph|graph|subgraph|node|edge|do|end|if|else|elsif|unless|each|upto|downto)\b/i, token: 'keyword' },
+          // Common Graphviz & HTML-label attribute names
+          { regex: /\b(?:label|xlabel|taillabel|headlabel|labelloc|labeljust|shape|style|fillcolor|color|bgcolor|pencolor|fontname|fontcolor|fontsize|rankdir|compound|constraint|minlen|ltail|lhead|newrank|concentrate|peripheries|dir|arrowhead|arrowtail|arrowsize|penwidth|weight|len|rank|same|min|max|source|sink|headport|tailport|margin|pad|pack|packmode|sep|esep|width|height|fixedsize|nodesep|ranksep|splines|overlap|layout|size|ratio|dpi|id|tooltip|href|target|group|pos|pin| border|cellborder|cellspacing|cellpadding|colspan|rowspan|align|valign|point-size)\b/i, token: 'builtin' },
           // Edge operators (-> for directed digraphs, -- for undirected graphs)
           { regex: /->|--/, token: 'operator' },
           // Booleans / constants / rank directions
-          { regex: /\b(?:true|false|none|both|forward|back|same|LR|TB|RL|BT)\b/i, token: 'atom' },
+          { regex: /\b(?:true|false|nil|none|both|forward|back|same|LR|TB|RL|BT|ortho|polyline|curved|spline|line)\b/i, token: 'atom' },
           // Strings (double quotes with escape support)
           { regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: 'string' },
-          // HTML-like labels: <...>
-          { regex: /<[^>]*>/, token: 'string url' },
+          // HTML-like label tags: <table>, <tr>, <td>, <b>, <font...>, <hr/>, etc.
+          { regex: /<\/?[a-zA-Z0-9_]+(?:\s+[^>]*)?\/?>/, token: 'tag' },
           // Numeric values and hex colors (#f8fafc)
           { regex: /#[a-fA-F0-9]{3,8}\b/, token: 'atom' },
           { regex: /\b[-+]?(?:\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?\b/i, token: 'number' },
@@ -2421,8 +2455,8 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
           { regex: /\#.*/, token: 'comment' },
           { regex: /\/\*/, token: 'comment', next: 'comment' },
           // Operators and punctuation
-          { regex: /[=;,]/, token: 'operator' },
-          { regex: /[{}\[\]]/, token: 'bracket' },
+          { regex: /[=;,<>:]/, token: 'operator' },
+          { regex: /[{}\[\]()]/, token: 'bracket' },
           // Node identifiers / attributes values
           { regex: /[a-zA-Z_][a-zA-Z0-9_]*/, token: 'variable' }
         ],
@@ -2447,6 +2481,44 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
   ensureGraphvizDotMode();
   ensureCodeMirrorFoldHelpers();
   ensureCodeMirrorVimFoldBindings();
+
+  function initGraphvizDotEditor() {
+    ensureGraphvizDotMode();
+    ensureCodeMirrorFoldHelpers();
+    if (mdGraphvizDotEditor) {
+      if (mdGraphvizDotEditor.getOption('mode') !== 'dot') {
+        mdGraphvizDotEditor.setOption('mode', 'dot');
+      }
+      return mdGraphvizDotEditor;
+    }
+    if (typeof CodeMirror === 'undefined') return null;
+    const dotTa = document.getElementById('md-graphviz-dot-output');
+    if (!dotTa) return null;
+
+    try {
+      mdGraphvizDotEditor = CodeMirror.fromTextArea(dotTa, {
+        mode: 'dot',
+        theme: 'material-ocean',
+        readOnly: true,
+        lineNumbers: true,
+        tabSize: 2,
+        lineWrapping: mdGraphvizLineWrap,
+        viewportMargin: 10,
+        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+        foldGutter: true,
+        foldOptions: { scanUp: true }
+      });
+      mdGraphvizDotEditor.setSize('100%', '100%');
+      window.cmEditors = window.cmEditors || {};
+      window.cmEditors['md-graphviz-dot-output'] = mdGraphvizDotEditor;
+      applyGraphvizEditorFont();
+      setTimeout(() => mdGraphvizDotEditor.refresh(), 30);
+      return mdGraphvizDotEditor;
+    } catch (e) {
+      console.warn('Could not initialize DOT CodeMirror viewer:', e);
+      return null;
+    }
+  }
 
   function initGraphvizCodeEditor() {
     ensureGraphvizDotMode();
@@ -3325,7 +3397,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     }
     if (mdGraphvizDotUseBtn) {
       mdGraphvizDotUseBtn.addEventListener('click', () => {
-        const text = mdGraphvizLastDot || (mdGraphvizDotOutput ? mdGraphvizDotOutput.textContent : '');
+        const text = mdGraphvizLastDot || (mdGraphvizDotEditor ? mdGraphvizDotEditor.getValue() : (mdGraphvizDotOutput ? (mdGraphvizDotOutput.value || mdGraphvizDotOutput.textContent) : ''));
         if (!text || !text.trim() || text.trim().startsWith('//')) {
           setGraphvizError('No compiled DOT code available yet. Click Render first.');
           return;
@@ -3354,7 +3426,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     }
     if (mdGraphvizDotCopyBtn) {
       mdGraphvizDotCopyBtn.addEventListener('click', () => {
-        const text = mdGraphvizLastDot || (mdGraphvizDotOutput ? mdGraphvizDotOutput.textContent : '');
+        const text = mdGraphvizLastDot || (mdGraphvizDotEditor ? mdGraphvizDotEditor.getValue() : (mdGraphvizDotOutput ? (mdGraphvizDotOutput.value || mdGraphvizDotOutput.textContent) : ''));
         if (!text) return;
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(text).then(() => {
@@ -3741,19 +3813,41 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       // 1. Check Git Status for uncommitted changes
       let statusData = { clean: true, items: [] };
       try {
-        const stRes = await fetch('/recordings/git/status', { credentials: 'same-origin' });
+        const statusParams = new URLSearchParams();
+        if (gitHistoryCurrentScope.slug) statusParams.set('slug', gitHistoryCurrentScope.slug);
+        const stRes = await fetch('/recordings/git/status?' + statusParams.toString(), { credentials: 'same-origin' });
         statusData = await stRes.json();
       } catch (e) {}
+
+      const remoteBadge = document.getElementById('git-history-remote-badge');
+      if (remoteBadge) {
+        if (statusData && statusData.branch) {
+          let label = statusData.branch;
+          if (statusData.remote_linked && statusData.remote_url) {
+            const ahead = statusData.ahead || 0;
+            const behind = statusData.behind || 0;
+            label += (ahead || behind) ? ` · origin (${ahead}↑ ${behind}↓)` : ' · origin';
+          } else {
+            label += ' · local';
+          }
+          remoteBadge.innerHTML = `<i class="fas fa-code-branch"></i> ${escapeHtml(label)}`;
+          remoteBadge.style.display = 'inline-flex';
+        } else {
+          remoteBadge.style.display = 'none';
+        }
+      }
 
       gitWorkingTreeChanges = [];
       if (statusData && Array.isArray(statusData.items)) {
         gitWorkingTreeChanges = statusData.items.filter(item => {
           if (!item || !item.file) return false;
           if (gitHistoryCurrentScope.path) {
-            return item.file === gitHistoryCurrentScope.path || item.file.endsWith('/' + gitHistoryCurrentScope.path) || gitHistoryCurrentScope.path.endsWith('/' + item.file);
+            return item.file === gitHistoryCurrentScope.path ||
+                   item.file.endsWith('/' + gitHistoryCurrentScope.path) ||
+                   gitHistoryCurrentScope.path.endsWith('/' + item.file);
           }
           if (gitHistoryCurrentScope.slug && gitHistoryCurrentScope.slug !== 'default') {
-            return item.file.startsWith(gitHistoryCurrentScope.slug + '/');
+            return !item.file.includes('/') || item.file.startsWith(gitHistoryCurrentScope.slug + '/');
           }
           return true;
         });
@@ -3938,7 +4032,11 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     if (discardBtn) discardBtn.style.display = 'none';
 
     try {
-      const res = await fetch('/recordings/git/diff/' + encodeURIComponent(hash), { credentials: 'same-origin' });
+      const diffParams = new URLSearchParams();
+      if (gitHistoryCurrentScope.slug) diffParams.set('slug', gitHistoryCurrentScope.slug);
+      if (gitHistoryCurrentScope.path) diffParams.set('path', gitHistoryCurrentScope.path);
+      const qs = diffParams.toString();
+      const res = await fetch('/recordings/git/diff/' + encodeURIComponent(hash) + (qs ? '?' + qs : ''), { credentials: 'same-origin' });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || 'Failed to load diff');
 
@@ -4036,17 +4134,20 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
   }
 
   async function discardWorkingTreeChanges() {
-    if (!gitHistoryCurrentScope.path) {
-      alert('Select a specific note to discard uncommitted changes.');
+    if (!gitHistoryCurrentScope.path && !gitHistoryCurrentScope.slug) {
+      alert('Select a walkthrough set or specific note to discard uncommitted changes.');
       return;
     }
-    if (!confirm(`Discard all uncommitted changes to "${gitHistoryCurrentScope.path}"?\n\nThis will revert the file to the last committed version.`)) {
+    const targetDesc = gitHistoryCurrentScope.path
+      ? `file "${gitHistoryCurrentScope.path}"`
+      : `all modified files in walkthrough set "${gitHistoryCurrentScope.slug}"`;
+    if (!confirm(`Discard uncommitted changes to ${targetDesc}?\n\nThis will revert to the last committed version.`)) {
       return;
     }
 
     try {
       const fd = new FormData();
-      fd.append('path', gitHistoryCurrentScope.path);
+      if (gitHistoryCurrentScope.path) fd.append('path', gitHistoryCurrentScope.path);
       if (gitHistoryCurrentScope.slug) fd.append('slug', gitHistoryCurrentScope.slug);
 
       const res = await fetch('/recordings/git/discard', {

@@ -16,22 +16,50 @@ class GraphvizTemplateContext
     id.to_s.strip.gsub(/[^a-zA-Z0-9_]/, '_')
   end
 
-  def graph_header(title = nil, rankdir: 'LR', bgcolor: '#1e293b', fontname: 'Helvetica, Arial, sans-serif', nodesep: '0.6', ranksep: '0.8')
+  def safe_endpoint(id)
+    parts = id.to_s.strip.split(':').map { |p| safe_id(p) }.reject(&:empty?)
+    parts.empty? ? safe_id(id) : parts.join(':')
+  end
+
+  def format_dot_val(val)
+    return val.to_s if val == true || val == false || val.is_a?(Numeric)
+    s = val.to_s
+    return s if s.start_with?('<') && s.end_with?('>')
+    s.inspect
+  end
+
+  def format_dot_attrs(attr)
+    return '' if attr.nil? || attr.empty?
+    pairs = []
+    attr.each do |k, v|
+      next if v.nil?
+      key = k.to_s.gsub(/[^a-zA-Z0-9_]/, '')
+      next if key.empty?
+      pairs << "#{key}=#{format_dot_val(v)}"
+    end
+    pairs.join(', ')
+  end
+
+  def graph_header(title = nil, rankdir: 'LR', bgcolor: '#1e293b', fontname: 'Helvetica, Arial, sans-serif', nodesep: '0.6', ranksep: '0.8', **attr)
     title_attr = title ? %(label=#{h(title).inspect};\n  labelloc="t";\n  fontname="#{fontname}";\n  fontsize="16";\n  fontcolor="#f8fafc";\n) : ''
+    extra_graph = format_dot_attrs(attr)
+    extra_suffix = extra_graph.empty? ? '' : ", #{extra_graph}"
     <<~DOT
-      #{title_attr}graph [bgcolor="#{bgcolor}", fontname="#{fontname}", rankdir="#{rankdir}", pad="0.4", nodesep="#{nodesep}", ranksep="#{ranksep}"];
+      #{title_attr}graph [bgcolor="#{bgcolor}", fontname="#{fontname}", rankdir="#{rankdir}", pad="0.4", nodesep="#{nodesep}", ranksep="#{ranksep}"#{extra_suffix}];
       node [shape=rect, style="rounded,filled", fillcolor="#0f172a", penwidth="2", fontname="#{fontname}", fontcolor="#f8fafc", margin="0.2,0.12"];
       edge [color="#64748b", penwidth="2", fontname="#{fontname}", fontsize="11", fontcolor="#94a3b8"];
     DOT
   end
 
-  def node(id, name: nil, ip: nil, subtitle: nil, icon: nil, color: '#38bdf8', fillcolor: '#0f172a')
+  def node(id, name: nil, ip: nil, subtitle: nil, icon: nil, color: '#38bdf8', fillcolor: '#0f172a', **attr)
     display_name = name || id
     details = ip || subtitle
     sub_row = details ? %(<tr><td><font color="#94a3b8" point-size="11">#{h(details)}</font></td></tr>) : ''
     icon_str = icon ? "#{icon} " : ''
+    extra = format_dot_attrs(attr)
+    extra_prefix = extra.empty? ? '' : ", #{extra}"
     <<~DOT
-      #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}", label=<
+      #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}"#{extra_prefix}, label=<
         <table border="0" cellborder="0" cellspacing="0" cellpadding="4">
           <tr><td><b><font color="#{color}" point-size="14">#{icon_str}#{h(display_name)}</font></b></td></tr>
           #{sub_row}
@@ -40,50 +68,60 @@ class GraphvizTemplateContext
     DOT
   end
 
-  def host(id, name: nil, ip: nil, subtitle: nil, icon: '💻', color: '#38bdf8', fillcolor: '#0f172a')
-    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def host(id, name: nil, ip: nil, subtitle: nil, icon: '💻', color: '#38bdf8', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def router(id, name: nil, ip: nil, subtitle: nil, icon: '🔀', color: '#f59e0b', fillcolor: '#0f172a')
-    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def router(id, name: nil, ip: nil, subtitle: nil, icon: '🔀', color: '#f59e0b', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def switch(id, name: nil, subtitle: nil, icon: '🎛️', color: '#10b981', fillcolor: '#0f172a')
-    node(id, name: name, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def switch(id, name: nil, ip: nil, subtitle: nil, icon: '🎛️', color: '#10b981', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def firewall(id, name: nil, ip: nil, subtitle: nil, icon: '🛡️', color: '#ef4444', fillcolor: '#0f172a')
-    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def firewall(id, name: nil, ip: nil, subtitle: nil, icon: '🛡️', color: '#ef4444', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def gateway(id, name: nil, ip: nil, subtitle: nil, icon: '🚪', color: '#a855f7', fillcolor: '#0f172a')
-    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def gateway(id, name: nil, ip: nil, subtitle: nil, icon: '🚪', color: '#a855f7', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def loadbalancer(id, name: nil, ip: nil, subtitle: nil, icon: '⚖️', color: '#a855f7', fillcolor: '#0f172a')
-    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def loadbalancer(id, name: nil, ip: nil, subtitle: nil, icon: '⚖️', color: '#a855f7', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def cloud(id, name: nil, subtitle: nil, icon: '☁️', color: '#0ea5e9', fillcolor: '#0f172a')
-    node(id, name: name, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor)
+  def cloud(id, name: nil, ip: nil, subtitle: nil, icon: '☁️', color: '#0ea5e9', fillcolor: '#0f172a', **attr)
+    node(id, name: name, ip: ip, subtitle: subtitle, icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def database(id, name: nil, ip: nil, engine: nil, subtitle: nil, icon: '🗄️', color: '#ec4899', fillcolor: '#0f172a')
+  def database(id, name: nil, ip: nil, engine: nil, subtitle: nil, icon: '🗄️', color: '#ec4899', fillcolor: '#0f172a', **attr)
     details = [engine, ip || subtitle].compact.join(' &bull; ')
-    node(id, name: name, subtitle: (details.empty? ? nil : details), icon: icon, color: color, fillcolor: fillcolor)
+    node(id, name: name, subtitle: (details.empty? ? nil : details), icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def k8s_pod(id, name: nil, namespace: nil, ip: nil, subtitle: nil, icon: '☸️', color: '#38bdf8', fillcolor: '#0f172a')
+  def k8s_pod(id, name: nil, namespace: nil, ip: nil, subtitle: nil, icon: '☸️', color: '#38bdf8', fillcolor: '#0f172a', **attr)
     details = [namespace ? "ns: #{namespace}" : nil, ip || subtitle].compact.join(' &bull; ')
-    node(id, name: name, subtitle: (details.empty? ? nil : details), icon: icon, color: color, fillcolor: fillcolor)
+    node(id, name: name, subtitle: (details.empty? ? nil : details), icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def badge(id, text, color: '#38bdf8', bg: '#0f172a')
-    %(#{safe_id(id)} [shape=box, style="rounded,filled", color="#{color}", fillcolor="#{bg}", fontcolor="#{color}", fontsize="12", label=#{h(text).inspect}];\n)
+  def badge(id, text, color: '#38bdf8', bg: '#0f172a', **attr)
+    extra = format_dot_attrs(attr)
+    extra_suffix = extra.empty? ? '' : ", #{extra}"
+    %(#{safe_id(id)} [shape=box, style="rounded,filled", color="#{color}", fillcolor="#{bg}", fontcolor="#{color}", fontsize="12", label=#{h(text).inspect}#{extra_suffix}];\n)
   end
 
   def same_rank(*nodes)
     rank_group('same', *nodes)
+  end
+
+  def rank_source(*nodes)
+    rank_group('source', *nodes)
+  end
+
+  def rank_sink(*nodes)
+    rank_group('sink', *nodes)
   end
 
   def rank_group(rank_type, *nodes)
@@ -92,32 +130,38 @@ class GraphvizTemplateContext
     "{ rank=#{rank_type}; #{flat.join('; ')}; }\n"
   end
 
-  def spacer(id, width: 0.1, height: 0.1)
-    %(#{safe_id(id)} [style=invis, shape=point, width=#{width}, height=#{height}, label=""];\n)
+  def spacer(id, width: 0.1, height: 0.1, **attr)
+    extra = format_dot_attrs(attr)
+    extra_suffix = extra.empty? ? '' : ", #{extra}"
+    %(#{safe_id(id)} [style=invis, shape=point, width=#{width}, height=#{height}, label=""#{extra_suffix}];\n)
   end
 
-  def invis_edge(from, to, minlen: 2, weight: 1)
+  def invis_edge(from, to, minlen: 2, weight: 1, **attr)
     attrs = ['style=invis']
     attrs << "minlen=#{minlen}" if minlen
     attrs << "weight=#{weight}" if weight
-    "#{safe_id(from)} -> #{safe_id(to)} [#{attrs.join(', ')}];\n"
+    extra = format_dot_attrs(attr)
+    attrs << extra unless extra.empty?
+    "#{safe_endpoint(from)} -> #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
   end
 
-  def stack_vertical(*nodes, minlen: 2)
+  def stack_vertical(*nodes, minlen: 2, weight: 10, **attr)
     flat = nodes.flatten
     return '' if flat.size < 2
-    flat.each_cons(2).map { |a, b| invis_edge(a, b, minlen: minlen, weight: 10) }.join
+    flat.each_cons(2).map { |a, b| invis_edge(a, b, minlen: minlen, weight: weight, **attr) }.join
   end
 
-  def table_node(id, title: nil, rows: [], icon: '📊', color: '#38bdf8', fillcolor: '#0f172a')
+  def table_node(id, title: nil, rows: [], icon: '📊', color: '#38bdf8', fillcolor: '#0f172a', **attr)
     rows_html = rows.map do |r|
       k, v = r.is_a?(Array) ? r : [r.to_s, '']
       %(<tr><td align="left"><font color="#cbd5e1" point-size="11">#{h(k)}</font></td><td align="right"><font color="#94a3b8" point-size="11">#{h(v)}</font></td></tr>)
     end.join("\n")
 
     icon_str = icon ? "#{icon} " : ''
+    extra = format_dot_attrs(attr)
+    extra_prefix = extra.empty? ? '' : ", #{extra}"
     <<~DOT
-      #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}", label=<
+      #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}"#{extra_prefix}, label=<
         <table border="0" cellborder="0" cellspacing="0" cellpadding="4">
           <tr><td colspan="2"><b><font color="#{color}" point-size="13">#{icon_str}#{h(title || id)}</font></b></td></tr>
           <hr/>
@@ -127,25 +171,34 @@ class GraphvizTemplateContext
     DOT
   end
 
-  def link(from, to, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil)
+  def link(from, to, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
     attrs = [%(color="#{color}"), %(penwidth="#{penwidth}")]
     attrs << %(label="#{h(label)}") if label
     attrs << %(style="#{style}") if style
     attrs << %(dir="#{dir}") if dir
-    "#{safe_id(from)} -> #{safe_id(to)} [#{attrs.join(', ')}];\n"
+    extra = format_dot_attrs(attr)
+    attrs << extra unless extra.empty?
+    "#{safe_endpoint(from)} -> #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
   end
 
-  def links(from, *to_nodes, color: '#64748b', style: nil, penwidth: 2)
-    to_nodes.flatten.map { |to| link(from, to, color: color, style: style, penwidth: penwidth) }.join
+  def links(from, *to_nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
+    to_nodes.flatten.map { |to| link(from, to, label: label, color: color, style: style, penwidth: penwidth, dir: dir, **attr) }.join
   end
 
-  def chain(*nodes, color: '#64748b', style: nil, penwidth: 2)
+  def chain(*nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
     flat = nodes.flatten
     return '' if flat.size < 2
-    flat.each_cons(2).map { |a, b| link(a, b, color: color, style: style, penwidth: penwidth) }.join
+    flat.each_cons(2).map { |a, b| link(a, b, label: label, color: color, style: style, penwidth: penwidth, dir: dir, **attr) }.join
   end
 
-  def cluster_start(id, label: nil, color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled')
+  def cluster_start(id, label: nil, color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled', **attr)
+    extra_lines = attr.map do |k, v|
+      next nil if v.nil?
+      key = k.to_s.gsub(/[^a-zA-Z0-9_]/, '')
+      next nil if key.empty?
+      "  #{key} = #{format_dot_val(v)};\n"
+    end.compact.join
+
     <<~DOT
       subgraph cluster_#{safe_id(id)} {
         label = #{h(label || id).inspect};
@@ -155,6 +208,7 @@ class GraphvizTemplateContext
         fontcolor = "#{fontcolor}";
         fontname = "Helvetica, Arial, sans-serif";
         fontsize = "13";
+      #{extra_lines}
     DOT
   end
 
@@ -162,8 +216,8 @@ class GraphvizTemplateContext
     "  }\n"
   end
 
-  def cluster(id, label: nil, nodes: [], color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled', &block)
-    header = cluster_start(id, label: label, color: color, fillcolor: fillcolor, fontcolor: fontcolor, style: style)
+  def cluster(id, label: nil, nodes: [], color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled', **attr, &block)
+    header = cluster_start(id, label: label, color: color, fillcolor: fillcolor, fontcolor: fontcolor, style: style, **attr)
     footer = cluster_end
 
     if block_given?

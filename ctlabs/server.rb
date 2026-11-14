@@ -45,6 +45,7 @@ require_relative 'services/graphviz_custom_blocks_service'
 require_relative 'services/graphviz_template_engine'
 require_relative 'services/graphviz_service'
 require_relative 'services/recording_git_service'
+require_relative 'services/walkthrough_git_service'
 require_relative 'services/terminal_service'
 
 # --- Load Controllers ---
@@ -62,6 +63,7 @@ require_relative 'controllers/logs_controller'
 require_relative 'controllers/dnat_controller'
 require_relative 'controllers/links_controller'
 require_relative 'controllers/controller_controller'
+require_relative 'controllers/walkthrough_git_controller'
 require_relative 'controllers/recordings_controller'
 
 # --- Sinatra Settings (Classic for root app) ---
@@ -110,6 +112,7 @@ use TerminalController
 use LogsController
 use DnatController
 use ControllerController
+use WalkthroughGitController
 use RecordingsController
 
 # ------------------------------------------------------------------------------

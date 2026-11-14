@@ -2,8 +2,9 @@
 
 # -----------------------------------------------------------------------------
 # File        : ctlabs/services/recording_git_service.rb
-# Description : Git versioning service for walkthrough sets, markdown notes,
-#               graphviz diagrams, terminal recordings (.cast), and export zips.
+# Description : Git versioning service for the active walkthrough repository
+#               (containing multiple walkthrough sets, markdown notes,
+#               graphviz diagrams, terminal recordings (.cast), and images).
 #               Video casts (.webm, .mp4) are ignored and not stored in git.
 # License     : MIT License
 # -----------------------------------------------------------------------------
@@ -26,24 +27,31 @@ class RecordingGitService
     *.flv
     *.wmv
 
-    # Temporary files & swap
+    # Temporary files & export archives
     *.tmp
     temp_*
+    export_*.zip
+    export_note_*.zip
     .DS_Store
   GITIGNORE
+
+  def self.root_dir
+    defined?(RecordingService) ? File.expand_path(RecordingService.dir) : ROOT
+  end
 
   def self.git_available?
     @git_available ||= system('git --version > /dev/null 2>&1')
   end
 
   def self.repo_initialized?
-    File.directory?(File.join(ROOT, '.git'))
+    File.directory?(File.join(root_dir, '.git'))
   end
 
   def self.ensure_repo!
     return false unless git_available?
 
-    FileUtils.mkdir_p(ROOT) unless File.directory?(ROOT)
+    rdir = root_dir
+    FileUtils.mkdir_p(rdir) unless File.directory?(rdir)
 
     unless repo_initialized?
       run_git('init')
@@ -51,16 +59,20 @@ class RecordingGitService
       run_git('config', 'user.email', 'ctlabs@localhost')
     end
 
-    gitignore_path = File.join(ROOT, '.gitignore')
+    gitignore_path = File.join(rdir, '.gitignore')
     unless File.exist?(gitignore_path)
       File.write(gitignore_path, GITIGNORE_CONTENT)
+    end
+
+    if defined?(WalkthroughGitService)
+      WalkthroughGitService.write_excludes(File.join(rdir, '.git')) rescue nil
     end
 
     # Initial commit if no commits exist yet
     _out, _err, status = run_git('rev-parse', '--verify', 'HEAD')
     if status.exitstatus != 0
       run_git('add', '-A')
-      run_git('commit', '-m', 'Initialize recordings repository (walkthroughs, notes, diagrams, casts, zips)')
+      run_git('commit', '-m', 'Initialize walkthrough repository')
     end
 
     true
@@ -69,7 +81,26 @@ class RecordingGitService
     false
   end
 
-  def self.commit(message, author: nil, files: nil)
+  def self.scoped_set_slug?(slug)
+    s = slug.to_s.strip
+    !s.empty? && s != 'default' && s != 'all'
+  end
+
+  def self.resolve_relative_target(slug: nil, path: nil)
+    clean_path = path.to_s.strip
+    clean_slug = slug.to_s.strip
+    if !clean_path.empty? && clean_path != '.'
+      if scoped_set_slug?(clean_slug) && !clean_path.start_with?('/') && !clean_path.start_with?("#{clean_slug}/")
+        clean_path = File.join(clean_slug, clean_path)
+      end
+      return relative_path(clean_path)
+    elsif scoped_set_slug?(clean_slug)
+      return relative_path(clean_slug)
+    end
+    '.'
+  end
+
+  def self.commit(message, author: nil, files: nil, slug: nil)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
     msg = message.to_s.strip
@@ -78,24 +109,26 @@ class RecordingGitService
     if files && !files.empty?
       Array(files).each do |f|
         rel = relative_path(f)
-        run_git('add', rel) if rel
+        run_git('add', '-A', '--', rel) if rel
       end
+    elsif scoped_set_slug?(slug)
+      rel = relative_path(slug.to_s.strip)
+      run_git('add', '-A', '--', rel) if rel
     else
       run_git('add', '-A')
     end
 
-    # Check if there is anything to commit
+    # Check if there is anything to commit in active repo
     _out, _err, status = run_git('diff', '--cached', '--quiet')
     if status.exitstatus == 0
-      # Clean working tree, nothing to commit
       head_hash = current_head_hash
       return { ok: true, committed: false, message: 'No changes to commit', hash: head_hash }
     end
 
     args = ['commit', '-m', msg]
     args += ['--author', author] if author && !author.strip.empty?
-
     out, err, commit_status = run_git(*args)
+
     if commit_status.exitstatus == 0
       head_hash = current_head_hash
       { ok: true, committed: true, message: msg, hash: head_hash }
@@ -115,24 +148,16 @@ class RecordingGitService
     return [] unless ensure_repo!
 
     lim = limit.to_i.positive? ? limit.to_i : 40
-    args = ['log', "-n#{lim}", '--pretty=format:%H|%h|%an|%ae|%ad|%s', '--date=iso']
+    args = ['log', "-n#{lim}", '--pretty=format:%H%x1f%h%x1f%an%x1f%ae%x1f%ad%x1f%s', '--date=iso']
 
-    if path && !path.strip.empty?
-      clean_path = path.strip
-      if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
-        clean_path = File.join(slug.strip, clean_path)
-      end
-      rel = relative_path(clean_path)
-      args += ['--', rel] if rel && rel != '.'
-    elsif slug && !slug.strip.empty? && slug != 'default'
-      args += ['--', slug]
-    end
+    rel = resolve_relative_target(slug: slug, path: path)
+    args += ['--', rel] if rel && rel != '.'
 
     out, _err, status = run_git(*args)
     return [] unless status.exitstatus == 0
 
-    commits = out.lines.map do |line|
-      parts = line.strip.split('|', 6)
+    commits = out.lines.filter_map do |line|
+      parts = line.strip.split("\x1f", 6)
       next nil unless parts.size == 6
 
       full_hash, short_hash, aname, aemail, adate, subject = parts
@@ -144,14 +169,15 @@ class RecordingGitService
         date: adate,
         message: subject
       }
-    end.compact
+    end
 
     # Enrich with changed files
     commits.each do |c|
       fout, _ferr, fstatus = run_git('diff-tree', '--no-commit-id', '--name-status', '-r', c[:hash])
       if fstatus.exitstatus == 0
-        c[:files] = fout.lines.map do |fl|
+        c[:files] = fout.lines.filter_map do |fl|
           status_char, filepath = fl.strip.split(/\s+/, 2)
+          next nil unless filepath
           { status: status_char, path: filepath }
         end
       else
@@ -170,28 +196,40 @@ class RecordingGitService
 
     args = ['diff', 'HEAD']
     stat_args = ['diff', '--stat', 'HEAD']
-    if path && !path.strip.empty?
-      clean_path = path.strip
-      if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
-        clean_path = File.join(slug.strip, clean_path)
-      end
-      rel = relative_path(clean_path)
-      if rel && rel != '.'
-        args += ['--', rel]
-        stat_args += ['--', rel]
-      end
-    elsif slug && !slug.strip.empty? && slug != 'default'
-      args += ['--', slug.strip]
-      stat_args += ['--', slug.strip]
+    rel = resolve_relative_target(slug: slug, path: path)
+    if rel && rel != '.'
+      args += ['--', rel]
+      stat_args += ['--', rel]
     end
 
     stat_out, _err, _st = run_git(*stat_args)
     patch_out, err, st = run_git(*args)
-    if st.exitstatus == 0
-      { ok: true, hash: 'working', stat: stat_out, diff: patch_out }
-    else
-      { ok: false, error: err.strip }
+    return { ok: false, error: err.strip } unless st.exitstatus == 0
+
+    patch_text = patch_out.to_s
+    stat_text = stat_out.to_s
+
+    # Include untracked files in working tree diff
+    p_out, _p_err, p_st = run_git('status', '--porcelain')
+    if p_st.exitstatus == 0
+      untracked = p_out.lines.filter_map do |line|
+        code = line[0, 2]
+        file = line[3..].to_s.strip
+        file if code == '??' && !file.empty?
+      end
+      if rel && rel != '.'
+        untracked.select! { |f| f == rel || f.start_with?("#{rel}/") }
+      end
+      rdir = root_dir
+      untracked.each do |uf|
+        full_p = File.join(rdir, uf)
+        next unless File.file?(full_p)
+        u_out, _u_err, _u_st = Open3.capture3('git', 'diff', '--no-index', '--', '/dev/null', full_p)
+        patch_text = [patch_text, u_out.to_s].reject(&:empty?).join("\n") unless u_out.to_s.empty?
+      end
     end
+
+    { ok: true, hash: 'working', stat: stat_text, diff: patch_text }
   rescue StandardError => e
     { ok: false, error: e.message }
   end
@@ -199,12 +237,8 @@ class RecordingGitService
   def self.discard_working(path, slug: nil)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
-    clean_path = path.to_s.strip
-    if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
-      clean_path = File.join(slug.strip, clean_path)
-    end
-    rel = relative_path(clean_path)
-    return { ok: false, error: 'invalid path' } unless rel && rel != '.'
+    rel = resolve_relative_target(slug: slug, path: path)
+    return { ok: false, error: 'invalid path' } unless rel
 
     _out, err, st = run_git('checkout', 'HEAD', '--', rel)
     if st.exitstatus == 0
@@ -216,14 +250,22 @@ class RecordingGitService
     { ok: false, error: e.message }
   end
 
-  def self.diff(hash)
+  def self.diff(hash, slug: nil, path: nil)
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
     clean_hash = hash.to_s.strip
     return { ok: false, error: 'invalid hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
 
-    stat_out, _err, _st = run_git('show', '--stat', '--oneline', clean_hash)
-    patch_out, err, st = run_git('show', '-p', clean_hash)
+    stat_args = ['show', '--stat', '--oneline', clean_hash]
+    patch_args = ['show', '-p', clean_hash]
+    rel = resolve_relative_target(slug: slug, path: path)
+    if rel && rel != '.'
+      stat_args += ['--', rel]
+      patch_args += ['--', rel]
+    end
+
+    stat_out, _err, _st = run_git(*stat_args)
+    patch_out, err, st = run_git(*patch_args)
 
     if st.exitstatus == 0
       { ok: true, hash: clean_hash, stat: stat_out, diff: patch_out }
@@ -240,12 +282,8 @@ class RecordingGitService
     clean_hash = hash.to_s.strip
     return { ok: false, error: 'invalid hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
 
-    clean_path = path.to_s.strip
-    if slug && !slug.strip.empty? && slug != 'default' && !clean_path.start_with?("#{slug.strip}/")
-      clean_path = File.join(slug.strip, clean_path)
-    end
-    rel = relative_path(clean_path)
-    return { ok: false, error: 'invalid path' } unless rel
+    rel = resolve_relative_target(slug: slug, path: path)
+    return { ok: false, error: 'invalid path' } unless rel && rel != '.'
 
     out, err, status = run_git('show', "#{clean_hash}:#{rel}")
     if status.exitstatus == 0
@@ -263,19 +301,12 @@ class RecordingGitService
     clean_hash = hash.to_s.strip
     return { ok: false, error: 'invalid hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
 
-    clean_path = path.to_s.strip
-    if clean_path.empty? && slug && !slug.strip.empty? && slug != 'default'
-      clean_path = slug.strip
-    elsif slug && !slug.strip.empty? && slug != 'default' && clean_path != '.' && !clean_path.start_with?("#{slug.strip}/")
-      clean_path = File.join(slug.strip, clean_path)
-    end
-
-    rel = relative_path(clean_path)
+    rel = resolve_relative_target(slug: slug, path: path)
     return { ok: false, error: 'invalid path' } unless rel
 
     _out, err, status = run_git('checkout', clean_hash, '--', rel)
     if status.exitstatus == 0
-      msg = message || "Restore #{rel} from #{clean_hash[0..7]}"
+      msg = message || "Restore #{rel == '.' ? 'repository' : rel} from #{clean_hash[0..7]}"
       commit(msg, files: (rel == '.' ? nil : [rel]))
       { ok: true, restored: rel, hash: clean_hash }
     else
@@ -285,7 +316,30 @@ class RecordingGitService
     { ok: false, error: e.message }
   end
 
-  def self.status
+  def self.status(slug: nil)
+    if defined?(WalkthroughGitService)
+      st = WalkthroughGitService.status(slug)
+      return st unless st[:ok]
+      items = Array(st[:changes]).map do |c|
+        { code: c[:code], file: c[:file] }
+      end
+      return {
+        ok: true,
+        repo: st[:repo],
+        repo_name: st[:repo_name],
+        repositories: st[:repositories],
+        slug: slug,
+        clean: items.empty?,
+        items: items,
+        branch: st[:branch],
+        remote: st[:remote],
+        remote_linked: st[:remote_linked],
+        ahead: st[:ahead],
+        behind: st[:behind],
+        last_commit: st[:last_commit]
+      }
+    end
+
     return { ok: false, error: 'git not available' } unless ensure_repo!
 
     out, err, st = run_git('status', '--porcelain')
@@ -307,15 +361,16 @@ class RecordingGitService
     p = path.to_s.strip
     return nil if p.empty?
     return '.' if p == '.'
+    rdir = root_dir
+    p = p.sub(%r{\A#{Regexp.escape(rdir)}/?}, '')
     p = p.sub(%r{\A#{Regexp.escape(ROOT)}/?}, '')
-    # Prevent traversal
     p = Pathname.new(p).cleanpath.to_s
     return nil if p.start_with?('..')
     p
   end
 
   def self.run_git(*args)
-    cmd = ['git', '-C', ROOT] + args
+    cmd = ['git', '-C', root_dir] + args
     Open3.capture3(*cmd)
   end
 end

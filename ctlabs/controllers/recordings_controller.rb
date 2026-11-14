@@ -128,11 +128,11 @@ class RecordingsController < BaseController
                    end
 
     # Clean up older export zip files (>1 hour old)
-    Dir.glob(File.join(RecordingService::DIR, 'export_*_*.zip')).each do |old_zip|
+    Dir.glob(File.join(RecordingService.dir, 'export_*_*.zip')).each do |old_zip|
       File.delete(old_zip) rescue nil if File.mtime(old_zip) < (Time.now - 3600)
     end
 
-    zip_path = File.join(RecordingService::DIR, "export_#{SecureRandom.hex(4)}_#{zip_filename}")
+    zip_path = File.join(RecordingService.dir, "export_#{SecureRandom.hex(4)}_#{zip_filename}")
 
     Zip::File.open(zip_path, create: true) do |zipfile|
       all_files.each do |rec|
@@ -150,7 +150,7 @@ class RecordingsController < BaseController
           zipfile.add("#{rec[:id]}#{ext}", rec[:path])
           if RecordingService::VIDEO_EXTS.include?(ext)
             sidecar = File.join(File.dirname(rec[:path]), "#{rec[:id]}.json")
-            sidecar = File.join(RecordingService::DIR, "#{rec[:id]}.json") unless File.file?(sidecar)
+            sidecar = File.join(RecordingService.dir, "#{rec[:id]}.json") unless File.file?(sidecar)
             zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
           end
         end
@@ -415,7 +415,7 @@ class RecordingsController < BaseController
                          c_id
                        end
 
-              File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::EXT}"), data)
+              File.binwrite(File.join(RecordingService.dir, "#{id}#{RecordingService::EXT}"), data)
               if manifest.nil? && conflict_action == 'rename' && !custom_name.empty?
                 RecordingService.set_title(id, custom_name)
               end
@@ -455,7 +455,7 @@ class RecordingsController < BaseController
                      c_id
                    end
 
-              File.binwrite(File.join(RecordingService::DIR, "#{id}#{RecordingService::MD_EXT}"), data)
+              File.binwrite(File.join(RecordingService.dir, "#{id}#{RecordingService::MD_EXT}"), data)
               id_map[old_id] = id
               id_map[old_id.downcase] = id
               id_map[base] = id
@@ -479,7 +479,7 @@ class RecordingsController < BaseController
                          c_id
                        end
 
-              File.binwrite(File.join(RecordingService::DIR, "#{id}#{ext}"), entry.get_input_stream.read)
+              File.binwrite(File.join(RecordingService.dir, "#{id}#{ext}"), entry.get_input_stream.read)
               id_map[old_id] = id
               id_map[old_id.downcase] = id
               id_map[base] = id
@@ -536,7 +536,7 @@ class RecordingsController < BaseController
               rescue StandardError
               end
             end
-            File.binwrite(File.join(RecordingService::DIR, "#{new_id}.json"), json_str)
+            File.binwrite(File.join(RecordingService.dir, "#{new_id}.json"), json_str)
           end
         end
 
@@ -678,7 +678,7 @@ class RecordingsController < BaseController
              end
 
         wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
         FileUtils.mkdir_p(target_dir)
 
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
@@ -748,7 +748,7 @@ class RecordingsController < BaseController
              end
 
         wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
         FileUtils.mkdir_p(target_dir)
 
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
@@ -790,7 +790,7 @@ class RecordingsController < BaseController
              end
 
         wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService::DIR
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
         FileUtils.mkdir_p(target_dir)
 
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
@@ -1124,11 +1124,11 @@ class RecordingsController < BaseController
                      end
 
       # Clean up older export note zip files (>1 hour old)
-      Dir.glob(File.join(RecordingService::DIR, 'export_note_*_*.zip')).each do |old_zip|
+      Dir.glob(File.join(RecordingService.dir, 'export_note_*_*.zip')).each do |old_zip|
         File.delete(old_zip) rescue nil if File.mtime(old_zip) < (Time.now - 3600)
       end
 
-      zip_path = File.join(RecordingService::DIR, "export_note_#{SecureRandom.hex(4)}_#{zip_filename}")
+      zip_path = File.join(RecordingService.dir, "export_note_#{SecureRandom.hex(4)}_#{zip_filename}")
 
       content = File.read(path) rescue ''
       rewritten_content = content.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
@@ -1440,10 +1440,12 @@ class RecordingsController < BaseController
 
   get '/recordings/git/diff/:hash' do
     content_type :json
+    slug = params[:walkthrough] || params[:slug]
+    path = params[:path]
     result = if params[:hash] == 'working' || params[:hash] == 'workdir'
-               RecordingGitService.diff_working(path: params[:path], slug: params[:walkthrough] || params[:slug])
+               RecordingGitService.diff_working(path: path, slug: slug)
              else
-               RecordingGitService.diff(params[:hash])
+               RecordingGitService.diff(params[:hash], slug: slug, path: path)
              end
     unless result[:ok]
       status 422
@@ -1475,20 +1477,20 @@ class RecordingsController < BaseController
     content_type :json
     p = json_or_form_params
     msg = (p[:message] || p['message']).to_s.strip
-    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    slug = (p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']).to_s.strip
     path = (p[:path] || p['path']).to_s.strip
     msg = "Manual commit: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}" if msg.empty?
     files = nil
     if !path.empty?
       clean_path = path
-      if slug && !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
+      if !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
         clean_path = File.join(slug, clean_path)
       end
       files = [clean_path]
-    elsif slug && !slug.empty? && slug != 'default'
+    elsif !slug.empty? && slug != 'default'
       files = [slug]
     end
-    result = RecordingGitService.commit(msg, files: files)
+    result = RecordingGitService.commit(msg, files: files, slug: slug)
     unless result[:ok]
       status 422
       return result.to_json
@@ -1503,20 +1505,20 @@ class RecordingsController < BaseController
     content_type :json
     p = json_or_form_params
     msg = (p[:message] || p['message']).to_s.strip
-    slug = p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']
+    slug = (p[:walkthrough] || p['walkthrough'] || p[:slug] || p['slug']).to_s.strip
     path = (p[:path] || p['path']).to_s.strip
     msg = "Manual snapshot: #{Time.now.strftime('%Y-%m-%d %H:%M:%S')}" if msg.empty?
     files = nil
     if !path.empty?
       clean_path = path
-      if slug && !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
+      if !slug.empty? && slug != 'default' && !clean_path.start_with?("#{slug}/")
         clean_path = File.join(slug, clean_path)
       end
       files = [clean_path]
-    elsif slug && !slug.empty? && slug != 'default'
+    elsif !slug.empty? && slug != 'default'
       files = [slug]
     end
-    result = RecordingGitService.commit(msg, files: files)
+    result = RecordingGitService.commit(msg, files: files, slug: slug)
     unless result[:ok]
       status 422
       return result.to_json
@@ -1563,7 +1565,8 @@ class RecordingsController < BaseController
 
   get '/recordings/git/status' do
     content_type :json
-    result = RecordingGitService.status
+    slug = params[:walkthrough] || params[:slug]
+    result = RecordingGitService.status(slug: slug)
     result.to_json
   rescue StandardError => e
     status 500

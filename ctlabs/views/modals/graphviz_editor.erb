@@ -259,7 +259,9 @@
                 </button>
               </div>
             </div>
-            <pre id="md-graphviz-dot-output" style="margin: 0; padding: 10px 12px; flex: 1; min-height: 0; overflow: auto; font-family: 'Courier New', Courier, monospace; font-size: 12.5px; line-height: 1.45; color: #e2e8f0; white-space: pre; user-select: text; background: #0b1120;"></pre>
+            <div id="md-graphviz-dot-editor-wrap" style="flex: 1 1 0%; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden;">
+              <textarea id="md-graphviz-dot-output" readonly spellcheck="false" autocomplete="off" style="width: 100%; height: 100%; box-sizing: border-box; flex: 1; min-height: 0; resize: none; margin: 0; padding: 10px 12px; font-family: 'Courier New', Courier, monospace; font-size: 12.5px; line-height: 1.45; color: #e2e8f0; white-space: pre-wrap; word-break: break-word; background: #0b1120; border: none; outline: none;"></textarea>
+            </div>
           </div>
 
           <div id="md-graphviz-vim-status-bar" style="display: none; margin-top: 4px; padding: 3px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; flex: none;">
@@ -321,7 +323,7 @@
       </div>
       <div>
         <label style="display: block; font-size: 0.82em; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">Ruby Implementation (<code style="color:#38bdf8;">def name(...) ... end</code>)</label>
-        <textarea id="md-graphviz-block-code" placeholder="def my_block(id, label: nil)&#10;  host(id, name: label || id, icon: &quot;💻&quot;)&#10;end" spellcheck="false" style="width: 100%; height: 140px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 8px 10px; color: #e2e8f0; font-size: 0.85em; font-family: monospace; line-height: 1.4; resize: vertical;"></textarea>
+        <textarea id="md-graphviz-block-code" placeholder="def my_block(id, label: nil, **attr)&#10;  host(id, name: label || id, icon: &quot;💻&quot;, **attr)&#10;end" spellcheck="false" style="width: 100%; height: 140px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 8px 10px; color: #e2e8f0; font-size: 0.85em; font-family: monospace; line-height: 1.4; resize: vertical;"></textarea>
       </div>
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
         <div>

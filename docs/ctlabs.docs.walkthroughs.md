@@ -125,3 +125,43 @@ The editor supports GitHub-style emoji shortcodes both when authoring and when p
 - **Import Button**: Click the **Import** button next to the walkthrough title.
 - **Duplicate Protection**: Importing files with matching names offers conflict warnings or automatic unique naming to avoid overwriting existing documentation.
 - **Image Path Normalization**: Imported markdown zip files automatically resolve local relative image links to `/recordings/images/` so screenshots render immediately.
+
+---
+
+## 8. Git Repository Sync
+
+Each walkthrough set can be linked to its own git repository so sets can be authored locally, versioned remotely, and shared between CTLABS installations. The git metadata is kept **outside** the set directory, so it never pollutes the set folder or the server's recording storage.
+
+- **Open the Git Dialog**: Click the <i class="fas fa-code-branch"></i> branch icon in the Walkthroughs toolbar. The dialog shows the current link state, remote, branch, last commit, ahead/behind counts, and any uncommitted files.
+- **Link an Existing Set**:
+  - Open the set, enter a **Remote URL** (and optional branch), then click **Link / Save Remote**.
+  - The first **Push** creates the branch on the remote (the branch is created from the set's current files).
+- **Clone a Repository as a New Set**:
+  - Expand **Clone a repository as a new walkthrough set** in the dialog, enter the repository URL, and optionally a branch and set name.
+  - The clone is imported into `/srv/ctlabs-server/recordings/<slug>/` and opened immediately.
+  - Cloning always creates a new set; existing sets are never overwritten.
+- **Sync Actions**:
+  - **Fetch**: Updates remote-tracking refs without touching local files.
+  - **Pull**: Fast-forward only. Pull fails rather than creating merge conflicts; resolve divergent branches in the remote repository or via the CLI.
+  - **Push**: Commits any local changes (using the message field) and pushes the branch upstream.
+  - **Commit**: Commits local changes without pushing.
+  - **Unlink**: Removes the local git link and metadata. The set files stay on disk.
+- **What Is Tracked**:
+  - Manifests, Markdown notes, terminal `.cast` recordings, image attachments, and other set files are tracked.
+  - `.webm`/`.mp4` videos are excluded from git sync to keep repositories small. Existing tracked videos remain tracked; new videos are ignored.
+- **Remote URL Support**:
+  - Supported: `https://`, `http://`, `ssh://`, `git://`, and scp-like `git@host:org/repo.git`.
+  - SSH uses the server's `~/.ssh` configuration and SSH agent (non-interactive; host keys are accepted on first use).
+  - HTTPS credentials may be embedded in the URL (`https://token@host/org/repo.git`); credentials are redacted in status responses.
+  - `file://` and absolute local paths are disabled by default and only allowed when `CTLABS_GIT_ALLOW_LOCAL_REMOTES=1`.
+  - `ext::` transport helpers, option-looking URLs, whitespace, and control characters are rejected.
+- **Environment Overrides**:
+  - `CTLABS_RECORDINGS_ROOT` (default `/srv/ctlabs-server/recordings`) controls where sets live.
+  - `CTLABS_WALKTHROUGH_GIT_DIR` (default `/srv/ctlabs-server/walkthrough-git`) controls where per-set git metadata is stored.
+- **Relationship to Version History**:
+  - The existing **Version History** dialog (<i class="fas fa-history"></i>) continues to track the whole recording root in a separate local repository.
+  - Git sync operations also mirror their commit into that local history, so per-set changes remain visible in the server's version history.
+- **Operational Notes**:
+  - Git must be installed on the server; the dialog reports when it is not.
+  - Pull/push commands run non-interactively with a 180-second timeout.
+  - Failed clones clean up the partially created set directory and git metadata automatically.
