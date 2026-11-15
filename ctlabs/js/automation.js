@@ -66,6 +66,7 @@ window.loadAvailableRepositories = async function() {
 // --- ANSIBLE ---
 // ----------------------------------------------------------------------------
 window.openAnsTab = function(tabId) {
+  window.currentAnsibleTab = tabId;
   document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
       
   document.querySelectorAll(".ans-tablink").forEach(btn => {
@@ -81,7 +82,14 @@ window.openAnsTab = function(tabId) {
   });
       
   const activeTab = document.getElementById(tabId);
-  if (activeTab) activeTab.style.display = "block";
+  if (activeTab) {
+    if (tabId === 'AnsSettings') {
+      activeTab.style.display = "block";
+    } else {
+      activeTab.style.display = "flex";
+      activeTab.style.flexDirection = "column";
+    }
+  }
 
   if (tabId === 'AnsSettings') {
     const envEl = document.getElementById('edit-ansible-env');
@@ -99,6 +107,10 @@ window.openAnsTab = function(tabId) {
   const taId = 'editor-' + tabId;
   if (window.cmEditors[taId]) {
     setTimeout(() => window.cmEditors[taId].refresh(), 50);
+  }
+
+  if (window.updateAnsibleVimStatus) {
+    window.updateAnsibleVimStatus();
   }
       
   // --- NEW: Remember the actively clicked tab! ---
@@ -214,7 +226,7 @@ window.openAnsTab = function(tabId) {
       div.style.display = "none";
       div.style.height = "100%";
       div.setAttribute('data-filepath', filepath);
-      div.innerHTML = `<textarea id="editor-${tabId}"></textarea>`;
+      div.innerHTML = `<div style="flex: 1; min-height: 0; height: 100%; position: relative;"><textarea id="editor-${tabId}"></textarea></div>`;
       
       const container = document.getElementById('ans-editors-container');
       container.insertBefore(div, document.getElementById('ansible-editor-result'));
@@ -262,6 +274,7 @@ window.loadAnsProfiles = async function() {
   window.openAnsibleEditor = async function(labName, base) {
     window.automationBase = base || null;
     window.currentEditLab = labName;
+    if (window.refreshAnsibleToolbar) window.refreshAnsibleToolbar();
     // Update labels for controller vs lab context. The modal renders both the
     // lab (automation/lab/) and controller (automation/ctl/) file paths into
     // data-lab-label / data-ctl-label; pick the one matching this context.

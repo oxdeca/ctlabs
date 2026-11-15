@@ -52,6 +52,151 @@ if (typeof CodeMirror.defineSimpleMode === 'function') {
   });
 }
 
+// --- ANSIBLE EDITOR PREFERENCES (vim / line wrap) ---
+window.isAnsibleEditorId = function(id) {
+    return /^editor-(Ans|ans-tab-)/.test(id || '');
+};
+
+window.AnsEditorPrefs = {
+    get: function() {
+        let wrap = true, vim = false;
+        try {
+            const w = localStorage.getItem('ctlabs_ansible_line_wrap');
+            if (w !== null) wrap = w === 'true';
+            vim = localStorage.getItem('ctlabs_ansible_vim_mode') === 'true';
+        } catch (e) {}
+        return { wrap: wrap, vim: vim };
+    },
+    set: function(key, val) {
+        try { localStorage.setItem(key === 'wrap' ? 'ctlabs_ansible_line_wrap' : 'ctlabs_ansible_vim_mode', val ? 'true' : 'false'); } catch (e) {}
+    }
+};
+
+window.updateAnsibleVimStatus = function(e) {
+    const bar = document.getElementById('ans-vim-status-bar');
+    const modeEl = document.getElementById('ans-vim-status-mode');
+    const keyEl = document.getElementById('ans-vim-status-key');
+    if (!bar || !modeEl) return;
+
+    const prefs = window.AnsEditorPrefs.get();
+    const activeTab = window.currentAnsibleTab || '';
+    const isEditorTab = activeTab && activeTab !== 'AnsSettings';
+
+    if (!prefs.vim || !isEditorTab) {
+        bar.style.display = 'none';
+        return;
+    }
+    bar.style.display = 'flex';
+
+    let mode = e ? e.mode : null;
+    let subMode = e ? e.subMode : '';
+    if (!mode) {
+        const ed = (activeTab && window.cmEditors['editor-' + activeTab]) || null;
+        if (ed && ed.state && ed.state.vim) {
+            const vState = ed.state.vim;
+            if (vState.insertMode) mode = 'insert';
+            else if (vState.visualMode) mode = 'visual';
+            else mode = 'normal';
+        }
+    }
+    if (!mode) mode = 'normal';
+
+    if (mode === 'insert') {
+        modeEl.textContent = '-- INSERT --';
+        modeEl.style.color = '#38bdf8';
+    } else if (mode === 'visual') {
+        modeEl.textContent = subMode === 'linewise' ? '-- VISUAL LINE --' : (subMode === 'blockwise' ? '-- VISUAL BLOCK --' : '-- VISUAL --');
+        modeEl.style.color = '#f59e0b';
+    } else if (mode === 'replace') {
+        modeEl.textContent = '-- REPLACE --';
+        modeEl.style.color = '#ef4444';
+    } else {
+        modeEl.textContent = '-- NORMAL --';
+        modeEl.style.color = '#22c55e';
+    }
+
+    if (keyEl && (!e || e.keyBuffer === '')) {
+        keyEl.textContent = '';
+    }
+};
+
+window.attachAnsibleVimStatus = function(editor) {
+    editor.on('vim-mode-change', function(e) {
+        window.updateAnsibleVimStatus(e);
+    });
+    editor.on('vim-keypress', function(key) {
+        const el = document.getElementById('ans-vim-status-key');
+        if (el) el.textContent = key || '';
+    });
+};
+
+window.refreshAnsibleToolbar = function() {
+    const prefs = window.AnsEditorPrefs.get();
+    const wrapCb = document.getElementById('ans-setting-wrap-checkbox');
+    const vimCb = document.getElementById('ans-setting-vim-checkbox');
+    if (wrapCb) wrapCb.checked = prefs.wrap;
+    if (vimCb) vimCb.checked = prefs.vim;
+
+    const btn = document.getElementById('ans-settings-btn');
+    if (btn) {
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.style.color = (prefs.vim || !prefs.wrap) ? '#38bdf8' : '#94a3b8';
+        }
+    }
+    window.updateAnsibleVimStatus();
+};
+
+window.toggleAnsibleSettingsMenu = function(open) {
+    const menu = document.getElementById('ans-settings-menu');
+    if (!menu) return;
+    const isClosed = !menu.style.display || menu.style.display === 'none';
+    const shouldOpen = (open !== undefined) ? open : isClosed;
+    menu.style.display = shouldOpen ? 'block' : 'none';
+    if (shouldOpen) {
+        window.refreshAnsibleToolbar();
+    }
+};
+
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('ans-settings-menu');
+    const btn = document.getElementById('ans-settings-btn');
+    if (!menu || menu.style.display === 'none') return;
+    if (!menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
+
+window.setAnsibleEditorPref = function(key, val) {
+    window.AnsEditorPrefs.set(key, val);
+    Object.keys(window.cmEditors).forEach(function(id) {
+        if (!window.isAnsibleEditorId(id)) return;
+        const ed = window.cmEditors[id];
+        if (!ed || !ed.setOption) return;
+        if (key === 'wrap') ed.setOption('lineWrapping', !!val);
+        if (key === 'vim') ed.setOption('keyMap', (val && CodeMirror.Vim) ? 'vim' : 'default');
+        setTimeout(function() { ed.refresh(); }, 20);
+    });
+    window.refreshAnsibleToolbar();
+};
+
+window.toggleAnsibleWrap = function() { window.setAnsibleEditorPref('wrap', !window.AnsEditorPrefs.get().wrap); };
+window.toggleAnsibleVim = function() {
+    if (!CodeMirror.Vim) { alert('Vim keymap is not loaded.'); return; }
+    window.setAnsibleEditorPref('vim', !window.AnsEditorPrefs.get().vim);
+};
+
+// :w / :wq / :q ex-commands for the ansible editor
+if (window.CodeMirror && CodeMirror.Vim && !window.__ansVimExDefined) {
+    window.__ansVimExDefined = true;
+    const inAns = function(cm) { const ta = cm.getTextArea && cm.getTextArea(); return ta && window.isAnsibleEditorId(ta.id); };
+    const closeAns = function() { const m = document.getElementById('ansible-editor-modal'); if (m) m.style.display = 'none'; };
+    const prevW = null;
+    CodeMirror.Vim.defineEx('write', 'w', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig(); });
+    CodeMirror.Vim.defineEx('wq', 'wq', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) { window.saveAnsibleConfig(); closeAns(); } });
+    CodeMirror.Vim.defineEx('quit', 'q', function(cm) { if (inAns(cm)) closeAns(); });
+}
+
 // --- UNIVERSAL EDITOR FACTORY ---
 window.initCodeEditor = function(textAreaId, langMode) {
     const existing = window.cmEditors[textAreaId];
@@ -72,18 +217,35 @@ window.initCodeEditor = function(textAreaId, langMode) {
 
     const ta = document.getElementById(textAreaId);
     if (!ta) return null;
-    // Build the new editor dynamically
-    const editor = CodeMirror.fromTextArea(ta, {
+    // Ansible editor tabs get extra capabilities (vim keymap, line wrapping, bigger area)
+    const isAns = window.isAnsibleEditorId(textAreaId);
+    const opts = {
         mode: langMode,
         theme: 'material-ocean',
         lineNumbers: true,
         tabSize: 2,
-        viewportMargin: Infinity
-    });
-    
-    editor.setSize("100%", "auto");
-    editor.getWrapperElement().style.minHeight = "400px";
-    
+        viewportMargin: 15
+    };
+    if (isAns) {
+        const prefs = window.AnsEditorPrefs.get();
+        opts.lineWrapping = prefs.wrap;
+        if (prefs.vim && CodeMirror.Vim) opts.keyMap = 'vim';
+    }
+    const editor = CodeMirror.fromTextArea(ta, opts);
+
+    if (isAns) {
+        editor.setSize("100%", "100%");
+        editor.getWrapperElement().style.minHeight = "0";
+        window.attachAnsibleVimStatus(editor);
+        editor.setOption('extraKeys', {
+            'Ctrl-S': () => { if (window.saveAnsibleConfig) window.saveAnsibleConfig(); },
+            'Cmd-S':  () => { if (window.saveAnsibleConfig) window.saveAnsibleConfig(); }
+        });
+    } else {
+        editor.setSize("100%", "auto");
+        editor.getWrapperElement().style.minHeight = "400px";
+    }
+
     window.cmEditors[textAreaId] = editor;
     
     // Refresh to fix the hidden-div glitch
