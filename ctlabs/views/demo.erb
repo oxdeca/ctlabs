@@ -4093,5 +4093,13 @@ if (metaForm) {
             }
           }
         };
+
+        // Auto-open Graphviz Editor if requested via URL query (?graphviz=<diagram_base>)
+        const autoGraphviz = new URLSearchParams(window.location.search).get('graphviz');
+        if (autoGraphviz) {
+          setTimeout(() => {
+            openGraphvizModal(autoGraphviz);
+          }, 350);
+        }
       })();
     </script>

@@ -3868,7 +3868,52 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     if (mdGraphvizTemplate) {
       mdGraphvizTemplate.addEventListener('change', () => {
         const key = mdGraphvizTemplate.value;
-        if (!key || !MD_GRAPHVIZ_TEMPLATES[key]) return;
+        if (!key) return;
+
+        if (key.startsWith('lab_')) {
+          const mapType = key.replace(/^lab_/, '');
+          const currentVal = getGraphvizEditorValue();
+          if (currentVal.trim() && !isDefaultGraphvizSource(currentVal)) {
+            if (!confirm('Replace current DOT source with live lab map?')) {
+              mdGraphvizTemplate.value = '';
+              return;
+            }
+          }
+          fetch(`/maps/dot/${encodeURIComponent(mapType)}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data.ok && data.dot) {
+                const mapName = data.name || key;
+                if (mdGraphvizName && (!mdGraphvizName.value.trim() || mdGraphvizName.value.startsWith('diagram'))) {
+                  mdGraphvizName.value = mapName;
+                }
+                const currentName = (mdGraphvizName && mdGraphvizName.value.trim()) || mapName;
+                const templateSource = formatGraphvizDocHeader(currentName) + data.dot;
+
+                setGraphvizEditorValue(templateSource);
+                if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
+                  if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${currentName}`;
+                  if (mdGraphvizExisting) {
+                    let blank = mdGraphvizExisting.querySelector('option[value=""]');
+                    if (blank) blank.textContent = `${currentName} (unsaved)`;
+                  }
+                }
+                mdGraphvizTemplate.value = '';
+                renderGraphviz();
+              } else {
+                alert(data.error || 'Failed to load lab map DOT source.');
+                mdGraphvizTemplate.value = '';
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              alert('Error loading lab map: ' + err.message);
+              mdGraphvizTemplate.value = '';
+            });
+          return;
+        }
+
+        if (!MD_GRAPHVIZ_TEMPLATES[key]) return;
 
         const currentVal = getGraphvizEditorValue();
         if (currentVal.trim() && !isDefaultGraphvizSource(currentVal)) {

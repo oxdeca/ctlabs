@@ -834,25 +834,36 @@ host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
     conf_path
   end
 
-  def to_dot(data)
+  def to_dot(data, name = nil)
     @log.write "#{__method__}(): data=#{data}", "debug"
 
+    rendered = ERB.new(data, trim_mode:'-').result(@binding)
     File.open("#{@dotfile}", "w" ) do |f|
-      f.write( ERB.new(data, trim_mode:'-').result(@binding) )
+      f.write( rendered )
     end
+    if name && @pubdir
+      begin
+        File.open("#{@pubdir}/#{name}.dot", "w") do |f|
+          f.write( rendered )
+        end
+      rescue StandardError => _e
+        # ignore write error
+      end
+    end
+    rendered
   end
 
   def to_png(data, name)
     @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
 
-    to_dot(data)
+    to_dot(data, name)
     %x( dot -Tpng #{@dotfile} -o #{@pubdir}/#{name}.png )
   end
 
   def to_svg(data, name)
     @log.write "#{__method__}(): data=#{data},name=#{name}", "debug"
 
-    to_dot(data)
+    to_dot(data, name)
     %x( dot -Tsvg #{@dotfile} -o #{@pubdir}/#{name}.svg )
   end
 

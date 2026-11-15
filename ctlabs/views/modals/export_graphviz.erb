@@ -1,0 +1,276 @@
+<!--
+# -----------------------------------------------------------------------------
+# File        : ctlabs/views/modals/export_graphviz.erb
+# License     : MIT License
+# -----------------------------------------------------------------------------
+-->
+
+<div id="export-graphviz-modal" class="w3-modal" style="z-index: 10005; padding-top: 50px;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 560px; margin: auto; border: 1px solid #334155; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+    <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-download"></i> Export to Graphviz Editor
+      </h3>
+      <span onclick="document.getElementById('export-graphviz-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 12px 18px; border-top-right-radius: 8px;">&times;</span>
+    </header>
+
+    <form onsubmit="window.submitExportGraphviz(event);">
+      <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="export-gv-type" value="topo" />
+
+        <div>
+          <label style="display: block; color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <i class="fas fa-project-diagram" style="color: #38bdf8;"></i> Source Diagram
+          </label>
+          <div id="export-gv-type-display" style="padding: 8px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-weight: 600; color: #f8fafc; font-size: 0.9em;">
+            Topology — Data Network
+          </div>
+        </div>
+
+        <div>
+          <label for="export-gv-name" style="display: block; color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <i class="fas fa-tag" style="color: #38bdf8;"></i> Diagram Name
+          </label>
+          <input type="text" id="export-gv-name" required class="w3-input" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;" placeholder="study.net01.topo.01" />
+          <span style="font-size: 0.78em; color: #64748b; margin-top: 4px; display: block;">
+            Creates &lt;name&gt;.dot and &lt;name&gt;.svg in the walkthrough images directory.
+          </span>
+        </div>
+
+        <div>
+          <label for="export-gv-walkthrough" style="display: block; color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <i class="fas fa-folder-open" style="color: #38bdf8;"></i> Target Walkthrough Set
+          </label>
+          <select id="export-gv-walkthrough" onchange="window.updateExportNotesDropdown()" class="w3-select" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;">
+          </select>
+        </div>
+
+        <div>
+          <label for="export-gv-note" style="display: block; color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Target Markdown Document
+          </label>
+          <select id="export-gv-note" onchange="window.toggleNewNoteTitleBox()" class="w3-select" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;">
+          </select>
+        </div>
+
+        <div id="export-gv-new-note-title-box" style="display: none;">
+          <label for="export-gv-new-note-title" style="display: block; color: #94a3b8; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <i class="fas fa-pen" style="color: #38bdf8;"></i> New Document Title
+          </label>
+          <input type="text" id="export-gv-new-note-title" class="w3-input" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;" placeholder="Topology Overview" />
+        </div>
+
+        <div id="export-gv-error" style="color: #ef4444; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 8px 12px; border-radius: 4px; font-size: 0.85em; display: none;"></div>
+      </div>
+
+      <footer style="padding: 12px 18px; background: #0f172a; border-top: 1px solid #334155; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" onclick="document.getElementById('export-graphviz-modal').style.display='none'" class="w3-button w3-round" style="background: #334155; color: #e2e8f0; font-size: 0.88em; font-weight: 500; padding: 6px 14px;">
+          Cancel
+        </button>
+        <button type="submit" id="export-gv-submit-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.88em; font-weight: 600; padding: 6px 16px; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fas fa-download"></i> Export &amp; Open in Editor
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<script>
+  window.exportInfoData = null;
+
+  window.openExportGraphvizModal = function(diagramType) {
+    const modal = document.getElementById('export-graphviz-modal');
+    if (!modal) return;
+
+    const typeInput = document.getElementById('export-gv-type');
+    const typeDisplay = document.getElementById('export-gv-type-display');
+    const nameInput = document.getElementById('export-gv-name');
+    const wkSelect = document.getElementById('export-gv-walkthrough');
+    const errorBox = document.getElementById('export-gv-error');
+    const submitBtn = document.getElementById('export-gv-submit-btn');
+
+    if (errorBox) {
+      errorBox.textContent = '';
+      errorBox.style.display = 'none';
+    }
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="fas fa-download"></i> Export &amp; Open in Editor';
+    }
+
+    typeInput.value = diagramType || 'topo';
+    modal.style.display = 'block';
+
+    fetch('/maps/export_info')
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          window.exportInfoData = data;
+          const typeNames = data.types || {
+            topo: 'Topology — Data Network',
+            mgmt_topo: 'Topology — Management Network',
+            con: 'Connections — Data Network',
+            mgmt_con: 'Connections — Management Network'
+          };
+          typeDisplay.textContent = typeNames[typeInput.value] || typeInput.value;
+
+          wkSelect.innerHTML = '';
+          (data.walkthrough_sets || []).forEach(set => {
+            const opt = document.createElement('option');
+            opt.value = set.slug;
+            opt.textContent = set.name || set.slug;
+            if (set.slug === data.active_walkthrough) opt.selected = true;
+            wkSelect.appendChild(opt);
+          });
+
+          const labClean = data.lab || 'lab';
+          const suggested = `study.${labClean}.${typeInput.value}.01`;
+          nameInput.value = suggested;
+          nameInput.focus();
+          nameInput.select();
+
+          window.updateExportNotesDropdown();
+        } else {
+          typeDisplay.textContent = typeInput.value;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        typeDisplay.textContent = typeInput.value;
+      });
+  };
+
+  window.updateExportNotesDropdown = function() {
+    const wkSelect = document.getElementById('export-gv-walkthrough');
+    const noteSelect = document.getElementById('export-gv-note');
+    if (!wkSelect || !noteSelect || !window.exportInfoData) return;
+
+    const currentWk = wkSelect.value;
+    const currentSet = (window.exportInfoData.walkthrough_sets || []).find(s => s.slug === currentWk);
+    const notes = (currentSet && currentSet.notes) || [];
+    const activeNoteId = (currentSet && currentSet.active_note) || '';
+
+    noteSelect.innerHTML = '';
+
+    // 1. Existing Notes in this set
+    if (notes.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'Existing Documents';
+      let foundActive = false;
+      notes.forEach((note, idx) => {
+        const opt = document.createElement('option');
+        opt.value = note.id;
+        opt.textContent = `${note.title || note.id}`;
+        if (note.id === activeNoteId || (!activeNoteId && idx === 0)) {
+          opt.selected = true;
+          foundActive = true;
+        }
+        group.appendChild(opt);
+      });
+      noteSelect.appendChild(group);
+    }
+
+    // 2. Option to create a new document
+    const optNew = document.createElement('option');
+    optNew.value = '__new__';
+    optNew.textContent = '+ Create New Document';
+    if (notes.length === 0) optNew.selected = true;
+    noteSelect.appendChild(optNew);
+
+    // 3. Option to not insert into any document
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = '— Do not insert into document (editor only) —';
+    noteSelect.appendChild(optNone);
+
+    window.toggleNewNoteTitleBox();
+  };
+
+  window.toggleNewNoteTitleBox = function() {
+    const noteSelect = document.getElementById('export-gv-note');
+    const newNoteBox = document.getElementById('export-gv-new-note-title-box');
+    const newNoteInput = document.getElementById('export-gv-new-note-title');
+    const typeDisplay = document.getElementById('export-gv-type-display');
+    if (!noteSelect || !newNoteBox) return;
+
+    if (noteSelect.value === '__new__') {
+      newNoteBox.style.display = 'block';
+      if (newNoteInput && !newNoteInput.value.trim() && typeDisplay) {
+        newNoteInput.value = typeDisplay.textContent.trim() || 'New Document';
+      }
+    } else {
+      newNoteBox.style.display = 'none';
+    }
+  };
+
+  window.submitExportGraphviz = function(e) {
+    if (e) e.preventDefault();
+    const type = document.getElementById('export-gv-type').value;
+    const name = document.getElementById('export-gv-name').value.trim();
+    const wk = document.getElementById('export-gv-walkthrough').value;
+    const noteId = document.getElementById('export-gv-note') ? document.getElementById('export-gv-note').value : '';
+    const newNoteTitle = document.getElementById('export-gv-new-note-title') ? document.getElementById('export-gv-new-note-title').value.trim() : '';
+    const submitBtn = document.getElementById('export-gv-submit-btn');
+    const errorBox = document.getElementById('export-gv-error');
+
+    if (!name) {
+      if (errorBox) {
+        errorBox.textContent = 'Please enter a diagram name.';
+        errorBox.style.display = 'block';
+      }
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting...';
+    if (errorBox) errorBox.style.display = 'none';
+
+    const formData = new URLSearchParams();
+    formData.append('type', type);
+    formData.append('name', name);
+    formData.append('walkthrough', wk);
+    formData.append('note_id', noteId);
+    if (noteId === '__new__') {
+      formData.append('new_note_title', newNoteTitle);
+    }
+
+    fetch('/maps/export_to_graphviz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString()
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          submitBtn.innerHTML = '<i class="fas fa-check"></i> Exported! Opening...';
+          const targetUrl = data.redirect || (`/demo?walkthrough=${encodeURIComponent(data.walkthrough || wk)}&graphviz=${encodeURIComponent(data.base || name)}`);
+          window.location.href = targetUrl;
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-download"></i> Export &amp; Open in Editor';
+          if (errorBox) {
+            errorBox.textContent = data.error || 'Failed to export diagram.';
+            errorBox.style.display = 'block';
+          }
+        }
+      })
+      .catch(err => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-download"></i> Export &amp; Open in Editor';
+        if (errorBox) {
+          errorBox.textContent = 'Network or server error: ' + err.message;
+          errorBox.style.display = 'block';
+        }
+      });
+  };
+
+  window.exportCurrentMapToGraphviz = function() {
+    const prefix = window.currentMapPrefix || 'topo';
+    let type = prefix;
+    const mgmtTab = document.getElementById('MgmtNet');
+    if (mgmtTab && mgmtTab.style.display !== 'none') {
+      type = 'mgmt_' + prefix;
+    }
+    window.openExportGraphvizModal(type);
+  };
+</script>

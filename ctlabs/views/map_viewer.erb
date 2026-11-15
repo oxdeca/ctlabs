@@ -9,8 +9,12 @@
 <link rel="stylesheet" href="/css/ctlabs-maps.css">
 <script src="/js/terminal.js"></script>
 <script src="/js/ctlabs-maps.js"></script>
+<script>
+  window.currentMapPrefix = '<%= @file_prefix %>';
+</script>
 
 <%= erb :'modals/terminal_manager' %>
+<%= erb :'modals/export_graphviz' %>
 
 <div id="map-header" class="w3-panel w3-green" style="margin-top: 0; margin-bottom: 16px;">
   <h2><i class="fas <%= @icon %>"></i> <%= @title %></h2>
@@ -22,6 +26,9 @@
   </button>
   <button class="w3-bar-item w3-button tablink w3-round-large" onclick="openMapTab(event, 'MgmtNet')" style="font-weight: 600;">
     <i class="fas fa-network-wired"></i> Management Network
+  </button>
+  <button class="w3-bar-item w3-button w3-right w3-round" onclick="exportCurrentMapToGraphviz()" title="Export current diagram to Graphviz Editor" style="background-color: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.82em; font-weight: 500; padding: 6px 12px; margin: 3px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px;">
+    <i class="fas fa-download" style="color: #38bdf8;"></i> Export
   </button>
 </div>
 

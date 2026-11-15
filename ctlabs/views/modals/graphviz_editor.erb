@@ -52,6 +52,12 @@
           <label for="md-graphviz-template" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Insert template</label>
           <select id="md-graphviz-template" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
             <option value="">Select template…</option>
+            <optgroup label="Current Lab Maps">
+              <option value="lab_topo">Topology (Data Network)</option>
+              <option value="lab_mgmt_topo">Topology (Management Network)</option>
+              <option value="lab_con">Connections (Data Network)</option>
+              <option value="lab_mgmt_con">Connections (Management Network)</option>
+            </optgroup>
             <optgroup label="ERB Topology Templates (Building Blocks)">
               <option value="erb_enterprise">Enterprise Network (ERB)</option>
               <option value="erb_k8s">Kubernetes Cluster (ERB)</option>

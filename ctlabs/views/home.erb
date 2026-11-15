@@ -6,26 +6,34 @@
 # -----------------------------------------------------------------------------
 -->
 
+<%= erb :'modals/export_graphviz' %>
+
 <div style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
   <div style="flex: 1; min-height: 0; overflow-y: auto;">
-    <div id="con" class="w3-panel w3-green" style="margin-bottom: 0;">
-      <h2>🕸 Connections [Data Network] </h2>
+    <div id="con" class="w3-panel w3-green" style="margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 8px 0;">🕸 Connections [Data Network]</h2>
+      <button class="w3-button w3-round" onclick="openExportGraphvizModal('con')" title="Export to Graphviz Editor" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.8em; font-weight: 500; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;">
+        <i class="fas fa-download" style="color: #38bdf8;"></i> Export
+      </button>
     </div>
     <div class="w3-card-4" style="width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" style="display: flex; flex-direction: column;">
-        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span></br>
+        <span>Zoom: <strong><span id="zoom-value-con">100</span>%</strong></span><br>
         <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="con-embed">
       </div>
       <div class="svg-container">
         <embed id="con-embed" src="con.svg" class="w3-round responsive-embed" alt="🕸 Connections" type="image/svg+xml" width="100%">
       </div>
     </div>
-    <div id="topo" class="w3-panel w3-green" style="margin-bottom: 0;">
-      <h2>🗺️ Topology [Data Network]</h2>
+    <div id="topo" class="w3-panel w3-green" style="margin-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+      <h2 style="margin: 8px 0;">🗺️ Topology [Data Network]</h2>
+      <button class="w3-button w3-round" onclick="openExportGraphvizModal('topo')" title="Export to Graphviz Editor" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.8em; font-weight: 500; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px;">
+        <i class="fas fa-download" style="color: #38bdf8;"></i> Export
+      </button>
     </div>
     <div class="w3-card-4" style="width: 100%; overflow: auto; position: relative;">
       <div class="w3-panel w3-text-yellow" style="display: flex; flex-direction: column;">
-        <span> Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span></br>
+        <span> Zoom: <strong><span id="zoom-value-topo">100</span>%</strong></span><br>
         <input type="range" min="50" max="200" value="100" step="5" class="zoom-slider" data-embed-id="topo-embed">
       </div>
       <div class="svg-container">

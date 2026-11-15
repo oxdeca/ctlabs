@@ -876,13 +876,46 @@ class Lab
       # Generate visuals
       lab = Lab.new(cfg: actual_path, log: LabLog.null)
       lab.visualize
-      lab.inventory
+      begin; lab.inventory; rescue StandardError => _e; end
       
       # Update the tracker file with the currently drawn lab
       File.write(tracker_file, lab_name)
       
     rescue => e
       puts "[Warning] Failed to generate visuals for #{lab_name}: #{e.message}"
+    end
+  end
+
+  def self.render_diagram_dot(type, lab_name: nil)
+    clean_type = type.to_s.strip.downcase
+    valid_types = ['topo', 'mgmt_topo', 'con', 'mgmt_con']
+    return nil unless valid_types.include?(clean_type)
+
+    pubdir = '/srv/ctlabs-server/public'
+    target_dot = File.join(pubdir, "#{clean_type}.dot")
+
+    target_lab = lab_name.to_s.strip
+    target_lab = current_name if target_lab.empty?
+
+    # If cached dot file exists and tracker matches target_lab, return it
+    tracker_file = File.join(pubdir, '.topo_tracker')
+    last_lab = File.exist?(tracker_file) ? File.read(tracker_file).strip : ''
+    if File.file?(target_dot) && File.size(target_dot) > 0 && (target_lab.empty? || last_lab == target_lab)
+      cached = File.read(target_dot, encoding: 'UTF-8') rescue nil
+      return cached if cached && !cached.strip.empty?
+    end
+
+    return nil if target_lab.nil? || target_lab.empty?
+    cfg = get_file_path(target_lab)
+    return nil unless File.file?(cfg)
+
+    # Rebuild visuals for target_lab
+    refresh_visuals(target_lab, force: true)
+
+    if File.file?(target_dot) && File.size(target_dot) > 0
+      File.read(target_dot, encoding: 'UTF-8') rescue nil
+    else
+      nil
     end
   end
 
