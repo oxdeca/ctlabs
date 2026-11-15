@@ -1034,8 +1034,28 @@ class RecordingsController < BaseController
 
   get '/recordings/images/:filename' do
     headers 'Access-Control-Allow-Origin' => '*'
-    path = RecordingService.image_path(params[:filename])
+    headers 'Cache-Control' => 'no-cache, must-revalidate'
+
+    wk = params[:walkthrough].to_s.strip
+    wk = params[:set].to_s.strip if wk.empty?
+    wk = session[:walkthrough].to_s.strip if wk.empty?
+
+    if wk.empty? && request.referer
+      begin
+        ref_uri = URI.parse(request.referer)
+        if ref_uri.query
+          q = Rack::Utils.parse_nested_query(ref_uri.query)
+          wk = q['walkthrough'].to_s.strip if q['walkthrough']
+        end
+      rescue StandardError
+      end
+    end
+
+    path = RecordingService.image_path(params[:filename], walkthrough: (wk.empty? ? nil : wk))
     halt 404, 'Image not found' unless path
+
+    headers 'ETag' => %("#{File.mtime(path).to_i}-#{File.size(path)}")
+    headers 'Last-Modified' => File.mtime(path).httpdate
 
     ext = File.extname(path).downcase
     mime = case ext
@@ -1055,8 +1075,13 @@ class RecordingsController < BaseController
 
   get '/recordings/:walkthrough/images/:filename' do
     headers 'Access-Control-Allow-Origin' => '*'
+    headers 'Cache-Control' => 'no-cache, must-revalidate'
+
     path = RecordingService.image_path(params[:filename], walkthrough: params[:walkthrough])
     halt 404, 'Image not found' unless path
+
+    headers 'ETag' => %("#{File.mtime(path).to_i}-#{File.size(path)}")
+    headers 'Last-Modified' => File.mtime(path).httpdate
 
     ext = File.extname(path).downcase
     mime = case ext
@@ -1408,6 +1433,7 @@ class RecordingsController < BaseController
     slug = params[:walkthrough].to_s
     if RecordingService.valid_id?(params[:id])
       session["last_recording_#{slug}"] = params[:id].to_s unless slug.empty?
+      session[:walkthrough] = slug unless slug.empty?
     end
     content_type :json
     { ok: true }.to_json

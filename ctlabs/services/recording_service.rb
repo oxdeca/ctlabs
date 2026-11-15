@@ -598,9 +598,10 @@ class RecordingService
       return target if File.file?(target)
     end
 
-    # 2. Check all walkthrough images directories
-    Dir.glob(File.join(dir, '*', 'images', clean)).each do |p|
-      return p if File.file?(p)
+    # 2. Check all walkthrough images directories, picking the newest if multiple sets have it
+    candidates = Dir.glob(File.join(dir, '*', 'images', clean)).select { |p| File.file?(p) }
+    if candidates.any?
+      return candidates.max_by { |p| File.mtime(p).to_f rescue 0 }
     end
 
     # 3. Check legacy/global images directory

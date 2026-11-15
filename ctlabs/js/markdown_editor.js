@@ -981,6 +981,8 @@
     }
   }
 
+  const diagramCacheBusters = {};
+
   function renderMarkdownPreview() {
     if (!mdPreviewPane) return;
     const raw = (mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '')) || '';
@@ -993,7 +995,21 @@
         });
       }
 
+      const activeWk = getActiveWalkthrough();
       mdPreviewPane.querySelectorAll('img').forEach(img => {
+        const rawSrc = img.getAttribute('src');
+        if (rawSrc && (rawSrc.startsWith('/recordings/images/') || rawSrc.includes('/images/'))) {
+          const cleanSrc = rawSrc.split('?')[0];
+          const queryParams = [];
+          if (activeWk) queryParams.push(`walkthrough=${encodeURIComponent(activeWk)}`);
+          const fname = cleanSrc.substring(cleanSrc.lastIndexOf('/') + 1);
+          const ts = diagramCacheBusters[cleanSrc] || diagramCacheBusters[fname];
+          if (ts) queryParams.push(`t=${ts}`);
+          if (queryParams.length > 0) {
+            img.src = `${cleanSrc}?${queryParams.join('&')}`;
+          }
+        }
+
         const link = img.closest('a');
         if (link && stepIdFromHref(link.getAttribute('href'))) {
           img.title = img.title || 'Click to open step';
@@ -3161,13 +3177,37 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         (base && (noteText.includes(`${base}.svg`) || noteText.includes(`${base}.png`)))
       );
 
+      const nowTs = Date.now();
+      if (data.filename) {
+        diagramCacheBusters[data.filename] = nowTs;
+        diagramCacheBusters[`/recordings/images/${data.filename}`] = nowTs;
+      }
+      if (data.base) {
+        diagramCacheBusters[data.base] = nowTs;
+        diagramCacheBusters[`${data.base}.svg`] = nowTs;
+        diagramCacheBusters[`${data.base}.png`] = nowTs;
+        diagramCacheBusters[`/recordings/images/${data.base}.svg`] = nowTs;
+        diagramCacheBusters[`/recordings/images/${data.base}.png`] = nowTs;
+      }
+      if (base) {
+        diagramCacheBusters[base] = nowTs;
+        diagramCacheBusters[`${base}.svg`] = nowTs;
+        diagramCacheBusters[`${base}.png`] = nowTs;
+        diagramCacheBusters[`/recordings/images/${base}.svg`] = nowTs;
+        diagramCacheBusters[`/recordings/images/${base}.png`] = nowTs;
+      }
+
       if (alreadyReferenced) {
         if (mdPreviewPane) {
           const previewImgs = mdPreviewPane.querySelectorAll('img');
+          const wk = getActiveWalkthrough();
           previewImgs.forEach(img => {
-            if (img.src && (img.src.includes(data.filename) || (base && img.src.includes(base)))) {
+            if (img.src && (img.src.includes(data.filename) || (base && img.src.includes(base)) || (data.base && img.src.includes(data.base)))) {
               const baseSrc = img.src.split('?')[0];
-              img.src = `${baseSrc}?t=${Date.now()}`;
+              const q = [];
+              if (wk) q.push(`walkthrough=${encodeURIComponent(wk)}`);
+              q.push(`t=${nowTs}`);
+              img.src = `${baseSrc}?${q.join('&')}`;
             }
           });
         }
