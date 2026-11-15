@@ -555,6 +555,7 @@ class RecordingService
 
     # Also rename in global images dir if present
     global_dir = ensure_images_dir
+    g_new_dot = nil
     if scoped_dir != global_dir
       g_old_dot = File.join(global_dir, "#{old_clean}#{DOT_EXT}")
       g_new_dot = File.join(global_dir, "#{new_clean}#{DOT_EXT}")
@@ -565,6 +566,23 @@ class RecordingService
       g_old_png = File.join(global_dir, "#{old_clean}.png")
       g_new_png = File.join(global_dir, "#{new_clean}.png")
       FileUtils.mv(g_old_png, g_new_png) if File.exist?(g_old_png) && !File.exist?(g_new_png)
+    end
+
+    # If the renamed .dot file starts with header "# File: <old_clean>", update it
+    [new_dot, g_new_dot].compact.uniq.each do |dot_file|
+      next unless File.file?(dot_file)
+      content = begin
+        File.read(dot_file, encoding: 'UTF-8')
+      rescue StandardError
+        nil
+      end
+      next unless content
+
+      header_regex = /\A(#[ \t]*-{40,}[ \t]*\r?\n#[ \t]*File:[ \t]*)#{Regexp.escape(old_clean)}([ \t]*\r?\n#[ \t]*-{40,}[ \t]*\r?\n?)/
+      if content.match?(header_regex)
+        updated = content.sub(header_regex, "\\1#{new_clean}\\2")
+        File.write(dot_file, updated, encoding: 'UTF-8')
+      end
     end
 
     # Update references in all markdown notes of this walkthrough

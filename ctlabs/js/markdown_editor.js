@@ -1629,13 +1629,39 @@
   let mdGraphvizActiveTab = 'source';
   let mdGraphvizLastDot = '';
 
-  const MD_GRAPHVIZ_DEFAULT = `digraph G {
+  const GRAPHVIZ_DOC_HEADER_REGEX = /^#[ \t]*-{40,}[ \t]*\r?\n#[ \t]*File:[ \t]*[^\r\n]*\r?\n#[ \t]*-{40,}[ \t]*\r?\n?/;
+
+  function formatGraphvizDocHeader(name) {
+    const filename = (name || 'diagram').trim();
+    return `# ------------------------------------------------------------------------------\n# File: ${filename}\n# ------------------------------------------------------------------------------\n`;
+  }
+
+  function updateGraphvizDocHeader(source, name) {
+    const header = formatGraphvizDocHeader(name);
+    if (GRAPHVIZ_DOC_HEADER_REGEX.test(source)) {
+      return source.replace(GRAPHVIZ_DOC_HEADER_REGEX, header);
+    }
+    return header + source;
+  }
+
+  function makeGraphvizDefaultSource(name = 'diagram') {
+    return `${formatGraphvizDocHeader(name)}digraph G {
   <%= graph_header("My Diagram", rankdir: "LR") %>
 
   <%= host("h1", name: "Host 1", ip: "192.168.1.10") %>
   <%= host("h2", name: "Host 2", ip: "192.168.1.11") %>
   <%= link("h1", "h2", label: "sync") %>
 }`;
+  }
+
+  const MD_GRAPHVIZ_DEFAULT = makeGraphvizDefaultSource('diagram');
+
+  function isDefaultGraphvizSource(source) {
+    if (!source || !source.trim()) return true;
+    const stripped = source.replace(GRAPHVIZ_DOC_HEADER_REGEX, '').trim();
+    const defaultStripped = MD_GRAPHVIZ_DEFAULT.replace(GRAPHVIZ_DOC_HEADER_REGEX, '').trim();
+    return stripped === defaultStripped;
+  }
 
   const MD_GRAPHVIZ_SNIPPETS = {
     stack_vertical: `// Force vertical stack order (top to bottom)
@@ -3029,7 +3055,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
-      setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+      setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
       return renderGraphviz({ silent: true });
     }
     if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Loading…';
@@ -3137,7 +3163,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       return;
     }
 
-    setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+    setGraphvizEditorValue(makeGraphvizDefaultSource(cleanName));
     if (mdGraphvizName) mdGraphvizName.value = cleanName;
     if (mdGraphvizExisting) {
       let blank = mdGraphvizExisting.querySelector('option[value=""]');
@@ -3174,6 +3200,11 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       return;
     }
 
+    const curSrc = getGraphvizEditorValue();
+    if (GRAPHVIZ_DOC_HEADER_REGEX.test(curSrc)) {
+      setGraphvizEditorValue(updateGraphvizDocHeader(curSrc, cleanName));
+    }
+
     saveAndInsertGraphviz({ saveAsNew: true, newName: cleanName });
   }
 
@@ -3201,6 +3232,10 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         mdGraphvizExisting.value = '';
       }
       if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
+      const curSrc = getGraphvizEditorValue();
+      if (GRAPHVIZ_DOC_HEADER_REGEX.test(curSrc)) {
+        setGraphvizEditorValue(updateGraphvizDocHeader(curSrc, cleanName));
+      }
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Renamed to ${cleanName}`;
       return;
     }
@@ -3426,13 +3461,22 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       if (window.CtlabsWalkthrough && window.CtlabsWalkthrough.cachedDiagramBases) {
         window.CtlabsWalkthrough.cachedDiagramBases.delete(base);
       }
-      if (mdGraphvizExisting) mdGraphvizExisting.value = '';
       const newName = suggestNewDiagramName();
       if (mdGraphvizName) mdGraphvizName.value = newName;
+      if (mdGraphvizExisting) {
+        let blank = mdGraphvizExisting.querySelector('option[value=""]');
+        if (!blank) {
+          blank = document.createElement('option');
+          blank.value = '';
+          mdGraphvizExisting.insertBefore(blank, mdGraphvizExisting.firstChild);
+        }
+        blank.textContent = `${newName} (unsaved)`;
+        mdGraphvizExisting.value = '';
+      }
       if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
-      setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+      setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Deleted ${base}`;
@@ -3490,10 +3534,10 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
       if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
     } else {
-      if (!getGraphvizEditorValue().trim()) {
-        setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
-      }
       const newName = suggestNewDiagramName();
+      if (!getGraphvizEditorValue().trim()) {
+        setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
+      }
       if (mdGraphvizName) mdGraphvizName.value = newName;
       if (mdGraphvizExisting) {
         let blank = mdGraphvizExisting.querySelector('option[value=""]');
@@ -3825,26 +3869,27 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       mdGraphvizTemplate.addEventListener('change', () => {
         const key = mdGraphvizTemplate.value;
         if (!key || !MD_GRAPHVIZ_TEMPLATES[key]) return;
-        const templateSource = MD_GRAPHVIZ_TEMPLATES[key];
 
         const currentVal = getGraphvizEditorValue();
-        if (currentVal.trim() && currentVal.trim() !== MD_GRAPHVIZ_DEFAULT.trim()) {
+        if (currentVal.trim() && !isDefaultGraphvizSource(currentVal)) {
           if (!confirm('Replace current DOT source with this template?')) {
             mdGraphvizTemplate.value = '';
             return;
           }
         }
 
-        setGraphvizEditorValue(templateSource);
         if (mdGraphvizName && (!mdGraphvizName.value.trim() || mdGraphvizName.value.startsWith('diagram'))) {
           mdGraphvizName.value = key;
         }
+        const currentName = (mdGraphvizName && mdGraphvizName.value.trim()) || key;
+        const templateSource = formatGraphvizDocHeader(currentName) + MD_GRAPHVIZ_TEMPLATES[key];
+
+        setGraphvizEditorValue(templateSource);
         if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
-          const templName = (mdGraphvizName && mdGraphvizName.value) || key;
-          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${templName}`;
+          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${currentName}`;
           if (mdGraphvizExisting) {
             let blank = mdGraphvizExisting.querySelector('option[value=""]');
-            if (blank) blank.textContent = `${templName} (unsaved)`;
+            if (blank) blank.textContent = `${currentName} (unsaved)`;
           }
         }
         mdGraphvizTemplate.value = '';
