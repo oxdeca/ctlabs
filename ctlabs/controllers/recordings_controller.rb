@@ -146,6 +146,9 @@ class RecordingsController < BaseController
           zipfile.get_output_stream("#{rec[:id]}#{ext}") do |io|
             io.write(rewritten_content)
           end
+          sidecar = File.join(File.dirname(rec[:path]), "#{rec[:id]}.json")
+          sidecar = File.join(RecordingService.dir, "#{rec[:id]}.json") unless File.file?(sidecar)
+          zipfile.add("#{rec[:id]}.json", sidecar) if File.file?(sidecar)
         else
           zipfile.add("#{rec[:id]}#{ext}", rec[:path])
           if RecordingService::VIDEO_EXTS.include?(ext)
@@ -1145,6 +1148,10 @@ class RecordingsController < BaseController
         zipfile.get_output_stream("#{base_name}.md") do |io|
           io.write(rewritten_content)
         end
+        sidecar_json = File.join(File.dirname(path), "#{base_name}.json")
+        sidecar_json = File.join(RecordingService.dir, "#{base_name}.json") unless File.file?(sidecar_json)
+        zipfile.add("#{base_name}.json", sidecar_json) if File.file?(sidecar_json)
+
         images_to_add.each do |img_name, img_path|
           zipfile.add("images/#{img_name}", img_path)
           sidecar = File.join(
@@ -1200,6 +1207,11 @@ class RecordingsController < BaseController
     # Ensure update_meta only updates the title field and never touches the node identifier
     if RecordingService.respond_to?(:update_meta)
       RecordingService.update_meta(params[:id], title: title)
+    end
+
+    if request.xhr? || request.accept?('application/json') || request.media_type == 'application/json'
+      content_type :json
+      return { ok: true, id: params[:id], title: title }.to_json
     end
 
     wks  = RecordingService.load_walkthroughs
@@ -1375,6 +1387,23 @@ class RecordingsController < BaseController
     { ok: false, error: e.message }.to_json
   end
 
+  post '/walkthroughs/:slug/graphviz/sources/:base/rename' do
+    content_type :json
+    slug = params[:slug].to_s
+    base = params[:base].to_s.strip
+    new_base = (params[:new_base] || params[:name]).to_s.strip
+    result = RecordingService.rename_diagram(slug, base, new_base)
+    unless result[:ok]
+      status 422
+      return result.to_json
+    end
+
+    result.to_json
+  rescue StandardError => e
+    status 500
+    { ok: false, error: e.message }.to_json
+  end
+
   post '/recordings/:id/active' do
     slug = params[:walkthrough].to_s
     if RecordingService.valid_id?(params[:id])
@@ -1399,12 +1428,14 @@ class RecordingsController < BaseController
     body = request.body.read
     commit_flag = false
     commit_msg = nil
+    new_title = nil
 
     content = if request.media_type == 'application/json'
                 begin
                   parsed = JSON.parse(body)
                   commit_flag = (parsed['commit'] == true || parsed['commit'] == 'true')
                   commit_msg = parsed['message'].to_s if parsed['message']
+                  new_title = parsed['title'].to_s.strip if parsed['title']
                   parsed['content'].to_s
                 rescue StandardError
                   params[:content].to_s
@@ -1412,8 +1443,13 @@ class RecordingsController < BaseController
               else
                 commit_flag = (params[:commit] == 'true')
                 commit_msg = params[:message].to_s if params[:message]
+                new_title = params[:title].to_s.strip if params[:title]
                 params[:content] || body
               end
+
+    if new_title && !new_title.empty? && RecordingService.respond_to?(:update_meta)
+      RecordingService.update_meta(params[:id], title: new_title)
+    end
 
     ok = RecordingService.update_content(params[:id], content, commit: commit_flag, commit_message: commit_msg)
     halt 500, { ok: false, error: 'Failed to save content' }.to_json unless ok

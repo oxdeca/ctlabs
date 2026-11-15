@@ -39,7 +39,7 @@
     try {
       const clean = url.split('?')[0].split('#')[0];
       const filename = clean.substring(clean.lastIndexOf('/') + 1);
-      const match = filename.match(/^([a-zA-Z0-9_\-]+)\.(?:svg|png)$/i);
+      const match = filename.match(/^([a-zA-Z0-9_.\-]+)\.(?:svg|png|dot)$/i);
       return match ? decodeURIComponent(match[1]) : null;
     } catch (err) {
       return null;

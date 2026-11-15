@@ -27,6 +27,10 @@
   const mdGraphvizModal = document.getElementById('md-graphviz-modal');
   const mdGraphvizName = document.getElementById('md-graphviz-name');
   const mdGraphvizExisting = document.getElementById('md-graphviz-existing');
+  const mdGraphvizNewBtn = document.getElementById('md-graphviz-new-btn');
+  const mdGraphvizSaveAsNewBtn = document.getElementById('md-graphviz-save-as-new-btn');
+  const mdGraphvizRenameBtn = document.getElementById('md-graphviz-rename-btn');
+  const mdGraphvizCurrentLabel = document.getElementById('md-graphviz-current-label');
   const mdGraphvizEngine = document.getElementById('md-graphviz-engine');
   const mdGraphvizTemplate = document.getElementById('md-graphviz-template');
   const mdGraphvizTabSource = document.getElementById('md-graphviz-tab-source');
@@ -1088,6 +1092,12 @@
     if (mdTextarea) mdTextarea.value = content;
 
     const payload = { content: content };
+    if (!isAutosave) {
+      const editTitleEl = document.getElementById('edit-title');
+      if (editTitleEl && editTitleEl.value.trim()) {
+        payload.title = editTitleEl.value.trim();
+      }
+    }
     if (commit) {
       payload.commit = true;
       if (commitMessage) payload.message = commitMessage;
@@ -2823,6 +2833,16 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     return false;
   }
 
+  function suggestNewDiagramName() {
+    let base = 'diagram';
+    if (!cachedDiagramBases || !cachedDiagramBases.has(base)) return base;
+    let idx = 1;
+    while (cachedDiagramBases.has(`${base}-${idx}`)) {
+      idx++;
+    }
+    return `${base}-${idx}`;
+  }
+
   function loadGraphvizSources(selectedBase = '') {
     if (!mdGraphvizExisting) return Promise.resolve();
     const activeWalkthrough = getActiveWalkthrough();
@@ -2840,7 +2860,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       mdGraphvizExisting.innerHTML = '';
       const blank = document.createElement('option');
       blank.value = '';
-      blank.textContent = 'New diagram';
+      blank.textContent = '+ New diagram (unsaved)';
       mdGraphvizExisting.appendChild(blank);
       list.forEach(item => {
         if (!item || !item.base) return;
@@ -2849,7 +2869,18 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         opt.textContent = item.base;
         mdGraphvizExisting.appendChild(opt);
       });
-      if (current) mdGraphvizExisting.value = current;
+      if (current && cachedDiagramBases.has(current)) {
+        mdGraphvizExisting.value = current;
+        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${current}`;
+        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
+        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
+      } else {
+        mdGraphvizExisting.value = '';
+        const nameVal = (mdGraphvizName && mdGraphvizName.value) || '';
+        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = nameVal ? `New: ${nameVal}` : '(New diagram)';
+        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+      }
     })
     .catch(() => {});
   }
@@ -2859,12 +2890,16 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       setGraphvizError('');
       mdGraphvizPendingFit = true;
       setGraphvizPreview(null);
+      const newName = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value !== base) ? mdGraphvizName.value : suggestNewDiagramName();
+      if (mdGraphvizName) mdGraphvizName.value = newName;
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
-      return Promise.resolve();
+      setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+      return renderGraphviz({ silent: true });
     }
     if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Loading…';
     const activeWalkthrough = getActiveWalkthrough();
@@ -2877,8 +2912,9 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         setGraphvizEditorValue(data.source);
         if (mdGraphvizName) mdGraphvizName.value = base;
         if (mdGraphvizExisting) mdGraphvizExisting.value = base;
+        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${base}`;
+        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
         if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-        if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
 
         const isReferenced = isDiagramReferencedInActiveNote(base, `${base}.svg`);
         if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = isReferenced ? 'Save Changes' : 'Save & Insert';
@@ -2957,8 +2993,110 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     });
   }
 
+  function startNewGraphvizDiagram() {
+    const defaultName = suggestNewDiagramName();
+    const entered = prompt('Create a new diagram:\nEnter diagram name:', defaultName);
+    if (entered === null) return;
+
+    let cleanName = entered.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+    if (!cleanName) cleanName = 'diagram';
+
+    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
+      alert(`A diagram named "${cleanName}" already exists. Please choose a different name or select it from the Diagram dropdown.`);
+      return;
+    }
+
+    setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
+    if (mdGraphvizName) mdGraphvizName.value = cleanName;
+    if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+    if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
+    if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+    if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+    if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
+    if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+    setGraphvizError('');
+    if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Started new diagram: ${cleanName}`;
+    renderGraphviz({ silent: true });
+    if (mdGraphvizCodeEditor) mdGraphvizCodeEditor.focus();
+  }
+
+  function saveCurrentDiagramAsNew() {
+    const current = (mdGraphvizExisting && mdGraphvizExisting.value) || (mdGraphvizName && mdGraphvizName.value) || 'diagram';
+    const suggested = current.endsWith('-copy') ? `${current}-1` : `${current}-copy`;
+    const entered = prompt('Save copy as new diagram:\nEnter new diagram name:', suggested);
+    if (entered === null) return;
+
+    let cleanName = entered.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+    if (!cleanName) cleanName = 'diagram';
+
+    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
+      alert(`A diagram named "${cleanName}" already exists. Please choose a different name.`);
+      return;
+    }
+
+    saveAndInsertGraphviz({ saveAsNew: true, newName: cleanName });
+  }
+
+  async function renameCurrentDiagram() {
+    const current = (mdGraphvizExisting && mdGraphvizExisting.value) || (mdGraphvizName && mdGraphvizName.value);
+    if (!current) return;
+
+    const entered = prompt(`Rename diagram "${current}":\nEnter new name:`, current);
+    if (entered === null) return;
+
+    let cleanName = entered.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+    if (!cleanName || cleanName === current) return;
+
+    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
+      alert(`A diagram named "${cleanName}" already exists.`);
+      return;
+    }
+
+    const activeWalkthrough = getActiveWalkthrough();
+    try {
+      const res = await fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources/${encodeURIComponent(current)}/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: new URLSearchParams({ new_base: cleanName })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setGraphvizError(data.error || 'Failed to rename diagram.');
+        return;
+      }
+
+      cachedDiagramBases.delete(current);
+      cachedDiagramBases.add(cleanName);
+      if (window.CtlabsWalkthrough && window.CtlabsWalkthrough.cachedDiagramBases) {
+        window.CtlabsWalkthrough.cachedDiagramBases.delete(current);
+        window.CtlabsWalkthrough.cachedDiagramBases.add(cleanName);
+      }
+
+      // Update references in active note editor if present
+      const cm = getMdEditor();
+      if (cm) {
+        const val = cm.getValue();
+        const updated = val.replaceAll(`${current}.svg`, `${cleanName}.svg`)
+                           .replaceAll(`${current}.png`, `${cleanName}.png`)
+                           .replaceAll(`${current}.dot`, `${cleanName}.dot`);
+        if (updated !== val) {
+          cm.setValue(updated);
+        }
+      }
+
+      if (mdGraphvizName) mdGraphvizName.value = cleanName;
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${cleanName}`;
+      await loadGraphvizSources(cleanName);
+      setGraphvizStatus(`Renamed to ${cleanName}`);
+      renderGraphviz({ silent: true });
+    } catch (e) {
+      setGraphvizError('Rename error: ' + (e.message || 'network error'));
+    }
+  }
+
   function saveAndInsertGraphviz(options = {}) {
     const saveAsNew = !!options.saveAsNew;
+    const newNameParam = options.newName;
     const closeAfter = !!options.closeAfter;
     const source = getGraphvizEditorValue();
     if (!source.trim()) {
@@ -2966,22 +3104,26 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       return;
     }
 
-    let name = (mdGraphvizName && mdGraphvizName.value.trim()) || 'diagram';
-    let base = saveAsNew ? '' : ((mdGraphvizExisting && mdGraphvizExisting.value) || '');
-    if (base && name && name !== base) {
-      base = name;
+    let name = '';
+    let base = '';
+    if (saveAsNew && newNameParam) {
+      name = newNameParam;
+      base = '';
+    } else if (saveAsNew) {
+      name = (mdGraphvizName && mdGraphvizName.value.trim()) || 'diagram';
+      if (mdGraphvizExisting && mdGraphvizExisting.value && name === mdGraphvizExisting.value) {
+        name = `${name}-copy`;
+      }
+      base = '';
+    } else {
+      base = (mdGraphvizExisting && mdGraphvizExisting.value) || '';
+      name = (mdGraphvizName && mdGraphvizName.value.trim()) || base || 'diagram';
     }
     const engine = (mdGraphvizEngine && mdGraphvizEngine.value) || 'dot';
 
-    if (saveAsNew && mdGraphvizExisting && mdGraphvizExisting.value) {
-      if (name === mdGraphvizExisting.value) {
-        name = `${name}-copy`;
-      }
-    }
-
     setGraphvizError('');
     if (mdGraphvizInsertBtn) mdGraphvizInsertBtn.disabled = true;
-    if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.disabled = true;
+    if (mdGraphvizSaveAsNewBtn) mdGraphvizSaveAsNewBtn.disabled = true;
     if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Saving…';
 
     const activeWalkthrough = getActiveWalkthrough();
@@ -3036,9 +3178,10 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       if (data.base) {
         if (mdGraphvizExisting) mdGraphvizExisting.value = data.base;
         if (mdGraphvizName) mdGraphvizName.value = data.base;
+        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${data.base}`;
         if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-        if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
-        if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Update';
+        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
+        if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save Changes';
         if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-save';
         loadGraphvizSources(data.base);
       }
@@ -3050,7 +3193,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
 
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
       if (mdGraphvizStatus) {
-        mdGraphvizStatus.textContent = `Saved (${timeStr})`;
+        mdGraphvizStatus.textContent = saveAsNew ? `Saved as new (${timeStr})` : `Saved (${timeStr})`;
         mdGraphvizStatus.style.color = '#38bdf8';
       }
 
@@ -3073,7 +3216,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     })
     .finally(() => {
       if (mdGraphvizInsertBtn) mdGraphvizInsertBtn.disabled = false;
-      if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.disabled = false;
+      if (mdGraphvizSaveAsNewBtn) mdGraphvizSaveAsNewBtn.disabled = false;
     });
   }
 
@@ -3107,10 +3250,12 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         window.CtlabsWalkthrough.cachedDiagramBases.delete(base);
       }
       if (mdGraphvizExisting) mdGraphvizExisting.value = '';
-      if (mdGraphvizName) mdGraphvizName.value = '';
+      const newName = suggestNewDiagramName();
+      if (mdGraphvizName) mdGraphvizName.value = newName;
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
       setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Deleted ${base}`;
@@ -3164,16 +3309,19 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     if (initialBase) {
       if (mdGraphvizName) mdGraphvizName.value = initialBase;
       if (mdGraphvizExisting) mdGraphvizExisting.value = initialBase;
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${initialBase}`;
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-      if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'inline-flex';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
     } else {
       if (!getGraphvizEditorValue().trim()) {
         setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
       }
-      if (mdGraphvizName) mdGraphvizName.value = '';
+      const newName = suggestNewDiagramName();
+      if (mdGraphvizName) mdGraphvizName.value = newName;
       if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizSaveNewBtn) mdGraphvizSaveNewBtn.style.display = 'none';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
     }
@@ -3467,12 +3615,24 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         }
 
         setGraphvizEditorValue(templateSource);
-        if (mdGraphvizName && (!mdGraphvizName.value.trim() || mdGraphvizName.value === 'diagram')) {
+        if (mdGraphvizName && (!mdGraphvizName.value.trim() || mdGraphvizName.value.startsWith('diagram'))) {
           mdGraphvizName.value = key;
+        }
+        if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
+          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${mdGraphvizName ? mdGraphvizName.value : key}`;
         }
         mdGraphvizTemplate.value = '';
         renderGraphviz();
       });
+    }
+    if (mdGraphvizNewBtn) {
+      mdGraphvizNewBtn.addEventListener('click', startNewGraphvizDiagram);
+    }
+    if (mdGraphvizSaveAsNewBtn) {
+      mdGraphvizSaveAsNewBtn.addEventListener('click', saveCurrentDiagramAsNew);
+    }
+    if (mdGraphvizRenameBtn) {
+      mdGraphvizRenameBtn.addEventListener('click', renameCurrentDiagram);
     }
     if (mdGraphvizRenderBtn) {
       mdGraphvizRenderBtn.addEventListener('click', () => renderGraphviz());
@@ -3484,7 +3644,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       mdGraphvizDeleteBtn.addEventListener('click', deleteGraphvizDiagram);
     }
     if (mdGraphvizSaveNewBtn) {
-      mdGraphvizSaveNewBtn.addEventListener('click', () => saveAndInsertGraphviz({ saveAsNew: true }));
+      mdGraphvizSaveNewBtn.addEventListener('click', saveCurrentDiagramAsNew);
     }
     if (mdGraphvizInsertBtn) {
       mdGraphvizInsertBtn.addEventListener('click', () => saveAndInsertGraphviz({ saveAsNew: false }));

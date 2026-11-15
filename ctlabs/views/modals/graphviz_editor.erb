@@ -14,15 +14,26 @@
     </header>
     <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0;">
       <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: none;">
-        <div style="flex: 1 1 200px; min-width: 160px;">
-          <label for="md-graphviz-name" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Diagram name</label>
-          <input type="text" id="md-graphviz-name" placeholder="diagram" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;" />
-        </div>
-        <div style="flex: 1 1 200px; min-width: 160px;">
-          <label for="md-graphviz-existing" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Edit saved diagram</label>
-          <select id="md-graphviz-existing" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
-            <option value="">New diagram</option>
-          </select>
+        <div style="flex: 1 1 360px; min-width: 280px;">
+          <label for="md-graphviz-existing" style="display: flex; justify-content: space-between; align-items: center; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
+            <span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-sitemap" style="color: #38bdf8;"></i> Diagram</span>
+            <span id="md-graphviz-current-label" style="font-size: 0.82em; font-weight: 500; color: #38bdf8; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+          </label>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select id="md-graphviz-existing" title="Select a diagram to edit or choose New Diagram" style="flex: 1; min-width: 130px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.88em; height: 38px;">
+              <option value="">+ New diagram (unsaved)</option>
+            </select>
+            <input type="hidden" id="md-graphviz-name" value="" />
+            <button type="button" id="md-graphviz-new-btn" title="Create a new blank diagram" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; padding: 0 11px; height: 38px; font-size: 0.84em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; flex: none; box-sizing: border-box;">
+              <i class="fas fa-plus"></i> <span>New</span>
+            </button>
+            <button type="button" id="md-graphviz-save-as-new-btn" title="Save current diagram as a new diagram with a new name" class="w3-button w3-round" style="background: #334155; border: 1px solid #475569; color: #e2e8f0; padding: 0 11px; height: 38px; font-size: 0.84em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; flex: none; box-sizing: border-box;">
+              <i class="fas fa-copy"></i> <span>Save as New</span>
+            </button>
+            <button type="button" id="md-graphviz-rename-btn" title="Rename this diagram" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; padding: 0 10px; height: 38px; font-size: 0.85em; display: none; align-items: center; justify-content: center; flex: none; box-sizing: border-box;">
+              <i class="fas fa-pencil-alt"></i>
+            </button>
+          </div>
         </div>
         <div style="flex: 0 1 160px; min-width: 130px;">
           <label for="md-graphviz-engine" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Layout engine</label>
@@ -298,7 +309,6 @@
         <div style="display: flex; gap: 8px; align-items: center;">
           <button type="button" id="md-graphviz-download-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-download"></i> Download SVG</button>
           <button type="button" id="md-graphviz-render-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-play"></i> Render</button>
-          <button type="button" id="md-graphviz-save-new-btn" class="w3-button w3-round" style="display: none; background: #334155; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-copy"></i> Save as New</button>
           <button type="button" id="md-graphviz-insert-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i id="md-graphviz-insert-icon" class="fas fa-plus"></i> <span id="md-graphviz-insert-text">Save &amp; Insert</span></button>
           <button type="button" id="md-graphviz-close-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600;">Close</button>
         </div>

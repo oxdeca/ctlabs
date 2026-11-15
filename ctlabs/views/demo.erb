@@ -121,11 +121,11 @@
                 <i class="fas fa-history" style="color: #38bdf8;"></i><span class="sidebar-btn-label">History</span>
               </button>
               <button type="button" id="import-btn" title="Import recordings or ZIP archive" class="sidebar-action-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 6px; border-radius: 4px; font-weight: 500; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; overflow: hidden;">
-                <i class="fas fa-upload" style="color: #94a3b8;"></i><span class="sidebar-btn-label">Import</span>
+                <i class="fas fa-upload" style="color: #38bdf8;"></i><span class="sidebar-btn-label">Import</span>
               </button>
               <input type="file" id="import-file-input" accept=".zip,.cast,.md,.webm,.mp4" multiple style="display: none;" />
               <button type="button" id="export-btn" onclick="openExportModal()" title="Export this walkthrough set as ZIP (choose file name)" class="sidebar-action-btn" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 6px; border-radius: 4px; font-weight: 500; font-size: 0.76em; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; overflow: hidden;">
-                <i class="fas fa-file-archive" style="color: #94a3b8;"></i><span class="sidebar-btn-label">Export</span>
+                <i class="fas fa-download" style="color: #38bdf8;"></i><span class="sidebar-btn-label">Export</span>
               </button>
             </div>
           </div>
@@ -534,7 +534,7 @@
     <div id="export-modal" class="w3-modal" style="z-index: 9999;">
       <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 480px;">
         <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
-          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8;"><i class="fas fa-file-archive"></i> Export Walkthrough Set</h3>
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8;"><i class="fas fa-download"></i> Export Walkthrough Set</h3>
           <span onclick="document.getElementById('export-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
         </header>
         <form method="get" action="/recordings/download-all" id="export-form" style="padding: 16px; margin: 0;">
@@ -1157,7 +1157,7 @@
           try {
             const clean = url.split('?')[0].split('#')[0];
             const filename = clean.substring(clean.lastIndexOf('/') + 1);
-            const match = filename.match(/^([a-zA-Z0-9_\-]+)\.(?:svg|png)$/i);
+            const match = filename.match(/^([a-zA-Z0-9_.\-]+)\.(?:svg|png|dot)$/i);
             return match ? decodeURIComponent(match[1]) : null;
           } catch (err) {
             return null;
@@ -1831,17 +1831,48 @@ if (metaForm) {
     if (activeDataType === 'markdown') {
       e.preventDefault();
       const newTitle = editTitle ? editTitle.value.trim() : '';
-      if (newTitle && window.MarkdownEditor) {
-        const cm = window.getMdEditor && window.getMdEditor();
-        if (cm) {
-          let curVal = cm.getValue();
-          if (/^\s*#+\s*[^\n]+/.test(curVal)) {
-            curVal = curVal.replace(/^(\s*#+\s*)([^\n]+)/, `$1${newTitle}`);
-          } else if (!curVal.trim().startsWith('#')) {
-            curVal = `# ${newTitle}\n\n` + curVal;
+      if (newTitle && activeId) {
+        const activeWalkthrough = (window.activeWalkthrough || (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : ''));
+        const body = new URLSearchParams({
+          title: newTitle,
+          walkthrough: activeWalkthrough
+        });
+
+        fetch(metaForm.action || `/recordings/${encodeURIComponent(activeId)}/meta`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'Accept': 'application/json'
+          },
+          body: body,
+          credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.ok) {
+            const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+            if (activeBtn) {
+              activeBtn.setAttribute('data-title', newTitle);
+              const titleSpan = activeBtn.querySelector('.item-title');
+              if (titleSpan) titleSpan.textContent = newTitle;
+              const step = activeBtn.getAttribute('data-step');
+              const titleEl = document.getElementById('rec-title');
+              if (titleEl) {
+                const span = titleEl.querySelector('span');
+                if (span) span.textContent = (step ? '#' + step + ': ' : '') + newTitle;
+              }
+            }
+            if (editTitle) editTitle.value = newTitle;
+            const statusEl = document.getElementById('md-save-status');
+            if (statusEl) {
+              statusEl.style.display = 'inline-flex';
+              setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            }
           }
-          cm.setValue(curVal);
-        }
+        })
+        .catch(err => {
+          console.error('Failed to update title:', err);
+        });
       }
       if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     }

@@ -442,8 +442,9 @@ class RecordingService
   end
 
   def self.diagram_base_valid?(base)
-    clean = base.to_s
+    clean = base.to_s.strip
     return false if clean.empty? || clean.include?('..') || clean.include?('/') || clean.include?('\\')
+    return false if clean.start_with?('.') || clean.end_with?('.')
     return false unless clean.match?(/\A[a-zA-Z0-9_.-]{1,80}\z/)
 
     !%w[. ..].include?(clean)
@@ -453,12 +454,12 @@ class RecordingService
     ext = ".#{format.to_s.downcase}"
     ext = '.svg' unless DIAGRAM_EXTS.include?(ext)
 
-    clean_base = base.to_s.strip
+    clean_base = base.to_s.strip.sub(/\.(svg|png|dot|jpe?g|webp)\z/i, '')
     clean_base = '' unless diagram_base_valid?(clean_base)
 
     if clean_base.empty?
-      clean_base = File.basename(original_name.to_s, '.*').gsub(/[^a-zA-Z0-9_.-]+/, '_').strip[0, 60]
-      clean_base = 'diagram' if clean_base.empty?
+      clean_base = File.basename(original_name.to_s).sub(/\.(svg|png|dot|jpe?g|webp)\z/i, '').gsub(/[^a-zA-Z0-9_.-]+/, '_').strip[0, 60]
+      clean_base = 'diagram' if clean_base.empty? || !diagram_base_valid?(clean_base)
     end
 
     filename   = "#{clean_base}#{ext}"
@@ -526,6 +527,65 @@ class RecordingService
     return nil unless File.file?(path)
 
     File.read(path, encoding: 'UTF-8')
+  end
+
+  def self.rename_diagram(slug, old_base, new_base)
+    key, = walkthrough_entry(slug)
+    old_clean = old_base.to_s.strip
+    new_clean = new_base.to_s.strip
+    return { ok: false, error: 'Invalid current diagram name' } unless diagram_base_valid?(old_clean)
+    return { ok: false, error: 'Invalid new diagram name' } unless diagram_base_valid?(new_clean)
+    return { ok: true, old_base: old_clean, new_base: new_clean } if old_clean == new_clean
+
+    scoped_dir = ensure_images_dir(key)
+    old_dot = File.join(scoped_dir, "#{old_clean}#{DOT_EXT}")
+    new_dot = File.join(scoped_dir, "#{new_clean}#{DOT_EXT}")
+
+    return { ok: false, error: "Diagram '#{new_clean}' already exists" } if File.exist?(new_dot)
+    return { ok: false, error: "Source diagram '#{old_clean}' not found" } unless File.exist?(old_dot)
+
+    # Rename .dot and images in scoped dir
+    FileUtils.mv(old_dot, new_dot) if File.exist?(old_dot)
+    old_svg = File.join(scoped_dir, "#{old_clean}.svg")
+    new_svg = File.join(scoped_dir, "#{new_clean}.svg")
+    FileUtils.mv(old_svg, new_svg) if File.exist?(old_svg)
+    old_png = File.join(scoped_dir, "#{old_clean}.png")
+    new_png = File.join(scoped_dir, "#{new_clean}.png")
+    FileUtils.mv(old_png, new_png) if File.exist?(old_png)
+
+    # Also rename in global images dir if present
+    global_dir = ensure_images_dir
+    if scoped_dir != global_dir
+      g_old_dot = File.join(global_dir, "#{old_clean}#{DOT_EXT}")
+      g_new_dot = File.join(global_dir, "#{new_clean}#{DOT_EXT}")
+      FileUtils.mv(g_old_dot, g_new_dot) if File.exist?(g_old_dot) && !File.exist?(g_new_dot)
+      g_old_svg = File.join(global_dir, "#{old_clean}.svg")
+      g_new_svg = File.join(global_dir, "#{new_clean}.svg")
+      FileUtils.mv(g_old_svg, g_new_svg) if File.exist?(g_old_svg) && !File.exist?(g_new_svg)
+      g_old_png = File.join(global_dir, "#{old_clean}.png")
+      g_new_png = File.join(global_dir, "#{new_clean}.png")
+      FileUtils.mv(g_old_png, g_new_png) if File.exist?(g_old_png) && !File.exist?(g_new_png)
+    end
+
+    # Update references in all markdown notes of this walkthrough
+    Dir.glob(File.join(walkthrough_dir(key), "*#{MD_EXT}")).each do |note_path|
+      next unless File.file?(note_path)
+      content = begin
+        File.read(note_path, encoding: 'UTF-8')
+      rescue StandardError
+        nil
+      end
+      next unless content
+
+      updated = content.gsub("#{old_clean}.svg", "#{new_clean}.svg")
+                       .gsub("#{old_clean}.png", "#{new_clean}.png")
+                       .gsub("#{old_clean}#{DOT_EXT}", "#{new_clean}#{DOT_EXT}")
+      File.write(note_path, updated, encoding: 'UTF-8') if updated != content
+    end
+
+    RecordingGitService.commit("Rename diagram '#{old_clean}' to '#{new_clean}' in '#{key}'", slug: key) rescue nil
+
+    { ok: true, old_base: old_clean, new_base: new_clean, filename: "#{new_clean}.svg" }
   end
 
   def self.image_path(filename, walkthrough: nil)
@@ -850,25 +910,54 @@ class RecordingService
     if path.end_with?(MD_EXT)
       id   = File.basename(path, MD_EXT)
       size = File.size(path)
-      content = begin
-        File.read(path, encoding: 'UTF-8')
-      rescue StandardError
-        ''
+      meta_file = File.join(File.dirname(path), "#{id}.json")
+      meta_file = File.join(dir, "#{id}.json") unless File.file?(meta_file)
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
       end
-      title = 'Step Note'
-      content.to_s.lines.each do |line|
-        l = line.strip
-        next if l.empty?
-        title = l.sub(/^#+\s*/, '')
-        break
+      meta_data = {} unless meta_data.is_a?(Hash)
+
+      title = meta_data['title'].to_s.strip
+      if title.empty?
+        content = begin
+          File.read(path, encoding: 'UTF-8')
+        rescue StandardError
+          ''
+        end
+        content.to_s.lines.each do |line|
+          l = line.strip
+          next if l.empty?
+          title = l.sub(/^#+\s*/, '').strip
+          break
+        end
+        title = 'Step Note' if title.empty?
+
+        begin
+          init_data = {
+            'title'      => title,
+            'type'       => 'markdown',
+            'created_at' => File.mtime(path).to_i
+          }
+          target_meta = File.join(File.dirname(path), "#{id}.json")
+          File.write(target_meta, JSON.pretty_generate(init_data))
+        rescue StandardError
+        end
       end
+
+      created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
+
       return {
         id:         id,
         path:       path,
         node:       'Markdown',
         title:      title,
         type:       :markdown,
-        created_at: File.mtime(path),
+        created_at: created_at,
         duration:   0.0,
         size:       size
       }
@@ -1057,27 +1146,25 @@ class RecordingService
     return false unless path
 
     if path.end_with?(MD_EXT)
-      content = begin
-        File.read(path, encoding: 'UTF-8')
-      rescue StandardError
-        ''
+      id_clean = File.basename(path, MD_EXT)
+      dir = File.dirname(path)
+      meta_file = File.join(dir, "#{id_clean}.json")
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
       end
-      lines = content.lines
-      new_title = title.to_s.strip
-      new_title = 'Step Note' if new_title.empty?
-      new_heading = "# #{new_title}\n"
-
-      first_non_empty_idx = lines.find_index { |l| !l.strip.empty? }
-      if first_non_empty_idx.nil?
-        File.write(path, new_heading)
-      elsif lines[first_non_empty_idx].strip.start_with?('#')
-        lines[first_non_empty_idx] = new_heading
-        File.write(path, lines.join)
-      else
-        lines.insert(first_non_empty_idx, new_heading + "\n")
-        File.write(path, lines.join)
-      end
-      RecordingGitService.commit("Update note '#{id}' title to '#{new_title}'", files: [path]) rescue nil
+      meta_data = {} unless meta_data.is_a?(Hash)
+      clean_title = title.to_s.strip
+      clean_title = 'Step Note' if clean_title.empty?
+      meta_data['title'] = clean_title
+      meta_data['type'] ||= 'markdown'
+      meta_data['created_at'] ||= File.mtime(path).to_i
+      File.write(meta_file, JSON.pretty_generate(meta_data))
+      RecordingGitService.commit("Update note '#{id}' title to '#{clean_title}'", files: [meta_file]) rescue nil
       return true
     end
 
@@ -1132,8 +1219,17 @@ class RecordingService
     clean_title = 'Step Note' if clean_title.empty?
     initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
     File.write(path, initial_content, encoding: 'UTF-8')
+
+    meta_file = File.join(target_dir, "#{id}.json")
+    meta_data = {
+      'title'      => clean_title,
+      'type'       => 'markdown',
+      'created_at' => File.mtime(path).to_i
+    }
+    File.write(meta_file, JSON.pretty_generate(meta_data))
+
     add_to_walkthrough(slug, [id])
-    RecordingGitService.commit("Create note '#{clean_title}' (#{id}) in '#{slug}'", files: [path, File.join(target_dir, MANIFEST)], slug: slug) rescue nil
+    RecordingGitService.commit("Create note '#{clean_title}' (#{id}) in '#{slug}'", files: [path, meta_file, File.join(target_dir, MANIFEST)], slug: slug) rescue nil
     id
   end
 
