@@ -2986,7 +2986,8 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       mdGraphvizExisting.innerHTML = '';
       const blank = document.createElement('option');
       blank.value = '';
-      blank.textContent = '+ New diagram (unsaved)';
+      const nameVal = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value.trim()) || '';
+      blank.textContent = nameVal ? `${nameVal} (unsaved)` : '+ New diagram (unsaved)';
       mdGraphvizExisting.appendChild(blank);
       list.forEach(item => {
         if (!item || !item.base) return;
@@ -3002,9 +3003,8 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
       } else {
         mdGraphvizExisting.value = '';
-        const nameVal = (mdGraphvizName && mdGraphvizName.value) || '';
         if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = nameVal ? `New: ${nameVal}` : '(New diagram)';
-        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = nameVal ? 'inline-flex' : 'none';
         if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
       }
     })
@@ -3018,8 +3018,13 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       setGraphvizPreview(null);
       const newName = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value !== base) ? mdGraphvizName.value : suggestNewDiagramName();
       if (mdGraphvizName) mdGraphvizName.value = newName;
+      if (mdGraphvizExisting) {
+        let blank = mdGraphvizExisting.querySelector('option[value=""]');
+        if (blank) blank.textContent = `${newName} (unsaved)`;
+        mdGraphvizExisting.value = '';
+      }
       if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
@@ -3134,9 +3139,18 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
 
     setGraphvizEditorValue(MD_GRAPHVIZ_DEFAULT);
     if (mdGraphvizName) mdGraphvizName.value = cleanName;
-    if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+    if (mdGraphvizExisting) {
+      let blank = mdGraphvizExisting.querySelector('option[value=""]');
+      if (!blank) {
+        blank = document.createElement('option');
+        blank.value = '';
+        mdGraphvizExisting.insertBefore(blank, mdGraphvizExisting.firstChild);
+      }
+      blank.textContent = `${cleanName} (unsaved)`;
+      mdGraphvizExisting.value = '';
+    }
     if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
-    if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+    if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
     if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
     if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
     if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
@@ -3166,6 +3180,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
   async function renameCurrentDiagram() {
     const current = (mdGraphvizExisting && mdGraphvizExisting.value) || (mdGraphvizName && mdGraphvizName.value);
     if (!current) return;
+    const isUnsaved = !mdGraphvizExisting || !mdGraphvizExisting.value;
 
     const entered = prompt(`Rename diagram "${current}":\nEnter new name:`, current);
     if (entered === null) return;
@@ -3175,6 +3190,18 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
 
     if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
       alert(`A diagram named "${cleanName}" already exists.`);
+      return;
+    }
+
+    if (isUnsaved) {
+      if (mdGraphvizName) mdGraphvizName.value = cleanName;
+      if (mdGraphvizExisting) {
+        let blank = mdGraphvizExisting.querySelector('option[value=""]');
+        if (blank) blank.textContent = `${cleanName} (unsaved)`;
+        mdGraphvizExisting.value = '';
+      }
+      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
+      if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Renamed to ${cleanName}`;
       return;
     }
 
@@ -3468,10 +3495,14 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       }
       const newName = suggestNewDiagramName();
       if (mdGraphvizName) mdGraphvizName.value = newName;
-      if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+      if (mdGraphvizExisting) {
+        let blank = mdGraphvizExisting.querySelector('option[value=""]');
+        if (blank) blank.textContent = `${newName} (unsaved)`;
+        mdGraphvizExisting.value = '';
+      }
       if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
       if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
       if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
       if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
     }
@@ -3809,7 +3840,12 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
           mdGraphvizName.value = key;
         }
         if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
-          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${mdGraphvizName ? mdGraphvizName.value : key}`;
+          const templName = (mdGraphvizName && mdGraphvizName.value) || key;
+          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${templName}`;
+          if (mdGraphvizExisting) {
+            let blank = mdGraphvizExisting.querySelector('option[value=""]');
+            if (blank) blank.textContent = `${templName} (unsaved)`;
+          }
         }
         mdGraphvizTemplate.value = '';
         renderGraphviz();
