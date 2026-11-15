@@ -45,6 +45,12 @@
   const mdGraphvizEmojiGrid = document.getElementById('md-graphviz-emoji-grid');
   const mdGraphvizEmojiFooterPreview = document.getElementById('md-graphviz-emoji-footer-preview');
   const mdGraphvizEmojiCatBtns = document.querySelectorAll('.md-gv-emoji-cat-btn');
+  const mdGraphvizEmojiCatPrev = document.getElementById('md-graphviz-emoji-cat-prev');
+  const mdGraphvizEmojiCatNext = document.getElementById('md-graphviz-emoji-cat-next');
+  const mdGraphvizEmojiCatViewport = document.getElementById('md-graphviz-emoji-cat-viewport');
+  const mdGraphvizEmojiCatMenuBtn = document.getElementById('md-graphviz-emoji-cat-menu-btn');
+  const mdGraphvizEmojiCatDropdown = document.getElementById('md-graphviz-emoji-cat-dropdown');
+  const mdGraphvizEmojiMenuItems = document.querySelectorAll('.md-gv-emoji-menu-item');
   const mdGraphvizDotContainer = document.getElementById('md-graphviz-dot-container');
   const mdGraphvizDotOutput = document.getElementById('md-graphviz-dot-output');
   const mdGraphvizDotUseBtn = document.getElementById('md-graphviz-dot-use-btn');
@@ -143,6 +149,12 @@
   const mdEmojiGrid = document.getElementById('md-emoji-grid');
   const mdEmojiFooterPreview = document.getElementById('md-emoji-footer-preview');
   const mdEmojiCatBtns = document.querySelectorAll('.md-emoji-cat-btn');
+  const mdEmojiCatPrev = document.getElementById('md-emoji-cat-prev');
+  const mdEmojiCatNext = document.getElementById('md-emoji-cat-next');
+  const mdEmojiCatViewport = document.getElementById('md-emoji-cat-viewport');
+  const mdEmojiCatMenuBtn = document.getElementById('md-emoji-cat-menu-btn');
+  const mdEmojiCatDropdown = document.getElementById('md-emoji-cat-dropdown');
+  const mdEmojiMenuItems = document.querySelectorAll('.md-emoji-menu-item');
 
   // --- State Variables ---
   let mdCodeEditor = null;
@@ -1340,6 +1352,30 @@
   }
 
   // --- Emoji Picker ---
+  function selectEmojiCategory(cat = 'all') {
+    mdEmojiCatBtns.forEach(b => {
+      const isMatch = b.getAttribute('data-cat') === cat;
+      b.classList.toggle('active', isMatch);
+      b.style.background = isMatch ? '#0284c7' : 'transparent';
+      b.style.color = isMatch ? '#fff' : '#94a3b8';
+      if (isMatch && mdEmojiCatViewport) {
+        b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    });
+
+    mdEmojiMenuItems.forEach(m => {
+      const isMatch = m.getAttribute('data-cat') === cat;
+      m.classList.toggle('active', isMatch);
+      m.style.background = isMatch ? '#0284c7' : 'transparent';
+      m.style.color = isMatch ? '#fff' : '#cbd5e1';
+    });
+
+    if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
+
+    const query = mdEmojiSearch ? mdEmojiSearch.value : '';
+    renderEmojiGrid(cat, query);
+  }
+
   async function toggleMdEmojiMenu(open) {
     if (!mdEmojiMenu) return;
     const isClosed = !mdEmojiMenu.style.display || mdEmojiMenu.style.display === 'none';
@@ -1349,51 +1385,58 @@
       if (ctlabsEmojiList.length === 0) {
         await loadCtlabsEmojis();
       }
+      if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
+      if (mdEmojiCatViewport) mdEmojiCatViewport.scrollLeft = 0;
       if (mdEmojiSearch) {
         mdEmojiSearch.value = '';
+        if (mdEmojiSearchClear) mdEmojiSearchClear.style.display = 'none';
         mdEmojiSearch.focus();
       }
-      renderEmojiGrid('all', '');
+      selectEmojiCategory('all');
+    } else {
+      if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
     }
   }
 
   function renderEmojiGrid(cat = 'all', query = '') {
     const list = getEmojiList();
     if (!mdEmojiGrid || !list) return;
-    const cleanQuery = query.trim().toLowerCase();
+    const rawQuery = query.trim().toLowerCase();
+    const cleanQuery = rawQuery.replace(/^[:&]+|[:;]+$/g, '');
     const filtered = list.filter(item => {
-      if (cat !== 'all') {
-        if (cat === 'github') {
-          if (item.cat !== 'github' && item.cat !== 'popular') return false;
-        } else if (item.cat !== cat) {
-          return false;
-        }
-      }
+      if (cat !== 'all' && item.cat !== cat) return false;
       if (cleanQuery) {
-        return item.code.toLowerCase().includes(cleanQuery) || item.name.toLowerCase().includes(cleanQuery);
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
       }
       return true;
     });
 
     if (filtered.length === 0) {
-      mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis</div>';
+      mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis or symbols</div>';
       return;
     }
 
     // Limit initial unsearched rendering for smooth DOM performance if viewing all
-    const displayItems = cleanQuery ? filtered : filtered.slice(0, 320);
+    const displayItems = cleanQuery ? filtered : filtered.slice(0, 360);
 
     mdEmojiGrid.innerHTML = displayItems.map(item => {
-      const visual = item.img
-        ? `<img src="${item.img}" width="22" height="22" alt=":${item.code}:" style="pointer-events: none; border-radius: 2px; vertical-align: middle;">`
-        : (item.char || '');
-      return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-img="${item.img || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${visual}</button>`;
+      return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;
     }).join('');
 
     mdEmojiGrid.querySelectorAll('.md-emoji-cell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
         if (mdEmojiFooterPreview) {
-          mdEmojiFooterPreview.textContent = `:${cell.getAttribute('data-code')}: — ${cell.getAttribute('data-name')}`;
+          const code = cell.getAttribute('data-code');
+          const name = cell.getAttribute('data-name');
+          const entity = cell.getAttribute('data-entity');
+          const codeDisplay = entity ? `:${code}: (${entity})` : `:${code}:`;
+          mdEmojiFooterPreview.textContent = `${codeDisplay} — ${name}`;
         }
       });
       const handleInsert = (e, forceCode) => {
@@ -1401,8 +1444,12 @@
         e.stopPropagation();
         const code = cell.getAttribute('data-code');
         const ch = cell.getAttribute('data-char');
-        // Left-click inserts character (or :code: if custom image/no char). Right-click inserts :code:.
-        const snippet = (forceCode || !ch) ? `:${code}:` : ch;
+        const entity = cell.getAttribute('data-entity');
+        // Left-click inserts character. Right-click inserts :code: (or &entity; if available).
+        let snippet = ch;
+        if (forceCode) {
+          snippet = code ? `:${code}:` : (entity || ch);
+        }
 
         if (currentMdMode === 'preview') setMdMode('split');
         const cm = getMdEditor();
@@ -1457,22 +1504,62 @@
     }
 
     mdEmojiCatBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        mdEmojiCatBtns.forEach(b => {
-          b.classList.remove('active');
-          b.style.background = 'transparent';
-          b.style.color = '#94a3b8';
-        });
-        btn.classList.add('active');
-        btn.style.background = '#0284c7';
-        btn.style.color = '#fff';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const cat = btn.getAttribute('data-cat') || 'all';
-        const query = mdEmojiSearch ? mdEmojiSearch.value : '';
-        renderEmojiGrid(cat, query);
+        selectEmojiCategory(cat);
       });
     });
 
+    mdEmojiMenuItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cat = item.getAttribute('data-cat') || 'all';
+        selectEmojiCategory(cat);
+      });
+    });
+
+    if (mdEmojiCatPrev && mdEmojiCatViewport) {
+      mdEmojiCatPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const current = mdEmojiCatViewport.scrollLeft;
+        const scrollStep = 264;
+        if (current <= 10) {
+          mdEmojiCatViewport.scrollTo({ left: mdEmojiCatViewport.scrollWidth, behavior: 'smooth' });
+        } else {
+          mdEmojiCatViewport.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+        }
+      });
+    }
+
+    if (mdEmojiCatNext && mdEmojiCatViewport) {
+      mdEmojiCatNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const current = mdEmojiCatViewport.scrollLeft;
+        const maxScroll = mdEmojiCatViewport.scrollWidth - mdEmojiCatViewport.clientWidth - 10;
+        const scrollStep = 264;
+        if (current >= maxScroll) {
+          mdEmojiCatViewport.scrollTo({ left: 0, behavior: 'smooth' });
+        } else {
+          mdEmojiCatViewport.scrollBy({ left: scrollStep, behavior: 'smooth' });
+        }
+      });
+    }
+
+    if (mdEmojiCatMenuBtn && mdEmojiCatDropdown) {
+      mdEmojiCatMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isClosed = !mdEmojiCatDropdown.style.display || mdEmojiCatDropdown.style.display === 'none';
+        mdEmojiCatDropdown.style.display = isClosed ? 'flex' : 'none';
+      });
+    }
+
     document.addEventListener('click', (e) => {
+      if (mdEmojiCatDropdown && mdEmojiCatDropdown.style.display !== 'none') {
+        if (!mdEmojiCatDropdown.contains(e.target) && e.target !== mdEmojiCatMenuBtn && !mdEmojiCatMenuBtn.contains(e.target)) {
+          mdEmojiCatDropdown.style.display = 'none';
+        }
+      }
       if (mdEmojiMenu && mdEmojiMenu.style.display !== 'none') {
         if (!mdEmojiMenu.contains(e.target) && e.target !== mdEmojiBtn && !mdEmojiBtn.contains(e.target)) {
           toggleMdEmojiMenu(false);
@@ -2298,6 +2385,30 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     scheduleGraphvizPreview();
   }
 
+  function selectGraphvizEmojiCategory(cat = 'all') {
+    mdGraphvizEmojiCatBtns.forEach(b => {
+      const isMatch = b.getAttribute('data-cat') === cat;
+      b.classList.toggle('active', isMatch);
+      b.style.background = isMatch ? '#0284c7' : 'transparent';
+      b.style.color = isMatch ? '#fff' : '#94a3b8';
+      if (isMatch && mdGraphvizEmojiCatViewport) {
+        b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+    });
+
+    mdGraphvizEmojiMenuItems.forEach(m => {
+      const isMatch = m.getAttribute('data-cat') === cat;
+      m.classList.toggle('active', isMatch);
+      m.style.background = isMatch ? '#0284c7' : 'transparent';
+      m.style.color = isMatch ? '#fff' : '#cbd5e1';
+    });
+
+    if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
+
+    const query = mdGraphvizEmojiSearch ? mdGraphvizEmojiSearch.value : '';
+    renderGraphvizEmojiGrid(cat, query);
+  }
+
   async function toggleGraphvizEmojiMenu(open) {
     if (!mdGraphvizEmojiMenu) return;
     const isClosed = !mdGraphvizEmojiMenu.style.display || mdGraphvizEmojiMenu.style.display === 'none';
@@ -2308,57 +2419,57 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         await loadCtlabsEmojis();
       }
       if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
+      if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
+      if (mdGraphvizEmojiCatViewport) mdGraphvizEmojiCatViewport.scrollLeft = 0;
       if (mdGraphvizEmojiSearch) {
         mdGraphvizEmojiSearch.value = '';
         if (mdGraphvizEmojiSearchClear) mdGraphvizEmojiSearchClear.style.display = 'none';
         setTimeout(() => mdGraphvizEmojiSearch.focus(), 30);
       }
-      mdGraphvizEmojiCatBtns.forEach(b => {
-        const isAll = b.getAttribute('data-cat') === 'all';
-        b.classList.toggle('active', isAll);
-        b.style.background = isAll ? '#0284c7' : 'transparent';
-        b.style.color = isAll ? '#fff' : '#94a3b8';
-      });
-      renderGraphvizEmojiGrid('all', '');
+      selectGraphvizEmojiCategory('all');
+    } else {
+      if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
     }
   }
 
   function renderGraphvizEmojiGrid(cat = 'all', query = '') {
     const list = getEmojiList();
     if (!mdGraphvizEmojiGrid || !list) return;
-    const cleanQuery = query.trim().toLowerCase();
+    const rawQuery = query.trim().toLowerCase();
+    const cleanQuery = rawQuery.replace(/^[:&]+|[:;]+$/g, '');
     const filtered = list.filter(item => {
-      if (cat !== 'all') {
-        if (cat === 'github') {
-          if (item.cat !== 'github' && item.cat !== 'popular') return false;
-        } else if (item.cat !== cat) {
-          return false;
-        }
-      }
+      if (cat !== 'all' && item.cat !== cat) return false;
       if (cleanQuery) {
-        return item.code.toLowerCase().includes(cleanQuery) || item.name.toLowerCase().includes(cleanQuery);
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
       }
       return true;
     });
 
     if (filtered.length === 0) {
-      mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis</div>';
+      mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis or symbols</div>';
       return;
     }
 
-    const displayItems = cleanQuery ? filtered : filtered.slice(0, 320);
+    const displayItems = cleanQuery ? filtered : filtered.slice(0, 360);
 
     mdGraphvizEmojiGrid.innerHTML = displayItems.map(item => {
-      const visual = item.img
-        ? `<img src="${item.img}" width="22" height="22" alt=":${item.code}:" style="pointer-events: none; border-radius: 2px; vertical-align: middle;">`
-        : (item.char || '');
-      return `<button type="button" class="md-gv-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-img="${item.img || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${visual}</button>`;
+      return `<button type="button" class="md-gv-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;
     }).join('');
 
     mdGraphvizEmojiGrid.querySelectorAll('.md-gv-emoji-cell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
         if (mdGraphvizEmojiFooterPreview) {
-          mdGraphvizEmojiFooterPreview.textContent = `:${cell.getAttribute('data-code')}: — ${cell.getAttribute('data-name')}`;
+          const code = cell.getAttribute('data-code');
+          const name = cell.getAttribute('data-name');
+          const entity = cell.getAttribute('data-entity');
+          const codeDisplay = entity ? `:${code}: (${entity})` : `:${code}:`;
+          mdGraphvizEmojiFooterPreview.textContent = `${codeDisplay} — ${name}`;
         }
       });
 
@@ -2367,8 +2478,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
         e.stopPropagation();
         const code = cell.getAttribute('data-code');
         const ch = cell.getAttribute('data-char');
-        const img = cell.getAttribute('data-img');
-        const snippet = (asCode || !ch || img) ? `:${code}:` : ch;
+        const snippet = (asCode || !ch) ? `:${code}:` : ch;
 
         insertGraphvizEmoji(snippet);
         toggleGraphvizEmojiMenu(false);
@@ -3560,22 +3670,62 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       }
 
       mdGraphvizEmojiCatBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-          mdGraphvizEmojiCatBtns.forEach(b => {
-            b.classList.remove('active');
-            b.style.background = 'transparent';
-            b.style.color = '#94a3b8';
-          });
-          btn.classList.add('active');
-          btn.style.background = '#0284c7';
-          btn.style.color = '#fff';
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
           const cat = btn.getAttribute('data-cat') || 'all';
-          const query = mdGraphvizEmojiSearch ? mdGraphvizEmojiSearch.value : '';
-          renderGraphvizEmojiGrid(cat, query);
+          selectGraphvizEmojiCategory(cat);
         });
       });
 
+      mdGraphvizEmojiMenuItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const cat = item.getAttribute('data-cat') || 'all';
+          selectGraphvizEmojiCategory(cat);
+        });
+      });
+
+      if (mdGraphvizEmojiCatPrev && mdGraphvizEmojiCatViewport) {
+        mdGraphvizEmojiCatPrev.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const current = mdGraphvizEmojiCatViewport.scrollLeft;
+          const scrollStep = 264;
+          if (current <= 10) {
+            mdGraphvizEmojiCatViewport.scrollTo({ left: mdGraphvizEmojiCatViewport.scrollWidth, behavior: 'smooth' });
+          } else {
+            mdGraphvizEmojiCatViewport.scrollBy({ left: -scrollStep, behavior: 'smooth' });
+          }
+        });
+      }
+
+      if (mdGraphvizEmojiCatNext && mdGraphvizEmojiCatViewport) {
+        mdGraphvizEmojiCatNext.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const current = mdGraphvizEmojiCatViewport.scrollLeft;
+          const maxScroll = mdGraphvizEmojiCatViewport.scrollWidth - mdGraphvizEmojiCatViewport.clientWidth - 10;
+          const scrollStep = 264;
+          if (current >= maxScroll) {
+            mdGraphvizEmojiCatViewport.scrollTo({ left: 0, behavior: 'smooth' });
+          } else {
+            mdGraphvizEmojiCatViewport.scrollBy({ left: scrollStep, behavior: 'smooth' });
+          }
+        });
+      }
+
+      if (mdGraphvizEmojiCatMenuBtn && mdGraphvizEmojiCatDropdown) {
+        mdGraphvizEmojiCatMenuBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isClosed = !mdGraphvizEmojiCatDropdown.style.display || mdGraphvizEmojiCatDropdown.style.display === 'none';
+          mdGraphvizEmojiCatDropdown.style.display = isClosed ? 'flex' : 'none';
+        });
+      }
+
       document.addEventListener('click', (e) => {
+        if (mdGraphvizEmojiCatDropdown && mdGraphvizEmojiCatDropdown.style.display !== 'none') {
+          if (!mdGraphvizEmojiCatDropdown.contains(e.target) && e.target !== mdGraphvizEmojiCatMenuBtn && !mdGraphvizEmojiCatMenuBtn.contains(e.target)) {
+            mdGraphvizEmojiCatDropdown.style.display = 'none';
+          }
+        }
         if (mdGraphvizEmojiMenu && mdGraphvizEmojiMenu.style.display !== 'none') {
           if (!mdGraphvizEmojiMenu.contains(e.target) && e.target !== mdGraphvizEmojiBtn && !mdGraphvizEmojiBtn.contains(e.target)) {
             toggleGraphvizEmojiMenu(false);

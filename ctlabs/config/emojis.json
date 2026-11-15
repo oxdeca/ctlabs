@@ -1,1094 +1,2574 @@
 [
   {
-    "code": "+1",
-    "char": "👍",
-    "name": "Thumbs Up",
-    "cat": "popular"
+    "code": "grinning",
+    "char": "😀",
+    "name": "Grinning Face",
+    "cat": "smileys",
+    "keywords": "smile happy face joy grin"
   },
   {
-    "code": "-1",
-    "char": "👎",
-    "name": "Thumbs Down",
-    "cat": "popular"
-  },
-  {
-    "code": "thumbsup",
-    "char": "👍",
-    "name": "Thumbs Up",
-    "cat": "popular"
-  },
-  {
-    "code": "thumbsdown",
-    "char": "👎",
-    "name": "Thumbs Down",
-    "cat": "popular"
-  },
-  {
-    "code": "rocket",
-    "char": "🚀",
-    "name": "Rocket / Launch",
-    "cat": "popular"
-  },
-  {
-    "code": "tada",
-    "char": "🎉",
-    "name": "Party Popper / Tada",
-    "cat": "popular"
-  },
-  {
-    "code": "sparkles",
-    "char": "✨",
-    "name": "Sparkles",
-    "cat": "popular"
-  },
-  {
-    "code": "fire",
-    "char": "🔥",
-    "name": "Fire / Hot",
-    "cat": "popular"
-  },
-  {
-    "code": "zap",
-    "char": "⚡",
-    "name": "Zap / Lightning / Fast",
-    "cat": "popular"
-  },
-  {
-    "code": "star",
-    "char": "⭐",
-    "name": "Star",
-    "cat": "popular"
-  },
-  {
-    "code": "star2",
-    "char": "🌟",
-    "name": "Glowing Star",
-    "cat": "popular"
-  },
-  {
-    "code": "heart",
-    "char": "❤️",
-    "name": "Red Heart",
-    "cat": "popular"
-  },
-  {
-    "code": "eyes",
-    "char": "👀",
-    "name": "Eyes / Looking",
-    "cat": "popular"
-  },
-  {
-    "code": "100",
-    "char": "💯",
-    "name": "Hundred Points",
-    "cat": "popular"
-  },
-  {
-    "code": "bulb",
-    "char": "💡",
-    "name": "Light Bulb / Idea",
-    "cat": "popular"
-  },
-  {
-    "code": "memo",
-    "char": "📝",
-    "name": "Memo / Note",
-    "cat": "popular"
+    "code": "smiley",
+    "char": "😃",
+    "name": "Smiling Face with Big Eyes",
+    "cat": "smileys",
+    "keywords": "happy joy haha"
   },
   {
     "code": "smile",
     "char": "😄",
-    "name": "Grinning Face",
-    "cat": "popular"
+    "name": "Smiling Face with Smiling Eyes",
+    "cat": "smileys",
+    "keywords": "happy laugh glad"
+  },
+  {
+    "code": "grin",
+    "char": "😁",
+    "name": "Beaming Face with Smiling Eyes",
+    "cat": "smileys",
+    "keywords": "happy cheer proud"
+  },
+  {
+    "code": "laughing",
+    "char": "😆",
+    "name": "Grinning Squinting Face",
+    "cat": "smileys",
+    "keywords": "lol haha laugh"
+  },
+  {
+    "code": "sweat_smile",
+    "char": "😅",
+    "name": "Grinning Face with Sweat",
+    "cat": "smileys",
+    "keywords": "relief phew nervous"
+  },
+  {
+    "code": "joy",
+    "char": "😂",
+    "name": "Face with Tears of Joy",
+    "cat": "smileys",
+    "keywords": "lmao haha cry laugh funny"
+  },
+  {
+    "code": "rofl",
+    "char": "🤣",
+    "name": "Rolling on the Floor Laughing",
+    "cat": "smileys",
+    "keywords": "rofl lol funny"
+  },
+  {
+    "code": "blush",
+    "char": "😊",
+    "name": "Smiling Face with Smiling Eyes",
+    "cat": "smileys",
+    "keywords": "blush warm happy"
+  },
+  {
+    "code": "halo",
+    "char": "😇",
+    "name": "Smiling Face with Halo",
+    "cat": "smileys",
+    "keywords": "angel innocent good"
+  },
+  {
+    "code": "slightly_smiling",
+    "char": "🙂",
+    "name": "Slightly Smiling Face",
+    "cat": "smileys",
+    "keywords": "smile ok calm"
+  },
+  {
+    "code": "upside_down",
+    "char": "🙃",
+    "name": "Upside-Down Face",
+    "cat": "smileys",
+    "keywords": "silly sarcasm ironical"
+  },
+  {
+    "code": "wink",
+    "char": "😉",
+    "name": "Winking Face",
+    "cat": "smileys",
+    "keywords": "wink tease flirt"
+  },
+  {
+    "code": "relieved",
+    "char": "😌",
+    "name": "Relieved Face",
+    "cat": "smileys",
+    "keywords": "peace calm phew"
+  },
+  {
+    "code": "heart_eyes",
+    "char": "😍",
+    "name": "Smiling Face with Heart-Eyes",
+    "cat": "smileys",
+    "keywords": "love crush adore beautiful"
+  },
+  {
+    "code": "kissing_heart",
+    "char": "😘",
+    "name": "Face Blowing a Kiss",
+    "cat": "smileys",
+    "keywords": "kiss love affection"
+  },
+  {
+    "code": "yum",
+    "char": "😋",
+    "name": "Face Savoring Food",
+    "cat": "smileys",
+    "keywords": "tasty delicious treat"
+  },
+  {
+    "code": "stuck_out_tongue",
+    "char": "😛",
+    "name": "Face with Tongue",
+    "cat": "smileys",
+    "keywords": "playful silly prank"
+  },
+  {
+    "code": "stuck_out_tongue_winking_eye",
+    "char": "😜",
+    "name": "Winking Face with Tongue",
+    "cat": "smileys",
+    "keywords": "kidding joke crazy"
+  },
+  {
+    "code": "stuck_out_tongue_closed_eyes",
+    "char": "😝",
+    "name": "Squinting Face with Tongue",
+    "cat": "smileys",
+    "keywords": "playful lol hilarious"
+  },
+  {
+    "code": "zany_face",
+    "char": "🤪",
+    "name": "Zany Face",
+    "cat": "smileys",
+    "keywords": "wild goofy party"
+  },
+  {
+    "code": "sunglasses",
+    "char": "😎",
+    "name": "Smiling Face with Sunglasses",
+    "cat": "smileys",
+    "keywords": "cool awesome badass chill"
+  },
+  {
+    "code": "star_struck",
+    "char": "🤩",
+    "name": "Star-Struck",
+    "cat": "smileys",
+    "keywords": "wow amazing celebrity"
+  },
+  {
+    "code": "partying_face",
+    "char": "🥳",
+    "name": "Partying Face",
+    "cat": "smileys",
+    "keywords": "celebrate party hat horn"
+  },
+  {
+    "code": "smirk",
+    "char": "😏",
+    "name": "Smirking Face",
+    "cat": "smileys",
+    "keywords": "smug sly clever"
+  },
+  {
+    "code": "neutral_face",
+    "char": "😐",
+    "name": "Neutral Face",
+    "cat": "smileys",
+    "keywords": "meh pokerface okay"
+  },
+  {
+    "code": "expressionless",
+    "char": "😑",
+    "name": "Expressionless Face",
+    "cat": "smileys",
+    "keywords": "blank no comment"
+  },
+  {
+    "code": "no_mouth",
+    "char": "😶",
+    "name": "Face Without Mouth",
+    "cat": "smileys",
+    "keywords": "silent quiet speechless"
+  },
+  {
+    "code": "rolling_eyes",
+    "char": "🙄",
+    "name": "Face with Rolling Eyes",
+    "cat": "smileys",
+    "keywords": "eyeroll whatever bored"
   },
   {
     "code": "thinking",
     "char": "🤔",
     "name": "Thinking Face",
-    "cat": "popular"
+    "cat": "smileys",
+    "keywords": "ponder consider idea hmm"
+  },
+  {
+    "code": "shushing_face",
+    "char": "🤫",
+    "name": "Shushing Face",
+    "cat": "smileys",
+    "keywords": "quiet secret hush"
+  },
+  {
+    "code": "face_with_hand_over_mouth",
+    "char": "🤭",
+    "name": "Face with Hand Over Mouth",
+    "cat": "smileys",
+    "keywords": "oops giggle chuckle"
+  },
+  {
+    "code": "raised_eyebrow",
+    "char": "🤨",
+    "name": "Face with Raised Eyebrow",
+    "cat": "smileys",
+    "keywords": "skeptic doubt suspicious"
+  },
+  {
+    "code": "monocle_face",
+    "char": "🧐",
+    "name": "Face with Monocle",
+    "cat": "smileys",
+    "keywords": "examine inspect investigate curious"
+  },
+  {
+    "code": "nerd_face",
+    "char": "🤓",
+    "name": "Nerd Face",
+    "cat": "smileys",
+    "keywords": "geek smart clever code"
+  },
+  {
+    "code": "hugging_face",
+    "char": "🤗",
+    "name": "Hugging Face",
+    "cat": "smileys",
+    "keywords": "hug affection warmth"
+  },
+  {
+    "code": "pleading_face",
+    "char": "🥺",
+    "name": "Pleading Face",
+    "cat": "smileys",
+    "keywords": "puppy eyes please beg"
+  },
+  {
+    "code": "sleeping",
+    "char": "😴",
+    "name": "Sleeping Face",
+    "cat": "smileys",
+    "keywords": "sleep zzz tired rest"
+  },
+  {
+    "code": "yawning_face",
+    "char": "🥱",
+    "name": "Yawning Face",
+    "cat": "smileys",
+    "keywords": "tired sleepy bore"
+  },
+  {
+    "code": "mask",
+    "char": "😷",
+    "name": "Face with Medical Mask",
+    "cat": "smileys",
+    "keywords": "sick health doctor covid"
+  },
+  {
+    "code": "face_with_thermometer",
+    "char": "🤒",
+    "name": "Face with Thermometer",
+    "cat": "smileys",
+    "keywords": "fever ill sick"
+  },
+  {
+    "code": "head_bandage",
+    "char": "🤕",
+    "name": "Face with Head-Bandage",
+    "cat": "smileys",
+    "keywords": "hurt injured wound"
+  },
+  {
+    "code": "nauseated_face",
+    "char": "🤢",
+    "name": "Nauseated Face",
+    "cat": "smileys",
+    "keywords": "gross sick puking"
+  },
+  {
+    "code": "exploding_head",
+    "char": "🤯",
+    "name": "Exploding Head",
+    "cat": "smileys",
+    "keywords": "mind blown shock unbelievable"
+  },
+  {
+    "code": "confused",
+    "char": "😕",
+    "name": "Confused Face",
+    "cat": "smileys",
+    "keywords": "puzzled unsure"
+  },
+  {
+    "code": "worried",
+    "char": "😟",
+    "name": "Worried Face",
+    "cat": "smileys",
+    "keywords": "concerned anxious"
+  },
+  {
+    "code": "cry",
+    "char": "😢",
+    "name": "Crying Face",
+    "cat": "smileys",
+    "keywords": "tear sad sorrow"
+  },
+  {
+    "code": "sob",
+    "char": "😭",
+    "name": "Loudly Crying Face",
+    "cat": "smileys",
+    "keywords": "bawl weep tears"
+  },
+  {
+    "code": "scream",
+    "char": "😱",
+    "name": "Face Screaming in Fear",
+    "cat": "smileys",
+    "keywords": "scared shock horror omg"
+  },
+  {
+    "code": "flushed",
+    "char": "😳",
+    "name": "Flushed Face",
+    "cat": "smileys",
+    "keywords": "blush shock embarrassed"
+  },
+  {
+    "code": "rage",
+    "char": "😡",
+    "name": "Enraged Face",
+    "cat": "smileys",
+    "keywords": "angry mad fury red"
+  },
+  {
+    "code": "skull",
+    "char": "💀",
+    "name": "Skull",
+    "cat": "smileys",
+    "keywords": "dead death skeleton gameover"
+  },
+  {
+    "code": "skull_crossbones",
+    "char": "☠️",
+    "name": "Skull and Crossbones",
+    "cat": "smileys",
+    "keywords": "danger poison pirate"
+  },
+  {
+    "code": "ghost",
+    "char": "👻",
+    "name": "Ghost",
+    "cat": "smileys",
+    "keywords": "spooky phantom halloween"
+  },
+  {
+    "code": "alien",
+    "char": "👽",
+    "name": "Alien",
+    "cat": "smileys",
+    "keywords": "ufo space extraterrestrial"
+  },
+  {
+    "code": "robot",
+    "char": "🤖",
+    "name": "Robot",
+    "cat": "smileys",
+    "keywords": "bot automation ai machine"
+  },
+  {
+    "code": "clown_face",
+    "char": "🤡",
+    "name": "Clown Face",
+    "cat": "smileys",
+    "keywords": "joker funny fool"
+  },
+  {
+    "code": "poop",
+    "char": "💩",
+    "name": "Pile of Poo",
+    "cat": "smileys",
+    "keywords": "shit crap poop"
+  },
+  {
+    "code": "thumbsup",
+    "char": "👍",
+    "name": "Thumbs Up",
+    "cat": "smileys",
+    "keywords": "+1 like approve agree yes good ok positive"
+  },
+  {
+    "code": "thumbsdown",
+    "char": "👎",
+    "name": "Thumbs Down",
+    "cat": "smileys",
+    "keywords": "-1 dislike reject no bad negative"
   },
   {
     "code": "wave",
     "char": "👋",
     "name": "Waving Hand",
-    "cat": "popular"
+    "cat": "smileys",
+    "keywords": "hello goodbye hi bye greeting"
   },
   {
-    "code": "raised_hands",
-    "char": "🙌",
-    "name": "Raised Hands / Celebrate",
-    "cat": "popular"
+    "code": "raised_hand",
+    "char": "✋",
+    "name": "Raised Hand",
+    "cat": "smileys",
+    "keywords": "stop highfive halt"
   },
   {
-    "code": "clap",
-    "char": "👏",
-    "name": "Clapping Hands",
-    "cat": "popular"
+    "code": "vulcan_salute",
+    "char": "🖖",
+    "name": "Vulcan Salute",
+    "cat": "smileys",
+    "keywords": "spock star trek live long prosper"
   },
   {
     "code": "ok_hand",
     "char": "👌",
     "name": "OK Hand",
-    "cat": "popular"
+    "cat": "smileys",
+    "keywords": "perfect fine ok agreed"
   },
   {
-    "code": "octocat",
-    "char": "🐙",
-    "name": "Octocat / GitHub",
-    "cat": "github"
+    "code": "pinching_hand",
+    "char": "🤏",
+    "name": "Pinching Hand",
+    "cat": "smileys",
+    "keywords": "tiny small little bit"
   },
   {
-    "code": "shipit",
-    "char": "🐿️",
-    "name": "Ship It Squirrel",
-    "cat": "github"
+    "code": "v",
+    "char": "✌️",
+    "name": "Victory Hand",
+    "cat": "smileys",
+    "keywords": "peace two v victory"
   },
   {
-    "code": "copilot",
-    "char": "🤖",
-    "name": "GitHub Copilot / Bot",
-    "cat": "github"
+    "code": "crossed_fingers",
+    "char": "🤞",
+    "name": "Crossed Fingers",
+    "cat": "smileys",
+    "keywords": "luck hope wish"
   },
   {
-    "code": "check",
-    "char": "✅",
-    "name": "Check Mark",
-    "cat": "status"
+    "code": "metal",
+    "char": "🤘",
+    "name": "Sign of the Horns",
+    "cat": "smileys",
+    "keywords": "rock rockon heavy metal"
   },
   {
-    "code": "white_check_mark",
-    "char": "✅",
-    "name": "White Check Mark",
-    "cat": "status"
+    "code": "call_me_hand",
+    "char": "🤙",
+    "name": "Call Me Hand",
+    "cat": "smileys",
+    "keywords": "shaka phone hang loose"
   },
   {
-    "code": "heavy_check_mark",
-    "char": "✔️",
-    "name": "Heavy Check Mark",
-    "cat": "status"
+    "code": "point_left",
+    "char": "👈",
+    "name": "Backhand Index Pointing Left",
+    "cat": "smileys",
+    "keywords": "left point finger"
   },
   {
-    "code": "x",
-    "char": "❌",
-    "name": "Cross Mark",
-    "cat": "status"
+    "code": "point_right",
+    "char": "👉",
+    "name": "Backhand Index Pointing Right",
+    "cat": "smileys",
+    "keywords": "right point finger"
   },
   {
-    "code": "negative_squared_cross_mark",
-    "char": "❎",
-    "name": "Squared Cross",
-    "cat": "status"
+    "code": "point_up",
+    "char": "👆",
+    "name": "Backhand Index Pointing Up",
+    "cat": "smileys",
+    "keywords": "up point finger above"
   },
   {
-    "code": "warning",
-    "char": "⚠️",
-    "name": "Warning",
-    "cat": "status"
+    "code": "point_down",
+    "char": "👇",
+    "name": "Backhand Index Pointing Down",
+    "cat": "smileys",
+    "keywords": "down point finger below"
   },
   {
-    "code": "alert",
-    "char": "🚨",
-    "name": "Alert / Siren",
-    "cat": "status"
+    "code": "punch",
+    "char": "👊",
+    "name": "Oncoming Fist",
+    "cat": "smileys",
+    "keywords": "fistbump bump punch power"
   },
   {
-    "code": "rotating_light",
-    "char": "🚨",
-    "name": "Rotating Light",
-    "cat": "status"
+    "code": "clap",
+    "char": "👏",
+    "name": "Clapping Hands",
+    "cat": "smileys",
+    "keywords": "applause bravo praise cheer"
   },
   {
-    "code": "stop_sign",
-    "char": "🛑",
-    "name": "Stop Sign",
-    "cat": "status"
+    "code": "raised_hands",
+    "char": "🙌",
+    "name": "Raising Hands",
+    "cat": "smileys",
+    "keywords": "celebrate hooray praise"
   },
   {
-    "code": "no_entry",
-    "char": "⛔",
-    "name": "No Entry",
-    "cat": "status"
+    "code": "handshake",
+    "char": "🤝",
+    "name": "Handshake",
+    "cat": "smileys",
+    "keywords": "deal agreement partner meet"
   },
   {
-    "code": "no_entry_sign",
-    "char": "🚫",
-    "name": "Prohibited",
-    "cat": "status"
+    "code": "pray",
+    "char": "🙏",
+    "name": "Folded Hands",
+    "cat": "smileys",
+    "keywords": "thanks please pray gratitude hope"
   },
   {
-    "code": "bell",
-    "char": "🔔",
-    "name": "Bell / Notification",
-    "cat": "status"
+    "code": "writing_hand",
+    "char": "✍️",
+    "name": "Writing Hand",
+    "cat": "smileys",
+    "keywords": "write author compose edit"
   },
   {
-    "code": "bell_slash",
-    "char": "🔕",
-    "name": "Muted Bell",
-    "cat": "status"
+    "code": "muscle",
+    "char": "💪",
+    "name": "Flexed Biceps",
+    "cat": "smileys",
+    "keywords": "strong power flex fitness"
   },
   {
-    "code": "hourglass",
-    "char": "⌛",
-    "name": "Hourglass / In Progress",
-    "cat": "status"
+    "code": "eyes",
+    "char": "👀",
+    "name": "Eyes",
+    "cat": "smileys",
+    "keywords": "look observe watch review notice"
   },
   {
-    "code": "hourglass_flowing_sand",
-    "char": "⏳",
-    "name": "Hourglass Running",
-    "cat": "status"
-  },
-  {
-    "code": "construction",
-    "char": "🚧",
-    "name": "Under Construction",
-    "cat": "status"
-  },
-  {
-    "code": "radioactive",
-    "char": "☢️",
-    "name": "Radioactive",
-    "cat": "status"
-  },
-  {
-    "code": "biohazard",
-    "char": "☣️",
-    "name": "Biohazard",
-    "cat": "status"
-  },
-  {
-    "code": "green_circle",
-    "char": "🟢",
-    "name": "Green Circle / Online",
-    "cat": "status"
-  },
-  {
-    "code": "red_circle",
-    "char": "🔴",
-    "name": "Red Circle / Offline",
-    "cat": "status"
-  },
-  {
-    "code": "yellow_circle",
-    "char": "🟡",
-    "name": "Yellow Circle / Degraded",
-    "cat": "status"
-  },
-  {
-    "code": "blue_circle",
-    "char": "🔵",
-    "name": "Blue Circle / Info",
-    "cat": "status"
-  },
-  {
-    "code": "white_circle",
-    "char": "⚪",
-    "name": "White Circle",
-    "cat": "status"
-  },
-  {
-    "code": "black_circle",
-    "char": "⚫",
-    "name": "Black Circle",
-    "cat": "status"
-  },
-  {
-    "code": "large_green_circle",
-    "char": "🟢",
-    "name": "Large Green Circle",
-    "cat": "status"
-  },
-  {
-    "code": "large_blue_circle",
-    "char": "🔵",
-    "name": "Large Blue Circle",
-    "cat": "status"
-  },
-  {
-    "code": "heavy_plus_sign",
-    "char": "➕",
-    "name": "Plus / Add",
-    "cat": "status"
-  },
-  {
-    "code": "heavy_minus_sign",
-    "char": "➖",
-    "name": "Minus / Remove",
-    "cat": "status"
-  },
-  {
-    "code": "heavy_multiplication_x",
-    "char": "✖️",
-    "name": "Multiply / Close",
-    "cat": "status"
-  },
-  {
-    "code": "boom",
-    "char": "💥",
-    "name": "Boom / Collision",
-    "cat": "status"
-  },
-  {
-    "code": "collision",
-    "char": "💥",
-    "name": "Collision",
-    "cat": "status"
-  },
-  {
-    "code": "shield",
-    "char": "🛡️",
-    "name": "Shield / Secure",
-    "cat": "status"
-  },
-  {
-    "code": "bricks",
-    "char": "🧱",
-    "name": "Bricks / Blocks / Building",
-    "cat": "tech"
-  },
-  {
-    "code": "server",
-    "char": "🖥️",
-    "name": "Server / Host / Node",
-    "cat": "tech"
-  },
-  {
-    "code": "host",
-    "char": "💻",
-    "name": "Host / Laptop",
-    "cat": "tech"
-  },
-  {
-    "code": "database",
-    "char": "🗄️",
-    "name": "Database / Storage",
-    "cat": "tech"
-  },
-  {
-    "code": "db",
-    "char": "🗄️",
-    "name": "Database Alias",
-    "cat": "tech"
-  },
-  {
-    "code": "firewall",
-    "char": "🛡️",
-    "name": "Firewall / WAF",
-    "cat": "tech"
-  },
-  {
-    "code": "router",
-    "char": "🔀",
-    "name": "Router / Routing",
-    "cat": "tech"
-  },
-  {
-    "code": "switch",
-    "char": "🎛️",
-    "name": "Switch / Controls",
-    "cat": "tech"
-  },
-  {
-    "code": "gateway",
-    "char": "🚪",
-    "name": "Gateway",
-    "cat": "tech"
-  },
-  {
-    "code": "cloud",
-    "char": "☁️",
-    "name": "Cloud / WAN",
-    "cat": "tech"
-  },
-  {
-    "code": "k8s",
-    "char": "☸️",
-    "name": "Kubernetes / K8s",
-    "cat": "tech"
-  },
-  {
-    "code": "kubernetes",
-    "char": "☸️",
-    "name": "Kubernetes Alias",
-    "cat": "tech"
-  },
-  {
-    "code": "docker",
-    "char": "🐳",
-    "name": "Docker / Container",
-    "cat": "tech"
-  },
-  {
-    "code": "pod",
-    "char": "☸️",
-    "name": "Pod / K8s Pod",
-    "cat": "tech"
-  },
-  {
-    "code": "terminal",
-    "char": "💻",
-    "name": "Terminal / Console",
-    "cat": "tech"
+    "code": "brain",
+    "char": "🧠",
+    "name": "Brain",
+    "cat": "smileys",
+    "keywords": "mind intelligence smart think memory"
   },
   {
     "code": "computer",
     "char": "💻",
-    "name": "Computer",
-    "cat": "tech"
-  },
-  {
-    "code": "laptop",
-    "char": "💻",
     "name": "Laptop",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "laptop pc code developer dev work"
   },
   {
     "code": "desktop_computer",
     "char": "🖥️",
     "name": "Desktop Computer",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "desktop monitor workstation screen"
   },
   {
-    "code": "lock",
-    "char": "🔒",
-    "name": "Locked / SSL / Secret",
-    "cat": "tech"
+    "code": "keyboard",
+    "char": "⌨️",
+    "name": "Keyboard",
+    "cat": "tech",
+    "keywords": "type input key hardware"
   },
   {
-    "code": "unlock",
-    "char": "🔓",
-    "name": "Unlocked / Open",
-    "cat": "tech"
+    "code": "mouse",
+    "char": "🖱️",
+    "name": "Computer Mouse",
+    "cat": "tech",
+    "keywords": "hardware click track"
   },
   {
-    "code": "key",
-    "char": "🔑",
-    "name": "Key / SSH / Token",
-    "cat": "tech"
+    "code": "printer",
+    "char": "🖨️",
+    "name": "Printer",
+    "cat": "tech",
+    "keywords": "hardware print paper output"
   },
   {
-    "code": "old_key",
-    "char": "🗝️",
-    "name": "Old Key",
-    "cat": "tech"
+    "code": "server",
+    "char": "🗄️",
+    "name": "File Cabinet / Server Rack",
+    "cat": "tech",
+    "keywords": "server rack hosting storage database infra"
   },
   {
-    "code": "network",
-    "char": "🌐",
-    "name": "Network / Global",
-    "cat": "tech"
-  },
-  {
-    "code": "globe_with_meridians",
-    "char": "🌐",
-    "name": "Globe / Internet",
-    "cat": "tech"
-  },
-  {
-    "code": "link",
-    "char": "🔗",
-    "name": "Link / Hyperlink",
-    "cat": "tech"
-  },
-  {
-    "code": "cpu",
-    "char": "🧠",
-    "name": "CPU / Processor",
-    "cat": "tech"
-  },
-  {
-    "code": "ram",
+    "code": "floppy_disk",
     "char": "💾",
-    "name": "RAM / Memory",
-    "cat": "tech"
+    "name": "Floppy Disk",
+    "cat": "tech",
+    "keywords": "save storage drive media"
   },
   {
-    "code": "cable",
-    "char": "🔌",
-    "name": "Cable / Connection",
-    "cat": "tech"
+    "code": "cd",
+    "char": "💿",
+    "name": "Optical Disk (CD/DVD)",
+    "cat": "tech",
+    "keywords": "iso disk media rom image"
   },
   {
-    "code": "plug",
-    "char": "🔌",
-    "name": "Electric Plug",
-    "cat": "tech"
+    "code": "phone",
+    "char": "📱",
+    "name": "Mobile Phone",
+    "cat": "tech",
+    "keywords": "cellphone smartphone mobile app"
   },
   {
-    "code": "electric_plug",
-    "char": "🔌",
-    "name": "Electric Plug Alias",
-    "cat": "tech"
+    "code": "telephone",
+    "char": "☎️",
+    "name": "Telephone",
+    "cat": "tech",
+    "keywords": "phone dial landline support"
   },
   {
     "code": "battery",
     "char": "🔋",
     "name": "Battery",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "power energy charge level"
   },
   {
-    "code": "satellite",
-    "char": "🛰️",
-    "name": "Satellite",
-    "cat": "tech"
+    "code": "electric_plug",
+    "char": "🔌",
+    "name": "Electric Plug",
+    "cat": "tech",
+    "keywords": "power socket connect cable plug"
   },
   {
     "code": "satellite_antenna",
     "char": "📡",
-    "name": "Satellite Dish / Antenna",
-    "cat": "tech"
+    "name": "Satellite Antenna",
+    "cat": "tech",
+    "keywords": "dish signal wireless telecom comms"
   },
   {
     "code": "gear",
     "char": "⚙️",
-    "name": "Gear / Settings / Config",
-    "cat": "tech"
+    "name": "Gear / Settings",
+    "cat": "tech",
+    "keywords": "cog config setup configure options settings",
+    "entity": "&gear;"
   },
   {
-    "code": "gears",
-    "char": "⚙️",
-    "name": "Gears",
-    "cat": "tech"
+    "code": "tools",
+    "char": "🛠️",
+    "name": "Hammer and Wrench",
+    "cat": "tech",
+    "keywords": "admin fix debug utility maintenance tools"
   },
   {
     "code": "wrench",
     "char": "🔧",
-    "name": "Wrench / Maintenance",
-    "cat": "tech"
-  },
-  {
-    "code": "hammer_and_wrench",
-    "char": "🛠️",
-    "name": "Tools / DevOps",
-    "cat": "tech"
+    "name": "Wrench",
+    "cat": "tech",
+    "keywords": "spanner fix repair maintenance tool"
   },
   {
     "code": "hammer",
     "char": "🔨",
     "name": "Hammer",
-    "cat": "tech"
-  },
-  {
-    "code": "toolbox",
-    "char": "🧰",
-    "name": "Toolbox",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "build construct tool make"
   },
   {
     "code": "nut_and_bolt",
     "char": "🔩",
     "name": "Nut and Bolt",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "screw hardware fasten assembly"
+  },
+  {
+    "code": "chains",
+    "char": "⛓️",
+    "name": "Chains",
+    "cat": "tech",
+    "keywords": "chain link blockchain binding connect",
+    "entity": "&chain;"
+  },
+  {
+    "code": "toolbox",
+    "char": "🧰",
+    "name": "Toolbox",
+    "cat": "tech",
+    "keywords": "utilities kit tools bundle suite"
+  },
+  {
+    "code": "magnet",
+    "char": "🧲",
+    "name": "Magnet",
+    "cat": "tech",
+    "keywords": "attract physics magnetic capture"
+  },
+  {
+    "code": "telescope",
+    "char": "🔭",
+    "name": "Telescope",
+    "cat": "tech",
+    "keywords": "observe discover vision search explore"
+  },
+  {
+    "code": "microscope",
+    "char": "🔬",
+    "name": "Microscope",
+    "cat": "tech",
+    "keywords": "inspect inspect analyze lab science test"
+  },
+  {
+    "code": "test_tube",
+    "char": "🧪",
+    "name": "Test Tube",
+    "cat": "tech",
+    "keywords": "lab experiment chemistry unit test testcase"
+  },
+  {
+    "code": "petri_dish",
+    "char": "🧫",
+    "name": "Petri Dish",
+    "cat": "tech",
+    "keywords": "culture lab experiment biology test"
+  },
+  {
+    "code": "dna",
+    "char": "🧬",
+    "name": "DNA",
+    "cat": "tech",
+    "keywords": "genetics biology origin template"
+  },
+  {
+    "code": "lock",
+    "char": "🔒",
+    "name": "Locked",
+    "cat": "tech",
+    "keywords": "security safe closed auth ssl https private encrypted"
+  },
+  {
+    "code": "unlock",
+    "char": "🔓",
+    "name": "Unlocked",
+    "cat": "tech",
+    "keywords": "security open unauthenticated public insecure"
+  },
+  {
+    "code": "key",
+    "char": "🔑",
+    "name": "Key",
+    "cat": "tech",
+    "keywords": "auth token credential access ssh secret password api"
+  },
+  {
+    "code": "old_key",
+    "char": "🗝️",
+    "name": "Old Key",
+    "cat": "tech",
+    "keywords": "secret cipher crypt access masterkey"
+  },
+  {
+    "code": "shield",
+    "char": "🛡️",
+    "name": "Shield",
+    "cat": "tech",
+    "keywords": "security protect defense firewall safe guard"
   },
   {
     "code": "package",
     "char": "📦",
-    "name": "Package / RPM / Deb",
-    "cat": "tech"
+    "name": "Package",
+    "cat": "tech",
+    "keywords": "box delivery shipment npm pypi gem deb rpm container archive"
   },
   {
-    "code": "box",
-    "char": "📦",
-    "name": "Box / Container",
-    "cat": "tech"
+    "code": "label",
+    "char": "🏷️",
+    "name": "Label",
+    "cat": "tech",
+    "keywords": "tag metadata release badge ticket version"
   },
   {
-    "code": "inbox_tray",
-    "char": "📥",
-    "name": "Inbox / Receive",
-    "cat": "tech"
+    "code": "rocket",
+    "char": "🚀",
+    "name": "Rocket",
+    "cat": "tech",
+    "keywords": "launch deploy fast speed release blastoff shipit"
   },
   {
-    "code": "outbox_tray",
-    "char": "📤",
-    "name": "Outbox / Send",
-    "cat": "tech"
+    "code": "satellite",
+    "char": "🛰️",
+    "name": "Satellite",
+    "cat": "tech",
+    "keywords": "orbit space telecom navigation gps"
   },
   {
-    "code": "bug",
-    "char": "🐛",
-    "name": "Bug / Defect",
-    "cat": "tech"
+    "code": "globe",
+    "char": "🌐",
+    "name": "Globe with Meridians",
+    "cat": "tech",
+    "keywords": "internet web network world dns wan cloud"
   },
   {
-    "code": "ant",
-    "char": "🐜",
-    "name": "Ant",
-    "cat": "tech"
+    "code": "world_map",
+    "char": "🗺️",
+    "name": "World Map",
+    "cat": "tech",
+    "keywords": "map location geography topology routing"
   },
   {
-    "code": "floppy_disk",
-    "char": "💾",
-    "name": "Floppy Disk / Save",
-    "cat": "tech"
+    "code": "compass",
+    "char": "🧭",
+    "name": "Compass",
+    "cat": "tech",
+    "keywords": "navigation direction explore orient guide"
   },
   {
-    "code": "cd",
-    "char": "💿",
-    "name": "CD / ISO / Media",
-    "cat": "tech"
+    "code": "building_construction",
+    "char": "🏗️",
+    "name": "Building Construction",
+    "cat": "tech",
+    "keywords": "build scaffolding dev ci architecture"
   },
   {
-    "code": "dvd",
-    "char": "📀",
-    "name": "DVD / Optical Disk",
-    "cat": "tech"
+    "code": "factory",
+    "char": "🏭",
+    "name": "Factory",
+    "cat": "tech",
+    "keywords": "industry plant pipeline automation manufacture"
   },
   {
-    "code": "file_folder",
-    "char": "📁",
-    "name": "Folder / Directory",
-    "cat": "tech"
-  },
-  {
-    "code": "open_file_folder",
-    "char": "📂",
-    "name": "Open Folder",
-    "cat": "tech"
-  },
-  {
-    "code": "card_index_dividers",
-    "char": "🗂️",
-    "name": "Index Dividers",
-    "cat": "tech"
-  },
-  {
-    "code": "page_facing_up",
-    "char": "📄",
-    "name": "Document / Page",
-    "cat": "tech"
-  },
-  {
-    "code": "page_with_curl",
-    "char": "📃",
-    "name": "Page with Curl",
-    "cat": "tech"
-  },
-  {
-    "code": "scroll",
-    "char": "📜",
-    "name": "Scroll / Script",
-    "cat": "tech"
+    "code": "office_building",
+    "char": "🏢",
+    "name": "Office Building",
+    "cat": "tech",
+    "keywords": "corporate enterprise workplace headquarters"
   },
   {
     "code": "clipboard",
     "char": "📋",
     "name": "Clipboard",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "checklist todo notes audit inspect task"
+  },
+  {
+    "code": "memo",
+    "char": "📝",
+    "name": "Memo",
+    "cat": "tech",
+    "keywords": "document note edit draft text pencil"
+  },
+  {
+    "code": "file_folder",
+    "char": "📁",
+    "name": "File Folder",
+    "cat": "tech",
+    "keywords": "directory folder path storage"
+  },
+  {
+    "code": "open_file_folder",
+    "char": "📂",
+    "name": "Open File Folder",
+    "cat": "tech",
+    "keywords": "directory browsing catalog"
+  },
+  {
+    "code": "card_index_dividers",
+    "char": "🗂️",
+    "name": "Card Index Dividers",
+    "cat": "tech",
+    "keywords": "organize tabs index catalog"
+  },
+  {
+    "code": "page_facing_up",
+    "char": "📄",
+    "name": "Page Facing Up",
+    "cat": "tech",
+    "keywords": "document file article markdown text"
+  },
+  {
+    "code": "scroll",
+    "char": "📜",
+    "name": "Scroll",
+    "cat": "tech",
+    "keywords": "document ancient policy manifest license agreement"
   },
   {
     "code": "bookmark_tabs",
     "char": "📑",
     "name": "Bookmark Tabs",
-    "cat": "tech"
-  },
-  {
-    "code": "bookmark",
-    "char": "🔖",
-    "name": "Bookmark",
-    "cat": "tech"
-  },
-  {
-    "code": "label",
-    "char": "🏷️",
-    "name": "Label / Tag",
-    "cat": "tech"
-  },
-  {
-    "code": "tag",
-    "char": "🏷️",
-    "name": "Tag Alias",
-    "cat": "tech"
+    "cat": "tech",
+    "keywords": "documentation reference manual book"
   },
   {
     "code": "bar_chart",
     "char": "📊",
-    "name": "Bar Chart / Metrics",
-    "cat": "tech"
+    "name": "Bar Chart",
+    "cat": "tech",
+    "keywords": "metrics statistics telemetry analytics dashboard report"
   },
   {
-    "code": "chart_with_upwards_trend",
+    "code": "chart_increasing",
     "char": "📈",
-    "name": "Chart Upwards / Telemetry",
-    "cat": "tech"
+    "name": "Chart Increasing",
+    "cat": "tech",
+    "keywords": "uptrend growth metrics performance success increase"
   },
   {
-    "code": "chart_with_downwards_trend",
+    "code": "chart_decreasing",
     "char": "📉",
-    "name": "Chart Downwards",
-    "cat": "tech"
+    "name": "Chart Decreasing",
+    "cat": "tech",
+    "keywords": "downtrend loss drop decline error fall"
   },
   {
-    "code": "mag",
-    "char": "🔍",
-    "name": "Search / Magnifier",
-    "cat": "tech"
+    "code": "calendar",
+    "char": "📅",
+    "name": "Calendar",
+    "cat": "tech",
+    "keywords": "date schedule time plan meeting"
   },
   {
-    "code": "mag_right",
-    "char": "🔎",
-    "name": "Search Right",
-    "cat": "tech"
-  },
-  {
-    "code": "microscope",
-    "char": "🔬",
-    "name": "Microscope / Deep Dive",
-    "cat": "tech"
-  },
-  {
-    "code": "telescope",
-    "char": "🔭",
-    "name": "Telescope / Observability",
-    "cat": "tech"
-  },
-  {
-    "code": "compass",
-    "char": "🧭",
-    "name": "Compass / Navigation",
-    "cat": "tech"
-  },
-  {
-    "code": "test_tube",
-    "char": "🧪",
-    "name": "Test Tube / QA",
-    "cat": "tech"
-  },
-  {
-    "code": "radio",
-    "char": "📻",
-    "name": "Radio / Broadcast",
-    "cat": "tech"
-  },
-  {
-    "code": "robot",
-    "char": "🤖",
-    "name": "Robot / Automation / AI",
-    "cat": "people"
-  },
-  {
-    "code": "technologist",
-    "char": "🧑‍💻",
-    "name": "Technologist / Engineer",
-    "cat": "people"
-  },
-  {
-    "code": "man_technologist",
-    "char": "👨‍💻",
-    "name": "Man Technologist",
-    "cat": "people"
-  },
-  {
-    "code": "woman_technologist",
-    "char": "👩‍💻",
-    "name": "Woman Technologist",
-    "cat": "people"
-  },
-  {
-    "code": "detective",
-    "char": "🕵️",
-    "name": "Detective / Security Auditor",
-    "cat": "people"
-  },
-  {
-    "code": "construction_worker",
-    "char": "👷",
-    "name": "Builder / Infra Engineer",
-    "cat": "people"
-  },
-  {
-    "code": "guard",
-    "char": "💂",
-    "name": "Guard / SecOps",
-    "cat": "people"
-  },
-  {
-    "code": "bust_in_silhouette",
-    "char": "👤",
-    "name": "User / Account",
-    "cat": "people"
-  },
-  {
-    "code": "busts_in_silhouette",
-    "char": "👥",
-    "name": "Users / Team",
-    "cat": "people"
-  },
-  {
-    "code": "user",
-    "char": "👤",
-    "name": "User Alias",
-    "cat": "people"
-  },
-  {
-    "code": "admin",
-    "char": "🧙",
-    "name": "Admin / Wizard",
-    "cat": "people"
-  },
-  {
-    "code": "team",
-    "char": "👥",
-    "name": "Team Alias",
-    "cat": "people"
-  },
-  {
-    "code": "arrow_right",
-    "char": "➡️",
-    "name": "Arrow Right",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_left",
-    "char": "⬅️",
-    "name": "Arrow Left",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_up",
-    "char": "⬆️",
-    "name": "Arrow Up",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_down",
-    "char": "⬇️",
-    "name": "Arrow Down",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_upper_right",
-    "char": "↗️",
-    "name": "Arrow Up Right",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_lower_right",
-    "char": "↘️",
-    "name": "Arrow Down Right",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_upper_left",
-    "char": "↖️",
-    "name": "Arrow Up Left",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_lower_left",
-    "char": "↙️",
-    "name": "Arrow Down Left",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrow_forward",
-    "char": "▶️",
-    "name": "Forward / Play",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrows_counterclockwise",
-    "char": "🔄",
-    "name": "Reload / Cycle",
-    "cat": "symbols"
-  },
-  {
-    "code": "arrows_clockwise",
-    "char": "🔃",
-    "name": "Clockwise Arrows",
-    "cat": "symbols"
-  },
-  {
-    "code": "recycle",
-    "char": "♻️",
-    "name": "Recycle / Reuse",
-    "cat": "symbols"
-  },
-  {
-    "code": "repeat",
-    "char": "🔁",
-    "name": "Repeat / Loop",
-    "cat": "symbols"
-  },
-  {
-    "code": "fast_forward",
-    "char": "⏩",
-    "name": "Fast Forward",
-    "cat": "symbols"
-  },
-  {
-    "code": "rewind",
-    "char": "⏪",
-    "name": "Rewind",
-    "cat": "symbols"
-  },
-  {
-    "code": "hash",
-    "char": "#️⃣",
-    "name": "Hash / Number",
-    "cat": "symbols"
-  },
-  {
-    "code": "zero",
-    "char": "0️⃣",
-    "name": "Zero",
-    "cat": "symbols"
-  },
-  {
-    "code": "one",
-    "char": "1️⃣",
-    "name": "One",
-    "cat": "symbols"
-  },
-  {
-    "code": "two",
-    "char": "2️⃣",
-    "name": "Two",
-    "cat": "symbols"
-  },
-  {
-    "code": "three",
-    "char": "3️⃣",
-    "name": "Three",
-    "cat": "symbols"
-  },
-  {
-    "code": "four",
-    "char": "4️⃣",
-    "name": "Four",
-    "cat": "symbols"
-  },
-  {
-    "code": "five",
-    "char": "5️⃣",
-    "name": "Five",
-    "cat": "symbols"
-  },
-  {
-    "code": "information_source",
-    "char": "ℹ️",
-    "name": "Information",
-    "cat": "symbols"
-  },
-  {
-    "code": "info",
-    "char": "ℹ️",
-    "name": "Info Alias",
-    "cat": "symbols"
-  },
-  {
-    "code": "grey_question",
-    "char": "❔",
-    "name": "Question Mark",
-    "cat": "symbols"
-  },
-  {
-    "code": "question",
-    "char": "❓",
-    "name": "Question Mark Red",
-    "cat": "symbols"
-  },
-  {
-    "code": "grey_exclamation",
-    "char": "❕",
-    "name": "Exclamation Mark",
-    "cat": "symbols"
-  },
-  {
-    "code": "heavy_exclamation_mark",
-    "char": "❗",
-    "name": "Exclamation Red",
-    "cat": "symbols"
-  },
-  {
-    "code": "speech_balloon",
-    "char": "💬",
-    "name": "Speech / Comment",
-    "cat": "symbols"
-  },
-  {
-    "code": "thought_balloon",
-    "char": "💭",
-    "name": "Thought Bubble",
-    "cat": "symbols"
-  },
-  {
-    "code": "triangular_flag_on_post",
-    "char": "🚩",
-    "name": "Flag / Milestone",
-    "cat": "symbols"
-  },
-  {
-    "code": "white_flag",
-    "char": "🏳️",
-    "name": "White Flag",
-    "cat": "symbols"
-  },
-  {
-    "code": "black_flag",
-    "char": "🏴",
-    "name": "Black Flag",
-    "cat": "symbols"
-  },
-  {
-    "code": "pin",
-    "char": "📌",
-    "name": "Pushpin",
-    "cat": "symbols"
-  },
-  {
-    "code": "pushpin",
-    "char": "📍",
-    "name": "Round Pushpin",
-    "cat": "symbols"
+    "code": "link",
+    "char": "🔗",
+    "name": "Link",
+    "cat": "tech",
+    "keywords": "url hyperlink connection bind route"
   },
   {
     "code": "paperclip",
     "char": "📎",
-    "name": "Paperclip / Attachment",
-    "cat": "symbols"
+    "name": "Paperclip",
+    "cat": "tech",
+    "keywords": "attachment attach file include"
   },
   {
-    "code": "paperclips",
-    "char": "🖇️",
-    "name": "Linked Paperclips",
-    "cat": "symbols"
-  },
-  {
-    "code": "triangular_ruler",
-    "char": "📐",
-    "name": "Triangular Ruler / Layout",
-    "cat": "symbols"
+    "code": "scissors",
+    "char": "✂️",
+    "name": "Scissors",
+    "cat": "tech",
+    "keywords": "cut clip trim split",
+    "entity": "&scscissors;"
   },
   {
     "code": "straight_ruler",
     "char": "📏",
-    "name": "Straight Ruler / Size",
-    "cat": "symbols"
+    "name": "Straight Ruler",
+    "cat": "tech",
+    "keywords": "measure size scale dimension rule"
   },
   {
-    "code": "point_right",
-    "char": "👉",
-    "name": "Point Right",
-    "cat": "symbols"
+    "code": "triangular_ruler",
+    "char": "📐",
+    "name": "Triangular Ruler",
+    "cat": "tech",
+    "keywords": "measure angle geometry architecture design"
   },
   {
-    "code": "point_left",
-    "char": "👈",
-    "name": "Point Left",
-    "cat": "symbols"
+    "code": "magnifying_glass_left",
+    "char": "🔍",
+    "name": "Magnifying Glass Left",
+    "cat": "tech",
+    "keywords": "search find query inspect investigate lookup"
   },
   {
-    "code": "point_up",
-    "char": "👆",
-    "name": "Point Up",
-    "cat": "symbols"
+    "code": "light_bulb",
+    "char": "💡",
+    "name": "Light Bulb",
+    "cat": "tech",
+    "keywords": "idea hint tip bright solution insight innovate"
   },
   {
-    "code": "point_down",
-    "char": "👇",
-    "name": "Point Down",
-    "cat": "symbols"
+    "code": "check_mark",
+    "char": "✅",
+    "name": "Check Mark Button",
+    "cat": "status",
+    "keywords": "success ok pass done completed confirmed verified green"
+  },
+  {
+    "code": "cross_mark",
+    "char": "❌",
+    "name": "Cross Mark",
+    "cat": "status",
+    "keywords": "fail error cancel rejected bad denied red wrong"
+  },
+  {
+    "code": "heavy_check_mark",
+    "char": "✔️",
+    "name": "Heavy Check Mark",
+    "cat": "status",
+    "keywords": "check tick ok done success true",
+    "entity": "&check;"
+  },
+  {
+    "code": "heavy_multiplication_x",
+    "char": "✖️",
+    "name": "Heavy Multiplication X",
+    "cat": "status",
+    "keywords": "multiply times cancel close exit false",
+    "entity": "&times;"
+  },
+  {
+    "code": "warning",
+    "char": "⚠️",
+    "name": "Warning",
+    "cat": "status",
+    "keywords": "alert caution danger issue bug notice yellow",
+    "entity": "&warning;"
+  },
+  {
+    "code": "no_entry",
+    "char": "⛔",
+    "name": "No Entry",
+    "cat": "status",
+    "keywords": "stop forbidden access denied prohibited block"
+  },
+  {
+    "code": "prohibited",
+    "char": "🚫",
+    "name": "Prohibited",
+    "cat": "status",
+    "keywords": "forbidden banned restricted not allowed disabled"
+  },
+  {
+    "code": "rotating_light",
+    "char": "🚨",
+    "name": "Police Car Light / Siren",
+    "cat": "status",
+    "keywords": "alert critical emergency alarm pager incident"
+  },
+  {
+    "code": "bell",
+    "char": "🔔",
+    "name": "Bell",
+    "cat": "status",
+    "keywords": "notification alert ring subscribe ping reminder"
+  },
+  {
+    "code": "bell_slash",
+    "char": "🔕",
+    "name": "Bell with Slash",
+    "cat": "status",
+    "keywords": "mute silent quiet do not disturb disable notifications"
+  },
+  {
+    "code": "fire",
+    "char": "🔥",
+    "name": "Fire",
+    "cat": "status",
+    "keywords": "hot blaze flame burn emergency popular lit"
+  },
+  {
+    "code": "zap",
+    "char": "⚡",
+    "name": "High Voltage",
+    "cat": "status",
+    "keywords": "lightning electricity energy fast quick flash power zap",
+    "entity": "&zap;"
+  },
+  {
+    "code": "collision",
+    "char": "💥",
+    "name": "Collision",
+    "cat": "status",
+    "keywords": "boom crash blast impact explosion"
+  },
+  {
+    "code": "sparkles",
+    "char": "✨",
+    "name": "Sparkles",
+    "cat": "status",
+    "keywords": "clean new shiny magic polish star special"
+  },
+  {
+    "code": "star",
+    "char": "⭐",
+    "name": "Star",
+    "cat": "status",
+    "keywords": "favorite bookmark rating review featured highlight"
+  },
+  {
+    "code": "glowing_star",
+    "char": "🌟",
+    "name": "Glowing Star",
+    "cat": "status",
+    "keywords": "shine highlight brilliance standout"
+  },
+  {
+    "code": "tada",
+    "char": "🎉",
+    "name": "Party Popper",
+    "cat": "status",
+    "keywords": "celebrate congratulations winner milestone success hooray"
+  },
+  {
+    "code": "confetti_ball",
+    "char": "🎊",
+    "name": "Confetti Ball",
+    "cat": "status",
+    "keywords": "celebrate party festival event"
+  },
+  {
+    "code": "trophy",
+    "char": "🏆",
+    "name": "Trophy",
+    "cat": "status",
+    "keywords": "award win champion prize victory first"
+  },
+  {
+    "code": "medal",
+    "char": "🎖️",
+    "name": "Military Medal",
+    "cat": "status",
+    "keywords": "honor achievement rank badge award"
+  },
+  {
+    "code": "red_circle",
+    "char": "🔴",
+    "name": "Red Circle",
+    "cat": "status",
+    "keywords": "offline down failed critical error stopped"
+  },
+  {
+    "code": "orange_circle",
+    "char": "🟠",
+    "name": "Orange Circle",
+    "cat": "status",
+    "keywords": "warning degraded pending pause"
+  },
+  {
+    "code": "yellow_circle",
+    "char": "🟡",
+    "name": "Yellow Circle",
+    "cat": "status",
+    "keywords": "caution in-progress building unstable"
+  },
+  {
+    "code": "green_circle",
+    "char": "🟢",
+    "name": "Green Circle",
+    "cat": "status",
+    "keywords": "online healthy running ok operational active pass"
+  },
+  {
+    "code": "blue_circle",
+    "char": "🔵",
+    "name": "Blue Circle",
+    "cat": "status",
+    "keywords": "info notice processing neutral primary"
+  },
+  {
+    "code": "purple_circle",
+    "char": "🟣",
+    "name": "Purple Circle",
+    "cat": "status",
+    "keywords": "custom special tag badge secondary"
+  },
+  {
+    "code": "white_circle",
+    "char": "⚪",
+    "name": "White Circle",
+    "cat": "status",
+    "keywords": "idle unassigned blank empty"
+  },
+  {
+    "code": "black_circle",
+    "char": "⚫",
+    "name": "Black Circle",
+    "cat": "status",
+    "keywords": "unknown dead dark terminated"
+  },
+  {
+    "code": "red_square",
+    "char": "🟥",
+    "name": "Red Square",
+    "cat": "status",
+    "keywords": "stop block error critical"
+  },
+  {
+    "code": "green_square",
+    "char": "🟩",
+    "name": "Green Square",
+    "cat": "status",
+    "keywords": "running success ready pass"
+  },
+  {
+    "code": "blue_square",
+    "char": "🟦",
+    "name": "Blue Square",
+    "cat": "status",
+    "keywords": "info primary item"
+  },
+  {
+    "code": "question_mark",
+    "char": "❓",
+    "name": "Red Question Mark",
+    "cat": "status",
+    "keywords": "help question query faq unknown why"
+  },
+  {
+    "code": "white_question_mark",
+    "char": "❔",
+    "name": "White Question Mark",
+    "cat": "status",
+    "keywords": "help query ask doubt"
+  },
+  {
+    "code": "exclamation_mark",
+    "char": "❗️",
+    "name": "Red Exclamation Mark",
+    "cat": "status",
+    "keywords": "important alert attention note priority"
+  },
+  {
+    "code": "white_exclamation_mark",
+    "char": "❕",
+    "name": "White Exclamation Mark",
+    "cat": "status",
+    "keywords": "notice info alert attention"
+  },
+  {
+    "code": "hourglass_flowing",
+    "char": "⏳",
+    "name": "Hourglass Not Done",
+    "cat": "status",
+    "keywords": "waiting pending loading timer delay timeout"
+  },
+  {
+    "code": "hourglass_done",
+    "char": "⌛",
+    "name": "Hourglass Done",
+    "cat": "status",
+    "keywords": "time duration expired end complete"
+  },
+  {
+    "code": "stopwatch",
+    "char": "⏱️",
+    "name": "Stopwatch",
+    "cat": "status",
+    "keywords": "timer latency speed benchmark performance duration"
+  },
+  {
+    "code": "alarm_clock",
+    "char": "⏰",
+    "name": "Alarm Clock",
+    "cat": "status",
+    "keywords": "schedule time wake deadline reminder"
+  },
+  {
+    "code": "speech_balloon",
+    "char": "💬",
+    "name": "Speech Balloon",
+    "cat": "status",
+    "keywords": "comment message talk chat conversation discussion"
+  },
+  {
+    "code": "thought_balloon",
+    "char": "💭",
+    "name": "Thought Balloon",
+    "cat": "status",
+    "keywords": "think ponder idea dream reasoning"
+  },
+  {
+    "code": "mega",
+    "char": "📣",
+    "name": "Megaphone",
+    "cat": "status",
+    "keywords": "announcement broadcast notice publish shout"
+  },
+  {
+    "code": "loudspeaker",
+    "char": "📢",
+    "name": "Loudspeaker",
+    "cat": "status",
+    "keywords": "broadcast alert audio announce announcement"
+  },
+  {
+    "code": "radio_button",
+    "char": "🔘",
+    "name": "Radio Button",
+    "cat": "status",
+    "keywords": "option select choice toggle state active"
+  },
+  {
+    "code": "hundred",
+    "char": "💯",
+    "name": "Hundred Points",
+    "cat": "status",
+    "keywords": "100 percent perfect score complete accurate"
+  },
+  {
+    "code": "arrow_left",
+    "char": "←",
+    "name": "Leftwards Arrow",
+    "cat": "arrows",
+    "keywords": "left back previous return larr",
+    "entity": "&larr;"
+  },
+  {
+    "code": "arrow_up",
+    "char": "↑",
+    "name": "Upwards Arrow",
+    "cat": "arrows",
+    "keywords": "up top rise uarr",
+    "entity": "&uarr;"
+  },
+  {
+    "code": "arrow_right",
+    "char": "→",
+    "name": "Rightwards Arrow",
+    "cat": "arrows",
+    "keywords": "right next forward proceed rarr",
+    "entity": "&rarr;"
+  },
+  {
+    "code": "arrow_down",
+    "char": "↓",
+    "name": "Downwards Arrow",
+    "cat": "arrows",
+    "keywords": "down bottom fall darr",
+    "entity": "&darr;"
+  },
+  {
+    "code": "arrow_left_right",
+    "char": "↔",
+    "name": "Left Right Arrow",
+    "cat": "arrows",
+    "keywords": "horizontal bidirectional width harr",
+    "entity": "&harr;"
+  },
+  {
+    "code": "arrow_up_down",
+    "char": "↕",
+    "name": "Up Down Arrow",
+    "cat": "arrows",
+    "keywords": "vertical bidirectional height varr",
+    "entity": "&varr;"
+  },
+  {
+    "code": "arrow_upper_left",
+    "char": "↖",
+    "name": "North West Arrow",
+    "cat": "arrows",
+    "keywords": "diagonal nwarr",
+    "entity": "&nwarr;"
+  },
+  {
+    "code": "arrow_upper_right",
+    "char": "↗",
+    "name": "North East Arrow",
+    "cat": "arrows",
+    "keywords": "diagonal nearr",
+    "entity": "&nearr;"
+  },
+  {
+    "code": "arrow_lower_right",
+    "char": "↘",
+    "name": "South East Arrow",
+    "cat": "arrows",
+    "keywords": "diagonal searr",
+    "entity": "&searr;"
+  },
+  {
+    "code": "arrow_lower_left",
+    "char": "↙",
+    "name": "South West Arrow",
+    "cat": "arrows",
+    "keywords": "diagonal swarr",
+    "entity": "&swarr;"
+  },
+  {
+    "code": "arrow_return_left",
+    "char": "↵",
+    "name": "Downwards Arrow with Corner Leftwards",
+    "cat": "arrows",
+    "keywords": "enter return crarr carriage newline",
+    "entity": "&crarr;"
+  },
+  {
+    "code": "arrow_double_left",
+    "char": "⇐",
+    "name": "Leftwards Double Arrow",
+    "cat": "arrows",
+    "keywords": "implies backward lArr",
+    "entity": "&lArr;"
+  },
+  {
+    "code": "arrow_double_up",
+    "char": "⇑",
+    "name": "Upwards Double Arrow",
+    "cat": "arrows",
+    "keywords": "uArr double up",
+    "entity": "&uArr;"
+  },
+  {
+    "code": "arrow_double_right",
+    "char": "⇒",
+    "name": "Rightwards Double Arrow",
+    "cat": "arrows",
+    "keywords": "implies therefore rArr then",
+    "entity": "&rArr;"
+  },
+  {
+    "code": "arrow_double_down",
+    "char": "⇓",
+    "name": "Downwards Double Arrow",
+    "cat": "arrows",
+    "keywords": "dArr double down",
+    "entity": "&dArr;"
+  },
+  {
+    "code": "arrow_double_left_right",
+    "char": "⇔",
+    "name": "Left Right Double Arrow",
+    "cat": "arrows",
+    "keywords": "equivalent iff hArr bidirectional",
+    "entity": "&hArr;"
+  },
+  {
+    "code": "arrows_counterclockwise",
+    "char": "↺",
+    "name": "Anticlockwise Open Circle Arrow",
+    "cat": "arrows",
+    "keywords": "undo reload revert counterclockwise"
+  },
+  {
+    "code": "arrows_clockwise",
+    "char": "↻",
+    "name": "Clockwise Open Circle Arrow",
+    "cat": "arrows",
+    "keywords": "redo reload refresh sync clockwise"
+  },
+  {
+    "code": "arrows_exchange",
+    "char": "⇄",
+    "name": "Rightwards Arrow Over Leftwards Arrow",
+    "cat": "arrows",
+    "keywords": "exchange swap transfer duplex sync"
+  },
+  {
+    "code": "arrows_exchange_down",
+    "char": "⇅",
+    "name": "Upwards Arrow Leftwards of Downwards Arrow",
+    "cat": "arrows",
+    "keywords": "duplex vertical swap"
+  },
+  {
+    "code": "arrow_forward_solid",
+    "char": "➔",
+    "name": "Heavy Rightwards Arrow",
+    "cat": "arrows",
+    "keywords": "arrow right bold solid point"
+  },
+  {
+    "code": "arrow_chevron_right",
+    "char": "➤",
+    "name": "Black Right-Pointing Arrowhead",
+    "cat": "arrows",
+    "keywords": "arrow chevron cursor bullet next"
+  },
+  {
+    "code": "arrow_hook_left",
+    "char": "↩",
+    "name": "Leftwards Arrow with Hook",
+    "cat": "arrows",
+    "keywords": "hook return back undo"
+  },
+  {
+    "code": "arrow_hook_right",
+    "char": "↪",
+    "name": "Rightwards Arrow with Hook",
+    "cat": "arrows",
+    "keywords": "hook follow forward jump branch"
+  },
+  {
+    "code": "arrow_maps_to",
+    "char": "↦",
+    "name": "Rightwards Arrow from Bar",
+    "cat": "arrows",
+    "keywords": "mapsto mapping function transform"
+  },
+  {
+    "code": "arrow_long_right",
+    "char": "⟶",
+    "name": "Long Rightwards Arrow",
+    "cat": "arrows",
+    "keywords": "long arrow right leads to yields"
+  },
+  {
+    "code": "arrow_long_left",
+    "char": "⟵",
+    "name": "Long Leftwards Arrow",
+    "cat": "arrows",
+    "keywords": "long arrow left from"
+  },
+  {
+    "code": "arrow_long_both",
+    "char": "⟷",
+    "name": "Long Left Right Arrow",
+    "cat": "arrows",
+    "keywords": "long bidirectional relation equivalent"
+  },
+  {
+    "code": "forall",
+    "char": "∀",
+    "name": "For All",
+    "cat": "math",
+    "keywords": "universal quantifier logic every forall",
+    "entity": "&forall;"
+  },
+  {
+    "code": "partial",
+    "char": "∂",
+    "name": "Partial Differential",
+    "cat": "math",
+    "keywords": "derivative gradient calculus diff part",
+    "entity": "&part;"
+  },
+  {
+    "code": "exists",
+    "char": "∃",
+    "name": "There Exists",
+    "cat": "math",
+    "keywords": "existential quantifier logic exists",
+    "entity": "&exist;"
+  },
+  {
+    "code": "not_exists",
+    "char": "∄",
+    "name": "There Does Not Exist",
+    "cat": "math",
+    "keywords": "logic not exists none"
+  },
+  {
+    "code": "empty_set",
+    "char": "∅",
+    "name": "Empty Set",
+    "cat": "math",
+    "keywords": "null void nil empty",
+    "entity": "&empty;"
+  },
+  {
+    "code": "nabla",
+    "char": "∇",
+    "name": "Nabla / Del Gradient",
+    "cat": "math",
+    "keywords": "gradient divergence vector laplacian nabla",
+    "entity": "&nabla;"
+  },
+  {
+    "code": "element_of",
+    "char": "∈",
+    "name": "Element Of",
+    "cat": "math",
+    "keywords": "in member set membership isin",
+    "entity": "&isin;"
+  },
+  {
+    "code": "not_element_of",
+    "char": "∉",
+    "name": "Not an Element Of",
+    "cat": "math",
+    "keywords": "not in exclude notin",
+    "entity": "&notin;"
+  },
+  {
+    "code": "contains_as_member",
+    "char": "∋",
+    "name": "Contains as Member",
+    "cat": "math",
+    "keywords": "owns ni has member",
+    "entity": "&ni;"
+  },
+  {
+    "code": "product",
+    "char": "∏",
+    "name": "N-Ary Product",
+    "cat": "math",
+    "keywords": "multiplication prod product pi series",
+    "entity": "&prod;"
+  },
+  {
+    "code": "summation",
+    "char": "∑",
+    "name": "N-Ary Summation",
+    "cat": "math",
+    "keywords": "sum add total series sigma aggregate",
+    "entity": "&sum;"
+  },
+  {
+    "code": "minus",
+    "char": "−",
+    "name": "Minus Sign",
+    "cat": "math",
+    "keywords": "subtract negative decrease minus",
+    "entity": "&minus;"
+  },
+  {
+    "code": "plus_minus",
+    "char": "±",
+    "name": "Plus-Minus Sign",
+    "cat": "math",
+    "keywords": "error margin range tolerance plusmn",
+    "entity": "&plusmn;"
+  },
+  {
+    "code": "minus_plus",
+    "char": "∓",
+    "name": "Minus-or-Plus Sign",
+    "cat": "math",
+    "keywords": "opposite range minus plus"
+  },
+  {
+    "code": "divide",
+    "char": "÷",
+    "name": "Division Sign",
+    "cat": "math",
+    "keywords": "divide fraction division",
+    "entity": "&divide;"
+  },
+  {
+    "code": "multiply",
+    "char": "×",
+    "name": "Multiplication Sign",
+    "cat": "math",
+    "keywords": "multiply times by x cross",
+    "entity": "&times;"
+  },
+  {
+    "code": "asterisk_operator",
+    "char": "∗",
+    "name": "Low Asterisk / Convolution",
+    "cat": "math",
+    "keywords": "asterisk star operator lowast",
+    "entity": "&lowast;"
+  },
+  {
+    "code": "square_root",
+    "char": "√",
+    "name": "Square Root / Radical",
+    "cat": "math",
+    "keywords": "radical sqrt root",
+    "entity": "&radic;"
+  },
+  {
+    "code": "proportional_to",
+    "char": "∝",
+    "name": "Proportional To",
+    "cat": "math",
+    "keywords": "proportional scale prop",
+    "entity": "&prop;"
+  },
+  {
+    "code": "infinity",
+    "char": "∞",
+    "name": "Infinity",
+    "cat": "math",
+    "keywords": "infinite unbound loop limitless infin",
+    "entity": "&infin;"
+  },
+  {
+    "code": "angle",
+    "char": "∠",
+    "name": "Angle",
+    "cat": "math",
+    "keywords": "geometry degree corner ang",
+    "entity": "&ang;"
+  },
+  {
+    "code": "logical_and",
+    "char": "∧",
+    "name": "Logical AND / Wedge",
+    "cat": "math",
+    "keywords": "conjunction and bool logic",
+    "entity": "&and;"
+  },
+  {
+    "code": "logical_or",
+    "char": "∨",
+    "name": "Logical OR / Vee",
+    "cat": "math",
+    "keywords": "disjunction or bool logic",
+    "entity": "&or;"
+  },
+  {
+    "code": "intersection",
+    "char": "∩",
+    "name": "Intersection / Cap",
+    "cat": "math",
+    "keywords": "set intersection and common cap",
+    "entity": "&cap;"
+  },
+  {
+    "code": "union",
+    "char": "∪",
+    "name": "Union / Cup",
+    "cat": "math",
+    "keywords": "set union or join cup",
+    "entity": "&cup;"
+  },
+  {
+    "code": "integral",
+    "char": "∫",
+    "name": "Integral",
+    "cat": "math",
+    "keywords": "calculus area antiderivative int",
+    "entity": "&int;"
+  },
+  {
+    "code": "double_integral",
+    "char": "∬",
+    "name": "Double Integral",
+    "cat": "math",
+    "keywords": "surface calculus int"
+  },
+  {
+    "code": "triple_integral",
+    "char": "∭",
+    "name": "Triple Integral",
+    "cat": "math",
+    "keywords": "volume calculus int"
+  },
+  {
+    "code": "contour_integral",
+    "char": "∮",
+    "name": "Contour Integral",
+    "cat": "math",
+    "keywords": "path line integral calculus loop"
+  },
+  {
+    "code": "therefore",
+    "char": "∴",
+    "name": "Therefore",
+    "cat": "math",
+    "keywords": "proof logic conclusion hence there4",
+    "entity": "&there4;"
+  },
+  {
+    "code": "because",
+    "char": "∵",
+    "name": "Because / Since",
+    "cat": "math",
+    "keywords": "reason logic proof since"
+  },
+  {
+    "code": "similar",
+    "char": "∼",
+    "name": "Tilde Operator / Similar",
+    "cat": "math",
+    "keywords": "asymptotically distributed approx sim",
+    "entity": "&sim;"
+  },
+  {
+    "code": "congruent",
+    "char": "≅",
+    "name": "Approximately Equal / Congruent",
+    "cat": "math",
+    "keywords": "congruent shape equal geom cong",
+    "entity": "&cong;"
+  },
+  {
+    "code": "almost_equal",
+    "char": "≈",
+    "name": "Almost Equal To",
+    "cat": "math",
+    "keywords": "approximately estimate round asymp",
+    "entity": "&asymp;"
+  },
+  {
+    "code": "not_equal",
+    "char": "≠",
+    "name": "Not Equal To",
+    "cat": "math",
+    "keywords": "unequal different ne",
+    "entity": "&ne;"
+  },
+  {
+    "code": "identical_to",
+    "char": "≡",
+    "name": "Identical / Equivalent To",
+    "cat": "math",
+    "keywords": "identity modulo equiv",
+    "entity": "&equiv;"
+  },
+  {
+    "code": "less_than_equal",
+    "char": "≤",
+    "name": "Less-Than or Equal To",
+    "cat": "math",
+    "keywords": "leq comparison smaller le",
+    "entity": "&le;"
+  },
+  {
+    "code": "greater_than_equal",
+    "char": "≥",
+    "name": "Greater-Than or Equal To",
+    "cat": "math",
+    "keywords": "geq comparison bigger ge",
+    "entity": "&ge;"
+  },
+  {
+    "code": "much_less_than",
+    "char": "≪",
+    "name": "Much Less-Than",
+    "cat": "math",
+    "keywords": "negligible smaller <<"
+  },
+  {
+    "code": "much_greater_than",
+    "char": "≫",
+    "name": "Much Greater-Than",
+    "cat": "math",
+    "keywords": "dominates bigger >>"
+  },
+  {
+    "code": "subset_of",
+    "char": "⊂",
+    "name": "Subset Of",
+    "cat": "math",
+    "keywords": "proper subset set containment sub",
+    "entity": "&sub;"
+  },
+  {
+    "code": "superset_of",
+    "char": "⊃",
+    "name": "Superset Of",
+    "cat": "math",
+    "keywords": "proper superset set contains sup",
+    "entity": "&sup;"
+  },
+  {
+    "code": "subset_or_equal",
+    "char": "⊆",
+    "name": "Subset of or Equal To",
+    "cat": "math",
+    "keywords": "sube set containment",
+    "entity": "&sube;"
+  },
+  {
+    "code": "superset_or_equal",
+    "char": "⊇",
+    "name": "Superset of or Equal To",
+    "cat": "math",
+    "keywords": "supe set contains",
+    "entity": "&supe;"
+  },
+  {
+    "code": "circled_plus",
+    "char": "⊕",
+    "name": "Circled Plus / XOR",
+    "cat": "math",
+    "keywords": "direct sum xor oplus",
+    "entity": "&oplus;"
+  },
+  {
+    "code": "circled_times",
+    "char": "⊗",
+    "name": "Circled Times / Tensor",
+    "cat": "math",
+    "keywords": "tensor product otimes",
+    "entity": "&otimes;"
+  },
+  {
+    "code": "perpendicular",
+    "char": "⊥",
+    "name": "Up Tack / Perpendicular / Orthogonal",
+    "cat": "math",
+    "keywords": "orthogonal normal perp bottom",
+    "entity": "&perp;"
+  },
+  {
+    "code": "dot_operator",
+    "char": "⋅",
+    "name": "Dot Operator / Scalar Product",
+    "cat": "math",
+    "keywords": "multiplication dot inner product sdot",
+    "entity": "&sdot;"
+  },
+  {
+    "code": "per_mille",
+    "char": "‰",
+    "name": "Per Mille Sign",
+    "cat": "math",
+    "keywords": "permil basis point parts per thousand",
+    "entity": "&permil;"
+  },
+  {
+    "code": "degree_sign",
+    "char": "°",
+    "name": "Degree Sign",
+    "cat": "math",
+    "keywords": "angle temperature celsius fahrenheit deg",
+    "entity": "&deg;"
+  },
+  {
+    "code": "prime",
+    "char": "′",
+    "name": "Prime / Minutes / Feet",
+    "cat": "math",
+    "keywords": "derivative prime foot tick",
+    "entity": "&prime;"
+  },
+  {
+    "code": "double_prime",
+    "char": "″",
+    "name": "Double Prime / Seconds / Inches",
+    "cat": "math",
+    "keywords": "second inch dprime quote",
+    "entity": "&dprime;"
+  },
+  {
+    "code": "alpha",
+    "char": "α",
+    "name": "Greek Small Letter Alpha",
+    "cat": "greek",
+    "keywords": "alpha greek lowercase a",
+    "entity": "&alpha;"
+  },
+  {
+    "code": "beta",
+    "char": "β",
+    "name": "Greek Small Letter Beta",
+    "cat": "greek",
+    "keywords": "beta greek lowercase b test",
+    "entity": "&beta;"
+  },
+  {
+    "code": "gamma",
+    "char": "γ",
+    "name": "Greek Small Letter Gamma",
+    "cat": "greek",
+    "keywords": "gamma greek lowercase g",
+    "entity": "&gamma;"
+  },
+  {
+    "code": "delta",
+    "char": "δ",
+    "name": "Greek Small Letter Delta",
+    "cat": "greek",
+    "keywords": "delta greek lowercase d change diff",
+    "entity": "&delta;"
+  },
+  {
+    "code": "epsilon",
+    "char": "ε",
+    "name": "Greek Small Letter Epsilon",
+    "cat": "greek",
+    "keywords": "epsilon greek lowercase e small error",
+    "entity": "&epsilon;"
+  },
+  {
+    "code": "zeta",
+    "char": "ζ",
+    "name": "Greek Small Letter Zeta",
+    "cat": "greek",
+    "keywords": "zeta greek lowercase z",
+    "entity": "&zeta;"
+  },
+  {
+    "code": "eta",
+    "char": "η",
+    "name": "Greek Small Letter Eta",
+    "cat": "greek",
+    "keywords": "eta greek lowercase h efficiency",
+    "entity": "&eta;"
+  },
+  {
+    "code": "theta",
+    "char": "θ",
+    "name": "Greek Small Letter Theta",
+    "cat": "greek",
+    "keywords": "theta greek lowercase angle",
+    "entity": "&theta;"
+  },
+  {
+    "code": "iota",
+    "char": "ι",
+    "name": "Greek Small Letter Iota",
+    "cat": "greek",
+    "keywords": "iota greek lowercase tiny",
+    "entity": "&iota;"
+  },
+  {
+    "code": "kappa",
+    "char": "κ",
+    "name": "Greek Small Letter Kappa",
+    "cat": "greek",
+    "keywords": "kappa greek lowercase",
+    "entity": "&kappa;"
+  },
+  {
+    "code": "lambda",
+    "char": "λ",
+    "name": "Greek Small Letter Lambda",
+    "cat": "greek",
+    "keywords": "lambda greek lowercase functional aws",
+    "entity": "&lambda;"
+  },
+  {
+    "code": "mu",
+    "char": "μ",
+    "name": "Greek Small Letter Mu / Micro",
+    "cat": "greek",
+    "keywords": "mu micro metric greek lowercase u",
+    "entity": "&mu;"
+  },
+  {
+    "code": "nu",
+    "char": "ν",
+    "name": "Greek Small Letter Nu",
+    "cat": "greek",
+    "keywords": "nu greek lowercase frequency",
+    "entity": "&nu;"
+  },
+  {
+    "code": "xi",
+    "char": "ξ",
+    "name": "Greek Small Letter Xi",
+    "cat": "greek",
+    "keywords": "xi greek lowercase",
+    "entity": "&xi;"
+  },
+  {
+    "code": "omicron",
+    "char": "ο",
+    "name": "Greek Small Letter Omicron",
+    "cat": "greek",
+    "keywords": "omicron greek lowercase",
+    "entity": "&omicron;"
+  },
+  {
+    "code": "pi",
+    "char": "π",
+    "name": "Greek Small Letter Pi",
+    "cat": "greek",
+    "keywords": "pi greek lowercase math constant 3.14",
+    "entity": "&pi;"
+  },
+  {
+    "code": "rho",
+    "char": "ρ",
+    "name": "Greek Small Letter Rho",
+    "cat": "greek",
+    "keywords": "rho greek lowercase density correlation",
+    "entity": "&rho;"
+  },
+  {
+    "code": "sigma",
+    "char": "σ",
+    "name": "Greek Small Letter Sigma",
+    "cat": "greek",
+    "keywords": "sigma greek lowercase standard deviation",
+    "entity": "&sigma;"
+  },
+  {
+    "code": "sigma_final",
+    "char": "ς",
+    "name": "Greek Small Letter Final Sigma",
+    "cat": "greek",
+    "keywords": "sigma final wordend"
+  },
+  {
+    "code": "tau",
+    "char": "τ",
+    "name": "Greek Small Letter Tau",
+    "cat": "greek",
+    "keywords": "tau greek lowercase time torque",
+    "entity": "&tau;"
+  },
+  {
+    "code": "upsilon",
+    "char": "υ",
+    "name": "Greek Small Letter Upsilon",
+    "cat": "greek",
+    "keywords": "upsilon greek lowercase",
+    "entity": "&upsilon;"
+  },
+  {
+    "code": "phi",
+    "char": "φ",
+    "name": "Greek Small Letter Phi",
+    "cat": "greek",
+    "keywords": "phi greek lowercase golden ratio angle",
+    "entity": "&phi;"
+  },
+  {
+    "code": "chi",
+    "char": "χ",
+    "name": "Greek Small Letter Chi",
+    "cat": "greek",
+    "keywords": "chi greek lowercase distribution",
+    "entity": "&chi;"
+  },
+  {
+    "code": "psi",
+    "char": "ψ",
+    "name": "Greek Small Letter Psi",
+    "cat": "greek",
+    "keywords": "psi greek lowercase wave quantum",
+    "entity": "&psi;"
+  },
+  {
+    "code": "omega",
+    "char": "ω",
+    "name": "Greek Small Letter Omega",
+    "cat": "greek",
+    "keywords": "omega greek lowercase angular frequency last",
+    "entity": "&omega;"
+  },
+  {
+    "code": "Gamma",
+    "char": "Γ",
+    "name": "Greek Capital Letter Gamma",
+    "cat": "greek",
+    "keywords": "gamma capital function",
+    "entity": "&Gamma;"
+  },
+  {
+    "code": "Delta",
+    "char": "Δ",
+    "name": "Greek Capital Letter Delta",
+    "cat": "greek",
+    "keywords": "delta capital triangle diff change",
+    "entity": "&Delta;"
+  },
+  {
+    "code": "Theta",
+    "char": "Θ",
+    "name": "Greek Capital Letter Theta",
+    "cat": "greek",
+    "keywords": "theta capital angle big o notation",
+    "entity": "&Theta;"
+  },
+  {
+    "code": "Lambda",
+    "char": "Λ",
+    "name": "Greek Capital Letter Lambda",
+    "cat": "greek",
+    "keywords": "lambda capital logical",
+    "entity": "&Lambda;"
+  },
+  {
+    "code": "Xi",
+    "char": "Ξ",
+    "name": "Greek Capital Letter Xi",
+    "cat": "greek",
+    "keywords": "xi capital",
+    "entity": "&Xi;"
+  },
+  {
+    "code": "Pi",
+    "char": "Π",
+    "name": "Greek Capital Letter Pi",
+    "cat": "greek",
+    "keywords": "pi capital product",
+    "entity": "&Pi;"
+  },
+  {
+    "code": "Sigma",
+    "char": "Σ",
+    "name": "Greek Capital Letter Sigma",
+    "cat": "greek",
+    "keywords": "sigma capital sum summation",
+    "entity": "&Sigma;"
+  },
+  {
+    "code": "Phi",
+    "char": "Φ",
+    "name": "Greek Capital Letter Phi",
+    "cat": "greek",
+    "keywords": "phi capital flux golden",
+    "entity": "&Phi;"
+  },
+  {
+    "code": "Psi",
+    "char": "Ψ",
+    "name": "Greek Capital Letter Psi",
+    "cat": "greek",
+    "keywords": "psi capital quantum",
+    "entity": "&Psi;"
+  },
+  {
+    "code": "Omega",
+    "char": "Ω",
+    "name": "Greek Capital Letter Omega",
+    "cat": "greek",
+    "keywords": "omega capital ohm resistance end",
+    "entity": "&Omega;"
+  },
+  {
+    "code": "copyright",
+    "char": "©",
+    "name": "Copyright Sign",
+    "cat": "symbols",
+    "keywords": "copyright legal rights c",
+    "entity": "&copy;"
+  },
+  {
+    "code": "registered",
+    "char": "®",
+    "name": "Registered Sign",
+    "cat": "symbols",
+    "keywords": "trademark registered brand r",
+    "entity": "&reg;"
+  },
+  {
+    "code": "trademark",
+    "char": "™",
+    "name": "Trade Mark Sign",
+    "cat": "symbols",
+    "keywords": "trademark brand tm",
+    "entity": "&trade;"
+  },
+  {
+    "code": "section_sign",
+    "char": "§",
+    "name": "Section Sign",
+    "cat": "symbols",
+    "keywords": "section legal law paragraph sect",
+    "entity": "&sect;"
+  },
+  {
+    "code": "pilcrow",
+    "char": "¶",
+    "name": "Pilcrow / Paragraph Sign",
+    "cat": "symbols",
+    "keywords": "paragraph break format para",
+    "entity": "&para;"
+  },
+  {
+    "code": "dagger",
+    "char": "†",
+    "name": "Dagger",
+    "cat": "symbols",
+    "keywords": "footnote cross obelisk dagger",
+    "entity": "&dagger;"
+  },
+  {
+    "code": "double_dagger",
+    "char": "‡",
+    "name": "Double Dagger",
+    "cat": "symbols",
+    "keywords": "footnote diesis ddagger",
+    "entity": "&ddagger;"
+  },
+  {
+    "code": "bullet",
+    "char": "•",
+    "name": "Bullet Point",
+    "cat": "symbols",
+    "keywords": "bullet dot list item point",
+    "entity": "&bull;"
+  },
+  {
+    "code": "triangle_bullet",
+    "char": "‣",
+    "name": "Triangular Bullet",
+    "cat": "symbols",
+    "keywords": "triangle arrow bullet pointer"
+  },
+  {
+    "code": "ellipsis",
+    "char": "…",
+    "name": "Horizontal Ellipsis",
+    "cat": "symbols",
+    "keywords": "dots more continuation省略 hellip",
+    "entity": "&hellip;"
+  },
+  {
+    "code": "single_quote_left",
+    "char": "‘",
+    "name": "Left Single Quotation Mark",
+    "cat": "symbols",
+    "keywords": "quote apostrophe open lsquo",
+    "entity": "&lsquo;"
+  },
+  {
+    "code": "single_quote_right",
+    "char": "’",
+    "name": "Right Single Quotation Mark",
+    "cat": "symbols",
+    "keywords": "quote apostrophe close rsquo",
+    "entity": "&rsquo;"
+  },
+  {
+    "code": "double_quote_left",
+    "char": "“",
+    "name": "Left Double Quotation Mark",
+    "cat": "symbols",
+    "keywords": "quote double open ldquo",
+    "entity": "&ldquo;"
+  },
+  {
+    "code": "double_quote_right",
+    "char": "”",
+    "name": "Right Double Quotation Mark",
+    "cat": "symbols",
+    "keywords": "quote double close rdquo",
+    "entity": "&rdquo;"
+  },
+  {
+    "code": "guillemet_left",
+    "char": "«",
+    "name": "Left-Pointing Double Angle Quotation",
+    "cat": "symbols",
+    "keywords": "guillemet quote angle laquo",
+    "entity": "&laquo;"
+  },
+  {
+    "code": "guillemet_right",
+    "char": "»",
+    "name": "Right-Pointing Double Angle Quotation",
+    "cat": "symbols",
+    "keywords": "guillemet quote angle raquo",
+    "entity": "&raquo;"
+  },
+  {
+    "code": "single_guillemet_left",
+    "char": "‹",
+    "name": "Single Left-Pointing Angle Quotation",
+    "cat": "symbols",
+    "keywords": "angle quote chevron lsaquo",
+    "entity": "&lsaquo;"
+  },
+  {
+    "code": "single_guillemet_right",
+    "char": "›",
+    "name": "Single Right-Pointing Angle Quotation",
+    "cat": "symbols",
+    "keywords": "angle quote chevron rsaquo",
+    "entity": "&rsaquo;"
+  },
+  {
+    "code": "em_dash",
+    "char": "—",
+    "name": "Em Dash",
+    "cat": "symbols",
+    "keywords": "dash long break punctuation mdash",
+    "entity": "&mdash;"
+  },
+  {
+    "code": "en_dash",
+    "char": "–",
+    "name": "En Dash",
+    "cat": "symbols",
+    "keywords": "dash range interval ndash",
+    "entity": "&ndash;"
+  },
+  {
+    "code": "command_key",
+    "char": "⌘",
+    "name": "Place of Interest / Command Key",
+    "cat": "symbols",
+    "keywords": "cmd command mac apple key shortcut"
+  },
+  {
+    "code": "option_key",
+    "char": "⌥",
+    "name": "Option Key",
+    "cat": "symbols",
+    "keywords": "alt option mac key shortcut"
+  },
+  {
+    "code": "shift_key",
+    "char": "⇧",
+    "name": "Upwards White Arrow / Shift Key",
+    "cat": "symbols",
+    "keywords": "shift key modifier mac shortcut"
+  },
+  {
+    "code": "backspace_key",
+    "char": "⌫",
+    "name": "Erase to the Left / Backspace Key",
+    "cat": "symbols",
+    "keywords": "backspace delete erase remove key"
+  },
+  {
+    "code": "escape_key",
+    "char": "⎋",
+    "name": "Broken Circle with Northwest Arrow / Escape Key",
+    "cat": "symbols",
+    "keywords": "esc escape cancel quit key"
+  },
+  {
+    "code": "eject_key",
+    "char": "⏏",
+    "name": "Eject Symbol",
+    "cat": "symbols",
+    "keywords": "eject unmount media remove disk"
+  },
+  {
+    "code": "spade_suit",
+    "char": "♠",
+    "name": "Black Spade Suit",
+    "cat": "symbols",
+    "keywords": "card poker spades suit",
+    "entity": "&spades;"
+  },
+  {
+    "code": "club_suit",
+    "char": "♣",
+    "name": "Black Club Suit",
+    "cat": "symbols",
+    "keywords": "card poker clubs suit",
+    "entity": "&clubs;"
+  },
+  {
+    "code": "heart_suit",
+    "char": "♥",
+    "name": "Black Heart Suit",
+    "cat": "symbols",
+    "keywords": "card poker love hearts suit",
+    "entity": "&hearts;"
+  },
+  {
+    "code": "diamond_suit",
+    "char": "♦",
+    "name": "Black Diamond Suit",
+    "cat": "symbols",
+    "keywords": "card poker diamonds suit",
+    "entity": "&diams;"
+  },
+  {
+    "code": "music_note",
+    "char": "♪",
+    "name": "Eighth Note",
+    "cat": "symbols",
+    "keywords": "music song audio melody sound note"
+  },
+  {
+    "code": "musical_notes",
+    "char": "♫",
+    "name": "Beamed Eighth Notes",
+    "cat": "symbols",
+    "keywords": "music song audio tune notes"
+  },
+  {
+    "code": "music_flat",
+    "char": "♭",
+    "name": "Music Flat Sign",
+    "cat": "symbols",
+    "keywords": "music notation pitch flat"
+  },
+  {
+    "code": "music_sharp",
+    "char": "♯",
+    "name": "Music Sharp Sign",
+    "cat": "symbols",
+    "keywords": "music notation csharp pitch sharp tag hash"
+  },
+  {
+    "code": "currency_dollar",
+    "char": "$",
+    "name": "Dollar Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash usd dollar price"
+  },
+  {
+    "code": "currency_euro",
+    "char": "€",
+    "name": "Euro Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash eur euro price",
+    "entity": "&euro;"
+  },
+  {
+    "code": "currency_pound",
+    "char": "£",
+    "name": "Pound Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash gbp pound price",
+    "entity": "&pound;"
+  },
+  {
+    "code": "currency_yen",
+    "char": "¥",
+    "name": "Yen / Yuan Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash jpy cny yen yuan price",
+    "entity": "&yen;"
+  },
+  {
+    "code": "currency_cent",
+    "char": "¢",
+    "name": "Cent Sign",
+    "cat": "symbols",
+    "keywords": "money currency cent small change",
+    "entity": "&cent;"
+  },
+  {
+    "code": "currency_bitcoin",
+    "char": "₿",
+    "name": "Bitcoin Sign",
+    "cat": "symbols",
+    "keywords": "crypto currency btc bitcoin blockchain coin"
+  },
+  {
+    "code": "currency_rupee",
+    "char": "₹",
+    "name": "Indian Rupee Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash inr rupee price"
+  },
+  {
+    "code": "currency_won",
+    "char": "₩",
+    "name": "Won Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash krw won price"
+  },
+  {
+    "code": "currency_ruble",
+    "char": "₽",
+    "name": "Rouble Sign",
+    "cat": "symbols",
+    "keywords": "money currency cash rub ruble price"
+  },
+  {
+    "code": "check_plain",
+    "char": "✓",
+    "name": "Check Mark",
+    "cat": "symbols",
+    "keywords": "check mark tick pass ok done yes",
+    "entity": "&check;"
+  },
+  {
+    "code": "cross_plain",
+    "char": "✕",
+    "name": "Multiplication X / Cross",
+    "cat": "symbols",
+    "keywords": "cross x cancel mark wrong delete"
+  },
+  {
+    "code": "black_star",
+    "char": "★",
+    "name": "Black Star",
+    "cat": "symbols",
+    "keywords": "star solid rating favorite review highlight"
+  },
+  {
+    "code": "white_star",
+    "char": "☆",
+    "name": "White Star",
+    "cat": "symbols",
+    "keywords": "star empty outline rating review"
   }
 ]
