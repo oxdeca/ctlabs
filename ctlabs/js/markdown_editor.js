@@ -1422,8 +1422,8 @@
       return;
     }
 
-    // Limit initial unsearched rendering for smooth DOM performance if viewing all
-    const displayItems = cleanQuery ? filtered : filtered.slice(0, 360);
+    // Full items for filtered categories/queries; generous slice for 'all' overview
+    const displayItems = (cleanQuery || cat !== 'all') ? filtered : filtered.slice(0, 480);
 
     mdEmojiGrid.innerHTML = displayItems.map(item => {
       return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;
@@ -2456,7 +2456,7 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
       return;
     }
 
-    const displayItems = cleanQuery ? filtered : filtered.slice(0, 360);
+    const displayItems = (cleanQuery || cat !== 'all') ? filtered : filtered.slice(0, 480);
 
     mdGraphvizEmojiGrid.innerHTML = displayItems.map(item => {
       return `<button type="button" class="md-gv-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;

@@ -4,671 +4,766 @@
     "char": "😀",
     "name": "Grinning Face",
     "cat": "smileys",
-    "keywords": "smile happy face joy grin"
+    "keywords": "smile happy face joy grin",
+    "entity": "&#128512;"
   },
   {
     "code": "smiley",
     "char": "😃",
     "name": "Smiling Face with Big Eyes",
     "cat": "smileys",
-    "keywords": "happy joy haha"
+    "keywords": "happy joy haha",
+    "entity": "&#128515;"
   },
   {
     "code": "smile",
     "char": "😄",
     "name": "Smiling Face with Smiling Eyes",
     "cat": "smileys",
-    "keywords": "happy laugh glad"
+    "keywords": "happy laugh glad",
+    "entity": "&#128516;"
   },
   {
     "code": "grin",
     "char": "😁",
     "name": "Beaming Face with Smiling Eyes",
     "cat": "smileys",
-    "keywords": "happy cheer proud"
+    "keywords": "happy cheer proud",
+    "entity": "&#128513;"
   },
   {
     "code": "laughing",
     "char": "😆",
     "name": "Grinning Squinting Face",
     "cat": "smileys",
-    "keywords": "lol haha laugh"
+    "keywords": "lol haha laugh",
+    "entity": "&#128518;"
   },
   {
     "code": "sweat_smile",
     "char": "😅",
     "name": "Grinning Face with Sweat",
     "cat": "smileys",
-    "keywords": "relief phew nervous"
+    "keywords": "relief phew nervous",
+    "entity": "&#128517;"
   },
   {
     "code": "joy",
     "char": "😂",
     "name": "Face with Tears of Joy",
     "cat": "smileys",
-    "keywords": "lmao haha cry laugh funny"
+    "keywords": "lmao haha cry laugh funny",
+    "entity": "&#128514;"
   },
   {
     "code": "rofl",
     "char": "🤣",
     "name": "Rolling on the Floor Laughing",
     "cat": "smileys",
-    "keywords": "rofl lol funny"
+    "keywords": "rofl lol funny",
+    "entity": "&#129315;"
   },
   {
     "code": "blush",
     "char": "😊",
     "name": "Smiling Face with Smiling Eyes",
     "cat": "smileys",
-    "keywords": "blush warm happy"
+    "keywords": "blush warm happy",
+    "entity": "&#128522;"
   },
   {
     "code": "halo",
     "char": "😇",
     "name": "Smiling Face with Halo",
     "cat": "smileys",
-    "keywords": "angel innocent good"
+    "keywords": "angel innocent good",
+    "entity": "&#128519;"
   },
   {
     "code": "slightly_smiling",
     "char": "🙂",
     "name": "Slightly Smiling Face",
     "cat": "smileys",
-    "keywords": "smile ok calm"
+    "keywords": "smile ok calm",
+    "entity": "&#128578;"
   },
   {
     "code": "upside_down",
     "char": "🙃",
     "name": "Upside-Down Face",
     "cat": "smileys",
-    "keywords": "silly sarcasm ironical"
+    "keywords": "silly sarcasm ironical",
+    "entity": "&#128579;"
   },
   {
     "code": "wink",
     "char": "😉",
     "name": "Winking Face",
     "cat": "smileys",
-    "keywords": "wink tease flirt"
+    "keywords": "wink tease flirt",
+    "entity": "&#128521;"
   },
   {
     "code": "relieved",
     "char": "😌",
     "name": "Relieved Face",
     "cat": "smileys",
-    "keywords": "peace calm phew"
+    "keywords": "peace calm phew",
+    "entity": "&#128524;"
   },
   {
     "code": "heart_eyes",
     "char": "😍",
     "name": "Smiling Face with Heart-Eyes",
     "cat": "smileys",
-    "keywords": "love crush adore beautiful"
+    "keywords": "love crush adore beautiful",
+    "entity": "&#128525;"
   },
   {
     "code": "kissing_heart",
     "char": "😘",
     "name": "Face Blowing a Kiss",
     "cat": "smileys",
-    "keywords": "kiss love affection"
+    "keywords": "kiss love affection",
+    "entity": "&#128536;"
   },
   {
     "code": "yum",
     "char": "😋",
     "name": "Face Savoring Food",
     "cat": "smileys",
-    "keywords": "tasty delicious treat"
+    "keywords": "tasty delicious treat",
+    "entity": "&#128523;"
   },
   {
     "code": "stuck_out_tongue",
     "char": "😛",
     "name": "Face with Tongue",
     "cat": "smileys",
-    "keywords": "playful silly prank"
+    "keywords": "playful silly prank",
+    "entity": "&#128539;"
   },
   {
     "code": "stuck_out_tongue_winking_eye",
     "char": "😜",
     "name": "Winking Face with Tongue",
     "cat": "smileys",
-    "keywords": "kidding joke crazy"
+    "keywords": "kidding joke crazy",
+    "entity": "&#128540;"
   },
   {
     "code": "stuck_out_tongue_closed_eyes",
     "char": "😝",
     "name": "Squinting Face with Tongue",
     "cat": "smileys",
-    "keywords": "playful lol hilarious"
+    "keywords": "playful lol hilarious",
+    "entity": "&#128541;"
   },
   {
     "code": "zany_face",
     "char": "🤪",
     "name": "Zany Face",
     "cat": "smileys",
-    "keywords": "wild goofy party"
+    "keywords": "wild goofy party",
+    "entity": "&#129322;"
   },
   {
     "code": "sunglasses",
     "char": "😎",
     "name": "Smiling Face with Sunglasses",
     "cat": "smileys",
-    "keywords": "cool awesome badass chill"
+    "keywords": "cool awesome badass chill",
+    "entity": "&#128526;"
   },
   {
     "code": "star_struck",
     "char": "🤩",
     "name": "Star-Struck",
     "cat": "smileys",
-    "keywords": "wow amazing celebrity"
+    "keywords": "wow amazing celebrity",
+    "entity": "&#129321;"
   },
   {
     "code": "partying_face",
     "char": "🥳",
     "name": "Partying Face",
     "cat": "smileys",
-    "keywords": "celebrate party hat horn"
+    "keywords": "celebrate party hat horn",
+    "entity": "&#129395;"
   },
   {
     "code": "smirk",
     "char": "😏",
     "name": "Smirking Face",
     "cat": "smileys",
-    "keywords": "smug sly clever"
+    "keywords": "smug sly clever",
+    "entity": "&#128527;"
   },
   {
     "code": "neutral_face",
     "char": "😐",
     "name": "Neutral Face",
     "cat": "smileys",
-    "keywords": "meh pokerface okay"
+    "keywords": "meh pokerface okay",
+    "entity": "&#128528;"
   },
   {
     "code": "expressionless",
     "char": "😑",
     "name": "Expressionless Face",
     "cat": "smileys",
-    "keywords": "blank no comment"
+    "keywords": "blank no comment",
+    "entity": "&#128529;"
   },
   {
     "code": "no_mouth",
     "char": "😶",
     "name": "Face Without Mouth",
     "cat": "smileys",
-    "keywords": "silent quiet speechless"
+    "keywords": "silent quiet speechless",
+    "entity": "&#128566;"
   },
   {
     "code": "rolling_eyes",
     "char": "🙄",
     "name": "Face with Rolling Eyes",
     "cat": "smileys",
-    "keywords": "eyeroll whatever bored"
+    "keywords": "eyeroll whatever bored",
+    "entity": "&#128580;"
   },
   {
     "code": "thinking",
     "char": "🤔",
     "name": "Thinking Face",
     "cat": "smileys",
-    "keywords": "ponder consider idea hmm"
+    "keywords": "ponder consider idea hmm",
+    "entity": "&#129300;"
   },
   {
     "code": "shushing_face",
     "char": "🤫",
     "name": "Shushing Face",
     "cat": "smileys",
-    "keywords": "quiet secret hush"
+    "keywords": "quiet secret hush",
+    "entity": "&#129323;"
   },
   {
     "code": "face_with_hand_over_mouth",
     "char": "🤭",
     "name": "Face with Hand Over Mouth",
     "cat": "smileys",
-    "keywords": "oops giggle chuckle"
+    "keywords": "oops giggle chuckle",
+    "entity": "&#129325;"
   },
   {
     "code": "raised_eyebrow",
     "char": "🤨",
     "name": "Face with Raised Eyebrow",
     "cat": "smileys",
-    "keywords": "skeptic doubt suspicious"
+    "keywords": "skeptic doubt suspicious",
+    "entity": "&#129320;"
   },
   {
     "code": "monocle_face",
     "char": "🧐",
     "name": "Face with Monocle",
     "cat": "smileys",
-    "keywords": "examine inspect investigate curious"
+    "keywords": "examine inspect investigate curious",
+    "entity": "&#129488;"
   },
   {
     "code": "nerd_face",
     "char": "🤓",
     "name": "Nerd Face",
     "cat": "smileys",
-    "keywords": "geek smart clever code"
+    "keywords": "geek smart clever code",
+    "entity": "&#129299;"
   },
   {
     "code": "hugging_face",
     "char": "🤗",
     "name": "Hugging Face",
     "cat": "smileys",
-    "keywords": "hug affection warmth"
+    "keywords": "hug affection warmth",
+    "entity": "&#129303;"
   },
   {
     "code": "pleading_face",
     "char": "🥺",
     "name": "Pleading Face",
     "cat": "smileys",
-    "keywords": "puppy eyes please beg"
+    "keywords": "puppy eyes please beg",
+    "entity": "&#129402;"
   },
   {
     "code": "sleeping",
     "char": "😴",
     "name": "Sleeping Face",
     "cat": "smileys",
-    "keywords": "sleep zzz tired rest"
+    "keywords": "sleep zzz tired rest",
+    "entity": "&#128564;"
   },
   {
     "code": "yawning_face",
     "char": "🥱",
     "name": "Yawning Face",
     "cat": "smileys",
-    "keywords": "tired sleepy bore"
+    "keywords": "tired sleepy bore",
+    "entity": "&#129393;"
   },
   {
     "code": "mask",
     "char": "😷",
     "name": "Face with Medical Mask",
     "cat": "smileys",
-    "keywords": "sick health doctor covid"
+    "keywords": "sick health doctor covid",
+    "entity": "&#128567;"
   },
   {
     "code": "face_with_thermometer",
     "char": "🤒",
     "name": "Face with Thermometer",
     "cat": "smileys",
-    "keywords": "fever ill sick"
+    "keywords": "fever ill sick",
+    "entity": "&#129298;"
   },
   {
     "code": "head_bandage",
     "char": "🤕",
     "name": "Face with Head-Bandage",
     "cat": "smileys",
-    "keywords": "hurt injured wound"
+    "keywords": "hurt injured wound",
+    "entity": "&#129301;"
   },
   {
     "code": "nauseated_face",
     "char": "🤢",
     "name": "Nauseated Face",
     "cat": "smileys",
-    "keywords": "gross sick puking"
+    "keywords": "gross sick puking",
+    "entity": "&#129314;"
   },
   {
     "code": "exploding_head",
     "char": "🤯",
     "name": "Exploding Head",
     "cat": "smileys",
-    "keywords": "mind blown shock unbelievable"
+    "keywords": "mind blown shock unbelievable",
+    "entity": "&#129327;"
   },
   {
     "code": "confused",
     "char": "😕",
     "name": "Confused Face",
     "cat": "smileys",
-    "keywords": "puzzled unsure"
+    "keywords": "puzzled unsure",
+    "entity": "&#128533;"
   },
   {
     "code": "worried",
     "char": "😟",
     "name": "Worried Face",
     "cat": "smileys",
-    "keywords": "concerned anxious"
+    "keywords": "concerned anxious",
+    "entity": "&#128543;"
   },
   {
     "code": "cry",
     "char": "😢",
     "name": "Crying Face",
     "cat": "smileys",
-    "keywords": "tear sad sorrow"
+    "keywords": "tear sad sorrow",
+    "entity": "&#128546;"
   },
   {
     "code": "sob",
     "char": "😭",
     "name": "Loudly Crying Face",
     "cat": "smileys",
-    "keywords": "bawl weep tears"
+    "keywords": "bawl weep tears",
+    "entity": "&#128557;"
   },
   {
     "code": "scream",
     "char": "😱",
     "name": "Face Screaming in Fear",
     "cat": "smileys",
-    "keywords": "scared shock horror omg"
+    "keywords": "scared shock horror omg",
+    "entity": "&#128561;"
   },
   {
     "code": "flushed",
     "char": "😳",
     "name": "Flushed Face",
     "cat": "smileys",
-    "keywords": "blush shock embarrassed"
+    "keywords": "blush shock embarrassed",
+    "entity": "&#128563;"
   },
   {
     "code": "rage",
     "char": "😡",
     "name": "Enraged Face",
     "cat": "smileys",
-    "keywords": "angry mad fury red"
+    "keywords": "angry mad fury red",
+    "entity": "&#128545;"
   },
   {
     "code": "skull",
     "char": "💀",
     "name": "Skull",
     "cat": "smileys",
-    "keywords": "dead death skeleton gameover"
+    "keywords": "dead death skeleton gameover",
+    "entity": "&#128128;"
   },
   {
     "code": "skull_crossbones",
     "char": "☠️",
     "name": "Skull and Crossbones",
     "cat": "smileys",
-    "keywords": "danger poison pirate"
+    "keywords": "danger poison pirate",
+    "entity": "&#9760;&#65039;"
   },
   {
     "code": "ghost",
     "char": "👻",
     "name": "Ghost",
     "cat": "smileys",
-    "keywords": "spooky phantom halloween"
+    "keywords": "spooky phantom halloween",
+    "entity": "&#128123;"
   },
   {
     "code": "alien",
     "char": "👽",
     "name": "Alien",
     "cat": "smileys",
-    "keywords": "ufo space extraterrestrial"
+    "keywords": "ufo space extraterrestrial",
+    "entity": "&#128125;"
   },
   {
     "code": "robot",
     "char": "🤖",
     "name": "Robot",
     "cat": "smileys",
-    "keywords": "bot automation ai machine"
+    "keywords": "bot automation ai machine",
+    "entity": "&#129302;"
   },
   {
     "code": "clown_face",
     "char": "🤡",
     "name": "Clown Face",
     "cat": "smileys",
-    "keywords": "joker funny fool"
+    "keywords": "joker funny fool",
+    "entity": "&#129313;"
   },
   {
     "code": "poop",
     "char": "💩",
     "name": "Pile of Poo",
     "cat": "smileys",
-    "keywords": "shit crap poop"
+    "keywords": "shit crap poop",
+    "entity": "&#128169;"
   },
   {
     "code": "thumbsup",
     "char": "👍",
     "name": "Thumbs Up",
-    "cat": "smileys",
-    "keywords": "+1 like approve agree yes good ok positive"
+    "cat": "people",
+    "keywords": "+1 like approve agree yes good ok positive",
+    "entity": "&#128077;"
   },
   {
     "code": "thumbsdown",
     "char": "👎",
     "name": "Thumbs Down",
-    "cat": "smileys",
-    "keywords": "-1 dislike reject no bad negative"
+    "cat": "people",
+    "keywords": "-1 dislike reject no bad negative",
+    "entity": "&#128078;"
   },
   {
     "code": "wave",
     "char": "👋",
     "name": "Waving Hand",
-    "cat": "smileys",
-    "keywords": "hello goodbye hi bye greeting"
+    "cat": "people",
+    "keywords": "hello goodbye hi bye greeting",
+    "entity": "&#128075;"
   },
   {
     "code": "raised_hand",
     "char": "✋",
     "name": "Raised Hand",
-    "cat": "smileys",
-    "keywords": "stop highfive halt"
+    "cat": "people",
+    "keywords": "stop highfive halt",
+    "entity": "&#9995;"
   },
   {
     "code": "vulcan_salute",
     "char": "🖖",
     "name": "Vulcan Salute",
     "cat": "smileys",
-    "keywords": "spock star trek live long prosper"
+    "keywords": "spock star trek live long prosper",
+    "entity": "&#128406;"
   },
   {
     "code": "ok_hand",
     "char": "👌",
     "name": "OK Hand",
-    "cat": "smileys",
-    "keywords": "perfect fine ok agreed"
+    "cat": "people",
+    "keywords": "perfect fine ok agreed",
+    "entity": "&#128076;"
   },
   {
     "code": "pinching_hand",
     "char": "🤏",
     "name": "Pinching Hand",
-    "cat": "smileys",
-    "keywords": "tiny small little bit"
+    "cat": "people",
+    "keywords": "tiny small little bit",
+    "entity": "&#129295;"
   },
   {
     "code": "v",
     "char": "✌️",
     "name": "Victory Hand",
-    "cat": "smileys",
-    "keywords": "peace two v victory"
+    "cat": "people",
+    "keywords": "peace two v victory",
+    "entity": "&#9996;&#65039;"
   },
   {
     "code": "crossed_fingers",
     "char": "🤞",
     "name": "Crossed Fingers",
-    "cat": "smileys",
-    "keywords": "luck hope wish"
+    "cat": "people",
+    "keywords": "luck hope wish",
+    "entity": "&#129310;"
   },
   {
     "code": "metal",
     "char": "🤘",
     "name": "Sign of the Horns",
-    "cat": "smileys",
-    "keywords": "rock rockon heavy metal"
+    "cat": "people",
+    "keywords": "rock rockon heavy metal",
+    "entity": "&#129304;"
   },
   {
     "code": "call_me_hand",
     "char": "🤙",
     "name": "Call Me Hand",
     "cat": "smileys",
-    "keywords": "shaka phone hang loose"
+    "keywords": "shaka phone hang loose",
+    "entity": "&#129305;"
   },
   {
     "code": "point_left",
     "char": "👈",
     "name": "Backhand Index Pointing Left",
-    "cat": "smileys",
-    "keywords": "left point finger"
+    "cat": "people",
+    "keywords": "left point finger",
+    "entity": "&#128072;"
   },
   {
     "code": "point_right",
     "char": "👉",
     "name": "Backhand Index Pointing Right",
-    "cat": "smileys",
-    "keywords": "right point finger"
+    "cat": "people",
+    "keywords": "right point finger",
+    "entity": "&#128073;"
   },
   {
     "code": "point_up",
     "char": "👆",
     "name": "Backhand Index Pointing Up",
-    "cat": "smileys",
-    "keywords": "up point finger above"
+    "cat": "people",
+    "keywords": "up point finger above",
+    "entity": "&#128070;"
   },
   {
     "code": "point_down",
     "char": "👇",
     "name": "Backhand Index Pointing Down",
-    "cat": "smileys",
-    "keywords": "down point finger below"
+    "cat": "people",
+    "keywords": "down point finger below",
+    "entity": "&#128071;"
   },
   {
     "code": "punch",
     "char": "👊",
     "name": "Oncoming Fist",
-    "cat": "smileys",
-    "keywords": "fistbump bump punch power"
+    "cat": "people",
+    "keywords": "fistbump bump punch power",
+    "entity": "&#128074;"
   },
   {
     "code": "clap",
     "char": "👏",
     "name": "Clapping Hands",
-    "cat": "smileys",
-    "keywords": "applause bravo praise cheer"
+    "cat": "people",
+    "keywords": "applause bravo praise cheer",
+    "entity": "&#128079;"
   },
   {
     "code": "raised_hands",
     "char": "🙌",
     "name": "Raising Hands",
-    "cat": "smileys",
-    "keywords": "celebrate hooray praise"
+    "cat": "people",
+    "keywords": "celebrate hooray praise",
+    "entity": "&#128588;"
   },
   {
     "code": "handshake",
     "char": "🤝",
     "name": "Handshake",
-    "cat": "smileys",
-    "keywords": "deal agreement partner meet"
+    "cat": "people",
+    "keywords": "deal agreement partner meet",
+    "entity": "&#129309;"
   },
   {
     "code": "pray",
     "char": "🙏",
     "name": "Folded Hands",
-    "cat": "smileys",
-    "keywords": "thanks please pray gratitude hope"
+    "cat": "people",
+    "keywords": "thanks please pray gratitude hope",
+    "entity": "&#128591;"
   },
   {
     "code": "writing_hand",
     "char": "✍️",
     "name": "Writing Hand",
-    "cat": "smileys",
-    "keywords": "write author compose edit"
+    "cat": "people",
+    "keywords": "write author compose edit",
+    "entity": "&#9997;&#65039;"
   },
   {
     "code": "muscle",
     "char": "💪",
     "name": "Flexed Biceps",
-    "cat": "smileys",
-    "keywords": "strong power flex fitness"
+    "cat": "people",
+    "keywords": "strong power flex fitness",
+    "entity": "&#128170;"
   },
   {
     "code": "eyes",
     "char": "👀",
     "name": "Eyes",
-    "cat": "smileys",
-    "keywords": "look observe watch review notice"
+    "cat": "people",
+    "keywords": "look observe watch review notice",
+    "entity": "&#128064;"
   },
   {
     "code": "brain",
     "char": "🧠",
     "name": "Brain",
-    "cat": "smileys",
-    "keywords": "mind intelligence smart think memory"
+    "cat": "people",
+    "keywords": "mind intelligence smart think memory",
+    "entity": "&#129504;"
   },
   {
     "code": "computer",
     "char": "💻",
     "name": "Laptop",
-    "cat": "tech",
-    "keywords": "laptop pc code developer dev work"
+    "cat": "office",
+    "keywords": "laptop pc code developer dev work",
+    "entity": "&#128187;"
   },
   {
     "code": "desktop_computer",
     "char": "🖥️",
     "name": "Desktop Computer",
     "cat": "tech",
-    "keywords": "desktop monitor workstation screen"
+    "keywords": "desktop monitor workstation screen",
+    "entity": "&#128421;&#65039;"
   },
   {
     "code": "keyboard",
     "char": "⌨️",
     "name": "Keyboard",
-    "cat": "tech",
-    "keywords": "type input key hardware"
+    "cat": "office",
+    "keywords": "type input key hardware",
+    "entity": "&#9000;&#65039;"
   },
   {
     "code": "mouse",
     "char": "🖱️",
     "name": "Computer Mouse",
     "cat": "tech",
-    "keywords": "hardware click track"
+    "keywords": "hardware click track",
+    "entity": "&#128433;&#65039;"
   },
   {
     "code": "printer",
     "char": "🖨️",
     "name": "Printer",
-    "cat": "tech",
-    "keywords": "hardware print paper output"
+    "cat": "office",
+    "keywords": "hardware print paper output",
+    "entity": "&#128424;&#65039;"
   },
   {
     "code": "server",
     "char": "🗄️",
     "name": "File Cabinet / Server Rack",
     "cat": "tech",
-    "keywords": "server rack hosting storage database infra"
+    "keywords": "server rack hosting storage database infra",
+    "entity": "&#128452;&#65039;"
   },
   {
     "code": "floppy_disk",
     "char": "💾",
     "name": "Floppy Disk",
-    "cat": "tech",
-    "keywords": "save storage drive media"
+    "cat": "office",
+    "keywords": "save storage drive media",
+    "entity": "&#128190;"
   },
   {
     "code": "cd",
     "char": "💿",
     "name": "Optical Disk (CD/DVD)",
-    "cat": "tech",
-    "keywords": "iso disk media rom image"
+    "cat": "office",
+    "keywords": "iso disk media rom image",
+    "entity": "&#128191;"
   },
   {
     "code": "phone",
     "char": "📱",
     "name": "Mobile Phone",
     "cat": "tech",
-    "keywords": "cellphone smartphone mobile app"
+    "keywords": "cellphone smartphone mobile app",
+    "entity": "&#128241;"
   },
   {
     "code": "telephone",
     "char": "☎️",
     "name": "Telephone",
-    "cat": "tech",
-    "keywords": "phone dial landline support"
+    "cat": "office",
+    "keywords": "phone dial landline support",
+    "entity": "&#9742;&#65039;"
   },
   {
     "code": "battery",
     "char": "🔋",
     "name": "Battery",
-    "cat": "tech",
-    "keywords": "power energy charge level"
+    "cat": "office",
+    "keywords": "power energy charge level",
+    "entity": "&#128267;"
   },
   {
     "code": "electric_plug",
     "char": "🔌",
     "name": "Electric Plug",
-    "cat": "tech",
-    "keywords": "power socket connect cable plug"
+    "cat": "office",
+    "keywords": "power socket connect cable plug",
+    "entity": "&#128268;"
   },
   {
     "code": "satellite_antenna",
     "char": "📡",
     "name": "Satellite Antenna",
     "cat": "tech",
-    "keywords": "dish signal wireless telecom comms"
+    "keywords": "dish signal wireless telecom comms",
+    "entity": "&#128225;"
   },
   {
     "code": "gear",
     "char": "⚙️",
     "name": "Gear / Settings",
-    "cat": "tech",
+    "cat": "office",
     "keywords": "cog config setup configure options settings",
     "entity": "&gear;"
   },
@@ -677,28 +772,32 @@
     "char": "🛠️",
     "name": "Hammer and Wrench",
     "cat": "tech",
-    "keywords": "admin fix debug utility maintenance tools"
+    "keywords": "admin fix debug utility maintenance tools",
+    "entity": "&#128736;&#65039;"
   },
   {
     "code": "wrench",
     "char": "🔧",
     "name": "Wrench",
-    "cat": "tech",
-    "keywords": "spanner fix repair maintenance tool"
+    "cat": "office",
+    "keywords": "spanner fix repair maintenance tool",
+    "entity": "&#128295;"
   },
   {
     "code": "hammer",
     "char": "🔨",
     "name": "Hammer",
-    "cat": "tech",
-    "keywords": "build construct tool make"
+    "cat": "office",
+    "keywords": "build construct tool make",
+    "entity": "&#128296;"
   },
   {
     "code": "nut_and_bolt",
     "char": "🔩",
     "name": "Nut and Bolt",
     "cat": "tech",
-    "keywords": "screw hardware fasten assembly"
+    "keywords": "screw hardware fasten assembly",
+    "entity": "&#128297;"
   },
   {
     "code": "chains",
@@ -713,258 +812,294 @@
     "char": "🧰",
     "name": "Toolbox",
     "cat": "tech",
-    "keywords": "utilities kit tools bundle suite"
+    "keywords": "utilities kit tools bundle suite",
+    "entity": "&#129520;"
   },
   {
     "code": "magnet",
     "char": "🧲",
     "name": "Magnet",
     "cat": "tech",
-    "keywords": "attract physics magnetic capture"
+    "keywords": "attract physics magnetic capture",
+    "entity": "&#129522;"
   },
   {
     "code": "telescope",
     "char": "🔭",
     "name": "Telescope",
     "cat": "tech",
-    "keywords": "observe discover vision search explore"
+    "keywords": "observe discover vision search explore",
+    "entity": "&#128301;"
   },
   {
     "code": "microscope",
     "char": "🔬",
     "name": "Microscope",
     "cat": "tech",
-    "keywords": "inspect inspect analyze lab science test"
+    "keywords": "inspect inspect analyze lab science test",
+    "entity": "&#128300;"
   },
   {
     "code": "test_tube",
     "char": "🧪",
     "name": "Test Tube",
     "cat": "tech",
-    "keywords": "lab experiment chemistry unit test testcase"
+    "keywords": "lab experiment chemistry unit test testcase",
+    "entity": "&#129514;"
   },
   {
     "code": "petri_dish",
     "char": "🧫",
     "name": "Petri Dish",
     "cat": "tech",
-    "keywords": "culture lab experiment biology test"
+    "keywords": "culture lab experiment biology test",
+    "entity": "&#129515;"
   },
   {
     "code": "dna",
     "char": "🧬",
     "name": "DNA",
     "cat": "tech",
-    "keywords": "genetics biology origin template"
+    "keywords": "genetics biology origin template",
+    "entity": "&#129516;"
   },
   {
     "code": "lock",
     "char": "🔒",
     "name": "Locked",
-    "cat": "tech",
-    "keywords": "security safe closed auth ssl https private encrypted"
+    "cat": "office",
+    "keywords": "security safe closed auth ssl https private encrypted",
+    "entity": "&#128274;"
   },
   {
     "code": "unlock",
     "char": "🔓",
     "name": "Unlocked",
-    "cat": "tech",
-    "keywords": "security open unauthenticated public insecure"
+    "cat": "office",
+    "keywords": "security open unauthenticated public insecure",
+    "entity": "&#128275;"
   },
   {
     "code": "key",
     "char": "🔑",
     "name": "Key",
-    "cat": "tech",
-    "keywords": "auth token credential access ssh secret password api"
+    "cat": "office",
+    "keywords": "auth token credential access ssh secret password api",
+    "entity": "&#128273;"
   },
   {
     "code": "old_key",
     "char": "🗝️",
     "name": "Old Key",
     "cat": "tech",
-    "keywords": "secret cipher crypt access masterkey"
+    "keywords": "secret cipher crypt access masterkey",
+    "entity": "&#128477;&#65039;"
   },
   {
     "code": "shield",
     "char": "🛡️",
     "name": "Shield",
     "cat": "tech",
-    "keywords": "security protect defense firewall safe guard"
+    "keywords": "security protect defense firewall safe guard",
+    "entity": "&#128737;&#65039;"
   },
   {
     "code": "package",
     "char": "📦",
     "name": "Package",
-    "cat": "tech",
-    "keywords": "box delivery shipment npm pypi gem deb rpm container archive"
+    "cat": "office",
+    "keywords": "box delivery shipment npm pypi gem deb rpm container archive",
+    "entity": "&#128230;"
   },
   {
     "code": "label",
     "char": "🏷️",
     "name": "Label",
     "cat": "tech",
-    "keywords": "tag metadata release badge ticket version"
+    "keywords": "tag metadata release badge ticket version",
+    "entity": "&#127991;&#65039;"
   },
   {
     "code": "rocket",
     "char": "🚀",
     "name": "Rocket",
-    "cat": "tech",
-    "keywords": "launch deploy fast speed release blastoff shipit"
+    "cat": "transport",
+    "keywords": "launch deploy fast speed release blastoff shipit",
+    "entity": "&#128640;"
   },
   {
     "code": "satellite",
     "char": "🛰️",
     "name": "Satellite",
     "cat": "tech",
-    "keywords": "orbit space telecom navigation gps"
+    "keywords": "orbit space telecom navigation gps",
+    "entity": "&#128752;&#65039;"
   },
   {
     "code": "globe",
     "char": "🌐",
     "name": "Globe with Meridians",
     "cat": "tech",
-    "keywords": "internet web network world dns wan cloud"
+    "keywords": "internet web network world dns wan cloud",
+    "entity": "&#127760;"
   },
   {
     "code": "world_map",
     "char": "🗺️",
     "name": "World Map",
     "cat": "tech",
-    "keywords": "map location geography topology routing"
+    "keywords": "map location geography topology routing",
+    "entity": "&#128506;&#65039;"
   },
   {
     "code": "compass",
     "char": "🧭",
     "name": "Compass",
     "cat": "tech",
-    "keywords": "navigation direction explore orient guide"
+    "keywords": "navigation direction explore orient guide",
+    "entity": "&#129517;"
   },
   {
     "code": "building_construction",
     "char": "🏗️",
     "name": "Building Construction",
     "cat": "tech",
-    "keywords": "build scaffolding dev ci architecture"
+    "keywords": "build scaffolding dev ci architecture",
+    "entity": "&#127959;&#65039;"
   },
   {
     "code": "factory",
     "char": "🏭",
     "name": "Factory",
     "cat": "tech",
-    "keywords": "industry plant pipeline automation manufacture"
+    "keywords": "industry plant pipeline automation manufacture",
+    "entity": "&#127981;"
   },
   {
     "code": "office_building",
     "char": "🏢",
     "name": "Office Building",
     "cat": "tech",
-    "keywords": "corporate enterprise workplace headquarters"
+    "keywords": "corporate enterprise workplace headquarters",
+    "entity": "&#127970;"
   },
   {
     "code": "clipboard",
     "char": "📋",
     "name": "Clipboard",
     "cat": "tech",
-    "keywords": "checklist todo notes audit inspect task"
+    "keywords": "checklist todo notes audit inspect task",
+    "entity": "&#128203;"
   },
   {
     "code": "memo",
     "char": "📝",
     "name": "Memo",
-    "cat": "tech",
-    "keywords": "document note edit draft text pencil"
+    "cat": "office",
+    "keywords": "document note edit draft text pencil",
+    "entity": "&#128221;"
   },
   {
     "code": "file_folder",
     "char": "📁",
     "name": "File Folder",
-    "cat": "tech",
-    "keywords": "directory folder path storage"
+    "cat": "office",
+    "keywords": "directory folder path storage",
+    "entity": "&#128193;"
   },
   {
     "code": "open_file_folder",
     "char": "📂",
     "name": "Open File Folder",
     "cat": "tech",
-    "keywords": "directory browsing catalog"
+    "keywords": "directory browsing catalog",
+    "entity": "&#128194;"
   },
   {
     "code": "card_index_dividers",
     "char": "🗂️",
     "name": "Card Index Dividers",
     "cat": "tech",
-    "keywords": "organize tabs index catalog"
+    "keywords": "organize tabs index catalog",
+    "entity": "&#128450;&#65039;"
   },
   {
     "code": "page_facing_up",
     "char": "📄",
     "name": "Page Facing Up",
     "cat": "tech",
-    "keywords": "document file article markdown text"
+    "keywords": "document file article markdown text",
+    "entity": "&#128196;"
   },
   {
     "code": "scroll",
     "char": "📜",
     "name": "Scroll",
     "cat": "tech",
-    "keywords": "document ancient policy manifest license agreement"
+    "keywords": "document ancient policy manifest license agreement",
+    "entity": "&#128220;"
   },
   {
     "code": "bookmark_tabs",
     "char": "📑",
     "name": "Bookmark Tabs",
     "cat": "tech",
-    "keywords": "documentation reference manual book"
+    "keywords": "documentation reference manual book",
+    "entity": "&#128209;"
   },
   {
     "code": "bar_chart",
     "char": "📊",
     "name": "Bar Chart",
     "cat": "tech",
-    "keywords": "metrics statistics telemetry analytics dashboard report"
+    "keywords": "metrics statistics telemetry analytics dashboard report",
+    "entity": "&#128202;"
   },
   {
     "code": "chart_increasing",
     "char": "📈",
     "name": "Chart Increasing",
     "cat": "tech",
-    "keywords": "uptrend growth metrics performance success increase"
+    "keywords": "uptrend growth metrics performance success increase",
+    "entity": "&#128200;"
   },
   {
     "code": "chart_decreasing",
     "char": "📉",
     "name": "Chart Decreasing",
     "cat": "tech",
-    "keywords": "downtrend loss drop decline error fall"
+    "keywords": "downtrend loss drop decline error fall",
+    "entity": "&#128201;"
   },
   {
     "code": "calendar",
     "char": "📅",
     "name": "Calendar",
     "cat": "tech",
-    "keywords": "date schedule time plan meeting"
+    "keywords": "date schedule time plan meeting",
+    "entity": "&#128197;"
   },
   {
     "code": "link",
     "char": "🔗",
     "name": "Link",
     "cat": "tech",
-    "keywords": "url hyperlink connection bind route"
+    "keywords": "url hyperlink connection bind route",
+    "entity": "&#128279;"
   },
   {
     "code": "paperclip",
     "char": "📎",
     "name": "Paperclip",
-    "cat": "tech",
-    "keywords": "attachment attach file include"
+    "cat": "office",
+    "keywords": "attachment attach file include",
+    "entity": "&#128206;"
   },
   {
     "code": "scissors",
     "char": "✂️",
     "name": "Scissors",
-    "cat": "tech",
+    "cat": "office",
     "keywords": "cut clip trim split",
     "entity": "&scscissors;"
   },
@@ -973,42 +1108,48 @@
     "char": "📏",
     "name": "Straight Ruler",
     "cat": "tech",
-    "keywords": "measure size scale dimension rule"
+    "keywords": "measure size scale dimension rule",
+    "entity": "&#128207;"
   },
   {
     "code": "triangular_ruler",
     "char": "📐",
     "name": "Triangular Ruler",
     "cat": "tech",
-    "keywords": "measure angle geometry architecture design"
+    "keywords": "measure angle geometry architecture design",
+    "entity": "&#128208;"
   },
   {
     "code": "magnifying_glass_left",
     "char": "🔍",
     "name": "Magnifying Glass Left",
     "cat": "tech",
-    "keywords": "search find query inspect investigate lookup"
+    "keywords": "search find query inspect investigate lookup",
+    "entity": "&#128269;"
   },
   {
     "code": "light_bulb",
     "char": "💡",
     "name": "Light Bulb",
     "cat": "tech",
-    "keywords": "idea hint tip bright solution insight innovate"
+    "keywords": "idea hint tip bright solution insight innovate",
+    "entity": "&#128161;"
   },
   {
     "code": "check_mark",
     "char": "✅",
     "name": "Check Mark Button",
     "cat": "status",
-    "keywords": "success ok pass done completed confirmed verified green"
+    "keywords": "success ok pass done completed confirmed verified green",
+    "entity": "&#9989;"
   },
   {
     "code": "cross_mark",
     "char": "❌",
     "name": "Cross Mark",
     "cat": "status",
-    "keywords": "fail error cancel rejected bad denied red wrong"
+    "keywords": "fail error cancel rejected bad denied red wrong",
+    "entity": "&#10060;"
   },
   {
     "code": "heavy_check_mark",
@@ -1039,42 +1180,48 @@
     "char": "⛔",
     "name": "No Entry",
     "cat": "status",
-    "keywords": "stop forbidden access denied prohibited block"
+    "keywords": "stop forbidden access denied prohibited block",
+    "entity": "&#9940;"
   },
   {
     "code": "prohibited",
     "char": "🚫",
     "name": "Prohibited",
     "cat": "status",
-    "keywords": "forbidden banned restricted not allowed disabled"
+    "keywords": "forbidden banned restricted not allowed disabled",
+    "entity": "&#128683;"
   },
   {
     "code": "rotating_light",
     "char": "🚨",
     "name": "Police Car Light / Siren",
     "cat": "status",
-    "keywords": "alert critical emergency alarm pager incident"
+    "keywords": "alert critical emergency alarm pager incident",
+    "entity": "&#128680;"
   },
   {
     "code": "bell",
     "char": "🔔",
     "name": "Bell",
-    "cat": "status",
-    "keywords": "notification alert ring subscribe ping reminder"
+    "cat": "office",
+    "keywords": "notification alert ring subscribe ping reminder",
+    "entity": "&#128276;"
   },
   {
     "code": "bell_slash",
     "char": "🔕",
     "name": "Bell with Slash",
     "cat": "status",
-    "keywords": "mute silent quiet do not disturb disable notifications"
+    "keywords": "mute silent quiet do not disturb disable notifications",
+    "entity": "&#128277;"
   },
   {
     "code": "fire",
     "char": "🔥",
     "name": "Fire",
-    "cat": "status",
-    "keywords": "hot blaze flame burn emergency popular lit"
+    "cat": "nature",
+    "keywords": "hot blaze flame burn emergency popular lit",
+    "entity": "&#128293;"
   },
   {
     "code": "zap",
@@ -1089,231 +1236,264 @@
     "char": "💥",
     "name": "Collision",
     "cat": "status",
-    "keywords": "boom crash blast impact explosion"
+    "keywords": "boom crash blast impact explosion",
+    "entity": "&#128165;"
   },
   {
     "code": "sparkles",
     "char": "✨",
     "name": "Sparkles",
     "cat": "status",
-    "keywords": "clean new shiny magic polish star special"
+    "keywords": "clean new shiny magic polish star special",
+    "entity": "&#10024;"
   },
   {
     "code": "star",
     "char": "⭐",
     "name": "Star",
     "cat": "status",
-    "keywords": "favorite bookmark rating review featured highlight"
+    "keywords": "favorite bookmark rating review featured highlight",
+    "entity": "&#11088;"
   },
   {
     "code": "glowing_star",
     "char": "🌟",
     "name": "Glowing Star",
     "cat": "status",
-    "keywords": "shine highlight brilliance standout"
+    "keywords": "shine highlight brilliance standout",
+    "entity": "&#127775;"
   },
   {
     "code": "tada",
     "char": "🎉",
     "name": "Party Popper",
     "cat": "status",
-    "keywords": "celebrate congratulations winner milestone success hooray"
+    "keywords": "celebrate congratulations winner milestone success hooray",
+    "entity": "&#127881;"
   },
   {
     "code": "confetti_ball",
     "char": "🎊",
     "name": "Confetti Ball",
     "cat": "status",
-    "keywords": "celebrate party festival event"
+    "keywords": "celebrate party festival event",
+    "entity": "&#127882;"
   },
   {
     "code": "trophy",
     "char": "🏆",
     "name": "Trophy",
     "cat": "status",
-    "keywords": "award win champion prize victory first"
+    "keywords": "award win champion prize victory first",
+    "entity": "&#127942;"
   },
   {
     "code": "medal",
     "char": "🎖️",
     "name": "Military Medal",
     "cat": "status",
-    "keywords": "honor achievement rank badge award"
+    "keywords": "honor achievement rank badge award",
+    "entity": "&#127894;&#65039;"
   },
   {
     "code": "red_circle",
     "char": "🔴",
     "name": "Red Circle",
     "cat": "status",
-    "keywords": "offline down failed critical error stopped"
+    "keywords": "offline down failed critical error stopped",
+    "entity": "&#128308;"
   },
   {
     "code": "orange_circle",
     "char": "🟠",
     "name": "Orange Circle",
     "cat": "status",
-    "keywords": "warning degraded pending pause"
+    "keywords": "warning degraded pending pause",
+    "entity": "&#128992;"
   },
   {
     "code": "yellow_circle",
     "char": "🟡",
     "name": "Yellow Circle",
     "cat": "status",
-    "keywords": "caution in-progress building unstable"
+    "keywords": "caution in-progress building unstable",
+    "entity": "&#128993;"
   },
   {
     "code": "green_circle",
     "char": "🟢",
     "name": "Green Circle",
     "cat": "status",
-    "keywords": "online healthy running ok operational active pass"
+    "keywords": "online healthy running ok operational active pass",
+    "entity": "&#128994;"
   },
   {
     "code": "blue_circle",
     "char": "🔵",
     "name": "Blue Circle",
     "cat": "status",
-    "keywords": "info notice processing neutral primary"
+    "keywords": "info notice processing neutral primary",
+    "entity": "&#128309;"
   },
   {
     "code": "purple_circle",
     "char": "🟣",
     "name": "Purple Circle",
     "cat": "status",
-    "keywords": "custom special tag badge secondary"
+    "keywords": "custom special tag badge secondary",
+    "entity": "&#128995;"
   },
   {
     "code": "white_circle",
     "char": "⚪",
     "name": "White Circle",
     "cat": "status",
-    "keywords": "idle unassigned blank empty"
+    "keywords": "idle unassigned blank empty",
+    "entity": "&#9898;"
   },
   {
     "code": "black_circle",
     "char": "⚫",
     "name": "Black Circle",
     "cat": "status",
-    "keywords": "unknown dead dark terminated"
+    "keywords": "unknown dead dark terminated",
+    "entity": "&#9899;"
   },
   {
     "code": "red_square",
     "char": "🟥",
     "name": "Red Square",
     "cat": "status",
-    "keywords": "stop block error critical"
+    "keywords": "stop block error critical",
+    "entity": "&#128997;"
   },
   {
     "code": "green_square",
     "char": "🟩",
     "name": "Green Square",
     "cat": "status",
-    "keywords": "running success ready pass"
+    "keywords": "running success ready pass",
+    "entity": "&#129001;"
   },
   {
     "code": "blue_square",
     "char": "🟦",
     "name": "Blue Square",
     "cat": "status",
-    "keywords": "info primary item"
+    "keywords": "info primary item",
+    "entity": "&#128998;"
   },
   {
     "code": "question_mark",
     "char": "❓",
     "name": "Red Question Mark",
     "cat": "status",
-    "keywords": "help question query faq unknown why"
+    "keywords": "help question query faq unknown why",
+    "entity": "&#10067;"
   },
   {
     "code": "white_question_mark",
     "char": "❔",
     "name": "White Question Mark",
     "cat": "status",
-    "keywords": "help query ask doubt"
+    "keywords": "help query ask doubt",
+    "entity": "&#10068;"
   },
   {
     "code": "exclamation_mark",
     "char": "❗️",
     "name": "Red Exclamation Mark",
     "cat": "status",
-    "keywords": "important alert attention note priority"
+    "keywords": "important alert attention note priority",
+    "entity": "&#10071;&#65039;"
   },
   {
     "code": "white_exclamation_mark",
     "char": "❕",
     "name": "White Exclamation Mark",
     "cat": "status",
-    "keywords": "notice info alert attention"
+    "keywords": "notice info alert attention",
+    "entity": "&#10069;"
   },
   {
     "code": "hourglass_flowing",
     "char": "⏳",
     "name": "Hourglass Not Done",
     "cat": "status",
-    "keywords": "waiting pending loading timer delay timeout"
+    "keywords": "waiting pending loading timer delay timeout",
+    "entity": "&#9203;"
   },
   {
     "code": "hourglass_done",
     "char": "⌛",
     "name": "Hourglass Done",
     "cat": "status",
-    "keywords": "time duration expired end complete"
+    "keywords": "time duration expired end complete",
+    "entity": "&#8987;"
   },
   {
     "code": "stopwatch",
     "char": "⏱️",
     "name": "Stopwatch",
     "cat": "status",
-    "keywords": "timer latency speed benchmark performance duration"
+    "keywords": "timer latency speed benchmark performance duration",
+    "entity": "&#9201;&#65039;"
   },
   {
     "code": "alarm_clock",
     "char": "⏰",
     "name": "Alarm Clock",
-    "cat": "status",
-    "keywords": "schedule time wake deadline reminder"
+    "cat": "office",
+    "keywords": "schedule time wake deadline reminder",
+    "entity": "&#9200;"
   },
   {
     "code": "speech_balloon",
     "char": "💬",
     "name": "Speech Balloon",
     "cat": "status",
-    "keywords": "comment message talk chat conversation discussion"
+    "keywords": "comment message talk chat conversation discussion",
+    "entity": "&#128172;"
   },
   {
     "code": "thought_balloon",
     "char": "💭",
     "name": "Thought Balloon",
     "cat": "status",
-    "keywords": "think ponder idea dream reasoning"
+    "keywords": "think ponder idea dream reasoning",
+    "entity": "&#128173;"
   },
   {
     "code": "mega",
     "char": "📣",
     "name": "Megaphone",
     "cat": "status",
-    "keywords": "announcement broadcast notice publish shout"
+    "keywords": "announcement broadcast notice publish shout",
+    "entity": "&#128227;"
   },
   {
     "code": "loudspeaker",
     "char": "📢",
     "name": "Loudspeaker",
     "cat": "status",
-    "keywords": "broadcast alert audio announce announcement"
+    "keywords": "broadcast alert audio announce announcement",
+    "entity": "&#128226;"
   },
   {
     "code": "radio_button",
     "char": "🔘",
     "name": "Radio Button",
     "cat": "status",
-    "keywords": "option select choice toggle state active"
+    "keywords": "option select choice toggle state active",
+    "entity": "&#128280;"
   },
   {
     "code": "hundred",
     "char": "💯",
     "name": "Hundred Points",
     "cat": "status",
-    "keywords": "100 percent perfect score complete accurate"
+    "keywords": "100 percent perfect score complete accurate",
+    "entity": "&#128175;"
   },
   {
     "code": "arrow_left",
@@ -1448,84 +1628,96 @@
     "char": "↺",
     "name": "Anticlockwise Open Circle Arrow",
     "cat": "arrows",
-    "keywords": "undo reload revert counterclockwise"
+    "keywords": "undo reload revert counterclockwise",
+    "entity": "&#8634;"
   },
   {
     "code": "arrows_clockwise",
     "char": "↻",
     "name": "Clockwise Open Circle Arrow",
     "cat": "arrows",
-    "keywords": "redo reload refresh sync clockwise"
+    "keywords": "redo reload refresh sync clockwise",
+    "entity": "&#8635;"
   },
   {
     "code": "arrows_exchange",
     "char": "⇄",
     "name": "Rightwards Arrow Over Leftwards Arrow",
     "cat": "arrows",
-    "keywords": "exchange swap transfer duplex sync"
+    "keywords": "exchange swap transfer duplex sync",
+    "entity": "&#8644;"
   },
   {
     "code": "arrows_exchange_down",
     "char": "⇅",
     "name": "Upwards Arrow Leftwards of Downwards Arrow",
     "cat": "arrows",
-    "keywords": "duplex vertical swap"
+    "keywords": "duplex vertical swap",
+    "entity": "&#8645;"
   },
   {
     "code": "arrow_forward_solid",
     "char": "➔",
     "name": "Heavy Rightwards Arrow",
     "cat": "arrows",
-    "keywords": "arrow right bold solid point"
+    "keywords": "arrow right bold solid point",
+    "entity": "&#10132;"
   },
   {
     "code": "arrow_chevron_right",
     "char": "➤",
     "name": "Black Right-Pointing Arrowhead",
     "cat": "arrows",
-    "keywords": "arrow chevron cursor bullet next"
+    "keywords": "arrow chevron cursor bullet next",
+    "entity": "&#10148;"
   },
   {
     "code": "arrow_hook_left",
     "char": "↩",
     "name": "Leftwards Arrow with Hook",
     "cat": "arrows",
-    "keywords": "hook return back undo"
+    "keywords": "hook return back undo",
+    "entity": "&#8617;"
   },
   {
     "code": "arrow_hook_right",
     "char": "↪",
     "name": "Rightwards Arrow with Hook",
     "cat": "arrows",
-    "keywords": "hook follow forward jump branch"
+    "keywords": "hook follow forward jump branch",
+    "entity": "&#8618;"
   },
   {
     "code": "arrow_maps_to",
     "char": "↦",
     "name": "Rightwards Arrow from Bar",
     "cat": "arrows",
-    "keywords": "mapsto mapping function transform"
+    "keywords": "mapsto mapping function transform",
+    "entity": "&#8614;"
   },
   {
     "code": "arrow_long_right",
     "char": "⟶",
     "name": "Long Rightwards Arrow",
     "cat": "arrows",
-    "keywords": "long arrow right leads to yields"
+    "keywords": "long arrow right leads to yields",
+    "entity": "&#10230;"
   },
   {
     "code": "arrow_long_left",
     "char": "⟵",
     "name": "Long Leftwards Arrow",
     "cat": "arrows",
-    "keywords": "long arrow left from"
+    "keywords": "long arrow left from",
+    "entity": "&#10229;"
   },
   {
     "code": "arrow_long_both",
     "char": "⟷",
     "name": "Long Left Right Arrow",
     "cat": "arrows",
-    "keywords": "long bidirectional relation equivalent"
+    "keywords": "long bidirectional relation equivalent",
+    "entity": "&#10231;"
   },
   {
     "code": "forall",
@@ -1556,7 +1748,8 @@
     "char": "∄",
     "name": "There Does Not Exist",
     "cat": "math",
-    "keywords": "logic not exists none"
+    "keywords": "logic not exists none",
+    "entity": "&#8708;"
   },
   {
     "code": "empty_set",
@@ -1635,7 +1828,8 @@
     "char": "∓",
     "name": "Minus-or-Plus Sign",
     "cat": "math",
-    "keywords": "opposite range minus plus"
+    "keywords": "opposite range minus plus",
+    "entity": "&#8723;"
   },
   {
     "code": "divide",
@@ -1738,21 +1932,24 @@
     "char": "∬",
     "name": "Double Integral",
     "cat": "math",
-    "keywords": "surface calculus int"
+    "keywords": "surface calculus int",
+    "entity": "&#8748;"
   },
   {
     "code": "triple_integral",
     "char": "∭",
     "name": "Triple Integral",
     "cat": "math",
-    "keywords": "volume calculus int"
+    "keywords": "volume calculus int",
+    "entity": "&#8749;"
   },
   {
     "code": "contour_integral",
     "char": "∮",
     "name": "Contour Integral",
     "cat": "math",
-    "keywords": "path line integral calculus loop"
+    "keywords": "path line integral calculus loop",
+    "entity": "&#8750;"
   },
   {
     "code": "therefore",
@@ -1767,7 +1964,8 @@
     "char": "∵",
     "name": "Because / Since",
     "cat": "math",
-    "keywords": "reason logic proof since"
+    "keywords": "reason logic proof since",
+    "entity": "&#8757;"
   },
   {
     "code": "similar",
@@ -1830,14 +2028,16 @@
     "char": "≪",
     "name": "Much Less-Than",
     "cat": "math",
-    "keywords": "negligible smaller <<"
+    "keywords": "negligible smaller <<",
+    "entity": "&#8810;"
   },
   {
     "code": "much_greater_than",
     "char": "≫",
     "name": "Much Greater-Than",
     "cat": "math",
-    "keywords": "dominates bigger >>"
+    "keywords": "dominates bigger >>",
+    "entity": "&#8811;"
   },
   {
     "code": "subset_of",
@@ -2084,7 +2284,8 @@
     "char": "ς",
     "name": "Greek Small Letter Final Sigma",
     "cat": "greek",
-    "keywords": "sigma final wordend"
+    "keywords": "sigma final wordend",
+    "entity": "&#962;"
   },
   {
     "code": "tau",
@@ -2283,7 +2484,8 @@
     "char": "‣",
     "name": "Triangular Bullet",
     "cat": "symbols",
-    "keywords": "triangle arrow bullet pointer"
+    "keywords": "triangle arrow bullet pointer",
+    "entity": "&#8227;"
   },
   {
     "code": "ellipsis",
@@ -2378,42 +2580,48 @@
     "char": "⌘",
     "name": "Place of Interest / Command Key",
     "cat": "symbols",
-    "keywords": "cmd command mac apple key shortcut"
+    "keywords": "cmd command mac apple key shortcut",
+    "entity": "&#8984;"
   },
   {
     "code": "option_key",
     "char": "⌥",
     "name": "Option Key",
     "cat": "symbols",
-    "keywords": "alt option mac key shortcut"
+    "keywords": "alt option mac key shortcut",
+    "entity": "&#8997;"
   },
   {
     "code": "shift_key",
     "char": "⇧",
     "name": "Upwards White Arrow / Shift Key",
     "cat": "symbols",
-    "keywords": "shift key modifier mac shortcut"
+    "keywords": "shift key modifier mac shortcut",
+    "entity": "&#8679;"
   },
   {
     "code": "backspace_key",
     "char": "⌫",
     "name": "Erase to the Left / Backspace Key",
     "cat": "symbols",
-    "keywords": "backspace delete erase remove key"
+    "keywords": "backspace delete erase remove key",
+    "entity": "&#9003;"
   },
   {
     "code": "escape_key",
     "char": "⎋",
     "name": "Broken Circle with Northwest Arrow / Escape Key",
     "cat": "symbols",
-    "keywords": "esc escape cancel quit key"
+    "keywords": "esc escape cancel quit key",
+    "entity": "&#9099;"
   },
   {
     "code": "eject_key",
     "char": "⏏",
     "name": "Eject Symbol",
     "cat": "symbols",
-    "keywords": "eject unmount media remove disk"
+    "keywords": "eject unmount media remove disk",
+    "entity": "&#9167;"
   },
   {
     "code": "spade_suit",
@@ -2452,35 +2660,40 @@
     "char": "♪",
     "name": "Eighth Note",
     "cat": "symbols",
-    "keywords": "music song audio melody sound note"
+    "keywords": "music song audio melody sound note",
+    "entity": "&#9834;"
   },
   {
     "code": "musical_notes",
     "char": "♫",
     "name": "Beamed Eighth Notes",
     "cat": "symbols",
-    "keywords": "music song audio tune notes"
+    "keywords": "music song audio tune notes",
+    "entity": "&#9835;"
   },
   {
     "code": "music_flat",
     "char": "♭",
     "name": "Music Flat Sign",
     "cat": "symbols",
-    "keywords": "music notation pitch flat"
+    "keywords": "music notation pitch flat",
+    "entity": "&#9837;"
   },
   {
     "code": "music_sharp",
     "char": "♯",
     "name": "Music Sharp Sign",
     "cat": "symbols",
-    "keywords": "music notation csharp pitch sharp tag hash"
+    "keywords": "music notation csharp pitch sharp tag hash",
+    "entity": "&#9839;"
   },
   {
     "code": "currency_dollar",
     "char": "$",
     "name": "Dollar Sign",
     "cat": "symbols",
-    "keywords": "money currency cash usd dollar price"
+    "keywords": "money currency cash usd dollar price",
+    "entity": "&#36;"
   },
   {
     "code": "currency_euro",
@@ -2519,28 +2732,32 @@
     "char": "₿",
     "name": "Bitcoin Sign",
     "cat": "symbols",
-    "keywords": "crypto currency btc bitcoin blockchain coin"
+    "keywords": "crypto currency btc bitcoin blockchain coin",
+    "entity": "&#8383;"
   },
   {
     "code": "currency_rupee",
     "char": "₹",
     "name": "Indian Rupee Sign",
     "cat": "symbols",
-    "keywords": "money currency cash inr rupee price"
+    "keywords": "money currency cash inr rupee price",
+    "entity": "&#8377;"
   },
   {
     "code": "currency_won",
     "char": "₩",
     "name": "Won Sign",
     "cat": "symbols",
-    "keywords": "money currency cash krw won price"
+    "keywords": "money currency cash krw won price",
+    "entity": "&#8361;"
   },
   {
     "code": "currency_ruble",
     "char": "₽",
     "name": "Rouble Sign",
     "cat": "symbols",
-    "keywords": "money currency cash rub ruble price"
+    "keywords": "money currency cash rub ruble price",
+    "entity": "&#8381;"
   },
   {
     "code": "check_plain",
@@ -2555,20 +2772,3495 @@
     "char": "✕",
     "name": "Multiplication X / Cross",
     "cat": "symbols",
-    "keywords": "cross x cancel mark wrong delete"
+    "keywords": "cross x cancel mark wrong delete",
+    "entity": "&#10005;"
   },
   {
     "code": "black_star",
     "char": "★",
     "name": "Black Star",
     "cat": "symbols",
-    "keywords": "star solid rating favorite review highlight"
+    "keywords": "star solid rating favorite review highlight",
+    "entity": "&#9733;"
   },
   {
     "code": "white_star",
     "char": "☆",
     "name": "White Star",
     "cat": "symbols",
-    "keywords": "star empty outline rating review"
+    "keywords": "star empty outline rating review",
+    "entity": "&#9734;"
+  },
+  {
+    "code": "baby",
+    "char": "👶",
+    "name": "Baby",
+    "cat": "people",
+    "keywords": "child infant baby kid",
+    "entity": "&#128118;"
+  },
+  {
+    "code": "girl",
+    "char": "👧",
+    "name": "Girl",
+    "cat": "people",
+    "keywords": "female child daughter",
+    "entity": "&#128103;"
+  },
+  {
+    "code": "boy",
+    "char": "👦",
+    "name": "Boy",
+    "cat": "people",
+    "keywords": "male child son",
+    "entity": "&#128102;"
+  },
+  {
+    "code": "woman",
+    "char": "👩",
+    "name": "Woman",
+    "cat": "people",
+    "keywords": "adult female lady",
+    "entity": "&#128105;"
+  },
+  {
+    "code": "man",
+    "char": "👨",
+    "name": "Man",
+    "cat": "people",
+    "keywords": "adult male gentleman",
+    "entity": "&#128104;"
+  },
+  {
+    "code": "older_woman",
+    "char": "👵",
+    "name": "Older Woman",
+    "cat": "people",
+    "keywords": "grandma grandmother elderly senior",
+    "entity": "&#128117;"
+  },
+  {
+    "code": "older_man",
+    "char": "👴",
+    "name": "Older Man",
+    "cat": "people",
+    "keywords": "grandpa grandfather elderly senior",
+    "entity": "&#128116;"
+  },
+  {
+    "code": "police_officer",
+    "char": "👮",
+    "name": "Police Officer",
+    "cat": "people",
+    "keywords": "cop law enforcement officer police",
+    "entity": "&#128110;"
+  },
+  {
+    "code": "construction_worker",
+    "char": "👷",
+    "name": "Construction Worker",
+    "cat": "people",
+    "keywords": "builder helmet worker labor",
+    "entity": "&#128119;"
+  },
+  {
+    "code": "guard",
+    "char": "💂",
+    "name": "Guard",
+    "cat": "people",
+    "keywords": "sentinel security royal guard",
+    "entity": "&#128130;"
+  },
+  {
+    "code": "detective",
+    "char": "🕵️",
+    "name": "Detective",
+    "cat": "people",
+    "keywords": "sleuth investigator spy secret agent",
+    "entity": "&#128373;&#65039;"
+  },
+  {
+    "code": "health_worker",
+    "char": "👩‍⚕️",
+    "name": "Health Worker",
+    "cat": "people",
+    "keywords": "doctor nurse physician medic",
+    "entity": "&#128105;&#8205;&#9877;&#65039;"
+  },
+  {
+    "code": "student",
+    "char": "👨‍🎓",
+    "name": "Student",
+    "cat": "people",
+    "keywords": "graduate degree university college study",
+    "entity": "&#128104;&#8205;&#127891;"
+  },
+  {
+    "code": "teacher",
+    "char": "👨‍🏫",
+    "name": "Teacher",
+    "cat": "people",
+    "keywords": "instructor professor school tutor education",
+    "entity": "&#128104;&#8205;&#127979;"
+  },
+  {
+    "code": "judge",
+    "char": "👨‍⚖️",
+    "name": "Judge",
+    "cat": "people",
+    "keywords": "court law justice gavel legal",
+    "entity": "&#128104;&#8205;&#9878;&#65039;"
+  },
+  {
+    "code": "technologist",
+    "char": "👨‍💻",
+    "name": "Technologist / Developer",
+    "cat": "people",
+    "keywords": "programmer coder engineer developer hacker tech",
+    "entity": "&#128104;&#8205;&#128187;"
+  },
+  {
+    "code": "office_worker",
+    "char": "👨‍💼",
+    "name": "Office Worker",
+    "cat": "people",
+    "keywords": "business manager suit corporate worker",
+    "entity": "&#128104;&#8205;&#128188;"
+  },
+  {
+    "code": "mechanic",
+    "char": "👨‍🔧",
+    "name": "Mechanic",
+    "cat": "people",
+    "keywords": "technician plumber tool repair maintenance",
+    "entity": "&#128104;&#8205;&#128295;"
+  },
+  {
+    "code": "scientist",
+    "char": "👨‍🔬",
+    "name": "Scientist",
+    "cat": "people",
+    "keywords": "chemistry lab research biology science",
+    "entity": "&#128104;&#8205;&#128300;"
+  },
+  {
+    "code": "artist",
+    "char": "👨‍🎨",
+    "name": "Artist",
+    "cat": "people",
+    "keywords": "painter draw creative design art",
+    "entity": "&#128104;&#8205;&#127912;"
+  },
+  {
+    "code": "firefighter",
+    "char": "👨‍🚒",
+    "name": "Firefighter",
+    "cat": "people",
+    "keywords": "rescue fire hose emergency",
+    "entity": "&#128104;&#8205;&#128658;"
+  },
+  {
+    "code": "pilot",
+    "char": "👨‍✈️",
+    "name": "Pilot",
+    "cat": "people",
+    "keywords": "aviator airplane fly cockpit flight",
+    "entity": "&#128104;&#8205;&#9992;&#65039;"
+  },
+  {
+    "code": "astronaut",
+    "char": "👨‍🚀",
+    "name": "Astronaut",
+    "cat": "people",
+    "keywords": "cosmonaut space rocket nasa star",
+    "entity": "&#128104;&#8205;&#128640;"
+  },
+  {
+    "code": "superhero",
+    "char": "🦸",
+    "name": "Superhero",
+    "cat": "people",
+    "keywords": "hero brave cape power save",
+    "entity": "&#129464;"
+  },
+  {
+    "code": "supervillain",
+    "char": "🦹",
+    "name": "Supervillain",
+    "cat": "people",
+    "keywords": "villain evil villainous bad",
+    "entity": "&#129465;"
+  },
+  {
+    "code": "mage",
+    "char": "🧙",
+    "name": "Mage / Wizard",
+    "cat": "people",
+    "keywords": "sorcerer magic spell wizard",
+    "entity": "&#129497;"
+  },
+  {
+    "code": "fairy",
+    "char": "🧚",
+    "name": "Fairy",
+    "cat": "people",
+    "keywords": "pixie wings magical fantasy",
+    "entity": "&#129498;"
+  },
+  {
+    "code": "vampire",
+    "char": "🧛",
+    "name": "Vampire",
+    "cat": "people",
+    "keywords": "dracula fangs undead blood",
+    "entity": "&#129499;"
+  },
+  {
+    "code": "merperson",
+    "char": "🧜",
+    "name": "Merperson",
+    "cat": "people",
+    "keywords": "mermaid merman ocean sea aquatic",
+    "entity": "&#129500;"
+  },
+  {
+    "code": "elf",
+    "char": "🧝",
+    "name": "Elf",
+    "cat": "people",
+    "keywords": "fantasy ears magical woodland",
+    "entity": "&#129501;"
+  },
+  {
+    "code": "genie",
+    "char": "🧞",
+    "name": "Genie",
+    "cat": "people",
+    "keywords": "magic lamp wish djinn",
+    "entity": "&#129502;"
+  },
+  {
+    "code": "zombie",
+    "char": "🧟",
+    "name": "Zombie",
+    "cat": "people",
+    "keywords": "undead apocalypse walking dead",
+    "entity": "&#129503;"
+  },
+  {
+    "code": "person_walking",
+    "char": "🚶",
+    "name": "Person Walking",
+    "cat": "people",
+    "keywords": "pedestrian walk stroll step",
+    "entity": "&#128694;"
+  },
+  {
+    "code": "person_running",
+    "char": "🏃",
+    "name": "Person Running",
+    "cat": "people",
+    "keywords": "runner sprint athlete jog race fast",
+    "entity": "&#127939;"
+  },
+  {
+    "code": "woman_dancing",
+    "char": "💃",
+    "name": "Woman Dancing",
+    "cat": "people",
+    "keywords": "dancer salsa tango dress dance party",
+    "entity": "&#128131;"
+  },
+  {
+    "code": "man_dancing",
+    "char": "🕺",
+    "name": "Man Dancing",
+    "cat": "people",
+    "keywords": "dancer disco party groove dance",
+    "entity": "&#128378;"
+  },
+  {
+    "code": "person_climbing",
+    "char": "🧗",
+    "name": "Person Climbing",
+    "cat": "people",
+    "keywords": "rock mountain climber wall bouldering",
+    "entity": "&#129495;"
+  },
+  {
+    "code": "person_in_lotus_position",
+    "char": "🧘",
+    "name": "Person in Lotus Position",
+    "cat": "people",
+    "keywords": "yoga meditation zen calm peace",
+    "entity": "&#129496;"
+  },
+  {
+    "code": "person_taking_bath",
+    "char": "🛀",
+    "name": "Person Taking Bath",
+    "cat": "people",
+    "keywords": "relax clean soap tub bath",
+    "entity": "&#128704;"
+  },
+  {
+    "code": "person_in_bed",
+    "char": "🛌",
+    "name": "Person in Bed",
+    "cat": "people",
+    "keywords": "sleep rest hotel room dreaming",
+    "entity": "&#128716;"
+  },
+  {
+    "code": "busts_in_silhouette",
+    "char": "👥",
+    "name": "Busts in Silhouette",
+    "cat": "people",
+    "keywords": "users team group members account people",
+    "entity": "&#128101;"
+  },
+  {
+    "code": "bust_in_silhouette",
+    "char": "👤",
+    "name": "Bust in Silhouette",
+    "cat": "people",
+    "keywords": "user profile account member person avatar",
+    "entity": "&#128100;"
+  },
+  {
+    "code": "speaking_head",
+    "char": "🗣️",
+    "name": "Speaking Head",
+    "cat": "people",
+    "keywords": "voice talk speech shout talker discuss",
+    "entity": "&#128483;&#65039;"
+  },
+  {
+    "code": "people_hugging",
+    "char": "🫂",
+    "name": "People Hugging",
+    "cat": "people",
+    "keywords": "hug comfort embrace friends warmth love",
+    "entity": "&#129730;"
+  },
+  {
+    "code": "nail_polish",
+    "char": "💅",
+    "name": "Nail Polish",
+    "cat": "people",
+    "keywords": "cosmetics manicure beauty care flair",
+    "entity": "&#128133;"
+  },
+  {
+    "code": "selfie",
+    "char": "🤳",
+    "name": "Selfie",
+    "cat": "people",
+    "keywords": "photo smartphone camera snapshot",
+    "entity": "&#129331;"
+  },
+  {
+    "code": "soccer",
+    "char": "⚽",
+    "name": "Soccer Ball",
+    "cat": "sports",
+    "keywords": "football ball sports game match pitch fifa",
+    "entity": "&#9917;"
+  },
+  {
+    "code": "basketball",
+    "char": "🏀",
+    "name": "Basketball",
+    "cat": "sports",
+    "keywords": "ball hoop court nba dribble",
+    "entity": "&#127936;"
+  },
+  {
+    "code": "football",
+    "char": "🏈",
+    "name": "American Football",
+    "cat": "sports",
+    "keywords": "nfl ball touchdown pigskin",
+    "entity": "&#127944;"
+  },
+  {
+    "code": "baseball",
+    "char": "⚾",
+    "name": "Baseball",
+    "cat": "sports",
+    "keywords": "ball bat mlb inning pitch diamond",
+    "entity": "&#9918;"
+  },
+  {
+    "code": "softball",
+    "char": "🥎",
+    "name": "Softball",
+    "cat": "sports",
+    "keywords": "ball underhand game tournament",
+    "entity": "&#129358;"
+  },
+  {
+    "code": "tennis",
+    "char": "🎾",
+    "name": "Tennis",
+    "cat": "sports",
+    "keywords": "ball racket court match grand slam",
+    "entity": "&#127934;"
+  },
+  {
+    "code": "volleyball",
+    "char": "🏐",
+    "name": "Volleyball",
+    "cat": "sports",
+    "keywords": "ball beach net set spike",
+    "entity": "&#127952;"
+  },
+  {
+    "code": "rugby_football",
+    "char": "🏉",
+    "name": "Rugby Football",
+    "cat": "sports",
+    "keywords": "ball scrum tackle try six nations",
+    "entity": "&#127945;"
+  },
+  {
+    "code": "flying_disc",
+    "char": "🥏",
+    "name": "Flying Disc",
+    "cat": "sports",
+    "keywords": "frisbee ultimate beach catch throw",
+    "entity": "&#129359;"
+  },
+  {
+    "code": "pool_8_ball",
+    "char": "🎱",
+    "name": "Pool 8 Ball",
+    "cat": "sports",
+    "keywords": "billiards pool cue ball game",
+    "entity": "&#127921;"
+  },
+  {
+    "code": "ping_pong",
+    "char": "🏓",
+    "name": "Ping Pong",
+    "cat": "sports",
+    "keywords": "table tennis paddle ball paddle tournament",
+    "entity": "&#127955;"
+  },
+  {
+    "code": "badminton",
+    "char": "🏸",
+    "name": "Badminton",
+    "cat": "sports",
+    "keywords": "shuttlecock racket birdie net",
+    "entity": "&#127992;"
+  },
+  {
+    "code": "boxing_glove",
+    "char": "🥊",
+    "name": "Boxing Glove",
+    "cat": "sports",
+    "keywords": "fight punch sparring bout knockout",
+    "entity": "&#129354;"
+  },
+  {
+    "code": "martial_arts_uniform",
+    "char": "🥋",
+    "name": "Martial Arts Uniform",
+    "cat": "sports",
+    "keywords": "karate judo taekwondo dojo belt",
+    "entity": "&#129355;"
+  },
+  {
+    "code": "golf",
+    "char": "⛳",
+    "name": "Flag in Hole",
+    "cat": "sports",
+    "keywords": "golf course green par birdie putter",
+    "entity": "&#9971;"
+  },
+  {
+    "code": "ice_skate",
+    "char": "⛸️",
+    "name": "Ice Skate",
+    "cat": "sports",
+    "keywords": "skating rink winter figure hockey",
+    "entity": "&#9976;&#65039;"
+  },
+  {
+    "code": "fishing_pole",
+    "char": "🎣",
+    "name": "Fishing Pole",
+    "cat": "sports",
+    "keywords": "fish rod catch angler lake river",
+    "entity": "&#127907;"
+  },
+  {
+    "code": "diving_mask",
+    "char": "🤿",
+    "name": "Diving Mask",
+    "cat": "sports",
+    "keywords": "scuba snorkel ocean swim reef",
+    "entity": "&#129343;"
+  },
+  {
+    "code": "skis",
+    "char": "🎿",
+    "name": "Skis",
+    "cat": "sports",
+    "keywords": "skiing snow alpine slope winter resort",
+    "entity": "&#127935;"
+  },
+  {
+    "code": "sled",
+    "char": "🛷",
+    "name": "Sled",
+    "cat": "sports",
+    "keywords": "sledge snow winter downhill bobsled",
+    "entity": "&#128759;"
+  },
+  {
+    "code": "curling_stone",
+    "char": "🥌",
+    "name": "Curling Stone",
+    "cat": "sports",
+    "keywords": "ice stone winter olympics broom",
+    "entity": "&#129356;"
+  },
+  {
+    "code": "direct_hit",
+    "char": "🎯",
+    "name": "Bullseye / Target",
+    "cat": "sports",
+    "keywords": "target archery dart aim precision goal focus",
+    "entity": "&#127919;"
+  },
+  {
+    "code": "yo_yo",
+    "char": "🪀",
+    "name": "Yo-Yo",
+    "cat": "sports",
+    "keywords": "toy trick string string play",
+    "entity": "&#129664;"
+  },
+  {
+    "code": "kite",
+    "char": "🪁",
+    "name": "Kite",
+    "cat": "sports",
+    "keywords": "wind fly sky festival outdoor",
+    "entity": "&#129665;"
+  },
+  {
+    "code": "bow_and_arrow",
+    "char": "🏹",
+    "name": "Bow and Arrow",
+    "cat": "sports",
+    "keywords": "archery weapon shoot target hunter",
+    "entity": "&#127993;"
+  },
+  {
+    "code": "1st_place_medal",
+    "char": "🥇",
+    "name": "1st Place Medal",
+    "cat": "sports",
+    "keywords": "gold medal winner champion first victory",
+    "entity": "&#129351;"
+  },
+  {
+    "code": "2nd_place_medal",
+    "char": "🥈",
+    "name": "2nd Place Medal",
+    "cat": "sports",
+    "keywords": "silver medal runner-up second prize",
+    "entity": "&#129352;"
+  },
+  {
+    "code": "3rd_place_medal",
+    "char": "🥉",
+    "name": "3rd Place Medal",
+    "cat": "sports",
+    "keywords": "bronze medal third prize podium",
+    "entity": "&#129353;"
+  },
+  {
+    "code": "sports_medal",
+    "char": "🏅",
+    "name": "Sports Medal",
+    "cat": "sports",
+    "keywords": "award honor achievement ribbon prize",
+    "entity": "&#127941;"
+  },
+  {
+    "code": "ticket",
+    "char": "🎫",
+    "name": "Ticket",
+    "cat": "sports",
+    "keywords": "admission cinema concert event pass pass",
+    "entity": "&#127915;"
+  },
+  {
+    "code": "admission_tickets",
+    "char": "🎟️",
+    "name": "Admission Tickets",
+    "cat": "sports",
+    "keywords": "tickets movie event raffle lottery",
+    "entity": "&#127903;&#65039;"
+  },
+  {
+    "code": "circus_tent",
+    "char": "🎪",
+    "name": "Circus Tent",
+    "cat": "sports",
+    "keywords": "carnival festival big top entertainment show",
+    "entity": "&#127914;"
+  },
+  {
+    "code": "person_juggling",
+    "char": "🤹",
+    "name": "Person Juggling",
+    "cat": "sports",
+    "keywords": "multitask balance skill performance circus",
+    "entity": "&#129337;"
+  },
+  {
+    "code": "performing_arts",
+    "char": "🎭",
+    "name": "Performing Arts",
+    "cat": "sports",
+    "keywords": "theater comedy tragedy drama mask actor",
+    "entity": "&#127917;"
+  },
+  {
+    "code": "artist_palette",
+    "char": "🎨",
+    "name": "Artist Palette",
+    "cat": "sports",
+    "keywords": "paint colors artwork draw design creative",
+    "entity": "&#127912;"
+  },
+  {
+    "code": "clapper_board",
+    "char": "🎬",
+    "name": "Clapper Board",
+    "cat": "sports",
+    "keywords": "movie film cinema director hollywood video",
+    "entity": "&#127916;"
+  },
+  {
+    "code": "microphone",
+    "char": "🎤",
+    "name": "Microphone",
+    "cat": "sports",
+    "keywords": "sing karaoke podcast audio speech live",
+    "entity": "&#127908;"
+  },
+  {
+    "code": "headphones",
+    "char": "🎧",
+    "name": "Headphones",
+    "cat": "sports",
+    "keywords": "audio music sound listen earphone podcast",
+    "entity": "&#127911;"
+  },
+  {
+    "code": "musical_score",
+    "char": "🎼",
+    "name": "Musical Score",
+    "cat": "sports",
+    "keywords": "sheet music clef notes symphony compose",
+    "entity": "&#127932;"
+  },
+  {
+    "code": "musical_keyboard",
+    "char": "🎹",
+    "name": "Musical Keyboard",
+    "cat": "sports",
+    "keywords": "piano keys instrument music sound melody",
+    "entity": "&#127929;"
+  },
+  {
+    "code": "drum",
+    "char": "🥁",
+    "name": "Drum",
+    "cat": "sports",
+    "keywords": "percussion beat rhythm snare sticks band",
+    "entity": "&#129345;"
+  },
+  {
+    "code": "saxophone",
+    "char": "🎷",
+    "name": "Saxophone",
+    "cat": "sports",
+    "keywords": "jazz brass music instrument melody",
+    "entity": "&#127927;"
+  },
+  {
+    "code": "trumpet",
+    "char": "🎺",
+    "name": "Trumpet",
+    "cat": "sports",
+    "keywords": "brass fanfare horn music bugle",
+    "entity": "&#127930;"
+  },
+  {
+    "code": "guitar",
+    "char": "🎸",
+    "name": "Guitar",
+    "cat": "sports",
+    "keywords": "acoustic electric rock instrument music chord",
+    "entity": "&#127928;"
+  },
+  {
+    "code": "violin",
+    "char": "🎻",
+    "name": "Violin",
+    "cat": "sports",
+    "keywords": "strings orchestra classical fiddle bow",
+    "entity": "&#127931;"
+  },
+  {
+    "code": "game_die",
+    "char": "🎲",
+    "name": "Game Die",
+    "cat": "sports",
+    "keywords": "dice board game roll chance random luck",
+    "entity": "&#127922;"
+  },
+  {
+    "code": "chess_pawn",
+    "char": "♟️",
+    "name": "Chess Pawn",
+    "cat": "sports",
+    "keywords": "chess strategy board game tactics checkmate",
+    "entity": "&#9823;&#65039;"
+  },
+  {
+    "code": "bowling",
+    "char": "🎳",
+    "name": "Bowling",
+    "cat": "sports",
+    "keywords": "pins strike alley ball game score",
+    "entity": "&#127923;"
+  },
+  {
+    "code": "video_game",
+    "char": "🎮",
+    "name": "Video Game Controller",
+    "cat": "sports",
+    "keywords": "gamepad play console arcade gaming xbox playstation",
+    "entity": "&#127918;"
+  },
+  {
+    "code": "joystick",
+    "char": "🕹️",
+    "name": "Joystick",
+    "cat": "sports",
+    "keywords": "arcade gaming retro control retro",
+    "entity": "&#128377;&#65039;"
+  },
+  {
+    "code": "slot_machine",
+    "char": "🎰",
+    "name": "Slot Machine",
+    "cat": "sports",
+    "keywords": "casino jackpot gamble 777 luck betting",
+    "entity": "&#127920;"
+  },
+  {
+    "code": "puzzle_piece",
+    "char": "🧩",
+    "name": "Puzzle Piece",
+    "cat": "sports",
+    "keywords": "jigsaw problem riddle logic solve fit match",
+    "entity": "&#129513;"
+  },
+  {
+    "code": "skateboard",
+    "char": "🛹",
+    "name": "Skateboard",
+    "cat": "sports",
+    "keywords": "skating deck wheels kickflip park",
+    "entity": "&#128761;"
+  },
+  {
+    "code": "briefcase",
+    "char": "💼",
+    "name": "Briefcase",
+    "cat": "office",
+    "keywords": "business bag work portfolio job career lawyer",
+    "entity": "&#128188;"
+  },
+  {
+    "code": "receipt",
+    "char": "🧾",
+    "name": "Receipt",
+    "cat": "office",
+    "keywords": "bill invoice expense proof cost payment tax",
+    "entity": "&#129534;"
+  },
+  {
+    "code": "spiral_notepad",
+    "char": "🗒️",
+    "name": "Spiral Notepad",
+    "cat": "office",
+    "keywords": "pad notes draft scratch write memo pad",
+    "entity": "&#128466;&#65039;"
+  },
+  {
+    "code": "spiral_calendar",
+    "char": "🗓️",
+    "name": "Spiral Calendar",
+    "cat": "office",
+    "keywords": "schedule dates organizer planning agenda meeting",
+    "entity": "&#128467;&#65039;"
+  },
+  {
+    "code": "tear_off_calendar",
+    "char": "📆",
+    "name": "Tear-off Calendar",
+    "cat": "office",
+    "keywords": "date day reminder schedule month year",
+    "entity": "&#128198;"
+  },
+  {
+    "code": "card_index",
+    "char": "📇",
+    "name": "Card Index",
+    "cat": "office",
+    "keywords": "rolodex contacts addresses network index directory",
+    "entity": "&#128199;"
+  },
+  {
+    "code": "card_file_box",
+    "char": "🗃️",
+    "name": "Card File Box",
+    "cat": "office",
+    "keywords": "database archive records index drawer records",
+    "entity": "&#128451;&#65039;"
+  },
+  {
+    "code": "ballot_box",
+    "char": "🗳️",
+    "name": "Ballot Box with Ballot",
+    "cat": "office",
+    "keywords": "vote election poll decision democratic choice",
+    "entity": "&#128499;&#65039;"
+  },
+  {
+    "code": "inbox_tray",
+    "char": "📥",
+    "name": "Inbox Tray",
+    "cat": "office",
+    "keywords": "incoming received messages download mail deposit",
+    "entity": "&#128229;"
+  },
+  {
+    "code": "outbox_tray",
+    "char": "📤",
+    "name": "Outbox Tray",
+    "cat": "office",
+    "keywords": "outgoing sent mail send upload submit dispatch",
+    "entity": "&#128228;"
+  },
+  {
+    "code": "envelope",
+    "char": "✉️",
+    "name": "Envelope",
+    "cat": "office",
+    "keywords": "mail email letter message post contact send",
+    "entity": "&#9993;&#65039;"
+  },
+  {
+    "code": "e_mail",
+    "char": "📧",
+    "name": "E-Mail",
+    "cat": "office",
+    "keywords": "email electronic message inbox letter send webmail",
+    "entity": "&#128231;"
+  },
+  {
+    "code": "newspaper",
+    "char": "📰",
+    "name": "Newspaper",
+    "cat": "office",
+    "keywords": "press news article media journalism release daily",
+    "entity": "&#128240;"
+  },
+  {
+    "code": "notebook",
+    "char": "📓",
+    "name": "Notebook",
+    "cat": "office",
+    "keywords": "journal journal binding notes binder diary write",
+    "entity": "&#128211;"
+  },
+  {
+    "code": "closed_book",
+    "char": "📕",
+    "name": "Closed Book",
+    "cat": "office",
+    "keywords": "book reading manual novel documentation guide red",
+    "entity": "&#128213;"
+  },
+  {
+    "code": "open_book",
+    "char": "📖",
+    "name": "Open Book",
+    "cat": "office",
+    "keywords": "read learning documentation study research page literature",
+    "entity": "&#128214;"
+  },
+  {
+    "code": "books",
+    "char": "📚",
+    "name": "Books",
+    "cat": "office",
+    "keywords": "library study literature knowledge reading stack docs",
+    "entity": "&#128218;"
+  },
+  {
+    "code": "bookmark",
+    "char": "🔖",
+    "name": "Bookmark",
+    "cat": "office",
+    "keywords": "save favorite tag marker link reading reference",
+    "entity": "&#128278;"
+  },
+  {
+    "code": "linked_paperclips",
+    "char": "🖇️",
+    "name": "Linked Paperclips",
+    "cat": "office",
+    "keywords": "connect attachments papers files relation join",
+    "entity": "&#128391;&#65039;"
+  },
+  {
+    "code": "abacus",
+    "char": "🧮",
+    "name": "Abacus",
+    "cat": "office",
+    "keywords": "calculation counting beads math tally computation ledger",
+    "entity": "&#129518;"
+  },
+  {
+    "code": "pushpin",
+    "char": "📌",
+    "name": "Pushpin",
+    "cat": "office",
+    "keywords": "pin notice board location mark note tack remember",
+    "entity": "&#128204;"
+  },
+  {
+    "code": "round_pushpin",
+    "char": "📍",
+    "name": "Round Pushpin",
+    "cat": "office",
+    "keywords": "map location coordinate pin gps place mark destination",
+    "entity": "&#128205;"
+  },
+  {
+    "code": "pen",
+    "char": "🖊️",
+    "name": "Pen",
+    "cat": "office",
+    "keywords": "ballpoint write ink signing note document contract",
+    "entity": "&#128394;&#65039;"
+  },
+  {
+    "code": "fountain_pen",
+    "char": "🖋️",
+    "name": "Fountain Pen",
+    "cat": "office",
+    "keywords": "ink nib calligraphy luxury writing signature draw",
+    "entity": "&#128395;&#65039;"
+  },
+  {
+    "code": "black_nib",
+    "char": "✒️",
+    "name": "Black Nib",
+    "cat": "office",
+    "keywords": "pen calligraphy quill vector ink illustration drawing",
+    "entity": "&#10002;&#65039;"
+  },
+  {
+    "code": "pencil",
+    "char": "✏️",
+    "name": "Pencil",
+    "cat": "office",
+    "keywords": "sketch lead write graphite draw edit draft stationery",
+    "entity": "&#9999;&#65039;"
+  },
+  {
+    "code": "mag",
+    "char": "🔎",
+    "name": "Magnifying Glass Left",
+    "cat": "office",
+    "keywords": "search inspect zoom find inquiry investigate detail",
+    "entity": "&#128270;"
+  },
+  {
+    "code": "lock_with_ink_pen",
+    "char": "🔏",
+    "name": "Lock with Pen",
+    "cat": "office",
+    "keywords": "digital signature secure signing certificate privacy security",
+    "entity": "&#128271;"
+  },
+  {
+    "code": "closed_lock_with_key",
+    "char": "🔐",
+    "name": "Closed Lock with Key",
+    "cat": "office",
+    "keywords": "security credentials password private auth token",
+    "entity": "&#128272;"
+  },
+  {
+    "code": "axe",
+    "char": "🪓",
+    "name": "Axe",
+    "cat": "office",
+    "keywords": "wood tool chop tree cut lumberjack sharp",
+    "entity": "&#129683;"
+  },
+  {
+    "code": "pick",
+    "char": "⛏️",
+    "name": "Pick",
+    "cat": "office",
+    "keywords": "mine excavation tool mining rock dig extract quarry",
+    "entity": "&#9935;&#65039;"
+  },
+  {
+    "code": "hammer_and_pick",
+    "char": "⚒️",
+    "name": "Hammer and Pick",
+    "cat": "office",
+    "keywords": "mining tools forge quarry industry build metal",
+    "entity": "&#9874;&#65039;"
+  },
+  {
+    "code": "dagger_2",
+    "char": "🗡️",
+    "name": "Dagger",
+    "cat": "office",
+    "keywords": "blade knife combat weapon sharp steel knife",
+    "entity": "&#128481;&#65039;"
+  },
+  {
+    "code": "crossed_swords",
+    "char": "⚔️",
+    "name": "Crossed Swords",
+    "cat": "office",
+    "keywords": "battle fight war duel combat clash game conflict",
+    "entity": "&#9876;&#65039;"
+  },
+  {
+    "code": "screwdriver",
+    "char": "🪛",
+    "name": "Screwdriver",
+    "cat": "office",
+    "keywords": "tool tighten bolt assemble repair hardware tech",
+    "entity": "&#129691;"
+  },
+  {
+    "code": "clamp",
+    "char": "🗜️",
+    "name": "Clamp",
+    "cat": "office",
+    "keywords": "vise tool compress hold pressure grip hardware",
+    "entity": "&#128476;&#65039;"
+  },
+  {
+    "code": "balance_scale",
+    "char": "⚖️",
+    "name": "Balance Scale",
+    "cat": "office",
+    "keywords": "justice law court legal weight fairness balance equality",
+    "entity": "&#9878;&#65039;"
+  },
+  {
+    "code": "white_cane",
+    "char": "🦯",
+    "name": "White Cane",
+    "cat": "office",
+    "keywords": "accessibility blind guide cane mobility walking",
+    "entity": "&#129455;"
+  },
+  {
+    "code": "alembic",
+    "char": "⚗️",
+    "name": "Alembic",
+    "cat": "office",
+    "keywords": "chemistry flask lab experiment distillation potion science",
+    "entity": "&#9879;&#65039;"
+  },
+  {
+    "code": "syringe",
+    "char": "💉",
+    "name": "Syringe",
+    "cat": "office",
+    "keywords": "needle vaccine medicine hospital doctor inject treatment",
+    "entity": "&#128137;"
+  },
+  {
+    "code": "drop_of_blood",
+    "char": "🩸",
+    "name": "Drop of Blood",
+    "cat": "office",
+    "keywords": "bleed donation medicine plasma doctor blood transfusion",
+    "entity": "&#129656;"
+  },
+  {
+    "code": "pill",
+    "char": "💊",
+    "name": "Pill",
+    "cat": "office",
+    "keywords": "medicine drug pharmacy tablet cure prescription heal health",
+    "entity": "&#128138;"
+  },
+  {
+    "code": "adhesive_bandage",
+    "char": "🩹",
+    "name": "Adhesive Bandage",
+    "cat": "office",
+    "keywords": "bandaid healing cure minor injury first aid patch",
+    "entity": "&#129657;"
+  },
+  {
+    "code": "stethoscope",
+    "char": "🩺",
+    "name": "Stethoscope",
+    "cat": "office",
+    "keywords": "doctor heartbeat medical health examination clinic hospital",
+    "entity": "&#129658;"
+  },
+  {
+    "code": "house",
+    "char": "🏠",
+    "name": "House",
+    "cat": "places",
+    "keywords": "home residential domestic dwelling building building roof",
+    "entity": "&#127968;"
+  },
+  {
+    "code": "house_with_garden",
+    "char": "🏡",
+    "name": "House with Garden",
+    "cat": "places",
+    "keywords": "home suburban yard tree lawn property",
+    "entity": "&#127969;"
+  },
+  {
+    "code": "japanese_post_office",
+    "char": "🏣",
+    "name": "Japanese Post Office",
+    "cat": "places",
+    "keywords": "mail post service building package",
+    "entity": "&#127971;"
+  },
+  {
+    "code": "european_post_office",
+    "char": "🏤",
+    "name": "European Post Office",
+    "cat": "places",
+    "keywords": "mail postal service building letter",
+    "entity": "&#127972;"
+  },
+  {
+    "code": "hospital",
+    "char": "🏥",
+    "name": "Hospital",
+    "cat": "places",
+    "keywords": "doctor medical emergency health clinic healthcare care",
+    "entity": "&#127973;"
+  },
+  {
+    "code": "bank",
+    "char": "🏦",
+    "name": "Bank",
+    "cat": "places",
+    "keywords": "money finance vault deposit cash lending loan",
+    "entity": "&#127974;"
+  },
+  {
+    "code": "atm",
+    "char": "🏧",
+    "name": "ATM Sign",
+    "cat": "places",
+    "keywords": "cash machine automated teller withdraw deposit banking",
+    "entity": "&#127975;"
+  },
+  {
+    "code": "hotel",
+    "char": "🏨",
+    "name": "Hotel",
+    "cat": "places",
+    "keywords": "hospitality stay accommodation tourism guest resort vacation",
+    "entity": "&#127976;"
+  },
+  {
+    "code": "love_hotel",
+    "char": "🏩",
+    "name": "Love Hotel",
+    "cat": "places",
+    "keywords": "hearts motel stay private romantic room",
+    "entity": "&#127977;"
+  },
+  {
+    "code": "convenience_store",
+    "char": "🏪",
+    "name": "Convenience Store",
+    "cat": "places",
+    "keywords": "7-eleven shop retail snacks drinks market 24/7",
+    "entity": "&#127978;"
+  },
+  {
+    "code": "school",
+    "char": "🏫",
+    "name": "School",
+    "cat": "places",
+    "keywords": "education elementary academy university student building classroom",
+    "entity": "&#127979;"
+  },
+  {
+    "code": "department_store",
+    "char": "🏬",
+    "name": "Department Store",
+    "cat": "places",
+    "keywords": "mall shopping retail clothes goods commercial",
+    "entity": "&#127980;"
+  },
+  {
+    "code": "japanese_castle",
+    "char": "🏯",
+    "name": "Japanese Castle",
+    "cat": "places",
+    "keywords": "historic fortress pagoda palace landmark architecture",
+    "entity": "&#127983;"
+  },
+  {
+    "code": "castle",
+    "char": "🏰",
+    "name": "Castle",
+    "cat": "places",
+    "keywords": "kingdom medieval royal fortress fairy tale fortress moat",
+    "entity": "&#127984;"
+  },
+  {
+    "code": "wedding",
+    "char": "💒",
+    "name": "Wedding",
+    "cat": "places",
+    "keywords": "chapel marriage romantic church love bride groom ceremony",
+    "entity": "&#128146;"
+  },
+  {
+    "code": "tokyo_tower",
+    "char": "🗼",
+    "name": "Tokyo Tower",
+    "cat": "places",
+    "keywords": "japan landmark communications tower red eiffel",
+    "entity": "&#128508;"
+  },
+  {
+    "code": "statue_of_liberty",
+    "char": "🗽",
+    "name": "Statue of Liberty",
+    "cat": "places",
+    "keywords": "new york usa freedom landmark torch america",
+    "entity": "&#128509;"
+  },
+  {
+    "code": "church",
+    "char": "⛪",
+    "name": "Church",
+    "cat": "places",
+    "keywords": "christian religion cathedral cross worship service chapel",
+    "entity": "&#9962;"
+  },
+  {
+    "code": "mosque",
+    "char": "🕌",
+    "name": "Mosque",
+    "cat": "places",
+    "keywords": "islam muslim minaret dome worship prayer",
+    "entity": "&#128332;"
+  },
+  {
+    "code": "hindu_temple",
+    "char": "🛕",
+    "name": "Hindu Temple",
+    "cat": "places",
+    "keywords": "temple hinduism worship sacred spiritual deity",
+    "entity": "&#128725;"
+  },
+  {
+    "code": "synagogue",
+    "char": "🕍",
+    "name": "Synagogue",
+    "cat": "places",
+    "keywords": "jewish judaism worship star of david temple",
+    "entity": "&#128333;"
+  },
+  {
+    "code": "shinto_shrine",
+    "char": "⛩️",
+    "name": "Shinto Shrine",
+    "cat": "places",
+    "keywords": "torii gate sacred japan religion temple kami",
+    "entity": "&#9961;&#65039;"
+  },
+  {
+    "code": "kaaba",
+    "char": "🕋",
+    "name": "Kaaba",
+    "cat": "places",
+    "keywords": "mecca islam hajj pilgrimage sacred black stone",
+    "entity": "&#128331;"
+  },
+  {
+    "code": "fountain",
+    "char": "⛲",
+    "name": "Fountain",
+    "cat": "places",
+    "keywords": "park water feature square monument plaza splashing",
+    "entity": "&#9970;"
+  },
+  {
+    "code": "tent",
+    "char": "⛺",
+    "name": "Tent",
+    "cat": "places",
+    "keywords": "camping outdoor wilderness campsite scouts adventure nature",
+    "entity": "&#9978;"
+  },
+  {
+    "code": "foggy",
+    "char": "🌁",
+    "name": "Foggy City",
+    "cat": "places",
+    "keywords": "bridge bridge golden gate morning mist weather landscape",
+    "entity": "&#127745;"
+  },
+  {
+    "code": "night_with_stars",
+    "char": "🌃",
+    "name": "Night with Stars",
+    "cat": "places",
+    "keywords": "cityscape skyline starry dark evening midnight buildings",
+    "entity": "&#127747;"
+  },
+  {
+    "code": "cityscape",
+    "char": "🏙️",
+    "name": "Cityscape",
+    "cat": "places",
+    "keywords": "city skyscrapers metropolis urban downtown buildings",
+    "entity": "&#127961;&#65039;"
+  },
+  {
+    "code": "sunrise_over_mountains",
+    "char": "🌄",
+    "name": "Sunrise over Mountains",
+    "cat": "places",
+    "keywords": "dawn morning sun landscape nature scenic valley",
+    "entity": "&#127748;"
+  },
+  {
+    "code": "sunrise",
+    "char": "🌅",
+    "name": "Sunrise",
+    "cat": "places",
+    "keywords": "sun dawn ocean horizon morning sunset sea scenic",
+    "entity": "&#127749;"
+  },
+  {
+    "code": "city_sunset",
+    "char": "🌆",
+    "name": "City Sunset",
+    "cat": "places",
+    "keywords": "twilight skyline golden hour metropolis evening dusk",
+    "entity": "&#127750;"
+  },
+  {
+    "code": "sunset",
+    "char": "🌇",
+    "name": "Sunset",
+    "cat": "places",
+    "keywords": "sundown buildings evening orange horizon twilight dusk",
+    "entity": "&#127751;"
+  },
+  {
+    "code": "bridge_at_night",
+    "char": "🌉",
+    "name": "Bridge at Night",
+    "cat": "places",
+    "keywords": "suspension bridge stars water lights river passage",
+    "entity": "&#127753;"
+  },
+  {
+    "code": "hot_springs",
+    "char": "♨️",
+    "name": "Hot Springs",
+    "cat": "places",
+    "keywords": "onsen steam thermal bath volcanic mineral water",
+    "entity": "&#9832;&#65039;"
+  },
+  {
+    "code": "carousel_horse",
+    "char": "🎠",
+    "name": "Carousel Horse",
+    "cat": "places",
+    "keywords": "carnival amusement park ride merry-go-round children",
+    "entity": "&#127904;"
+  },
+  {
+    "code": "ferris_wheel",
+    "char": "🎡",
+    "name": "Ferris Wheel",
+    "cat": "places",
+    "keywords": "carnival fair amusement park ride observation wheel",
+    "entity": "&#127905;"
+  },
+  {
+    "code": "roller_coaster",
+    "char": "🎢",
+    "name": "Roller Coaster",
+    "cat": "places",
+    "keywords": "amusement park theme ride thrill speed tracks",
+    "entity": "&#127906;"
+  },
+  {
+    "code": "classical_building",
+    "char": "🏛️",
+    "name": "Classical Building",
+    "cat": "places",
+    "keywords": "columns museum courthouse architecture pantheon government capital",
+    "entity": "&#127963;&#65039;"
+  },
+  {
+    "code": "stadium",
+    "char": "🏟️",
+    "name": "Stadium",
+    "cat": "places",
+    "keywords": "arena sports crowd concert venue field pitch match",
+    "entity": "&#127967;&#65039;"
+  },
+  {
+    "code": "desert_island",
+    "char": "🏝️",
+    "name": "Desert Island",
+    "cat": "places",
+    "keywords": "palm tree tropical ocean paradise beach lonely escape",
+    "entity": "&#127965;&#65039;"
+  },
+  {
+    "code": "camping",
+    "char": "🏕️",
+    "name": "Camping",
+    "cat": "places",
+    "keywords": "campsite tent outdoor nature fire forest adventure",
+    "entity": "&#127957;&#65039;"
+  },
+  {
+    "code": "beach_with_umbrella",
+    "char": "🏖️",
+    "name": "Beach with Umbrella",
+    "cat": "places",
+    "keywords": "sea sand resort vacation holiday coast ocean relax",
+    "entity": "&#127958;&#65039;"
+  },
+  {
+    "code": "desert",
+    "char": "🏜️",
+    "name": "Desert",
+    "cat": "places",
+    "keywords": "arid dunes cactus sahara sand dry hot wilderness",
+    "entity": "&#127964;&#65039;"
+  },
+  {
+    "code": "snow_capped_mountain",
+    "char": "🏔️",
+    "name": "Snow-capped Mountain",
+    "cat": "places",
+    "keywords": "peak alps everest summit snow hiking altitude cold",
+    "entity": "&#127956;&#65039;"
+  },
+  {
+    "code": "mountain",
+    "char": "⛰️",
+    "name": "Mountain",
+    "cat": "places",
+    "keywords": "hiking trail nature scenic elevation high landscape outdoors",
+    "entity": "&#9968;&#65039;"
+  },
+  {
+    "code": "volcano",
+    "char": "🌋",
+    "name": "Volcano",
+    "cat": "places",
+    "keywords": "eruption magma lava heat island mountain disaster hazard",
+    "entity": "&#127755;"
+  },
+  {
+    "code": "mount_fuji",
+    "char": "🗻",
+    "name": "Mount Fuji",
+    "cat": "places",
+    "keywords": "japan fuji landmark sacred mountain snow peak volcano",
+    "entity": "&#128507;"
+  },
+  {
+    "code": "red_car",
+    "char": "🚗",
+    "name": "Car / Automobile",
+    "cat": "transport",
+    "keywords": "vehicle drive road automobile auto sedan motor transport",
+    "entity": "&#128663;"
+  },
+  {
+    "code": "oncoming_car",
+    "char": "🚘",
+    "name": "Oncoming Car",
+    "cat": "transport",
+    "keywords": "vehicle front automobile road drive traffic headlights",
+    "entity": "&#128664;"
+  },
+  {
+    "code": "suv",
+    "char": "🚙",
+    "name": "Sport Utility Vehicle",
+    "cat": "transport",
+    "keywords": "suv 4x4 car vehicle road drive offroad family",
+    "entity": "&#128665;"
+  },
+  {
+    "code": "delivery_truck",
+    "char": "🚚",
+    "name": "Delivery Truck",
+    "cat": "transport",
+    "keywords": "vehicle cargo lorry freight shipping package freight transport",
+    "entity": "&#128666;"
+  },
+  {
+    "code": "articulated_lorry",
+    "char": "🚛",
+    "name": "Articulated Lorry",
+    "cat": "transport",
+    "keywords": "semi truck 18-wheeler cargo hauling transport road",
+    "entity": "&#128667;"
+  },
+  {
+    "code": "tractor",
+    "char": "🚜",
+    "name": "Tractor",
+    "cat": "transport",
+    "keywords": "farm vehicle agriculture field harvest machinery countryside",
+    "entity": "&#128668;"
+  },
+  {
+    "code": "racing_car",
+    "char": "🏎️",
+    "name": "Racing Car",
+    "cat": "transport",
+    "keywords": "formula1 speed track motor f1 race vehicle fast",
+    "entity": "&#127950;&#65039;"
+  },
+  {
+    "code": "motorcycle",
+    "char": "🏍️",
+    "name": "Motorcycle",
+    "cat": "transport",
+    "keywords": "motorbike bike ride speed engine helmet road two-wheels",
+    "entity": "&#127949;&#65039;"
+  },
+  {
+    "code": "motor_scooter",
+    "char": "🛵",
+    "name": "Motor Scooter",
+    "cat": "transport",
+    "keywords": "vespa moped city commuter ride transport two-wheels",
+    "entity": "&#128757;"
+  },
+  {
+    "code": "manual_wheelchair",
+    "char": "🦽",
+    "name": "Manual Wheelchair",
+    "cat": "transport",
+    "keywords": "accessibility mobility handicap disability rolling",
+    "entity": "&#129469;"
+  },
+  {
+    "code": "motorized_wheelchair",
+    "char": "🦼",
+    "name": "Motorized Wheelchair",
+    "cat": "transport",
+    "keywords": "electric accessibility mobility disability transport",
+    "entity": "&#129468;"
+  },
+  {
+    "code": "auto_rickshaw",
+    "char": "🛺",
+    "name": "Auto Rickshaw",
+    "cat": "transport",
+    "keywords": "tuk tuk taxi urban transport commute three-wheel",
+    "entity": "&#128762;"
+  },
+  {
+    "code": "bicycle",
+    "char": "🚲",
+    "name": "Bicycle",
+    "cat": "transport",
+    "keywords": "bike cyclist ride commute exercise pedal wheels healthy",
+    "entity": "&#128690;"
+  },
+  {
+    "code": "kick_scooter",
+    "char": "🛴",
+    "name": "Kick Scooter",
+    "cat": "transport",
+    "keywords": "scooter sidewalk commuter urban transport roll",
+    "entity": "&#128756;"
+  },
+  {
+    "code": "oncoming_police_car",
+    "char": "🚔",
+    "name": "Oncoming Police Car",
+    "cat": "transport",
+    "keywords": "cop vehicle law emergency patrol sirens front",
+    "entity": "&#128660;"
+  },
+  {
+    "code": "oncoming_bus",
+    "char": "🚍",
+    "name": "Oncoming Bus",
+    "cat": "transport",
+    "keywords": "transit public transportation commute route vehicle front",
+    "entity": "&#128653;"
+  },
+  {
+    "code": "oncoming_taxi",
+    "char": "🚖",
+    "name": "Oncoming Taxi",
+    "cat": "transport",
+    "keywords": "cab fare ride hailing yellow uber front vehicle",
+    "entity": "&#128662;"
+  },
+  {
+    "code": "minibus",
+    "char": "🚐",
+    "name": "Minibus",
+    "cat": "transport",
+    "keywords": "van transport shuttle group passenger vehicle travel",
+    "entity": "&#128656;"
+  },
+  {
+    "code": "ambulance",
+    "char": "🚑",
+    "name": "Ambulance",
+    "cat": "transport",
+    "keywords": "emergency medical paramedic hospital rescue red cross 911 vehicle",
+    "entity": "&#128657;"
+  },
+  {
+    "code": "fire_engine",
+    "char": "🚒",
+    "name": "Fire Engine",
+    "cat": "transport",
+    "keywords": "fire truck emergency hose ladder firefighter rescue vehicle",
+    "entity": "&#128658;"
+  },
+  {
+    "code": "police_car",
+    "char": "🚓",
+    "name": "Police Car",
+    "cat": "transport",
+    "keywords": "cop patrol law enforcement vehicle emergency siren",
+    "entity": "&#128659;"
+  },
+  {
+    "code": "taxi",
+    "char": "🚕",
+    "name": "Taxi",
+    "cat": "transport",
+    "keywords": "cab ride fare driver airport yellow hailing car",
+    "entity": "&#128661;"
+  },
+  {
+    "code": "bus",
+    "char": "🚌",
+    "name": "Bus",
+    "cat": "transport",
+    "keywords": "transit coach public transport passenger commute vehicle route",
+    "entity": "&#128652;"
+  },
+  {
+    "code": "trolleybus",
+    "char": "🚎",
+    "name": "Trolleybus",
+    "cat": "transport",
+    "keywords": "electric bus overhead wires public transit urban commute",
+    "entity": "&#128654;"
+  },
+  {
+    "code": "locomotive",
+    "char": "🚂",
+    "name": "Locomotive",
+    "cat": "transport",
+    "keywords": "steam engine train rail antique travel vintage railway",
+    "entity": "&#128642;"
+  },
+  {
+    "code": "railway_car",
+    "char": "🚃",
+    "name": "Railway Car",
+    "cat": "transport",
+    "keywords": "train coach carriage passenger railway transit",
+    "entity": "&#128643;"
+  },
+  {
+    "code": "high_speed_train",
+    "char": "🚄",
+    "name": "High-Speed Train",
+    "cat": "transport",
+    "keywords": "bullet shinkansen railway transit fast rapid travel",
+    "entity": "&#128644;"
+  },
+  {
+    "code": "bullet_train",
+    "char": "🚅",
+    "name": "Bullet Train",
+    "cat": "transport",
+    "keywords": "shinkansen japan speed express rail passenger travel",
+    "entity": "&#128645;"
+  },
+  {
+    "code": "train",
+    "char": "🚆",
+    "name": "Train",
+    "cat": "transport",
+    "keywords": "railway commute locomotive transit station tracks travel",
+    "entity": "&#128646;"
+  },
+  {
+    "code": "metro",
+    "char": "🚇",
+    "name": "Metro",
+    "cat": "transport",
+    "keywords": "subway underground tube urban rapid transit railway station",
+    "entity": "&#128647;"
+  },
+  {
+    "code": "light_rail",
+    "char": "🚈",
+    "name": "Light Rail",
+    "cat": "transport",
+    "keywords": "tram commute public transit railway urban passenger",
+    "entity": "&#128648;"
+  },
+  {
+    "code": "station",
+    "char": "🚉",
+    "name": "Station",
+    "cat": "transport",
+    "keywords": "train platform railway depot transit stop passenger waiting",
+    "entity": "&#128649;"
+  },
+  {
+    "code": "tram",
+    "char": "🚊",
+    "name": "Tram",
+    "cat": "transport",
+    "keywords": "streetcar trolley tracks wire street commute rail",
+    "entity": "&#128650;"
+  },
+  {
+    "code": "monorail",
+    "char": "🚝",
+    "name": "Monorail",
+    "cat": "transport",
+    "keywords": "single track rail elevated airport transit train futuristic",
+    "entity": "&#128669;"
+  },
+  {
+    "code": "mountain_railway",
+    "char": "🚞",
+    "name": "Mountain Railway",
+    "cat": "transport",
+    "keywords": "funicular incline slope scenic mountain tracks train",
+    "entity": "&#128670;"
+  },
+  {
+    "code": "tram_car",
+    "char": "🚋",
+    "name": "Tram Car",
+    "cat": "transport",
+    "keywords": "streetcar cable car trolley urban transport commute",
+    "entity": "&#128651;"
+  },
+  {
+    "code": "airplane",
+    "char": "✈️",
+    "name": "Airplane",
+    "cat": "transport",
+    "keywords": "aeroplane flight airport aviation travel journey boeing airbus",
+    "entity": "&#9992;&#65039;"
+  },
+  {
+    "code": "airplane_departure",
+    "char": "🛫",
+    "name": "Airplane Departure",
+    "cat": "transport",
+    "keywords": "takeoff runway flight departure airport vacation trip fly",
+    "entity": "&#128747;"
+  },
+  {
+    "code": "airplane_arrival",
+    "char": "🛬",
+    "name": "Airplane Arrival",
+    "cat": "transport",
+    "keywords": "landing arrival runway flight airport destination arrive",
+    "entity": "&#128748;"
+  },
+  {
+    "code": "small_airplane",
+    "char": "🛩️",
+    "name": "Small Airplane",
+    "cat": "transport",
+    "keywords": "propeller cessna light aviation private flight pilot",
+    "entity": "&#128745;&#65039;"
+  },
+  {
+    "code": "seat",
+    "char": "💺",
+    "name": "Seat",
+    "cat": "transport",
+    "keywords": "chair airplane bus train passenger ticket reserve comfort",
+    "entity": "&#128186;"
+  },
+  {
+    "code": "flying_saucer",
+    "char": "🛸",
+    "name": "Flying Saucer",
+    "cat": "transport",
+    "keywords": "ufo alien sci-fi spaceship extraterrestrial mystery hover",
+    "entity": "&#128760;"
+  },
+  {
+    "code": "helicopter",
+    "char": "🚁",
+    "name": "Helicopter",
+    "cat": "transport",
+    "keywords": "chopper copter rotor flight rescue transport aviation fly",
+    "entity": "&#128641;"
+  },
+  {
+    "code": "canoe",
+    "char": "🛶",
+    "name": "Canoe",
+    "cat": "transport",
+    "keywords": "paddle boat kayak river lake rowing watercraft outdoors",
+    "entity": "&#128758;"
+  },
+  {
+    "code": "sailboat",
+    "char": "⛵",
+    "name": "Sailboat",
+    "cat": "transport",
+    "keywords": "sailing yacht boat wind sea ocean regatta watercraft",
+    "entity": "&#9973;"
+  },
+  {
+    "code": "speedboat",
+    "char": "🚤",
+    "name": "Speedboat",
+    "cat": "transport",
+    "keywords": "motorboat motor water race vessel lake ocean fast",
+    "entity": "&#128676;"
+  },
+  {
+    "code": "passenger_ship",
+    "char": "🛳️",
+    "name": "Passenger Ship",
+    "cat": "transport",
+    "keywords": "cruise liner vacation travel ocean voyage sea vessel",
+    "entity": "&#128755;&#65039;"
+  },
+  {
+    "code": "ferry",
+    "char": "⛴️",
+    "name": "Ferry",
+    "cat": "transport",
+    "keywords": "boat crossing commute passenger vehicle transport island sea",
+    "entity": "&#9972;&#65039;"
+  },
+  {
+    "code": "motor_boat",
+    "char": "🛥️",
+    "name": "Motor Boat",
+    "cat": "transport",
+    "keywords": "yacht cruise luxury leisure watercraft vessel sea lake",
+    "entity": "&#128741;&#65039;"
+  },
+  {
+    "code": "ship",
+    "char": "🚢",
+    "name": "Ship",
+    "cat": "transport",
+    "keywords": "cargo tanker container maritime vessel freight ocean sea",
+    "entity": "&#128674;"
+  },
+  {
+    "code": "anchor",
+    "char": "⚓",
+    "name": "Anchor",
+    "cat": "transport",
+    "keywords": "nautical port sailor marina navy ocean sea harbor stable",
+    "entity": "&#9875;"
+  },
+  {
+    "code": "fuel_pump",
+    "char": "⛽",
+    "name": "Fuel Pump",
+    "cat": "transport",
+    "keywords": "gas petrol station diesel energy refill tank fuel car",
+    "entity": "&#9981;"
+  },
+  {
+    "code": "construction",
+    "char": "🚧",
+    "name": "Construction Barrier",
+    "cat": "transport",
+    "keywords": "warning maintenance work detour road barrier caution hazard",
+    "entity": "&#128679;"
+  },
+  {
+    "code": "stop_sign",
+    "char": "🛑",
+    "name": "Stop Sign",
+    "cat": "transport",
+    "keywords": "halt red octagonal traffic danger safety halt break",
+    "entity": "&#128721;"
+  },
+  {
+    "code": "horizontal_traffic_light",
+    "char": "🚥",
+    "name": "Horizontal Traffic Light",
+    "cat": "transport",
+    "keywords": "signal red yellow green intersection road traffic",
+    "entity": "&#128677;"
+  },
+  {
+    "code": "vertical_traffic_light",
+    "char": "🚦",
+    "name": "Vertical Traffic Light",
+    "cat": "transport",
+    "keywords": "traffic signal semaphore intersection lights drive road",
+    "entity": "&#128678;"
+  },
+  {
+    "code": "green_apple",
+    "char": "🍏",
+    "name": "Green Apple",
+    "cat": "food",
+    "keywords": "fruit healthy tart crisp granny smith orchard",
+    "entity": "&#127823;"
+  },
+  {
+    "code": "red_apple",
+    "char": "🍎",
+    "name": "Red Apple",
+    "cat": "food",
+    "keywords": "fruit delicious fresh sweet teacher fruit snack",
+    "entity": "&#127822;"
+  },
+  {
+    "code": "pear",
+    "char": "🍐",
+    "name": "Pear",
+    "cat": "food",
+    "keywords": "fruit sweet orchard juicy dessert harvest",
+    "entity": "&#127824;"
+  },
+  {
+    "code": "tangerine",
+    "char": "🍊",
+    "name": "Tangerine",
+    "cat": "food",
+    "keywords": "orange citrus fruit mandarin clementine vitamin c",
+    "entity": "&#127818;"
+  },
+  {
+    "code": "lemon",
+    "char": "🍋",
+    "name": "Lemon",
+    "cat": "food",
+    "keywords": "sour citrus yellow fruit juice acid zest lemonade",
+    "entity": "&#127819;"
+  },
+  {
+    "code": "banana",
+    "char": "🍌",
+    "name": "Banana",
+    "cat": "food",
+    "keywords": "fruit peel potassium yellow tropical snack",
+    "entity": "&#127820;"
+  },
+  {
+    "code": "watermelon",
+    "char": "🍉",
+    "name": "Watermelon",
+    "cat": "food",
+    "keywords": "fruit melon slice seeds summer picnic refreshing",
+    "entity": "&#127817;"
+  },
+  {
+    "code": "grapes",
+    "char": "🍇",
+    "name": "Grapes",
+    "cat": "food",
+    "keywords": "fruit wine vineyard bunch purple green snack",
+    "entity": "&#127815;"
+  },
+  {
+    "code": "strawberry",
+    "char": "🍓",
+    "name": "Strawberry",
+    "cat": "food",
+    "keywords": "fruit berry red sweet dessert shortcake seeds",
+    "entity": "&#127827;"
+  },
+  {
+    "code": "blueberries",
+    "char": "🫐",
+    "name": "Blueberries",
+    "cat": "food",
+    "keywords": "fruit berry antioxidant superfood breakfast pancake",
+    "entity": "&#129744;"
+  },
+  {
+    "code": "melon",
+    "char": "🍈",
+    "name": "Melon",
+    "cat": "food",
+    "keywords": "fruit cantaloupe honeydew sweet juicy refreshing slice",
+    "entity": "&#127816;"
+  },
+  {
+    "code": "cherries",
+    "char": "🍒",
+    "name": "Cherries",
+    "cat": "food",
+    "keywords": "fruit red pair sweet topping dessert pie",
+    "entity": "&#127826;"
+  },
+  {
+    "code": "peach",
+    "char": "🍑",
+    "name": "Peach",
+    "cat": "food",
+    "keywords": "fruit sweet fuzzy juicy orchard summer cobbler",
+    "entity": "&#127825;"
+  },
+  {
+    "code": "mango",
+    "char": "🥭",
+    "name": "Mango",
+    "cat": "food",
+    "keywords": "fruit tropical sweet juicy pulp smoothie summer",
+    "entity": "&#129389;"
+  },
+  {
+    "code": "pineapple",
+    "char": "🍍",
+    "name": "Pineapple",
+    "cat": "food",
+    "keywords": "fruit tropical sweet spiky hawaii pina colada",
+    "entity": "&#127821;"
+  },
+  {
+    "code": "coconut",
+    "char": "🥥",
+    "name": "Coconut",
+    "cat": "food",
+    "keywords": "fruit tropical palm milk oil shell drink pina",
+    "entity": "&#129381;"
+  },
+  {
+    "code": "kiwi_fruit",
+    "char": "🥝",
+    "name": "Kiwi Fruit",
+    "cat": "food",
+    "keywords": "fruit fuzzy green slice vitamin c tart tropical",
+    "entity": "&#129373;"
+  },
+  {
+    "code": "tomato",
+    "char": "🍅",
+    "name": "Tomato",
+    "cat": "food",
+    "keywords": "fruit vegetable salad sauce pizza red soup ketchup",
+    "entity": "&#127813;"
+  },
+  {
+    "code": "avocado",
+    "char": "🥑",
+    "name": "Avocado",
+    "cat": "food",
+    "keywords": "guacamole healthy fruit toast green dip salad",
+    "entity": "&#129361;"
+  },
+  {
+    "code": "broccoli",
+    "char": "🥦",
+    "name": "Broccoli",
+    "cat": "food",
+    "keywords": "vegetable green healthy florets vitamins stalk greens",
+    "entity": "&#129382;"
+  },
+  {
+    "code": "leafy_green",
+    "char": "🥬",
+    "name": "Leafy Green",
+    "cat": "food",
+    "keywords": "lettuce salad cabbage kale spinach salad vegetable greens",
+    "entity": "&#129388;"
+  },
+  {
+    "code": "cucumber",
+    "char": "🥒",
+    "name": "Cucumber",
+    "cat": "food",
+    "keywords": "pickle vegetable fresh salad crunchy cool green",
+    "entity": "&#129362;"
+  },
+  {
+    "code": "hot_pepper",
+    "char": "🌶️",
+    "name": "Hot Pepper",
+    "cat": "food",
+    "keywords": "chili spicy jalapeno red heat seasoning taco sauce",
+    "entity": "&#127798;&#65039;"
+  },
+  {
+    "code": "ear_of_corn",
+    "char": "🌽",
+    "name": "Ear of Corn",
+    "cat": "food",
+    "keywords": "maize cob sweetcorn popcorn butter yellow vegetable",
+    "entity": "&#127805;"
+  },
+  {
+    "code": "carrot",
+    "char": "🥕",
+    "name": "Carrot",
+    "cat": "food",
+    "keywords": "orange vegetable rabbit crunchy vitamins beta carotene",
+    "entity": "&#129365;"
+  },
+  {
+    "code": "garlic",
+    "char": "🧄",
+    "name": "Garlic",
+    "cat": "food",
+    "keywords": "flavor clove seasoning culinary vampire cook bulb",
+    "entity": "&#129476;"
+  },
+  {
+    "code": "onion",
+    "char": "🧅",
+    "name": "Onion",
+    "cat": "food",
+    "keywords": "vegetable cooking tears bulb flavor savory layers",
+    "entity": "&#129477;"
+  },
+  {
+    "code": "potato",
+    "char": "🥔",
+    "name": "Potato",
+    "cat": "food",
+    "keywords": "spud tuber vegetable bake mash fry french fries",
+    "entity": "&#129364;"
+  },
+  {
+    "code": "croissant",
+    "char": "🥐",
+    "name": "Croissant",
+    "cat": "food",
+    "keywords": "french pastry bakery butter flaky breakfast roll",
+    "entity": "&#129360;"
+  },
+  {
+    "code": "bread",
+    "char": "🍞",
+    "name": "Bread",
+    "cat": "food",
+    "keywords": "loaf bakery slice wheat toast carb sandwich bake",
+    "entity": "&#127838;"
+  },
+  {
+    "code": "baguette_bread",
+    "char": "🥖",
+    "name": "Baguette Bread",
+    "cat": "food",
+    "keywords": "french bread loaf bakery crust sandwich wheat",
+    "entity": "&#129366;"
+  },
+  {
+    "code": "pretzel",
+    "char": "🥨",
+    "name": "Pretzel",
+    "cat": "food",
+    "keywords": "bavarian twist salt snack bakery knot octoberfest",
+    "entity": "&#129384;"
+  },
+  {
+    "code": "cheese_wedge",
+    "char": "🧀",
+    "name": "Cheese Wedge",
+    "cat": "food",
+    "keywords": "dairy swiss cheddar slice dairy snack yellow",
+    "entity": "&#129472;"
+  },
+  {
+    "code": "egg",
+    "char": "🥚",
+    "name": "Egg",
+    "cat": "food",
+    "keywords": "breakfast protein shell yolk cook bake fried hen",
+    "entity": "&#129370;"
+  },
+  {
+    "code": "cooking",
+    "char": "🍳",
+    "name": "Fried Egg",
+    "cat": "food",
+    "keywords": "breakfast pan sunny side up yolk skillet fry cook",
+    "entity": "&#127859;"
+  },
+  {
+    "code": "pancakes",
+    "char": "🥞",
+    "name": "Pancakes",
+    "cat": "food",
+    "keywords": "hotcakes flapjacks maple syrup butter stack breakfast sweet",
+    "entity": "&#129374;"
+  },
+  {
+    "code": "waffle",
+    "char": "🧇",
+    "name": "Waffle",
+    "cat": "food",
+    "keywords": "belgian grid breakfast butter syrup iron sweet crispy",
+    "entity": "&#129479;"
+  },
+  {
+    "code": "bacon",
+    "char": "🥓",
+    "name": "Bacon",
+    "cat": "food",
+    "keywords": "pork strips sizzle crispy breakfast meat cure savory",
+    "entity": "&#129363;"
+  },
+  {
+    "code": "cut_of_meat",
+    "char": "🥩",
+    "name": "Cut of Meat",
+    "cat": "food",
+    "keywords": "steak beef butcher pork raw grill protein barbecue",
+    "entity": "&#129385;"
+  },
+  {
+    "code": "poultry_leg",
+    "char": "🍗",
+    "name": "Poultry Leg",
+    "cat": "food",
+    "keywords": "chicken drumstick turkey dinner fried roasted meat",
+    "entity": "&#127831;"
+  },
+  {
+    "code": "meat_on_bone",
+    "char": "🍖",
+    "name": "Meat on Bone",
+    "cat": "food",
+    "keywords": "manga feast barbecue roast anime animal meal",
+    "entity": "&#127830;"
+  },
+  {
+    "code": "hot_dog",
+    "char": "🌭",
+    "name": "Hot Dog",
+    "cat": "food",
+    "keywords": "frankfurter sausage mustard bun fast food stadium grill",
+    "entity": "&#127789;"
+  },
+  {
+    "code": "hamburger",
+    "char": "🍔",
+    "name": "Hamburger",
+    "cat": "food",
+    "keywords": "burger patty bun beef fast food cheeseburger sesame",
+    "entity": "&#127828;"
+  },
+  {
+    "code": "french_fries",
+    "char": "🍟",
+    "name": "French Fries",
+    "cat": "food",
+    "keywords": "fries potato chips fast food salty potato ketchup snack",
+    "entity": "&#127839;"
+  },
+  {
+    "code": "pizza",
+    "char": "🍕",
+    "name": "Pizza",
+    "cat": "food",
+    "keywords": "slice cheese pepperoni pie italian fast food crust deliver",
+    "entity": "&#127829;"
+  },
+  {
+    "code": "sandwich",
+    "char": "🥪",
+    "name": "Sandwich",
+    "cat": "food",
+    "keywords": "bread sub deli lunch layers lettuce tomato cheese",
+    "entity": "&#129386;"
+  },
+  {
+    "code": "taco",
+    "char": "🌮",
+    "name": "Taco",
+    "cat": "food",
+    "keywords": "mexican shell beef salsa shell tortilla street food fiesta",
+    "entity": "&#127790;"
+  },
+  {
+    "code": "burrito",
+    "char": "🌯",
+    "name": "Burrito",
+    "cat": "food",
+    "keywords": "mexican wrap roll beans rice foil tortilla chipotle",
+    "entity": "&#127791;"
+  },
+  {
+    "code": "green_salad",
+    "char": "🥗",
+    "name": "Green Salad",
+    "cat": "food",
+    "keywords": "healthy bowl vegetables lettuce diet dressing vegan bowl",
+    "entity": "&#129367;"
+  },
+  {
+    "code": "spaghetti",
+    "char": "🍝",
+    "name": "Spaghetti",
+    "cat": "food",
+    "keywords": "pasta noodles tomato sauce italian dinner meatball fork",
+    "entity": "&#127837;"
+  },
+  {
+    "code": "steaming_bowl",
+    "char": "🍜",
+    "name": "Steaming Bowl / Ramen",
+    "cat": "food",
+    "keywords": "noodles soup broth asian ramen pho chopsticks hot",
+    "entity": "&#127836;"
+  },
+  {
+    "code": "pot_of_food",
+    "char": "🍲",
+    "name": "Pot of Food",
+    "cat": "food",
+    "keywords": "stew soup curry casserole boiling winter meal dinner",
+    "entity": "&#127858;"
+  },
+  {
+    "code": "curry_rice",
+    "char": "🍛",
+    "name": "Curry Rice",
+    "cat": "food",
+    "keywords": "spicy indian japanese meal sauce rice dinner",
+    "entity": "&#127835;"
+  },
+  {
+    "code": "sushi",
+    "char": "🍣",
+    "name": "Sushi",
+    "cat": "food",
+    "keywords": "japanese raw fish nigiri rice roll nori wasabi salmon",
+    "entity": "&#127843;"
+  },
+  {
+    "code": "bento_box",
+    "char": "🍱",
+    "name": "Bento Box",
+    "cat": "food",
+    "keywords": "japanese lunch box meal compartmental rice takeout meal",
+    "entity": "&#127857;"
+  },
+  {
+    "code": "dumpling",
+    "char": "🥟",
+    "name": "Dumpling",
+    "cat": "food",
+    "keywords": "potsticker gyoza dim sum pierogi ravioli wrapper steamed",
+    "entity": "&#129375;"
+  },
+  {
+    "code": "fried_shrimp",
+    "char": "🍤",
+    "name": "Fried Shrimp",
+    "cat": "food",
+    "keywords": "tempura seafood prawn appetizer battered crispy japanese",
+    "entity": "&#127844;"
+  },
+  {
+    "code": "rice_ball",
+    "char": "🍙",
+    "name": "Rice Ball",
+    "cat": "food",
+    "keywords": "onigiri seaweed japanese snack nori triangle lunch",
+    "entity": "&#127833;"
+  },
+  {
+    "code": "cooked_rice",
+    "char": "🍚",
+    "name": "Cooked Rice",
+    "cat": "food",
+    "keywords": "steamed bowl grain staple food meal carb jasmine",
+    "entity": "&#127834;"
+  },
+  {
+    "code": "soft_ice_cream",
+    "char": "🍦",
+    "name": "Soft Ice Cream",
+    "cat": "food",
+    "keywords": "cone swirl vanilla dessert sweet dairy summer treat",
+    "entity": "&#127846;"
+  },
+  {
+    "code": "shaved_ice",
+    "char": "🍧",
+    "name": "Shaved Ice",
+    "cat": "food",
+    "keywords": "kakigori syrup summer dessert snow cone refreshing sweet",
+    "entity": "&#127847;"
+  },
+  {
+    "code": "ice_cream",
+    "char": "🍨",
+    "name": "Ice Cream",
+    "cat": "food",
+    "keywords": "scoop bowl dessert sweet dairy sundae gelato summer",
+    "entity": "&#127848;"
+  },
+  {
+    "code": "doughnut",
+    "char": "🍩",
+    "name": "Doughnut",
+    "cat": "food",
+    "keywords": "donut frosting sprinkles pastry sweet dessert bakery glaze",
+    "entity": "&#127849;"
+  },
+  {
+    "code": "cookie",
+    "char": "🍪",
+    "name": "Cookie",
+    "cat": "food",
+    "keywords": "chocolate chip biscuit snack sweet bakery crumb dessert",
+    "entity": "&#127850;"
+  },
+  {
+    "code": "birthday_cake",
+    "char": "🎂",
+    "name": "Birthday Cake",
+    "cat": "food",
+    "keywords": "celebration candles dessert party frosting slice wish",
+    "entity": "&#127874;"
+  },
+  {
+    "code": "shortcake",
+    "char": "🍰",
+    "name": "Shortcake",
+    "cat": "food",
+    "keywords": "slice pastry strawberry dessert cream sweet bakery",
+    "entity": "&#127856;"
+  },
+  {
+    "code": "cupcake",
+    "char": "🧁",
+    "name": "Cupcake",
+    "cat": "food",
+    "keywords": "muffin frosting sprinkles bake dessert sweet small",
+    "entity": "&#129473;"
+  },
+  {
+    "code": "pie",
+    "char": "🥧",
+    "name": "Pie",
+    "cat": "food",
+    "keywords": "crust dessert apple pumpkin berry bake slice bakery",
+    "entity": "&#129383;"
+  },
+  {
+    "code": "chocolate_bar",
+    "char": "🍫",
+    "name": "Chocolate Bar",
+    "cat": "food",
+    "keywords": "cocoa sweet dessert candy treat dark milk squares",
+    "entity": "&#127851;"
+  },
+  {
+    "code": "candy",
+    "char": "🍬",
+    "name": "Candy",
+    "cat": "food",
+    "keywords": "sweet wrapped confection treat sugar lolly snack",
+    "entity": "&#127852;"
+  },
+  {
+    "code": "lollipop",
+    "char": "🍭",
+    "name": "Lollipop",
+    "cat": "food",
+    "keywords": "candy sucker sweet swirl stick confectionery kids",
+    "entity": "&#127853;"
+  },
+  {
+    "code": "custard",
+    "char": "🍮",
+    "name": "Custard / Flan",
+    "cat": "food",
+    "keywords": "pudding dessert caramel sweet creme brulee silky treat",
+    "entity": "&#127854;"
+  },
+  {
+    "code": "popcorn",
+    "char": "🍿",
+    "name": "Popcorn",
+    "cat": "food",
+    "keywords": "cinema movie theater butter salty kernel snack corn",
+    "entity": "&#127871;"
+  },
+  {
+    "code": "hot_beverage",
+    "char": "☕",
+    "name": "Hot Beverage / Coffee",
+    "cat": "food",
+    "keywords": "coffee tea mug steam espresso cafe morning caffeine",
+    "entity": "&#9749;"
+  },
+  {
+    "code": "teapot",
+    "char": "🫖",
+    "name": "Teapot",
+    "cat": "food",
+    "keywords": "tea kettle brew herbal afternoon ceramic pot infusion",
+    "entity": "&#129750;"
+  },
+  {
+    "code": "teacup_without_handle",
+    "char": "🍵",
+    "name": "Teacup",
+    "cat": "food",
+    "keywords": "green tea matcha japanese ceremony ceramic hot herbal",
+    "entity": "&#127861;"
+  },
+  {
+    "code": "sake",
+    "char": "🍶",
+    "name": "Sake Bottle and Cup",
+    "cat": "food",
+    "keywords": "japanese alcohol rice wine ceramic drink bottle toast",
+    "entity": "&#127862;"
+  },
+  {
+    "code": "bottle_with_popping_cork",
+    "char": "🍾",
+    "name": "Popping Cork",
+    "cat": "food",
+    "keywords": "champagne celebration sparkle wine party toast celebration",
+    "entity": "&#127870;"
+  },
+  {
+    "code": "wine_glass",
+    "char": "🍷",
+    "name": "Wine Glass",
+    "cat": "food",
+    "keywords": "red white vineyard alcohol drink dinner toast glass",
+    "entity": "&#127863;"
+  },
+  {
+    "code": "cocktail_glass",
+    "char": "🍸",
+    "name": "Cocktail Glass",
+    "cat": "food",
+    "keywords": "martini olive drink bar alcohol party evening",
+    "entity": "&#127864;"
+  },
+  {
+    "code": "tropical_drink",
+    "char": "🍹",
+    "name": "Tropical Drink",
+    "cat": "food",
+    "keywords": "tiki cocktail vacation beach fruit umbrella rum straw",
+    "entity": "&#127865;"
+  },
+  {
+    "code": "beer_mug",
+    "char": "🍺",
+    "name": "Beer Mug",
+    "cat": "food",
+    "keywords": "ale lager foam draft pub bar drink alcohol cheers",
+    "entity": "&#127866;"
+  },
+  {
+    "code": "clinking_beer_mugs",
+    "char": "🍻",
+    "name": "Clinking Beer Mugs",
+    "cat": "food",
+    "keywords": "cheers toast party celebration pub oktoberfest drinking",
+    "entity": "&#127867;"
+  },
+  {
+    "code": "clinking_glasses",
+    "char": "🥂",
+    "name": "Clinking Glasses",
+    "cat": "food",
+    "keywords": "champagne toast celebration event wedding congratulations glasses",
+    "entity": "&#129346;"
+  },
+  {
+    "code": "tumbler_glass",
+    "char": "🥃",
+    "name": "Tumbler Glass",
+    "cat": "food",
+    "keywords": "whiskey bourbon scotch liquor drink ice bar rocks",
+    "entity": "&#129347;"
+  },
+  {
+    "code": "cup_with_straw",
+    "char": "🥤",
+    "name": "Cup with Straw",
+    "cat": "food",
+    "keywords": "soda drink cola soft beverage fast food plastic sip",
+    "entity": "&#129380;"
+  },
+  {
+    "code": "bubble_tea",
+    "char": "🧋",
+    "name": "Bubble Tea",
+    "cat": "food",
+    "keywords": "boba tapioca milk tea pearl straw sweet drink",
+    "entity": "&#129483;"
+  },
+  {
+    "code": "beverage_box",
+    "char": "🧃",
+    "name": "Beverage Box",
+    "cat": "food",
+    "keywords": "juice box straw carton kids drink fruit lunch",
+    "entity": "&#129475;"
+  },
+  {
+    "code": "ice_cube",
+    "char": "🧊",
+    "name": "Ice Cube",
+    "cat": "food",
+    "keywords": "cold freeze chill drink solid water cooling freeze",
+    "entity": "&#129482;"
+  },
+  {
+    "code": "dog_face",
+    "char": "🐶",
+    "name": "Dog Face",
+    "cat": "nature",
+    "keywords": "puppy pet canine domestic friendly woof companion bark",
+    "entity": "&#128054;"
+  },
+  {
+    "code": "cat_face",
+    "char": "🐱",
+    "name": "Cat Face",
+    "cat": "nature",
+    "keywords": "kitten pet feline domestic meow whiskers purr companion",
+    "entity": "&#128049;"
+  },
+  {
+    "code": "mouse_face",
+    "char": "🐭",
+    "name": "Mouse Face",
+    "cat": "nature",
+    "keywords": "rodent pet cute whiskers cheese squeak rat",
+    "entity": "&#128045;"
+  },
+  {
+    "code": "hamster_face",
+    "char": "🐹",
+    "name": "Hamster Face",
+    "cat": "nature",
+    "keywords": "pet rodent cute cheeks furry cage seed",
+    "entity": "&#128057;"
+  },
+  {
+    "code": "rabbit_face",
+    "char": "🐰",
+    "name": "Rabbit Face",
+    "cat": "nature",
+    "keywords": "bunny pet long ears hopper carrot easter",
+    "entity": "&#128048;"
+  },
+  {
+    "code": "fox_face",
+    "char": "🦊",
+    "name": "Fox Face",
+    "cat": "nature",
+    "keywords": "wild canine clever red bushy tail predator woods",
+    "entity": "&#129418;"
+  },
+  {
+    "code": "bear_face",
+    "char": "🐻",
+    "name": "Bear Face",
+    "cat": "nature",
+    "keywords": "grizzly brown cub wilderness forest predator strong",
+    "entity": "&#128059;"
+  },
+  {
+    "code": "panda_face",
+    "char": "🐼",
+    "name": "Panda Face",
+    "cat": "nature",
+    "keywords": "bear china bamboo black and white endangered cute",
+    "entity": "&#128060;"
+  },
+  {
+    "code": "koala",
+    "char": "🐨",
+    "name": "Koala",
+    "cat": "nature",
+    "keywords": "australia marsupial eucalyptus bear cute tree animal",
+    "entity": "&#128040;"
+  },
+  {
+    "code": "tiger_face",
+    "char": "🐯",
+    "name": "Tiger Face",
+    "cat": "nature",
+    "keywords": "stripes wild big cat predator jungle fierce roar",
+    "entity": "&#128047;"
+  },
+  {
+    "code": "lion_face",
+    "char": "🦁",
+    "name": "Lion Face",
+    "cat": "nature",
+    "keywords": "king mane big cat jungle pride savanna roar",
+    "entity": "&#129409;"
+  },
+  {
+    "code": "cow_face",
+    "char": "🐮",
+    "name": "Cow Face",
+    "cat": "nature",
+    "keywords": "cattle farm dairy beef milk bovine moo animal",
+    "entity": "&#128046;"
+  },
+  {
+    "code": "pig_face",
+    "char": "🐷",
+    "name": "Pig Face",
+    "cat": "nature",
+    "keywords": "farm pork snout oink domestic pink animal",
+    "entity": "&#128055;"
+  },
+  {
+    "code": "frog_face",
+    "char": "🐸",
+    "name": "Frog Face",
+    "cat": "nature",
+    "keywords": "amphibian toad green pond lily pad croak ribbit",
+    "entity": "&#128056;"
+  },
+  {
+    "code": "monkey_face",
+    "char": "🐵",
+    "name": "Monkey Face",
+    "cat": "nature",
+    "keywords": "primate chimp ape banana jungle playful cheeky",
+    "entity": "&#128053;"
+  },
+  {
+    "code": "chicken",
+    "char": "🐔",
+    "name": "Chicken",
+    "cat": "nature",
+    "keywords": "rooster hen farm poultry bird cluck egg livestock",
+    "entity": "&#128020;"
+  },
+  {
+    "code": "penguin",
+    "char": "🐧",
+    "name": "Penguin",
+    "cat": "nature",
+    "keywords": "bird antarctica tuxedo waddle ice cold flightless arctic",
+    "entity": "&#128039;"
+  },
+  {
+    "code": "bird",
+    "char": "🐦",
+    "name": "Bird",
+    "cat": "nature",
+    "keywords": "avian songbird wildlife feather fly wing nest chirp",
+    "entity": "&#128038;"
+  },
+  {
+    "code": "baby_chick",
+    "char": "🐤",
+    "name": "Baby Chick",
+    "cat": "nature",
+    "keywords": "baby chicken cute yellow hatchling bird easter",
+    "entity": "&#128036;"
+  },
+  {
+    "code": "duck",
+    "char": "🦆",
+    "name": "Duck",
+    "cat": "nature",
+    "keywords": "mallard waterfowl bird quack pond feathers water",
+    "entity": "&#129414;"
+  },
+  {
+    "code": "eagle",
+    "char": "🦅",
+    "name": "Eagle",
+    "cat": "nature",
+    "keywords": "raptor bird of prey bald soar sharp patriotic predator",
+    "entity": "&#129413;"
+  },
+  {
+    "code": "owl",
+    "char": "🦉",
+    "name": "Owl",
+    "cat": "nature",
+    "keywords": "nocturnal bird wise hoot night feathers predator forest",
+    "entity": "&#129417;"
+  },
+  {
+    "code": "bat",
+    "char": "🦇",
+    "name": "Bat",
+    "cat": "nature",
+    "keywords": "vampire cave nocturnal wings halloween sonar mammal radar",
+    "entity": "&#129415;"
+  },
+  {
+    "code": "wolf",
+    "char": "🐺",
+    "name": "Wolf",
+    "cat": "nature",
+    "keywords": "canine wild howl pack predator moon forest tundra",
+    "entity": "&#128058;"
+  },
+  {
+    "code": "boar",
+    "char": "🐗",
+    "name": "Boar",
+    "cat": "nature",
+    "keywords": "wild pig tusks forest hog swine razorback animal",
+    "entity": "&#128023;"
+  },
+  {
+    "code": "horse_face",
+    "char": "🐴",
+    "name": "Horse Face",
+    "cat": "nature",
+    "keywords": "equine pony mare stallion farm ride gallop neigh",
+    "entity": "&#128052;"
+  },
+  {
+    "code": "unicorn",
+    "char": "🦄",
+    "name": "Unicorn",
+    "cat": "nature",
+    "keywords": "fantasy magical horn mythical horse rainbow dream fairytale",
+    "entity": "&#129412;"
+  },
+  {
+    "code": "honeybee",
+    "char": "🐝",
+    "name": "Honeybee",
+    "cat": "nature",
+    "keywords": "insect pollination honey hive buzz sting flower bug",
+    "entity": "&#128029;"
+  },
+  {
+    "code": "bug_caterpillar",
+    "char": "🐛",
+    "name": "Caterpillar",
+    "cat": "nature",
+    "keywords": "insect larva crawl garden butterfly chrysalis leaf",
+    "entity": "&#128027;"
+  },
+  {
+    "code": "butterfly",
+    "char": "🦋",
+    "name": "Butterfly",
+    "cat": "nature",
+    "keywords": "wings insect colorful metamorphosis nectar garden beautiful",
+    "entity": "&#129419;"
+  },
+  {
+    "code": "snail",
+    "char": "🐌",
+    "name": "Snail",
+    "cat": "nature",
+    "keywords": "shell slow crawl slime antenna gastropod garden spiral",
+    "entity": "&#128012;"
+  },
+  {
+    "code": "lady_beetle",
+    "char": "🐞",
+    "name": "Lady Beetle",
+    "cat": "nature",
+    "keywords": "ladybug insect spots red garden beneficial bug beetle",
+    "entity": "&#128030;"
+  },
+  {
+    "code": "ant",
+    "char": "🐜",
+    "name": "Ant",
+    "cat": "nature",
+    "keywords": "insect colony worker hill small industrious tiny team",
+    "entity": "&#128028;"
+  },
+  {
+    "code": "cricket",
+    "char": "🦗",
+    "name": "Cricket",
+    "cat": "nature",
+    "keywords": "insect grasshopper chirp leap jump green night bug",
+    "entity": "&#129431;"
+  },
+  {
+    "code": "spider",
+    "char": "🕷️",
+    "name": "Spider",
+    "cat": "nature",
+    "keywords": "arachnid web eight legs scary creepy crawl fangs",
+    "entity": "&#128375;&#65039;"
+  },
+  {
+    "code": "scorpion",
+    "char": "🦂",
+    "name": "Scorpion",
+    "cat": "nature",
+    "keywords": "arachnid sting pincers desert venom zodiac hazard",
+    "entity": "&#129410;"
+  },
+  {
+    "code": "turtle",
+    "char": "🐢",
+    "name": "Turtle",
+    "cat": "nature",
+    "keywords": "tortoise reptile shell slow ancient sea aquatic crawl",
+    "entity": "&#128034;"
+  },
+  {
+    "code": "snake",
+    "char": "🐍",
+    "name": "Snake",
+    "cat": "nature",
+    "keywords": "serpent reptile slither venom hiss fang reptile cobra",
+    "entity": "&#128013;"
+  },
+  {
+    "code": "lizard",
+    "char": "🦎",
+    "name": "Lizard",
+    "cat": "nature",
+    "keywords": "reptile gecko tail scales desert crawl chameleon iguana",
+    "entity": "&#129422;"
+  },
+  {
+    "code": "octopus",
+    "char": "🐙",
+    "name": "Octopus",
+    "cat": "nature",
+    "keywords": "tentacles ocean sea creature mollusk suction cephalopod ink",
+    "entity": "&#128025;"
+  },
+  {
+    "code": "squid",
+    "char": "🦑",
+    "name": "Squid",
+    "cat": "nature",
+    "keywords": "calamari ocean tentacles sea marine creature cephalopod giant",
+    "entity": "&#129425;"
+  },
+  {
+    "code": "shrimp",
+    "char": "🦐",
+    "name": "Shrimp",
+    "cat": "nature",
+    "keywords": "prawn crustacean seafood ocean marine small decapod",
+    "entity": "&#129424;"
+  },
+  {
+    "code": "lobster",
+    "char": "🦞",
+    "name": "Lobster",
+    "cat": "nature",
+    "keywords": "claws crustacean seafood ocean marine red pinch",
+    "entity": "&#129438;"
+  },
+  {
+    "code": "crab",
+    "char": "🦀",
+    "name": "Crab",
+    "cat": "nature",
+    "keywords": "crustacean pinch claws ocean beach sea tidepool zodiac",
+    "entity": "&#129408;"
+  },
+  {
+    "code": "blowfish",
+    "char": "🐡",
+    "name": "Blowfish",
+    "cat": "nature",
+    "keywords": "pufferfish ocean spikes venom fugu marine fish swell",
+    "entity": "&#128033;"
+  },
+  {
+    "code": "tropical_fish",
+    "char": "🐠",
+    "name": "Tropical Fish",
+    "cat": "nature",
+    "keywords": "aquarium reef marine ocean colorful swim fin gills",
+    "entity": "&#128032;"
+  },
+  {
+    "code": "fish",
+    "char": "🐟",
+    "name": "Fish",
+    "cat": "nature",
+    "keywords": "aquatic swim river ocean seafood gills fin scales angle",
+    "entity": "&#128031;"
+  },
+  {
+    "code": "dolphin",
+    "char": "🐬",
+    "name": "Dolphin",
+    "cat": "nature",
+    "keywords": "marine mammal clever ocean swim flipper jump pod sea",
+    "entity": "&#128044;"
+  },
+  {
+    "code": "spouting_whale",
+    "char": "🐳",
+    "name": "Spouting Whale",
+    "cat": "nature",
+    "keywords": "blowhole cetacean ocean sea marine giant mammal blubber",
+    "entity": "&#128051;"
+  },
+  {
+    "code": "shark",
+    "char": "🦈",
+    "name": "Shark",
+    "cat": "nature",
+    "keywords": "predator jaw fin ocean sea marine teeth apex dangerous",
+    "entity": "&#129416;"
+  },
+  {
+    "code": "crocodile",
+    "char": "🐊",
+    "name": "Crocodile",
+    "cat": "nature",
+    "keywords": "alligator reptile swamp river jaws teeth predator reptile",
+    "entity": "&#128010;"
+  },
+  {
+    "code": "elephant",
+    "char": "🐘",
+    "name": "Elephant",
+    "cat": "nature",
+    "keywords": "trunk tusks savanna pachyderm herd memory huge mammal",
+    "entity": "&#128024;"
+  },
+  {
+    "code": "rhinoceros",
+    "char": "🦏",
+    "name": "Rhinoceros",
+    "cat": "nature",
+    "keywords": "rhino horn armor savanna mammal heavy charging wildlife",
+    "entity": "&#129423;"
+  },
+  {
+    "code": "hippopotamus",
+    "char": "🦛",
+    "name": "Hippopotamus",
+    "cat": "nature",
+    "keywords": "hippo river massive jaws africa mud mammal amphibious",
+    "entity": "&#129435;"
+  },
+  {
+    "code": "giraffe",
+    "char": "🦒",
+    "name": "Giraffe",
+    "cat": "nature",
+    "keywords": "tall neck spots savanna trees herbivore wildlife mammal",
+    "entity": "&#129426;"
+  },
+  {
+    "code": "kangaroo",
+    "char": "🦘",
+    "name": "Kangaroo",
+    "cat": "nature",
+    "keywords": "australia pouch joey leap hop outback wildlife marsupial",
+    "entity": "&#129432;"
+  },
+  {
+    "code": "evergreen_tree",
+    "char": "🌲",
+    "name": "Evergreen Tree",
+    "cat": "nature",
+    "keywords": "pine fir forest conifers winter alpine nature woods",
+    "entity": "&#127794;"
+  },
+  {
+    "code": "deciduous_tree",
+    "char": "🌳",
+    "name": "Deciduous Tree",
+    "cat": "nature",
+    "keywords": "oak leaves shade park nature outdoors foliage green",
+    "entity": "&#127795;"
+  },
+  {
+    "code": "palm_tree",
+    "char": "🌴",
+    "name": "Palm Tree",
+    "cat": "nature",
+    "keywords": "tropical beach island warm summer coast coconut frond",
+    "entity": "&#127796;"
+  },
+  {
+    "code": "seedling",
+    "char": "🌱",
+    "name": "Seedling",
+    "cat": "nature",
+    "keywords": "sprout plant growth soil spring new begin ecology",
+    "entity": "&#127793;"
+  },
+  {
+    "code": "herb",
+    "char": "🌿",
+    "name": "Herb",
+    "cat": "nature",
+    "keywords": "plant leaves seasoning botanical flora foliage green garden",
+    "entity": "&#127807;"
+  },
+  {
+    "code": "shamrock",
+    "char": "☘️",
+    "name": "Shamrock",
+    "cat": "nature",
+    "keywords": "clover ireland st patrick green luck plant foliage",
+    "entity": "&#9752;&#65039;"
+  },
+  {
+    "code": "four_leaf_clover",
+    "char": "🍀",
+    "name": "Four Leaf Clover",
+    "cat": "nature",
+    "keywords": "lucky charm fortune saint patrick green find",
+    "entity": "&#127808;"
+  },
+  {
+    "code": "leaf_fluttering",
+    "char": "🍃",
+    "name": "Leaf in Wind",
+    "cat": "nature",
+    "keywords": "blowing breeze foliage autumn green nature windy blow",
+    "entity": "&#127811;"
+  },
+  {
+    "code": "fallen_leaf",
+    "char": "🍂",
+    "name": "Fallen Leaf",
+    "cat": "nature",
+    "keywords": "autumn leaves brown fall season dry foliage nature",
+    "entity": "&#127810;"
+  },
+  {
+    "code": "maple_leaf",
+    "char": "🍁",
+    "name": "Maple Leaf",
+    "cat": "nature",
+    "keywords": "canada autumn fall foliage red season syrup tree",
+    "entity": "&#127809;"
+  },
+  {
+    "code": "mushroom",
+    "char": "🍄",
+    "name": "Mushroom",
+    "cat": "nature",
+    "keywords": "fungus toadstool forest edible forage autumn red cap",
+    "entity": "&#127812;"
+  },
+  {
+    "code": "bouquet",
+    "char": "💐",
+    "name": "Bouquet",
+    "cat": "nature",
+    "keywords": "flowers arrangement gift romance wedding celebration floral bloom",
+    "entity": "&#128144;"
+  },
+  {
+    "code": "tulip",
+    "char": "🌷",
+    "name": "Tulip",
+    "cat": "nature",
+    "keywords": "spring flower garden holland bulb bloom floral pink",
+    "entity": "&#127799;"
+  },
+  {
+    "code": "rose",
+    "char": "🌹",
+    "name": "Rose",
+    "cat": "nature",
+    "keywords": "romance love flower red petals thorn valentine floral",
+    "entity": "&#127801;"
+  },
+  {
+    "code": "hibiscus",
+    "char": "🌺",
+    "name": "Hibiscus",
+    "cat": "nature",
+    "keywords": "tropical exotic flower floral bloom hawaii garden beauty",
+    "entity": "&#127802;"
+  },
+  {
+    "code": "cherry_blossom",
+    "char": "🌸",
+    "name": "Cherry Blossom",
+    "cat": "nature",
+    "keywords": "sakura spring japan flower bloom pink floral delicate",
+    "entity": "&#127800;"
+  },
+  {
+    "code": "blossom",
+    "char": "🌼",
+    "name": "Blossom",
+    "cat": "nature",
+    "keywords": "flower yellow petals bloom spring garden floral daisy",
+    "entity": "&#127804;"
+  },
+  {
+    "code": "sunflower",
+    "char": "🌻",
+    "name": "Sunflower",
+    "cat": "nature",
+    "keywords": "sun yellow summer seeds tall floral flower bloom garden",
+    "entity": "&#127803;"
+  },
+  {
+    "code": "sun_symbol",
+    "char": "☀️",
+    "name": "Sun",
+    "cat": "nature",
+    "keywords": "solar bright sunshine daylight weather summer heat rays",
+    "entity": "&#9728;&#65039;"
+  },
+  {
+    "code": "sun_behind_small_cloud",
+    "char": "🌤️",
+    "name": "Sun Behind Small Cloud",
+    "cat": "nature",
+    "keywords": "weather partly sunny sky fair forecast daylight day",
+    "entity": "&#127780;&#65039;"
+  },
+  {
+    "code": "sun_behind_cloud",
+    "char": "⛅",
+    "name": "Sun Behind Cloud",
+    "cat": "nature",
+    "keywords": "overcast partly cloudy weather forecast sky daylight",
+    "entity": "&#9925;"
+  },
+  {
+    "code": "cloud_symbol",
+    "char": "☁️",
+    "name": "Cloud",
+    "cat": "nature",
+    "keywords": "weather overcast sky cumulus storm fluffy white overcast",
+    "entity": "&#9729;&#65039;"
+  },
+  {
+    "code": "cloud_with_rain",
+    "char": "🌧️",
+    "name": "Cloud with Rain",
+    "cat": "nature",
+    "keywords": "rainy shower precipitation wet weather storm drops water",
+    "entity": "&#127783;&#65039;"
+  },
+  {
+    "code": "cloud_with_lightning_and_rain",
+    "char": "⛈️",
+    "name": "Thunderstorm",
+    "cat": "nature",
+    "keywords": "storm thunderstorm weather danger lightning flash thunder rain",
+    "entity": "&#9928;&#65039;"
+  },
+  {
+    "code": "cloud_with_lightning",
+    "char": "🌩️",
+    "name": "Cloud with Lightning",
+    "cat": "nature",
+    "keywords": "thunderstorm bolt flash storm weather electricity strike",
+    "entity": "&#127785;&#65039;"
+  },
+  {
+    "code": "cloud_with_snow",
+    "char": "🌨️",
+    "name": "Cloud with Snow",
+    "cat": "nature",
+    "keywords": "snowy weather flakes blizzard cold winter precipitation ice",
+    "entity": "&#127784;&#65039;"
+  },
+  {
+    "code": "snowflake",
+    "char": "❄️",
+    "name": "Snowflake",
+    "cat": "nature",
+    "keywords": "snow winter frost crystal cold ice frozen weather chilled",
+    "entity": "&#10052;&#65039;"
+  },
+  {
+    "code": "snowman",
+    "char": "☃️",
+    "name": "Snowman",
+    "cat": "nature",
+    "keywords": "winter snow holiday frost carrot scarf cold weather joy",
+    "entity": "&#9731;&#65039;"
+  },
+  {
+    "code": "wind_face",
+    "char": "🌬️",
+    "name": "Wind Face",
+    "cat": "nature",
+    "keywords": "blow gust breeze weather autumn blow winter air cold",
+    "entity": "&#127788;&#65039;"
+  },
+  {
+    "code": "dashing_away",
+    "char": "💨",
+    "name": "Dashing Away",
+    "cat": "nature",
+    "keywords": "puff gust speed dust fast run rush smoke sprint",
+    "entity": "&#128168;"
+  },
+  {
+    "code": "tornado",
+    "char": "🌪️",
+    "name": "Tornado",
+    "cat": "nature",
+    "keywords": "twister cyclone whirlwind funnel storm disaster hazard vortex",
+    "entity": "&#127786;&#65039;"
+  },
+  {
+    "code": "fog",
+    "char": "🌫️",
+    "name": "Fog",
+    "cat": "nature",
+    "keywords": "mist haze visibility weather morning vapor obscure humid",
+    "entity": "&#127787;&#65039;"
+  },
+  {
+    "code": "rainbow",
+    "char": "🌈",
+    "name": "Rainbow",
+    "cat": "nature",
+    "keywords": "colors arc sky weather hope prism pride colorful beauty",
+    "entity": "&#127752;"
+  },
+  {
+    "code": "umbrella_with_rain",
+    "char": "☔",
+    "name": "Umbrella with Rain",
+    "cat": "nature",
+    "keywords": "weather rain protection drops storm wet forecast cover",
+    "entity": "&#9748;"
+  },
+  {
+    "code": "water_wave",
+    "char": "🌊",
+    "name": "Water Wave",
+    "cat": "nature",
+    "keywords": "ocean sea surf tsunami tide beach splashing marine surge",
+    "entity": "&#127754;"
+  },
+  {
+    "code": "globe_europe_africa",
+    "char": "🌍",
+    "name": "Globe Showing Europe-Africa",
+    "cat": "nature",
+    "keywords": "earth planet world international geography sphere continent",
+    "entity": "&#127757;"
+  },
+  {
+    "code": "globe_americas",
+    "char": "🌎",
+    "name": "Globe Showing Americas",
+    "cat": "nature",
+    "keywords": "earth planet world global international western sphere",
+    "entity": "&#127758;"
+  },
+  {
+    "code": "globe_asia_australia",
+    "char": "🌏",
+    "name": "Globe Showing Asia-Australia",
+    "cat": "nature",
+    "keywords": "earth planet world orient pacific hemisphere sphere",
+    "entity": "&#127759;"
+  },
+  {
+    "code": "ringed_planet",
+    "char": "🪐",
+    "name": "Ringed Planet",
+    "cat": "nature",
+    "keywords": "saturn space astronomy cosmos orbit science planetary",
+    "entity": "&#129680;"
+  },
+  {
+    "code": "full_moon",
+    "char": "🌕",
+    "name": "Full Moon",
+    "cat": "nature",
+    "keywords": "lunar bright night astronomy sky illuminated sphere satellite",
+    "entity": "&#127765;"
+  },
+  {
+    "code": "crescent_moon",
+    "char": "🌙",
+    "name": "Crescent Moon",
+    "cat": "nature",
+    "keywords": "night evening dreams slumber sleep lunar darkness sky",
+    "entity": "&#127769;"
+  },
+  {
+    "code": "shooting_star",
+    "char": "🌠",
+    "name": "Shooting Star",
+    "cat": "nature",
+    "keywords": "meteor night wish astronomy sky sparkle streak cosmos",
+    "entity": "&#127776;"
+  },
+  {
+    "code": "milky_way",
+    "char": "🌌",
+    "name": "Milky Way",
+    "cat": "nature",
+    "keywords": "galaxy space astronomy stars cosmos universe night sky",
+    "entity": "&#127756;"
   }
 ]
