@@ -1,8 +1,8 @@
 <!--
 # -----------------------------------------------------------------------------
 # File        : ctlabs/views/modals/walkthrough_git.erb
-# Description : Walkthrough Repository & Git Sync Modal (multi-set repositories,
-#               switch active repository, create/clone repository, fetch/pull/push)
+# Description : Walkthrough Repository & Git Sync Modal (clean 2-tab layout,
+#               active repository & remote sync, hierarchical auth, add repository)
 # License     : MIT License
 # -----------------------------------------------------------------------------
 -->
@@ -11,9 +11,90 @@
   #wg-modal, #wg-modal *, #wg-modal *::before, #wg-modal *::after {
     box-sizing: border-box;
   }
+  .wg-nav-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #94a3b8;
+    padding: 10px 16px;
+    font-size: 0.88em;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+  }
+  .wg-nav-tab:hover {
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .wg-nav-tab.active {
+    color: #38bdf8;
+    border-bottom-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.06);
+  }
+  .wg-pill-btn {
+    background: #1e293b;
+    border: 1px solid #475569;
+    color: #cbd5e1;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .wg-pill-btn:hover {
+    background: #334155;
+    color: #f8fafc;
+  }
+  .wg-pill-btn.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #ffffff;
+    box-shadow: 0 0 0 1px #38bdf8;
+  }
+  .wg-sub-pill-btn {
+    background: #0f172a;
+    border: 1px solid #334155;
+    color: #94a3b8;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.76em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .wg-sub-pill-btn:hover {
+    color: #e2e8f0;
+    border-color: #475569;
+  }
+  .wg-sub-pill-btn.active {
+    background: #1e293b;
+    border-color: #14b8a6;
+    color: #14b8a6;
+    font-weight: 600;
+  }
+  .wg-status-badge {
+    background: #0b1120;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.78em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
 </style>
+
 <div id="wg-modal" class="w3-modal" style="z-index: 10004; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
-  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: 840px; max-height: 90vh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: 860px; max-height: 90vh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden;">
+    <!-- Modal Header -->
     <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
       <h3 style="margin: 0; font-size: 1.08em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         <i class="fas fa-code-branch" style="color: #14b8a6;"></i> Walkthrough Repository &amp; Git Sync
@@ -22,139 +103,427 @@
       <span onclick="WalkthroughGit.close()" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
     </header>
 
+    <!-- Navigation Tabs -->
+    <div style="display: flex; gap: 4px; border-bottom: 1px solid #334155; padding: 0 18px; background: #0f172a; flex: none;">
+      <button type="button" id="wg-tab-btn-sync" onclick="WalkthroughGit.switchTab('sync')" class="wg-nav-tab active">
+        <i class="fas fa-sync-alt" style="color: #38bdf8;"></i> Active Repository &amp; Remote Sync
+      </button>
+      <button type="button" id="wg-tab-btn-add" onclick="WalkthroughGit.switchTab('add')" class="wg-nav-tab">
+        <i class="fas fa-plus-circle" style="color: #14b8a6;"></i> Add Repository (Clone / Create)
+      </button>
+    </div>
+
+    <!-- Modal Content Body -->
     <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px;">
+      <!-- Git Missing Warning -->
       <div id="wg-git-missing" style="display: none; background: #451a03; border: 1px solid #92400e; color: #fde68a; padding: 10px 14px; border-radius: 6px; font-size: 0.86em; margin-bottom: 14px;">
         <i class="fas fa-exclamation-triangle"></i> Git is not installed on the server. Install it (e.g. <code>apt install git</code>) and reload this dialog.
       </div>
 
-      <!-- Active Repository Selector & Management Bar -->
-      <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-          <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
-            <i class="fas fa-database" style="color: #14b8a6;"></i> Active Repository
-            <span style="color: #64748b; font-size: 0.82em; font-weight: 400;">(holds multiple walkthrough sets; only one repository is active at a time)</span>
+      <!-- =================================================================== -->
+      <!-- TAB 1: ACTIVE REPOSITORY & REMOTE SYNC                              -->
+      <!-- =================================================================== -->
+      <div id="wg-tab-sync">
+        <!-- 1. Active Repository Selector & Status Header -->
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-database" style="color: #14b8a6;"></i> Active Repository
+              <span style="color: #64748b; font-size: 0.82em; font-weight: 400;">(holds multiple walkthrough sets; only one is active at a time)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" id="wg-rename-repo-btn" onclick="WalkthroughGit.renameRepo()" class="w3-button w3-round" title="Rename active repository" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.78em; padding: 4px 10px; font-weight: 600;">
+                <i class="fas fa-pen"></i> Rename
+              </button>
+              <button type="button" id="wg-delete-repo-btn" onclick="WalkthroughGit.deleteRepo()" class="w3-button w3-round" title="Delete this repository" style="background: #7f1d1d; color: #fecaca; font-size: 0.78em; padding: 4px 10px; font-weight: 600; display: none;">
+                <i class="fas fa-trash-alt"></i> Delete Repo
+              </button>
+            </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 6px;">
-            <button type="button" id="wg-rename-repo-btn" onclick="WalkthroughGit.renameRepo()" class="w3-button w3-round" title="Rename active repository" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.78em; padding: 4px 10px; font-weight: 600;">
-              <i class="fas fa-pen"></i> Rename
-            </button>
-            <button type="button" id="wg-delete-repo-btn" onclick="WalkthroughGit.deleteRepo()" class="w3-button w3-round" title="Delete this repository" style="background: #7f1d1d; color: #fecaca; font-size: 0.78em; padding: 4px 10px; font-weight: 600; display: none;">
-              <i class="fas fa-trash-alt"></i> Delete Repo
+          <select id="wg-repo-select" onchange="WalkthroughGit.switchRepo(this.value)" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 5px; font-size: 0.88em; font-weight: 500; cursor: pointer; margin-bottom: 10px;"></select>
+
+          <!-- Repository Status Badges Bar -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <div class="wg-status-badge">
+              <span style="color: #64748b;">Branch:</span>
+              <span id="wg-branch-text" style="color: #38bdf8; font-family: ui-monospace, monospace; font-weight: 600;">-</span>
+            </div>
+            <div class="wg-status-badge" style="flex: 1; min-width: 160px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              <span style="color: #64748b;">Remote:</span>
+              <span id="wg-remote-url-text" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis;" title="">None</span>
+            </div>
+            <div class="wg-status-badge">
+              <span style="color: #64748b;">Sync:</span>
+              <span id="wg-sync-text" style="color: #cbd5e1; font-weight: 500;">-</span>
+            </div>
+            <div class="wg-status-badge">
+              <span style="color: #64748b;">Working Tree:</span>
+              <span id="wg-working-tree-text" style="color: #10b981; font-weight: 600;">Clean</span>
+            </div>
+            <button type="button" onclick="WalkthroughGit.openHistory()" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.76em; padding: 4px 9px; font-weight: 600; margin-left: auto; display: inline-flex; align-items: center; gap: 5px;" title="Open Version History to view diffs and commit changes">
+              <i class="fas fa-history"></i> Version History
             </button>
           </div>
         </div>
-        <select id="wg-repo-select" onchange="WalkthroughGit.switchRepo(this.value)" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 5px; font-size: 0.88em; font-weight: 500; cursor: pointer;"></select>
+
+        <!-- 2. Remote Connection & Structured Authentication -->
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-link" style="color: #38bdf8;"></i> Remote Repository Connection
+            </div>
+            <div id="wg-remote-saved-badge" style="font-size: 0.72em; background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 2px 8px; border-radius: 10px;">
+              Not linked
+            </div>
+          </div>
+          <div style="color: #94a3b8; font-size: 0.78em; margin-bottom: 10px;">
+            Link this repository to an upstream Git remote (GitHub, GitLab, custom Git host) to sync walkthrough sets.
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+            <div style="flex: 3; min-width: 220px;">
+              <label for="wg-url" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Remote Git URL</label>
+              <input type="text" id="wg-url" placeholder="https://github.com/org/repo.git or git@github.com:org/repo.git" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.84em; font-family: ui-monospace, monospace;" />
+            </div>
+            <div style="flex: 1; min-width: 120px;">
+              <label for="wg-branch" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Branch (optional)</label>
+              <input type="text" id="wg-branch" placeholder="main" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.84em; font-family: ui-monospace, monospace;" />
+            </div>
+          </div>
+
+          <!-- Structured Authentication Box -->
+          <div style="background: #0b1120; border: 1px solid #1e293b; border-radius: 6px; padding: 12px; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="color: #94a3b8; font-size: 0.76em; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-shield-alt" style="color: #38bdf8;"></i> Remote Authentication
+              </div>
+              <!-- Protocol Selector Pills -->
+              <div style="display: flex; gap: 6px;">
+                <button type="button" id="wg-remote-proto-none" onclick="WalkthroughGit.setRemoteProto('none')" class="wg-pill-btn active">
+                  None (Public)
+                </button>
+                <button type="button" id="wg-remote-proto-https" onclick="WalkthroughGit.setRemoteProto('https')" class="wg-pill-btn">
+                  <i class="fas fa-lock"></i> HTTPS
+                </button>
+                <button type="button" id="wg-remote-proto-ssh" onclick="WalkthroughGit.setRemoteProto('ssh')" class="wg-pill-btn">
+                  <i class="fas fa-key"></i> SSH
+                </button>
+              </div>
+            </div>
+
+            <!-- Protocol: None -->
+            <div id="wg-remote-panel-none" style="display: block; color: #64748b; font-size: 0.78em; padding: 4px 0;">
+              No credentials configured. Suitable for public repositories (read-only) or system SSH agent.
+            </div>
+
+            <!-- Protocol: HTTPS -->
+            <div id="wg-remote-panel-https" style="display: none; padding-top: 4px;">
+              <!-- HTTPS Method Selector -->
+              <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
+                <span style="color: #64748b; font-size: 0.74em;">Method:</span>
+                <button type="button" id="wg-remote-https-btn-token" onclick="WalkthroughGit.setRemoteMethod('token')" class="wg-sub-pill-btn active">
+                  Personal Access Token (PAT)
+                </button>
+                <button type="button" id="wg-remote-https-btn-userpass" onclick="WalkthroughGit.setRemoteMethod('user_pass')" class="wg-sub-pill-btn">
+                  Username &amp; Password
+                </button>
+              </div>
+
+              <!-- HTTPS Token Form -->
+              <div id="wg-remote-https-view-token" style="display: block;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <div style="flex: 2; min-width: 180px;">
+                    <label for="wg-remote-token" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">Access Token</label>
+                    <input type="password" id="wg-remote-token" placeholder="PAT (ghp_..., glpat-..., or token)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                  <div style="flex: 1; min-width: 130px;">
+                    <label for="wg-remote-token-user" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">Username (opt)</label>
+                    <input type="text" id="wg-remote-token-user" placeholder="git (default)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                </div>
+                <div style="color: #64748b; font-size: 0.73em; margin-top: 4px;">Recommended for GitHub, GitLab, and Bitbucket. Tokens are securely invoked via askpass and never written to repository URLs or git logs.</div>
+              </div>
+
+              <!-- HTTPS User/Pass Form -->
+              <div id="wg-remote-https-view-userpass" style="display: none;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 140px;">
+                    <label for="wg-remote-user" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">Username / Account</label>
+                    <input type="text" id="wg-remote-user" placeholder="e.g. username" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                  <div style="flex: 1; min-width: 160px;">
+                    <label for="wg-remote-pass" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">Password</label>
+                    <input type="password" id="wg-remote-pass" placeholder="(leave blank to keep existing password)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                </div>
+                <div style="color: #64748b; font-size: 0.73em; margin-top: 4px;">Credentials are stored securely in repository config (mode 0600) and invoked non-interactively via GIT_ASKPASS.</div>
+              </div>
+            </div>
+
+            <!-- Protocol: SSH -->
+            <div id="wg-remote-panel-ssh" style="display: none; padding-top: 4px;">
+              <!-- SSH Method Selector -->
+              <div style="display: flex; gap: 6px; margin-bottom: 8px; align-items: center;">
+                <span style="color: #64748b; font-size: 0.74em;">Method:</span>
+                <button type="button" id="wg-remote-ssh-btn-key" onclick="WalkthroughGit.setRemoteMethod('key')" class="wg-sub-pill-btn active">
+                  SSH Key (Deploy Key)
+                </button>
+                <button type="button" id="wg-remote-ssh-btn-userpass" onclick="WalkthroughGit.setRemoteMethod('user_pass')" class="wg-sub-pill-btn">
+                  SSH Username &amp; Password
+                </button>
+              </div>
+
+              <!-- SSH Key View -->
+              <div id="wg-remote-ssh-view-key" style="display: block;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
+                  <span id="wg-remote-ssh-info" style="color: #cbd5e1; font-size: 0.78em; font-weight: 500;">Private Key</span>
+                  <button type="button" onclick="WalkthroughGit.generateKey('remote')" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.74em; padding: 3px 9px;">
+                    <i class="fas fa-plus"></i> Generate Key Pair
+                  </button>
+                </div>
+                <textarea id="wg-remote-ssh-key" rows="3" placeholder="Paste OpenSSH private key or generate one above" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.76em; font-family: ui-monospace, monospace; resize: vertical;"></textarea>
+                <div style="margin-top: 6px;">
+                  <label for="wg-remote-ssh-passphrase" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">Passphrase (optional)</label>
+                  <input type="password" id="wg-remote-ssh-passphrase" placeholder="Passphrase if key is encrypted" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                </div>
+                <div id="wg-remote-pubkey-wrap" style="display: none; margin-top: 6px; background: #0f172a; border: 1px dashed #334155; border-radius: 4px; padding: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="color: #14b8a6; font-size: 0.74em; font-weight: 600;"><i class="fas fa-key"></i> Public Key (Deploy Key for GitHub / GitLab / Git host):</span>
+                    <button type="button" onclick="WalkthroughGit.copyPubkey('wg-remote-pubkey')" class="w3-button w3-round" style="background: #14b8a6; color: #0f172a; font-size: 0.72em; padding: 2px 8px; font-weight: 700;">Copy</button>
+                  </div>
+                  <pre id="wg-remote-pubkey" style="margin: 0; font-size: 0.72em; color: #cbd5e1; font-family: ui-monospace, monospace; word-break: break-all; white-space: pre-wrap; max-height: 55px; overflow-y: auto;"></pre>
+                </div>
+              </div>
+
+              <!-- SSH User/Pass View -->
+              <div id="wg-remote-ssh-view-userpass" style="display: none;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <div style="flex: 1; min-width: 140px;">
+                    <label for="wg-remote-sshpass-user" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">SSH Username</label>
+                    <input type="text" id="wg-remote-sshpass-user" placeholder="e.g. git or username (opt if in URL)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                  <div style="flex: 1; min-width: 160px;">
+                    <label for="wg-remote-sshpass-pass" style="display: block; color: #94a3b8; font-size: 0.72em; margin-bottom: 3px;">SSH Password</label>
+                    <input type="password" id="wg-remote-sshpass-pass" placeholder="(leave blank to keep existing password)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.82em;" />
+                  </div>
+                </div>
+                <div style="color: #64748b; font-size: 0.74em; margin-top: 4px;">Credentials used via SSH_ASKPASS for remote sync (Fetch, Pull, Push); stored securely in repository config (mode 0600).</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Remote Save & Unlink Buttons -->
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <button type="button" onclick="WalkthroughGit.saveRemote()" class="w3-button w3-round" style="background: #38bdf8; color: #0f172a; font-size: 0.84em; padding: 6px 14px; font-weight: 700;">
+                <i class="fas fa-save"></i> Save Remote &amp; Credentials
+              </button>
+              <span style="color: #64748b; font-size: 0.76em;">Applies URL, branch, and authentication settings.</span>
+            </div>
+            <button type="button" id="wg-unlink-btn" onclick="WalkthroughGit.unlink()" class="w3-button w3-round" style="background: #7f1d1d; color: #fecaca; font-size: 0.82em; padding: 6px 12px; font-weight: 600; display: none;">
+              <i class="fas fa-unlink"></i> Unlink Remote
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Remote Sync Actions Card -->
+        <div id="wg-sync-card" style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+          <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; margin-bottom: 6px;"><i class="fas fa-cloud" style="color: #14b8a6;"></i> Remote Sync</div>
+          <div style="color: #94a3b8; font-size: 0.8em; margin-bottom: 10px;">
+            Synchronize changes with the remote repository. To inspect diffs or record commit snapshots, use Version History.
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button type="button" id="wg-fetch-btn" onclick="WalkthroughGit.fetch()" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.84em; padding: 6px 14px; font-weight: 600;" title="Fetch latest branches and tags from remote without modifying local files">
+              <i class="fas fa-sync-alt"></i> Fetch
+            </button>
+            <button type="button" id="wg-pull-btn" onclick="WalkthroughGit.pull()" class="w3-button w3-round" style="background: #0ea5e9; color: #0f172a; font-size: 0.84em; padding: 6px 14px; font-weight: 700;" title="Pull upstream commits (fast-forward)">
+              <i class="fas fa-arrow-down"></i> Pull
+            </button>
+            <button type="button" id="wg-push-btn" onclick="WalkthroughGit.push()" class="w3-button w3-round" style="background: #10b981; color: #0f172a; font-size: 0.84em; padding: 6px 14px; font-weight: 700;" title="Push local commits to upstream branch">
+              <i class="fas fa-arrow-up"></i> Push
+            </button>
+            <button type="button" onclick="WalkthroughGit.openHistory()" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.84em; padding: 5px 14px; font-weight: 600;" title="View revision history, file diffs, and snapshot changes">
+              <i class="fas fa-history"></i> Version History &amp; Diffs
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Create / Clone Repository Drawer -->
-      <details id="wg-clone-section" style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;">
-        <summary style="cursor: pointer; color: #38bdf8; font-size: 0.9em; font-weight: 600; outline: none;">
-          <i class="fas fa-plus-circle" style="color: #14b8a6; margin-right: 4px;"></i> Add Repository (Create New Local Repo or Clone from Remote)
-        </summary>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 12px; width: 100%; box-sizing: border-box;">
-          <!-- Option A: Clone Remote Repo -->
-          <div style="background: #131d31; border: 1px solid #334155; border-radius: 6px; padding: 12px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+      <!-- =================================================================== -->
+      <!-- TAB 2: ADD REPOSITORY (CLONE FROM REMOTE / CREATE LOCAL)            -->
+      <!-- =================================================================== -->
+      <div id="wg-tab-add" style="display: none;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; width: 100%; box-sizing: border-box; margin-bottom: 14px;">
+          <!-- Option A: Clone Remote Repository -->
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div style="font-weight: 600; color: #c084fc; font-size: 0.86em; margin-bottom: 8px;">
+              <div style="font-weight: 600; color: #c084fc; font-size: 0.92em; margin-bottom: 6px;">
                 <i class="fas fa-cloud-download-alt"></i> Clone Remote Repository
               </div>
+              <div style="color: #94a3b8; font-size: 0.78em; margin-bottom: 10px;">
+                Clone a repository containing walkthrough sets and activate it.
+              </div>
+
               <label for="wg-clone-url" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Remote Git URL</label>
-              <input type="text" id="wg-clone-url" placeholder="https://github.com/org/repo.git or git@github.com:org/repo.git" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace; margin-bottom: 8px;" />
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <input type="text" id="wg-clone-url" placeholder="https://github.com/org/repo.git or git@github.com:org/repo.git" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace; margin-bottom: 8px;" />
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
                 <div style="flex: 1; min-width: 110px;">
                   <label for="wg-clone-branch" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Branch (opt)</label>
-                  <input type="text" id="wg-clone-branch" placeholder="main" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace;" />
+                  <input type="text" id="wg-clone-branch" placeholder="main" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace;" />
                 </div>
                 <div style="flex: 1; min-width: 130px;">
                   <label for="wg-clone-name" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Display Name (opt)</label>
-                  <input type="text" id="wg-clone-name" placeholder="Derived from URL" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em;" />
+                  <input type="text" id="wg-clone-name" placeholder="Derived from URL" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em;" />
+                </div>
+              </div>
+
+              <!-- Clone Hierarchical Authentication Box -->
+              <div style="background: #0b1120; border: 1px solid #1e293b; border-radius: 6px; padding: 10px; margin-bottom: 12px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                  <div style="color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600;">
+                    <i class="fas fa-shield-alt" style="color: #38bdf8;"></i> Authentication
+                  </div>
+                  <div style="display: flex; gap: 4px;">
+                    <button type="button" id="wg-clone-proto-none" onclick="WalkthroughGit.setCloneProto('none')" class="wg-pill-btn active" style="padding: 3px 8px; font-size: 0.76em;">
+                      None
+                    </button>
+                    <button type="button" id="wg-clone-proto-https" onclick="WalkthroughGit.setCloneProto('https')" class="wg-pill-btn" style="padding: 3px 8px; font-size: 0.76em;">
+                      HTTPS
+                    </button>
+                    <button type="button" id="wg-clone-proto-ssh" onclick="WalkthroughGit.setCloneProto('ssh')" class="wg-pill-btn" style="padding: 3px 8px; font-size: 0.76em;">
+                      SSH
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Clone None -->
+                <div id="wg-clone-panel-none" style="display: block; color: #64748b; font-size: 0.76em; padding: 2px 0;">
+                  Public repo or local system agent.
+                </div>
+
+                <!-- Clone HTTPS -->
+                <div id="wg-clone-panel-https" style="display: none;">
+                  <div style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center;">
+                    <span style="color: #64748b; font-size: 0.72em;">Method:</span>
+                    <button type="button" id="wg-clone-https-btn-token" onclick="WalkthroughGit.setCloneMethod('token')" class="wg-sub-pill-btn active">
+                      Token (PAT)
+                    </button>
+                    <button type="button" id="wg-clone-https-btn-userpass" onclick="WalkthroughGit.setCloneMethod('user_pass')" class="wg-sub-pill-btn">
+                      User / Password
+                    </button>
+                  </div>
+                  <!-- Clone Token View -->
+                  <div id="wg-clone-https-view-token" style="display: block;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      <div style="flex: 2; min-width: 140px;">
+                        <input type="password" id="wg-clone-token" placeholder="PAT (ghp_..., glpat-...)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                      <div style="flex: 1; min-width: 100px;">
+                        <input type="text" id="wg-clone-token-user" placeholder="git (opt)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Clone User/Pass View -->
+                  <div id="wg-clone-https-view-userpass" style="display: none;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      <div style="flex: 1; min-width: 110px;">
+                        <input type="text" id="wg-clone-auth-user" placeholder="Username" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                      <div style="flex: 1; min-width: 130px;">
+                        <input type="password" id="wg-clone-auth-pass" placeholder="Password" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Clone SSH -->
+                <div id="wg-clone-panel-ssh" style="display: none;">
+                  <div style="display: flex; gap: 6px; margin-bottom: 6px; align-items: center;">
+                    <span style="color: #64748b; font-size: 0.72em;">Method:</span>
+                    <button type="button" id="wg-clone-ssh-btn-key" onclick="WalkthroughGit.setCloneMethod('key')" class="wg-sub-pill-btn active">
+                      SSH Key
+                    </button>
+                    <button type="button" id="wg-clone-ssh-btn-userpass" onclick="WalkthroughGit.setCloneMethod('user_pass')" class="wg-sub-pill-btn">
+                      SSH User / Password
+                    </button>
+                  </div>
+                  <!-- Clone SSH Key View -->
+                  <div id="wg-clone-ssh-view-key" style="display: block;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <span id="wg-clone-ssh-info" style="color: #cbd5e1; font-size: 0.74em; font-weight: 500;">Private Key</span>
+                      <button type="button" onclick="WalkthroughGit.generateKey('clone')" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.72em; padding: 2px 7px;">
+                        <i class="fas fa-plus"></i> Generate Key
+                      </button>
+                    </div>
+                    <textarea id="wg-clone-ssh-key" rows="2" placeholder="Paste OpenSSH private key or generate" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.74em; font-family: ui-monospace, monospace; resize: vertical;"></textarea>
+                    <input type="password" id="wg-clone-ssh-passphrase" placeholder="Passphrase (optional)" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.78em; margin-top: 4px;" />
+                    <div id="wg-clone-pubkey-wrap" style="display: none; margin-top: 6px; background: #0f172a; border: 1px dashed #334155; border-radius: 4px; padding: 6px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                        <span style="color: #14b8a6; font-size: 0.72em; font-weight: 600;"><i class="fas fa-key"></i> Deploy Key:</span>
+                        <button type="button" onclick="WalkthroughGit.copyPubkey('wg-clone-pubkey')" class="w3-button w3-round" style="background: #14b8a6; color: #0f172a; font-size: 0.7em; padding: 1px 7px; font-weight: 700;">Copy</button>
+                      </div>
+                      <pre id="wg-clone-pubkey" style="margin: 0; font-size: 0.7em; color: #cbd5e1; font-family: ui-monospace, monospace; word-break: break-all; white-space: pre-wrap; max-height: 48px; overflow-y: auto;"></pre>
+                    </div>
+                  </div>
+                  <!-- Clone SSH User/Pass View -->
+                  <div id="wg-clone-ssh-view-userpass" style="display: none;">
+                    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                      <div style="flex: 1; min-width: 110px;">
+                        <input type="text" id="wg-clone-sshpass-user" placeholder="SSH Username" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                      <div style="flex: 1; min-width: 130px;">
+                        <input type="password" id="wg-clone-sshpass-pass" placeholder="SSH Password" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 5px 8px; border-radius: 4px; font-size: 0.8em;" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <button type="button" onclick="WalkthroughGit.clone()" class="w3-button w3-round" style="margin-top: 10px; background: #a855f7; color: #ffffff; font-size: 0.82em; padding: 6px 14px; font-weight: 700; width: 100%; max-width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: normal;">
-              <i class="fas fa-clone"></i> <span>Clone &amp; Switch to Repository</span>
+
+            <button type="button" onclick="WalkthroughGit.clone()" class="w3-button w3-round" style="background: #a855f7; color: #ffffff; font-size: 0.84em; padding: 7px 14px; font-weight: 700; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fas fa-clone"></i> Clone &amp; Switch to Repository
             </button>
           </div>
 
-          <!-- Option B: Create New Local Repo -->
-          <div style="background: #131d31; border: 1px solid #334155; border-radius: 6px; padding: 12px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
+          <!-- Option B: Create New Local Repository -->
+          <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div style="font-weight: 600; color: #38bdf8; font-size: 0.86em; margin-bottom: 8px;">
-                <i class="fas fa-folder-plus"></i> Create New Repository
+              <div style="font-weight: 600; color: #38bdf8; font-size: 0.92em; margin-bottom: 6px;">
+                <i class="fas fa-folder-plus"></i> Create New Local Repository
               </div>
-              <label for="wg-create-repo-name" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Repository Name</label>
-              <input type="text" id="wg-create-repo-name" placeholder="e.g. Kubernetes Labs or repo-2" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em; margin-bottom: 8px;" />
+              <div style="color: #94a3b8; font-size: 0.78em; margin-bottom: 10px;">
+                Initializes an empty walkthrough repository in your workspace.
+              </div>
+
+              <label for="wg-create-repo-name" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Repository Display Name</label>
+              <input type="text" id="wg-create-repo-name" placeholder="e.g. Kubernetes Labs" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.83em; margin-bottom: 12px;" />
+
               <label for="wg-create-repo-url" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Remote URL (optional)</label>
-              <input type="text" id="wg-create-repo-url" placeholder="git@github.com:org/repo-2.git" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 6px 9px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace;" />
+              <input type="text" id="wg-create-repo-url" placeholder="git@github.com:org/repo-2.git" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.83em; font-family: ui-monospace, monospace; margin-bottom: 12px;" />
+
+              <div style="color: #64748b; font-size: 0.76em; line-height: 1.45;">
+                You can configure authentication or link upstream remotes at any time from the Active Repository tab after creation.
+              </div>
             </div>
-            <button type="button" onclick="WalkthroughGit.createRepo()" class="w3-button w3-round" style="margin-top: 10px; background: #0284c7; color: #ffffff; font-size: 0.82em; padding: 6px 14px; font-weight: 700; width: 100%; max-width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px; white-space: normal;">
-              <i class="fas fa-plus"></i> <span>Create &amp; Switch to Repository</span>
+
+            <button type="button" onclick="WalkthroughGit.createRepo()" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.84em; padding: 7px 14px; font-weight: 700; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fas fa-plus"></i> Create &amp; Switch to Repository
             </button>
           </div>
         </div>
-      </details>
-
-      <!-- Active Repository Git Status Card -->
-      <div id="wg-status-card" style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: none;">
-        <div style="display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; font-size: 0.84em; line-height: 1.45;">
-          <div style="color: #94a3b8;">State</div><div id="wg-state" style="color: #f8fafc;">-</div>
-          <div style="color: #94a3b8;">Remote</div><div id="wg-remote" style="color: #cbd5e1; font-family: ui-monospace, monospace; word-break: break-all;">-</div>
-          <div style="color: #94a3b8;">Branch</div><div id="wg-branch-display" style="color: #cbd5e1; font-family: ui-monospace, monospace;">-</div>
-          <div style="color: #94a3b8;">Last commit</div><div id="wg-last-commit" style="color: #cbd5e1;">-</div>
-          <div style="color: #94a3b8;">Sync</div><div id="wg-sync" style="color: #cbd5e1;">-</div>
-          <div style="color: #94a3b8;">Changes</div><div id="wg-changes" style="color: #cbd5e1;">-</div>
-        </div>
-        <div id="wg-changes-list" style="display: none; margin-top: 8px; max-height: 110px; overflow-y: auto; background: #0b1120; border: 1px solid #1e293b; border-radius: 4px; padding: 6px 8px; font-family: ui-monospace, monospace; font-size: 0.78em; color: #cbd5e1; white-space: pre;"></div>
       </div>
 
-      <!-- Active Repository Remote Configuration -->
-      <div style="background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
-        <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; margin-bottom: 8px;"><i class="fas fa-link" style="color: #38bdf8;"></i> Active Repository Remote</div>
-        <div id="wg-remote-hint" style="color: #94a3b8; font-size: 0.8em; margin-bottom: 8px;">
-          This repository is not linked to a remote yet. Enter a remote URL below to publish and sync its walkthrough sets.
-        </div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
-          <div style="flex: 3; min-width: 220px;">
-            <label for="wg-url" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Remote URL</label>
-            <input type="text" id="wg-url" placeholder="git@github.com:org/walkthroughs.git or https://token@host/org/repo.git" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.84em; font-family: ui-monospace, monospace;" />
-          </div>
-          <div style="flex: 1; min-width: 120px;">
-            <label for="wg-branch" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Branch</label>
-            <input type="text" id="wg-branch" placeholder="main" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.84em; font-family: ui-monospace, monospace;" />
-          </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <button type="button" onclick="WalkthroughGit.saveRemote()" class="w3-button w3-round" style="background: #38bdf8; color: #0f172a; font-size: 0.84em; padding: 6px 14px; font-weight: 700;">
-            <i class="fas fa-save"></i> Link / Save Remote
-          </button>
-          <span style="color: #64748b; font-size: 0.76em;">SSH uses the server's <code>~/.ssh</code> config/agent. HTTPS can embed a token in the URL.</span>
-        </div>
-      </div>
-
-      <!-- Sync & Commit Actions -->
-      <div id="wg-linked-actions" style="display: none; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
-        <div style="font-weight: 600; color: #f8fafc; font-size: 0.9em; margin-bottom: 8px;"><i class="fas fa-cloud" style="color: #14b8a6;"></i> Commit &amp; Remote Sync</div>
-        <label for="wg-message" style="display: block; color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Commit message (push / commit all changes in active repository)</label>
-        <input type="text" id="wg-message" placeholder="Update walkthrough sets" style="width: 100%; box-sizing: border-box; background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.85em; margin-bottom: 10px;" />
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-          <button type="button" id="wg-fetch-btn" onclick="WalkthroughGit.fetch()" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.84em; padding: 6px 12px; font-weight: 600;"><i class="fas fa-sync-alt"></i> Fetch</button>
-          <button type="button" id="wg-pull-btn" onclick="WalkthroughGit.pull()" class="w3-button w3-round" style="background: #0ea5e9; color: #0f172a; font-size: 0.84em; padding: 6px 12px; font-weight: 700;"><i class="fas fa-arrow-down"></i> Pull</button>
-          <button type="button" id="wg-push-btn" onclick="WalkthroughGit.push()" class="w3-button w3-round" style="background: #10b981; color: #0f172a; font-size: 0.84em; padding: 6px 12px; font-weight: 700;"><i class="fas fa-arrow-up"></i> Push</button>
-          <button type="button" id="wg-commit-btn" onclick="WalkthroughGit.commit()" class="w3-button w3-round" style="background: #eab308; color: #0f172a; font-size: 0.84em; padding: 6px 12px; font-weight: 700;"><i class="fas fa-code-branch"></i> Commit</button>
-          <button type="button" onclick="WalkthroughGit.openHistory()" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; font-size: 0.84em; padding: 5px 12px; font-weight: 600;"><i class="fas fa-history"></i> History &amp; Diffs</button>
-          <button type="button" id="wg-unlink-btn" onclick="WalkthroughGit.unlink()" class="w3-button w3-round" style="background: #7f1d1d; color: #fecaca; font-size: 0.84em; padding: 6px 12px; font-weight: 700; margin-left: auto;"><i class="fas fa-unlink"></i> Unlink Remote</button>
-        </div>
-        <div style="color: #64748b; font-size: 0.76em; margin-top: 8px;">Pull is fast-forward only. Push commits local changes in this repository automatically.</div>
-      </div>
-
-      <div id="wg-log-wrap" style="display: none;">
-        <div style="color: #94a3b8; font-size: 0.76em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Output</div>
-        <pre id="wg-log" style="margin: 0; max-height: 160px; overflow-y: auto; background: #0b1120; border: 1px solid #1e293b; border-radius: 4px; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 0.78em; color: #cbd5e1; white-space: pre-wrap;"></pre>
+      <!-- Command Output Log -->
+      <div id="wg-log-wrap" style="display: none; margin-top: 10px;">
+        <div style="color: #94a3b8; font-size: 0.74em; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px;">Command Output</div>
+        <pre id="wg-log" style="margin: 0; max-height: 140px; overflow-y: auto; background: #0b1120; border: 1px solid #1e293b; border-radius: 4px; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: 0.78em; color: #cbd5e1; white-space: pre-wrap;"></pre>
       </div>
     </div>
 
+    <!-- Modal Footer -->
     <footer style="padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
-      <span style="color: #64748b; font-size: 0.8em;"><i class="fas fa-shield-alt"></i> Video files (.webm, .mp4) are excluded from git sync</span>
+      <span style="color: #64748b; font-size: 0.78em;"><i class="fas fa-shield-alt"></i> Video files (.webm, .mp4) are excluded from git sync</span>
       <button type="button" onclick="WalkthroughGit.close()" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
     </footer>
   </div>

@@ -70,8 +70,9 @@ class WalkthroughGitController < BaseController
     end
 
     repo_slug = RecordingService.create_repository(name.empty? ? slug : name, slug: (slug.empty? ? nil : slug), switch: true)
-    unless url.empty?
-      remote_res = WalkthroughGitService.set_remote(repo_slug, url: url, branch: branch)
+    auth = data['auth'] || data[:auth]
+    if !url.empty? || (auth && !auth.empty?)
+      remote_res = WalkthroughGitService.set_remote(repo_slug, url: url, branch: branch, auth: auth)
       unless remote_res[:ok]
         return walkthrough_git_respond(remote_res)
       end
@@ -150,7 +151,8 @@ class WalkthroughGitController < BaseController
       url: data['url'] || data[:url],
       branch: data['branch'] || data[:branch],
       name: data['name'] || data[:name],
-      slug: data['slug'] || data[:slug]
+      slug: data['slug'] || data[:slug],
+      auth: data['auth'] || data[:auth]
     )
     if result[:ok] && result[:slug]
       session[:walkthrough] = result[:slug]
@@ -165,8 +167,29 @@ class WalkthroughGitController < BaseController
     result = WalkthroughGitService.set_remote(
       params[:slug],
       url: data['url'] || data[:url],
-      branch: data['branch'] || data[:branch]
+      branch: data['branch'] || data[:branch],
+      auth: data['auth'] || data[:auth]
     )
+    walkthrough_git_respond(result)
+  rescue StandardError => e
+    walkthrough_git_respond({ ok: false, error: e.message }, error_status: 500)
+  end
+
+  post '/walkthroughs/git/key/generate' do
+    data = walkthrough_git_params
+    slug = (data['slug'] || data[:slug] || data['repo'] || data[:repo] || 'key').to_s.strip
+    passphrase = (data['passphrase'] || data[:passphrase]).to_s
+    result = WalkthroughGitService.generate_ssh_key(slug, passphrase: passphrase)
+    walkthrough_git_respond(result)
+  rescue StandardError => e
+    walkthrough_git_respond({ ok: false, error: e.message }, error_status: 500)
+  end
+
+  post '/walkthroughs/:slug/git/key/generate' do
+    data = walkthrough_git_params
+    slug = (data['slug'] || data[:slug] || params[:slug] || 'key').to_s.strip
+    passphrase = (data['passphrase'] || data[:passphrase]).to_s
+    result = WalkthroughGitService.generate_ssh_key(slug, passphrase: passphrase)
     walkthrough_git_respond(result)
   rescue StandardError => e
     walkthrough_git_respond({ ok: false, error: e.message }, error_status: 500)

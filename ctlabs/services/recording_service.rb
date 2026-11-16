@@ -127,6 +127,7 @@ class RecordingService
   def self.save_repositories(state)
     FileUtils.mkdir_p(REPOS_BASE_DIR) unless Dir.exist?(REPOS_BASE_DIR)
     File.write(REPOS_MANIFEST, JSON.pretty_generate(state))
+    File.chmod(0600, REPOS_MANIFEST) rescue nil
   rescue StandardError
     nil
   end
@@ -206,10 +207,11 @@ class RecordingService
     display_name = name.to_s.strip[0, NAME_MAX]
     display_name = (clean_slug == 'default' ? 'Local Workspace' : clean_slug) if display_name.empty?
 
-    state['repos'][clean_slug] = {
+    existing = state['repos'][clean_slug] || {}
+    state['repos'][clean_slug] = existing.merge(
       'name'       => display_name,
-      'created_at' => (state.dig('repos', clean_slug, 'created_at') || Time.now.to_f)
-    }
+      'created_at' => (existing['created_at'] || Time.now.to_f)
+    )
     state['active'] = clean_slug if switch
     save_repositories(state)
     clean_slug
@@ -259,6 +261,8 @@ class RecordingService
 
     rdir = repo_dir(clean_slug)
     FileUtils.rm_rf(rdir) if File.directory?(rdir) && rdir.start_with?(REPOS_BASE_DIR + '/')
+    keys_dir = File.join(REPOS_BASE_DIR, '.keys')
+    Dir.glob(File.join(keys_dir, "#{clean_slug}*")).each { |f| FileUtils.rm_f(f) } if Dir.exist?(keys_dir)
 
     state['repos'].delete(clean_slug)
     state['active'] = 'default' if state['active'] == clean_slug

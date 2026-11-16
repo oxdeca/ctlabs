@@ -13,6 +13,8 @@ require 'fileutils'
 require 'json'
 require 'timeout'
 require 'pathname'
+require 'shellwords'
+require 'securerandom'
 
 class WalkthroughGitService
   SLUG_RE          = /\A[a-zA-Z0-9_-]{1,120}\z/
@@ -20,6 +22,7 @@ class WalkthroughGitService
   VIDEO_PATTERNS   = %w[*.webm *.mp4 *.mkv *.mov *.avi *.flv *.wmv].freeze
   EXCLUDE_PATTERNS = (VIDEO_PATTERNS + %w[*.tmp temp_* export_*.zip export_note_*.zip .DS_Store _repos.json]).freeze
   SSH_COMMAND      = 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20'
+  ASKPASS_SCRIPT   = File.expand_path('../scripts/git_askpass.sh', __dir__)
   DEFAULT_TIMEOUT  = 90
 
   @mutex = Mutex.new
@@ -56,6 +59,255 @@ class WalkthroughGitService
 
   def self.repo_initialized?(slug_or_repo = nil)
     File.directory?(git_dir(slug_or_repo))
+  end
+
+  def self.keys_dir
+    repos_root = defined?(RecordingService) ? RecordingService::REPOS_BASE_DIR : '/srv/ctlabs-server/walkthrough-repos'
+    dir = File.join(repos_root, '.keys')
+    FileUtils.mkdir_p(dir) unless Dir.exist?(dir)
+    File.chmod(0700, dir) rescue nil
+    dir
+  end
+
+  def self.ensure_askpass_script!
+    bin_dir = File.dirname(ASKPASS_SCRIPT)
+    FileUtils.mkdir_p(bin_dir) unless Dir.exist?(bin_dir)
+    content = <<~'SH'
+      #!/bin/sh
+      prompt="$1"
+      case "$prompt" in
+        *[Uu]sername*) echo "$CTLABS_GIT_USERNAME" ;;
+        *[Pp]assword*|*[Tt]oken*) echo "$CTLABS_GIT_PASSWORD" ;;
+        *[Pp]assphrase*) echo "$CTLABS_GIT_PASSPHRASE" ;;
+        *) echo "" ;;
+      esac
+    SH
+    unless File.file?(ASKPASS_SCRIPT) && File.read(ASKPASS_SCRIPT) == content
+      File.write(ASKPASS_SCRIPT, content)
+    end
+    File.chmod(0755, ASKPASS_SCRIPT) rescue nil
+    ASKPASS_SCRIPT
+  rescue StandardError => e
+    warn "WalkthroughGitService.ensure_askpass_script! error: #{e.message}"
+    ASKPASS_SCRIPT
+  end
+
+  def self.auth_for(slug_or_repo = nil)
+    rslug = resolve_repo_slug(slug_or_repo)
+    return nil unless defined?(RecordingService)
+
+    repos = RecordingService.load_repositories['repos'] || {}
+    auth = repos.dig(rslug, 'auth')
+    auth.is_a?(Hash) ? auth : nil
+  rescue StandardError
+    nil
+  end
+
+  def self.set_auth(slug_or_repo, auth_data)
+    rslug = resolve_repo_slug(slug_or_repo)
+    return false unless defined?(RecordingService)
+
+    state = RecordingService.load_repositories
+    return false unless state['repos']&.key?(rslug)
+
+    if auth_data.nil? || auth_data.empty? || auth_data['type'] == 'none' || auth_data[:type] == 'none'
+      state['repos'][rslug].delete('auth')
+    else
+      clean_auth = {}
+      type = (auth_data['type'] || auth_data[:type]).to_s.strip
+      method = (auth_data['auth_method'] || auth_data[:auth_method]).to_s.strip
+      case type
+      when 'http', 'basic'
+        clean_auth['type'] = 'http'
+        clean_auth['auth_method'] = method.empty? ? 'token' : method
+        clean_auth['username'] = (auth_data['username'] || auth_data[:username]).to_s.strip
+        pass = (auth_data['password'] || auth_data[:password] || auth_data['token'] || auth_data[:token]).to_s
+        clean_auth['password'] = pass
+      when 'ssh_password'
+        clean_auth['type'] = 'ssh_password'
+        clean_auth['auth_method'] = 'user_pass'
+        clean_auth['username'] = (auth_data['username'] || auth_data[:username]).to_s.strip
+        pass = (auth_data['password'] || auth_data[:password]).to_s
+        clean_auth['password'] = pass
+      when 'ssh_key'
+        clean_auth['type'] = 'ssh_key'
+        clean_auth['auth_method'] = 'key'
+        clean_auth['key_path'] = (auth_data['key_path'] || auth_data[:key_path]).to_s.strip
+        passphrase = (auth_data['passphrase'] || auth_data[:passphrase]).to_s
+        clean_auth['passphrase'] = passphrase unless passphrase.empty?
+      end
+      state['repos'][rslug]['auth'] = clean_auth
+    end
+    RecordingService.save_repositories(state)
+    true
+  rescue StandardError => e
+    warn "WalkthroughGitService.set_auth error: #{e.message}"
+    false
+  end
+
+  def self.sanitized_auth(slug_or_repo = nil)
+    auth = auth_for(slug_or_repo)
+    return { type: 'none', protocol: 'none', auth_method: 'none' } unless auth.is_a?(Hash)
+
+    type = auth['type'].to_s
+    case type
+    when 'http', 'basic'
+      m = auth['auth_method'].to_s
+      m = 'token' if m.empty?
+      {
+        type: 'http',
+        protocol: 'https',
+        auth_method: m,
+        username: auth['username'].to_s,
+        has_password: !auth['password'].to_s.empty?
+      }
+    when 'ssh_password'
+      {
+        type: 'ssh_password',
+        protocol: 'ssh',
+        auth_method: 'user_pass',
+        username: auth['username'].to_s,
+        has_password: !auth['password'].to_s.empty?
+      }
+    when 'ssh_key'
+      key_path = auth['key_path'].to_s
+      key_exists = !key_path.empty? && File.file?(key_path)
+      pub_key = key_exists ? extract_public_key(key_path, passphrase: auth['passphrase']) : nil
+      {
+        type: 'ssh_key',
+        protocol: 'ssh',
+        auth_method: 'key',
+        key_path: key_path,
+        key_name: key_path.empty? ? nil : File.basename(key_path),
+        key_exists: key_exists,
+        public_key: pub_key,
+        has_passphrase: !auth['passphrase'].to_s.empty?
+      }
+    else
+      { type: 'none', protocol: 'none', auth_method: 'none' }
+    end
+  rescue StandardError
+    { type: 'none', protocol: 'none', auth_method: 'none' }
+  end
+
+  def self.save_ssh_key(slug, key_content, passphrase: nil)
+    clean_slug = slugify(slug)
+    clean_slug = "key_#{SecureRandom.hex(4)}" if clean_slug.empty? || clean_slug == 'walkthrough'
+    dir = keys_dir
+    key_path = File.join(dir, "#{clean_slug}.key")
+    File.write(key_path, key_content.to_s.strip + "\n")
+    File.chmod(0600, key_path)
+    pub = extract_public_key(key_path, passphrase: passphrase)
+    File.write("#{key_path}.pub", pub + "\n") if pub
+    key_path
+  end
+
+  def self.generate_ssh_key(slug, passphrase: nil)
+    clean_slug = slugify(slug)
+    clean_slug = "key_#{SecureRandom.hex(4)}" if clean_slug.empty? || clean_slug == 'walkthrough'
+    dir = keys_dir
+    key_path = File.join(dir, "#{clean_slug}.key")
+    FileUtils.rm_f(key_path)
+    FileUtils.rm_f("#{key_path}.pub")
+
+    args = ['ssh-keygen', '-t', 'ed25519', '-N', (passphrase || ''), '-f', key_path, '-C', "ctlabs@#{clean_slug}"]
+    out, status = Open3.capture2e(*args)
+    unless status.success?
+      args = ['ssh-keygen', '-t', 'rsa', '-b', '4096', '-N', (passphrase || ''), '-f', key_path, '-C', "ctlabs@#{clean_slug}"]
+      out, status = Open3.capture2e(*args)
+      return failure("SSH key generation failed: #{out.strip}") unless status.success?
+    end
+
+    File.chmod(0600, key_path)
+    pub = extract_public_key(key_path, passphrase: passphrase)
+    {
+      ok: true,
+      key_path: key_path,
+      key_name: File.basename(key_path),
+      public_key: pub
+    }
+  rescue StandardError => e
+    failure(e.message)
+  end
+
+  def self.extract_public_key(key_path, passphrase: nil)
+    return nil unless key_path && File.file?(key_path)
+
+    pub_file = "#{key_path}.pub"
+    if File.file?(pub_file) && (passphrase.nil? || passphrase.to_s.empty?)
+      content = File.read(pub_file).strip
+      return content unless content.empty?
+    end
+
+    cmd = ['ssh-keygen', '-y', '-f', key_path]
+    cmd += ['-P', passphrase.to_s] if passphrase && !passphrase.to_s.empty?
+    out, status = Open3.capture2(*cmd)
+    if status.success?
+      pub = out.strip
+      File.write(pub_file, pub + "\n") rescue nil
+      pub
+    else
+      nil
+    end
+  rescue StandardError
+    nil
+  end
+
+  def self.auth_env_for(slug_or_repo = nil, auth_override = nil)
+    auth = auth_override || auth_for(slug_or_repo)
+    return {} unless auth.is_a?(Hash)
+
+    ensure_askpass_script!
+    env = {}
+    type = (auth['type'] || auth[:type]).to_s
+
+    case type
+    when 'basic', 'http'
+      username = (auth['username'] || auth[:username]).to_s.strip
+      password = (auth['password'] || auth[:password] || auth['token'] || auth[:token]).to_s
+      username = 'git' if username.empty?
+      env['GIT_ASKPASS'] = ASKPASS_SCRIPT
+      env['CTLABS_GIT_USERNAME'] = username
+      env['CTLABS_GIT_PASSWORD'] = password
+    when 'ssh_password'
+      username = (auth['username'] || auth[:username]).to_s.strip
+      password = (auth['password'] || auth[:password]).to_s
+      env['SSH_ASKPASS'] = ASKPASS_SCRIPT
+      env['SSH_ASKPASS_REQUIRE'] = 'force'
+      env['CTLABS_GIT_PASSWORD'] = password
+      env['DISPLAY'] = ':0'
+
+      ssh_opts = [
+        '-o PreferredAuthentications=password,keyboard-interactive',
+        '-o PubkeyAuthentication=no',
+        '-o NumberOfPasswordPrompts=1',
+        '-o StrictHostKeyChecking=accept-new',
+        '-o ConnectTimeout=20'
+      ]
+      ssh_opts << "-l #{Shellwords.escape(username)}" unless username.empty?
+      env['GIT_SSH_COMMAND'] = "ssh #{ssh_opts.join(' ')}"
+    when 'ssh_key'
+      key_path = (auth['key_path'] || auth[:key_path]).to_s
+      passphrase = (auth['passphrase'] || auth[:passphrase]).to_s
+
+      if !key_path.empty? && File.file?(key_path)
+        batch_opt = passphrase.empty? ? '-o BatchMode=yes' : ''
+        ssh_cmd = "ssh -i #{Shellwords.escape(key_path)} -o IdentitiesOnly=yes #{batch_opt} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20".squeeze(' ').strip
+        env['GIT_SSH_COMMAND'] = ssh_cmd
+
+        unless passphrase.empty?
+          env['SSH_ASKPASS'] = ASKPASS_SCRIPT
+          env['SSH_ASKPASS_REQUIRE'] = 'force'
+          env['CTLABS_GIT_PASSPHRASE'] = passphrase
+          env['DISPLAY'] = ':0'
+        end
+      end
+    end
+
+    env
+  rescue StandardError => e
+    warn "WalkthroughGitService.auth_env_for error: #{e.message}"
+    {}
   end
 
   def self.ensure_repo!(slug_or_repo = nil)
@@ -118,7 +370,8 @@ class WalkthroughGitService
       git_available: available,
       initialized: initialized,
       linked: initialized,
-      remote_linked: has_remote
+      remote_linked: has_remote,
+      auth: sanitized_auth(rslug)
     }
     return base unless initialized
 
@@ -162,7 +415,7 @@ class WalkthroughGitService
   # Clones a remote Git repository into a standalone repository directory under
   # /srv/ctlabs-server/walkthrough-repos/<repo_slug> and switches the active
   # repository to it.
-  def self.clone(url:, branch: nil, name: nil, slug: nil)
+  def self.clone(url:, branch: nil, name: nil, slug: nil, auth: nil)
     return failure('git is not installed on the server') unless git_available?
 
     url = url.to_s.strip
@@ -191,6 +444,20 @@ class WalkthroughGitService
       return failure("A repository named '#{clean}' already exists")
     end
 
+    auth_data = auth.is_a?(Hash) ? auth.dup : nil
+    created_key_path = nil
+
+    if auth_data && (auth_data['type'] == 'ssh_key' || auth_data[:type] == 'ssh_key')
+      key_content = (auth_data['key_content'] || auth_data[:key_content]).to_s.strip
+      passphrase = (auth_data['passphrase'] || auth_data[:passphrase]).to_s
+      if !key_content.empty?
+        created_key_path = save_ssh_key(clean, key_content, passphrase: passphrase)
+        auth_data['key_path'] = created_key_path
+      end
+    end
+
+    auth_env = auth_env_for(nil, auth_data)
+
     @mutex.synchronize do
       FileUtils.rm_rf(target_dir) if File.exist?(target_dir)
 
@@ -198,9 +465,13 @@ class WalkthroughGitService
       args += ['--branch', branch_arg] unless branch_arg.empty?
       args += [url, target_dir]
 
-      res = run_git(args, timeout: 180)
+      res = run_git(args, env: auth_env, timeout: 180)
       unless res[:ok]
         FileUtils.rm_rf(target_dir) rescue nil
+        if created_key_path
+          FileUtils.rm_f(created_key_path) rescue nil
+          FileUtils.rm_f("#{created_key_path}.pub") rescue nil
+        end
         return failure("Clone failed: #{res[:err].to_s.strip}")
       end
 
@@ -216,6 +487,7 @@ class WalkthroughGitService
 
       if defined?(RecordingService)
         RecordingService.register_repository(clean, name: label, switch: true)
+        set_auth(clean, auth_data) if auth_data
         wks = RecordingService.load_walkthroughs
         first_set = wks.keys.first.to_s
       else
@@ -229,14 +501,19 @@ class WalkthroughGitService
         slug: first_set,
         branch: chosen,
         remote: redact_url(url),
-        name: label
+        name: label,
+        auth: sanitized_auth(clean)
       }
     end
   rescue StandardError => e
+    if created_key_path
+      FileUtils.rm_f(created_key_path) rescue nil
+      FileUtils.rm_f("#{created_key_path}.pub") rescue nil
+    end
     failure(e.message)
   end
 
-  def self.set_remote(slug_or_repo = nil, url: nil, branch: nil)
+  def self.set_remote(slug_or_repo = nil, url: nil, branch: nil, auth: nil)
     return failure('git is not installed on the server') unless git_available?
 
     rslug = resolve_repo_slug(slug_or_repo)
@@ -249,7 +526,7 @@ class WalkthroughGitService
 
     has_remote = repo_initialized?(rslug) && remote_url_present?(rslug)
     if url.empty?
-      return failure('Remote URL is required to link this repository') unless has_remote || !branch.empty?
+      return failure('Remote URL is required to link this repository') unless has_remote || !branch.empty? || auth
     else
       url_error = remote_url_error(url)
       return failure(url_error) if url_error
@@ -275,13 +552,51 @@ class WalkthroughGitService
         end
       end
 
+      if auth.is_a?(Hash)
+        auth_type = (auth['type'] || auth[:type]).to_s.strip
+        if auth_type == 'none'
+          set_auth(rslug, nil)
+        elsif auth_type == 'basic' || auth_type == 'http'
+          existing = auth_for(rslug)
+          user = (auth['username'] || auth[:username]).to_s.strip
+          pass = (auth['password'] || auth[:password] || auth['token'] || auth[:token]).to_s
+          method = (auth['auth_method'] || auth[:auth_method]).to_s.strip
+          method = (existing && existing['auth_method']) || 'token' if method.empty?
+          if pass.empty? && existing && (existing['type'] == 'basic' || existing['type'] == 'http')
+            pass = existing['password'].to_s
+          end
+          set_auth(rslug, { 'type' => 'http', 'auth_method' => method, 'username' => user, 'password' => pass })
+        elsif auth_type == 'ssh_password'
+          existing = auth_for(rslug)
+          user = (auth['username'] || auth[:username]).to_s.strip
+          pass = (auth['password'] || auth[:password]).to_s
+          if pass.empty? && existing && existing['type'] == 'ssh_password'
+            pass = existing['password'].to_s
+          end
+          set_auth(rslug, { 'type' => 'ssh_password', 'username' => user, 'password' => pass })
+        elsif auth_type == 'ssh_key'
+          existing = auth_for(rslug)
+          content = (auth['key_content'] || auth[:key_content]).to_s.strip
+          passphrase = (auth['passphrase'] || auth[:passphrase]).to_s
+          key_path = (auth['key_path'] || auth[:key_path]).to_s.strip
+          if !content.empty?
+            key_path = save_ssh_key(rslug, content, passphrase: passphrase)
+          elsif key_path.empty? && existing && existing['type'] == 'ssh_key'
+            key_path = existing['key_path']
+            passphrase = existing['passphrase'].to_s if passphrase.empty?
+          end
+          set_auth(rslug, { 'type' => 'ssh_key', 'key_path' => key_path, 'passphrase' => passphrase })
+        end
+      end
+
       {
         ok: true,
         repo: rslug,
         linked: true,
         remote_linked: remote_url_present?(rslug),
         remote: redact_url(remote_url(rslug)),
-        branch: current_branch(rslug)
+        branch: current_branch(rslug),
+        auth: sanitized_auth(rslug)
       }
     end
   rescue StandardError => e
@@ -296,7 +611,8 @@ class WalkthroughGitService
     return failure('No remote repository linked yet. Enter a Remote URL and click Link / Save Remote first.') unless remote_url_present?(rslug)
 
     @mutex.synchronize do
-      res = run_repo(rslug, 'fetch', 'origin', '--prune', timeout: 180)
+      auth_env = auth_env_for(rslug)
+      res = run_repo(rslug, 'fetch', 'origin', '--prune', env: auth_env, timeout: 180)
       return failure("Fetch failed: #{res[:err].to_s.strip}") unless res[:ok]
 
       { ok: true, repo: rslug, output: (res[:out] + res[:err]).strip }
@@ -317,7 +633,8 @@ class WalkthroughGitService
       return failure('Invalid branch name') if !branch.to_s.strip.empty? && target.nil?
       return failure('No branch checked out') unless target
 
-      fetched = run_repo(rslug, 'fetch', 'origin', '--prune', timeout: 180)
+      auth_env = auth_env_for(rslug)
+      fetched = run_repo(rslug, 'fetch', 'origin', '--prune', env: auth_env, timeout: 180)
       return failure("Fetch failed: #{fetched[:err].to_s.strip}") unless fetched[:ok]
 
       exists = run_repo(rslug, 'rev-parse', '--verify', "origin/#{target}")
@@ -381,7 +698,8 @@ class WalkthroughGitService
       args << '-u' unless upstream[:ok]
       args += ['origin', target]
 
-      pushed = run_repo(rslug, *args, timeout: 180)
+      auth_env = auth_env_for(rslug)
+      pushed = run_repo(rslug, *args, env: auth_env, timeout: 180)
       return failure("Push failed: #{pushed[:err].to_s.strip}") unless pushed[:ok]
 
       {
@@ -454,12 +772,13 @@ class WalkthroughGitService
       if repo_initialized?(rslug) && remote_url_present?(rslug)
         run_repo(rslug, 'remote', 'remove', 'origin')
       end
+      set_auth(rslug, nil)
       {
         ok: true,
         repo: rslug,
         unlinked: true,
         slug: rslug,
-        output: 'Remote link removed. Local walkthrough sets and commit history were kept.'
+        output: 'Remote link and credentials removed. Local walkthrough sets and commit history were kept.'
       }
     end
   rescue StandardError => e
@@ -701,12 +1020,12 @@ class WalkthroughGitService
     { ok: false, error: message.to_s }
   end
 
-  def self.run_repo(slug_or_repo, *args, timeout: DEFAULT_TIMEOUT)
-    run_in_dir(repo_dir(slug_or_repo), *args, timeout: timeout)
+  def self.run_repo(slug_or_repo, *args, env: {}, timeout: DEFAULT_TIMEOUT)
+    run_in_dir(repo_dir(slug_or_repo), *args, env: env, timeout: timeout)
   end
 
-  def self.run_in_dir(work_path, *args, timeout: DEFAULT_TIMEOUT)
-    run_git(['-C', work_path, *args], timeout: timeout)
+  def self.run_in_dir(work_path, *args, env: {}, timeout: DEFAULT_TIMEOUT)
+    run_git(['-C', work_path, *args], env: env, timeout: timeout)
   end
 
   def self.run_git(args, env: {}, timeout: DEFAULT_TIMEOUT)

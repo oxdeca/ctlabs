@@ -2,6 +2,7 @@
  -----------------------------------------------------------------------------
  File        : ctlabs/js/walkthrough_git.js
  Description : Walkthrough Repository & Git Sync Modal controller
+               (hierarchical authentication, 2-tab workflow, multi-repo management)
  License     : MIT License
  -----------------------------------------------------------------------------
 */
@@ -12,6 +13,15 @@
   let currentSlug = '';
   let currentStatus = null;
   let busy = false;
+  let generatedCloneKeyPath = null;
+  let generatedRemoteKeyPath = null;
+  let userEditedRemoteAuth = false;
+
+  let activeTab = 'sync'; // 'sync' | 'add'
+  let remoteProto = 'none'; // 'none' | 'https' | 'ssh'
+  let remoteMethod = 'token'; // 'token' | 'user_pass' | 'key'
+  let cloneProto = 'none'; // 'none' | 'https' | 'ssh'
+  let cloneMethod = 'token'; // 'token' | 'user_pass' | 'key'
 
   function byId(id) {
     return document.getElementById(id);
@@ -75,6 +85,235 @@
     return valueOf('wg-branch');
   }
 
+  // ---------------------------------------------------------------------------
+  // Tabs Navigation
+  // ---------------------------------------------------------------------------
+
+  function switchTab(tabId) {
+    activeTab = (tabId === 'add') ? 'add' : 'sync';
+
+    const tabSync = byId('wg-tab-sync');
+    const tabAdd = byId('wg-tab-add');
+    const btnSync = byId('wg-tab-btn-sync');
+    const btnAdd = byId('wg-tab-btn-add');
+
+    if (tabSync) tabSync.style.display = (activeTab === 'sync') ? 'block' : 'none';
+    if (tabAdd) tabAdd.style.display = (activeTab === 'add') ? 'block' : 'none';
+
+    if (btnSync) {
+      if (activeTab === 'sync') btnSync.classList.add('active');
+      else btnSync.classList.remove('active');
+    }
+    if (btnAdd) {
+      if (activeTab === 'add') btnAdd.classList.add('active');
+      else btnAdd.classList.remove('active');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Authentication Hierarchical Switchers
+  // ---------------------------------------------------------------------------
+
+  function setRemoteProto(proto, userAction) {
+    remoteProto = ['none', 'https', 'ssh'].includes(proto) ? proto : 'none';
+    if (userAction) userEditedRemoteAuth = true;
+
+    // Default method when switching protocols
+    if (remoteProto === 'https' && remoteMethod !== 'token' && remoteMethod !== 'user_pass') {
+      remoteMethod = 'token';
+    } else if (remoteProto === 'ssh' && remoteMethod !== 'key' && remoteMethod !== 'user_pass') {
+      remoteMethod = 'key';
+    }
+
+    // Update pill buttons
+    ['none', 'https', 'ssh'].forEach((p) => {
+      const btn = byId('wg-remote-proto-' + p);
+      if (btn) {
+        if (p === remoteProto) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+
+    // Update subpanels
+    const panelNone = byId('wg-remote-panel-none');
+    const panelHttps = byId('wg-remote-panel-https');
+    const panelSsh = byId('wg-remote-panel-ssh');
+
+    if (panelNone) panelNone.style.display = (remoteProto === 'none') ? 'block' : 'none';
+    if (panelHttps) panelHttps.style.display = (remoteProto === 'https') ? 'block' : 'none';
+    if (panelSsh) panelSsh.style.display = (remoteProto === 'ssh') ? 'block' : 'none';
+
+    // Render active method views
+    if (remoteProto === 'https') {
+      setRemoteMethod(remoteMethod, userAction);
+    } else if (remoteProto === 'ssh') {
+      setRemoteMethod(remoteMethod, userAction);
+    }
+  }
+
+  function setRemoteMethod(method, userAction) {
+    if (userAction) userEditedRemoteAuth = true;
+
+    if (remoteProto === 'https') {
+      remoteMethod = (method === 'user_pass') ? 'user_pass' : 'token';
+      const btnToken = byId('wg-remote-https-btn-token');
+      const btnUserPass = byId('wg-remote-https-btn-userpass');
+      const viewToken = byId('wg-remote-https-view-token');
+      const viewUserPass = byId('wg-remote-https-view-userpass');
+
+      if (btnToken) btnToken.classList.toggle('active', remoteMethod === 'token');
+      if (btnUserPass) btnUserPass.classList.toggle('active', remoteMethod === 'user_pass');
+      if (viewToken) viewToken.style.display = (remoteMethod === 'token') ? 'block' : 'none';
+      if (viewUserPass) viewUserPass.style.display = (remoteMethod === 'user_pass') ? 'block' : 'none';
+    } else if (remoteProto === 'ssh') {
+      remoteMethod = (method === 'user_pass') ? 'user_pass' : 'key';
+      const btnKey = byId('wg-remote-ssh-btn-key');
+      const btnUserPass = byId('wg-remote-ssh-btn-userpass');
+      const viewKey = byId('wg-remote-ssh-view-key');
+      const viewUserPass = byId('wg-remote-ssh-view-userpass');
+
+      if (btnKey) btnKey.classList.toggle('active', remoteMethod === 'key');
+      if (btnUserPass) btnUserPass.classList.toggle('active', remoteMethod === 'user_pass');
+      if (viewKey) viewKey.style.display = (remoteMethod === 'key') ? 'block' : 'none';
+      if (viewUserPass) viewUserPass.style.display = (remoteMethod === 'user_pass') ? 'block' : 'none';
+    }
+  }
+
+  function setCloneProto(proto) {
+    cloneProto = ['none', 'https', 'ssh'].includes(proto) ? proto : 'none';
+
+    if (cloneProto === 'https' && cloneMethod !== 'token' && cloneMethod !== 'user_pass') {
+      cloneMethod = 'token';
+    } else if (cloneProto === 'ssh' && cloneMethod !== 'key' && cloneMethod !== 'user_pass') {
+      cloneMethod = 'key';
+    }
+
+    ['none', 'https', 'ssh'].forEach((p) => {
+      const btn = byId('wg-clone-proto-' + p);
+      if (btn) {
+        if (p === cloneProto) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+    });
+
+    const panelNone = byId('wg-clone-panel-none');
+    const panelHttps = byId('wg-clone-panel-https');
+    const panelSsh = byId('wg-clone-panel-ssh');
+
+    if (panelNone) panelNone.style.display = (cloneProto === 'none') ? 'block' : 'none';
+    if (panelHttps) panelHttps.style.display = (cloneProto === 'https') ? 'block' : 'none';
+    if (panelSsh) panelSsh.style.display = (cloneProto === 'ssh') ? 'block' : 'none';
+
+    if (cloneProto === 'https') {
+      setCloneMethod(cloneMethod);
+    } else if (cloneProto === 'ssh') {
+      setCloneMethod(cloneMethod);
+    }
+  }
+
+  function setCloneMethod(method) {
+    if (cloneProto === 'https') {
+      cloneMethod = (method === 'user_pass') ? 'user_pass' : 'token';
+      const btnToken = byId('wg-clone-https-btn-token');
+      const btnUserPass = byId('wg-clone-https-btn-userpass');
+      const viewToken = byId('wg-clone-https-view-token');
+      const viewUserPass = byId('wg-clone-https-view-userpass');
+
+      if (btnToken) btnToken.classList.toggle('active', cloneMethod === 'token');
+      if (btnUserPass) btnUserPass.classList.toggle('active', cloneMethod === 'user_pass');
+      if (viewToken) viewToken.style.display = (cloneMethod === 'token') ? 'block' : 'none';
+      if (viewUserPass) viewUserPass.style.display = (cloneMethod === 'user_pass') ? 'block' : 'none';
+    } else if (cloneProto === 'ssh') {
+      cloneMethod = (method === 'user_pass') ? 'user_pass' : 'key';
+      const btnKey = byId('wg-clone-ssh-btn-key');
+      const btnUserPass = byId('wg-clone-ssh-btn-userpass');
+      const viewKey = byId('wg-clone-ssh-view-key');
+      const viewUserPass = byId('wg-clone-ssh-view-userpass');
+
+      if (btnKey) btnKey.classList.toggle('active', cloneMethod === 'key');
+      if (btnUserPass) btnUserPass.classList.toggle('active', cloneMethod === 'user_pass');
+      if (viewKey) viewKey.style.display = (cloneMethod === 'key') ? 'block' : 'none';
+      if (viewUserPass) viewUserPass.style.display = (cloneMethod === 'user_pass') ? 'block' : 'none';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // SSH Key Generation & Public Key Copy
+  // ---------------------------------------------------------------------------
+
+  async function generateKey(context) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const targetSlug = (context === 'clone')
+        ? (valueOf('wg-clone-name') || 'clone_key')
+        : (currentStatus && (currentStatus.repo || currentStatus.slug) || 'repo_key');
+
+      const result = await api('/walkthroughs/git/key/generate', {
+        method: 'POST',
+        body: JSON.stringify({ slug: targetSlug })
+      });
+
+      if (!result || !result.ok) {
+        showLog((result && result.error) || 'Failed to generate SSH key.', true);
+        return;
+      }
+
+      if (context === 'clone') {
+        generatedCloneKeyPath = result.key_path;
+        const info = byId('wg-clone-ssh-info');
+        if (info) info.textContent = 'Generated Key: ' + result.key_name;
+        const pubWrap = byId('wg-clone-pubkey-wrap');
+        const pubPre = byId('wg-clone-pubkey');
+        if (pubWrap && pubPre) {
+          pubWrap.style.display = 'block';
+          pubPre.textContent = result.public_key || '';
+        }
+        const keyArea = byId('wg-clone-ssh-key');
+        if (keyArea) keyArea.value = '';
+      } else {
+        generatedRemoteKeyPath = result.key_path;
+        const info = byId('wg-remote-ssh-info');
+        if (info) info.textContent = 'Generated Key: ' + result.key_name;
+        const pubWrap = byId('wg-remote-pubkey-wrap');
+        const pubPre = byId('wg-remote-pubkey');
+        if (pubWrap && pubPre) {
+          pubWrap.style.display = 'block';
+          pubPre.textContent = result.public_key || '';
+        }
+        const keyArea = byId('wg-remote-ssh-key');
+        if (keyArea) keyArea.value = '';
+      }
+
+      showLog('Generated SSH key pair: ' + result.key_name + '. Copy the public key and add it to your Git host Deploy Keys.', false);
+    } catch (e) {
+      showLog('Key generation failed: ' + e.message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function copyPubkey(preId) {
+    const el = byId(preId);
+    if (!el) return;
+    const text = (el.textContent || '').trim();
+    if (!text) return;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function() {
+        showLog('Copied public key to clipboard.', false);
+      }).catch(function() {
+        window.prompt('Copy public key:', text);
+      });
+    } else {
+      window.prompt('Copy public key:', text);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render & UI State
+  // ---------------------------------------------------------------------------
+
   function renderRepositories(status) {
     const repos = Array.isArray(status.repositories) ? status.repositories : [];
     const activeRepo = status.repo || 'default';
@@ -126,91 +365,136 @@
     const missing = byId('wg-git-missing');
     if (missing) missing.style.display = gitMissing ? 'block' : 'none';
 
-    const cloneSection = byId('wg-clone-section');
-    if (cloneSection) cloneSection.style.display = gitMissing ? 'none' : 'block';
-
-    const statusCard = byId('wg-status-card');
-    const linkedActions = byId('wg-linked-actions');
-    const remoteHint = byId('wg-remote-hint');
     const initialized = !!(status.initialized || status.linked);
     const hasRemote = !!(status.remote_linked || (status.remote && String(status.remote).trim()));
 
-    if (statusCard) statusCard.style.display = initialized ? 'block' : 'none';
-    if (linkedActions) linkedActions.style.display = initialized ? 'block' : 'none';
-    if (remoteHint) {
-      remoteHint.style.display = hasRemote ? 'none' : 'block';
-      remoteHint.textContent = initialized
-        ? 'Local Git history is active for this repository. Enter a remote URL below to link it for Fetch / Pull / Push.'
-        : 'This repository is not linked to a remote yet. Enter a remote URL to publish it.';
+    // Status Badges
+    const branchText = byId('wg-branch-text');
+    const remoteUrlText = byId('wg-remote-url-text');
+    const syncText = byId('wg-sync-text');
+    const workingTreeText = byId('wg-working-tree-text');
+
+    if (branchText) {
+      branchText.textContent = status.branch || (status.detached ? '(detached)' : '-');
+    }
+    if (remoteUrlText) {
+      const rem = status.remote || 'None';
+      remoteUrlText.textContent = rem;
+      remoteUrlText.title = rem;
+    }
+    if (syncText) {
+      if (!hasRemote) {
+        syncText.textContent = 'Local only';
+        syncText.style.color = '#94a3b8';
+      } else if (status.detached) {
+        syncText.textContent = 'Detached HEAD';
+        syncText.style.color = '#fbbf24';
+      } else {
+        const ahead = Number(status.ahead || 0);
+        const behind = Number(status.behind || 0);
+        if (ahead === 0 && behind === 0) {
+          syncText.textContent = 'Up to date';
+          syncText.style.color = '#10b981';
+        } else {
+          syncText.textContent = ahead + ' ahead, ' + behind + ' behind';
+          syncText.style.color = '#38bdf8';
+        }
+      }
+    }
+    if (workingTreeText) {
+      const changes = Array.isArray(status.changes) ? status.changes : [];
+      if (changes.length === 0) {
+        workingTreeText.textContent = 'Clean';
+        workingTreeText.style.color = '#10b981';
+      } else {
+        workingTreeText.textContent = changes.length + ' uncommitted';
+        workingTreeText.style.color = '#f59e0b';
+      }
     }
 
-    ['wg-fetch-btn', 'wg-pull-btn', 'wg-push-btn', 'wg-unlink-btn'].forEach((btnId) => {
+    // Branch input pre-population
+    const branchInput = byId('wg-branch');
+    if (branchInput && !branchInput.value && status.branch) {
+      branchInput.value = status.branch;
+    }
+
+    // Remote link status badge & unlink button
+    const savedBadge = byId('wg-remote-saved-badge');
+    if (savedBadge) {
+      if (hasRemote) {
+        savedBadge.textContent = 'Linked: ' + (status.branch || 'main');
+        savedBadge.style.color = '#38bdf8';
+        savedBadge.style.background = '#0c4a6e';
+        savedBadge.style.borderColor = '#0284c7';
+      } else {
+        savedBadge.textContent = 'Not linked';
+        savedBadge.style.color = '#94a3b8';
+        savedBadge.style.background = '#1e293b';
+        savedBadge.style.borderColor = '#334155';
+      }
+    }
+
+    const unlinkBtn = byId('wg-unlink-btn');
+    if (unlinkBtn) {
+      unlinkBtn.style.display = hasRemote ? 'inline-block' : 'none';
+    }
+
+    // Sync Action Buttons
+    ['wg-fetch-btn', 'wg-pull-btn', 'wg-push-btn'].forEach((btnId) => {
       const btn = byId(btnId);
       if (!btn) return;
       btn.disabled = busy || !hasRemote;
       btn.style.opacity = (!busy && !hasRemote) ? '0.45' : (busy ? '0.6' : '');
-      btn.title = hasRemote ? '' : 'Configure a Remote URL above first';
+      btn.title = hasRemote ? '' : 'Configure and save a Remote URL above first';
     });
 
-    const stateEl = byId('wg-state');
-    const remoteEl = byId('wg-remote');
-    const branchEl = byId('wg-branch-display');
-    const lastEl = byId('wg-last-commit');
-    const syncEl = byId('wg-sync');
-    const changesEl = byId('wg-changes');
-    const changesList = byId('wg-changes-list');
-    const branchInput = byId('wg-branch');
+    // Populate credentials from status.auth if user hasn't modified settings
+    if (!userEditedRemoteAuth) {
+      const auth = status.auth || { type: 'none', protocol: 'none', auth_method: 'none' };
+      let proto = auth.protocol || 'none';
+      if (proto === 'none' && (auth.type === 'basic' || auth.type === 'http')) proto = 'https';
+      if (proto === 'none' && (auth.type === 'ssh_key' || auth.type === 'ssh_password')) proto = 'ssh';
 
-    if (!initialized) {
-      if (stateEl) stateEl.textContent = 'Not initialized';
-      if (remoteEl) remoteEl.textContent = '-';
-      if (branchEl) branchEl.textContent = '-';
-      if (lastEl) lastEl.textContent = '-';
-      if (syncEl) syncEl.textContent = '-';
-      if (changesEl) changesEl.textContent = '-';
-      if (changesList) changesList.style.display = 'none';
-      if (branchInput) branchInput.value = '';
-      return;
-    }
+      let method = auth.auth_method || 'token';
+      if (proto === 'ssh' && (auth.type === 'ssh_key' || method === 'key')) method = 'key';
+      if (proto === 'ssh' && (auth.type === 'ssh_password' || method === 'user_pass')) method = 'user_pass';
+      if (proto === 'https' && method !== 'user_pass') method = 'token';
 
-    if (branchInput && !branchInput.value) branchInput.value = status.branch || '';
-    if (stateEl) {
-      const prefix = hasRemote ? 'Linked to remote' : 'Local repository';
-      stateEl.textContent = status.clean ? (prefix + ' — working tree clean') : (prefix + ' — uncommitted changes');
-    }
-    if (remoteEl) remoteEl.textContent = status.remote || '(no remote configured — local only)';
-    if (branchEl) branchEl.textContent = status.branch || (status.detached ? '(detached HEAD)' : '-');
+      setRemoteProto(proto, false);
+      setRemoteMethod(method, false);
 
-    const commit = status.last_commit;
-    if (lastEl) {
-      lastEl.textContent = commit
-        ? commit.short_hash + ' — ' + commit.message + ' (' + commit.author + ', ' + commit.date + ')'
-        : '(no commits yet)';
-    }
-
-    const ahead = Number(status.ahead || 0);
-    const behind = Number(status.behind || 0);
-    if (syncEl) {
-      if (!hasRemote) {
-        syncEl.textContent = 'Local only (link a Remote URL above to sync)';
-      } else if (status.detached) {
-        syncEl.textContent = 'Detached HEAD';
-      } else if (ahead === 0 && behind === 0) {
-        syncEl.textContent = 'Up to date with upstream';
-      } else {
-        syncEl.textContent = ahead + ' ahead, ' + behind + ' behind';
-      }
-    }
-
-    const changes = Array.isArray(status.changes) ? status.changes : [];
-    if (changesEl) changesEl.textContent = changes.length === 0 ? 'None' : changes.length + ' file(s) with local changes';
-    if (changesList) {
-      if (changes.length === 0) {
-        changesList.style.display = 'none';
-        changesList.textContent = '';
-      } else {
-        changesList.style.display = 'block';
-        changesList.textContent = changes.map((item) => item.code + ' ' + item.file).join('\n');
+      if (proto === 'https') {
+        if (method === 'token') {
+          const userEl = byId('wg-remote-token-user');
+          const tokenEl = byId('wg-remote-token');
+          if (userEl) userEl.value = auth.username || '';
+          if (tokenEl) tokenEl.placeholder = auth.has_password ? '(unchanged - token configured)' : 'PAT (ghp_..., glpat-..., or token)';
+        } else {
+          const userEl = byId('wg-remote-user');
+          const passEl = byId('wg-remote-pass');
+          if (userEl) userEl.value = auth.username || '';
+          if (passEl) passEl.placeholder = auth.has_password ? '(unchanged - password configured)' : 'Password';
+        }
+      } else if (proto === 'ssh') {
+        if (method === 'key') {
+          const info = byId('wg-remote-ssh-info');
+          if (info) info.textContent = auth.key_name ? ('Active Key: ' + auth.key_name) : 'Private Key';
+          const pubWrap = byId('wg-remote-pubkey-wrap');
+          const pubPre = byId('wg-remote-pubkey');
+          if (pubWrap && pubPre) {
+            if (auth.public_key) {
+              pubWrap.style.display = 'block';
+              pubPre.textContent = auth.public_key;
+            } else {
+              pubWrap.style.display = 'none';
+            }
+          }
+        } else {
+          const userEl = byId('wg-remote-sshpass-user');
+          const passEl = byId('wg-remote-sshpass-pass');
+          if (userEl) userEl.value = auth.username || '';
+          if (passEl) passEl.placeholder = auth.has_password ? '(unchanged - password configured)' : 'SSH user password';
+        }
       }
     }
   }
@@ -244,6 +528,10 @@
       setBusy(false);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Repository Management Actions
+  // ---------------------------------------------------------------------------
 
   async function switchRepo(repoSlug) {
     if (busy || !repoSlug) return;
@@ -338,6 +626,81 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Remote & Sync Actions
+  // ---------------------------------------------------------------------------
+
+  async function saveRemote() {
+    if (busy) return;
+    const url = valueOf('wg-url');
+    const branch = branchValue();
+    const hasRemote = !!(currentStatus && currentStatus.remote_linked);
+
+    if (!hasRemote && !url && remoteProto === 'none') {
+      showLog('Enter a Remote Git URL to link this repository.', true);
+      return;
+    }
+
+    let authData = { type: 'none' };
+    if (remoteProto === 'https') {
+      if (remoteMethod === 'token') {
+        authData = {
+          type: 'http',
+          auth_method: 'token',
+          username: valueOf('wg-remote-token-user'),
+          password: valueOf('wg-remote-token')
+        };
+      } else {
+        authData = {
+          type: 'http',
+          auth_method: 'user_pass',
+          username: valueOf('wg-remote-user'),
+          password: valueOf('wg-remote-pass')
+        };
+      }
+    } else if (remoteProto === 'ssh') {
+      if (remoteMethod === 'key') {
+        authData = {
+          type: 'ssh_key',
+          auth_method: 'key',
+          key_content: valueOf('wg-remote-ssh-key'),
+          passphrase: valueOf('wg-remote-ssh-passphrase')
+        };
+        if (generatedRemoteKeyPath) {
+          authData.key_path = generatedRemoteKeyPath;
+        }
+      } else {
+        authData = {
+          type: 'ssh_password',
+          auth_method: 'user_pass',
+          username: valueOf('wg-remote-sshpass-user'),
+          password: valueOf('wg-remote-sshpass-pass')
+        };
+      }
+    }
+
+    const result = await simpleAction('remote', 'Save remote', { url: url, branch: branch, auth: authData });
+    if (result && result.ok) {
+      const urlInput = byId('wg-url');
+      if (urlInput) urlInput.value = '';
+      const tokenInput = byId('wg-remote-token');
+      if (tokenInput) tokenInput.value = '';
+      const passInput = byId('wg-remote-pass');
+      if (passInput) passInput.value = '';
+      const sshPassInput = byId('wg-remote-sshpass-pass');
+      if (sshPassInput) sshPassInput.value = '';
+      const sshKeyInput = byId('wg-remote-ssh-key');
+      if (sshKeyInput) sshKeyInput.value = '';
+      const sshPassphraseInput = byId('wg-remote-ssh-passphrase');
+      if (sshPassphraseInput) sshPassphraseInput.value = '';
+      generatedRemoteKeyPath = null;
+      userEditedRemoteAuth = false;
+
+      showLog(result.remote_linked ? 'Remote repository and credentials saved successfully.' : 'Remote settings updated.', false);
+      await refresh();
+    }
+  }
+
   async function doFetch() {
     const result = await simpleAction('fetch', 'Fetch');
     if (result && result.ok) await refresh();
@@ -357,30 +720,9 @@
   }
 
   async function doPush() {
-    const message = valueOf('wg-message');
-    const result = await simpleAction('push', 'Push', { message: message, branch: branchValue() });
+    const result = await simpleAction('push', 'Push', { branch: branchValue() });
     if (result && result.ok) {
-      const msgEl = byId('wg-message');
-      if (msgEl) msgEl.value = '';
       await refresh();
-    }
-  }
-
-  async function doCommit() {
-    const message = valueOf('wg-message');
-    const result = await simpleAction('commit', 'Commit', { message: message });
-    if (result && result.ok) {
-      const msgEl = byId('wg-message');
-      if (msgEl) msgEl.value = '';
-      await refresh();
-    }
-  }
-
-  function openHistory() {
-    const slug = currentSlug || window.activeWalkthrough || '';
-    close();
-    if (typeof window.openGitHistoryModal === 'function') {
-      window.openGitHistoryModal(slug);
     }
   }
 
@@ -391,24 +733,17 @@
     if (result && result.ok) await refresh();
   }
 
-  async function saveRemote() {
-    if (busy) return;
-    const url = valueOf('wg-url');
-    const branch = branchValue();
-    const linked = !!(currentStatus && currentStatus.linked);
-    if (!linked && !url) {
-      showLog('Enter a remote URL to link this repository.', true);
-      return;
-    }
-
-    const result = await simpleAction('remote', 'Save remote', { url: url, branch: branch });
-    if (result && result.ok) {
-      const urlInput = byId('wg-url');
-      if (urlInput) urlInput.value = '';
-      showLog(result.remote_linked ? 'Remote saved. You can now Fetch, Pull, and Push.' : 'Branch updated.', false);
-      await refresh();
+  function openHistory() {
+    const slug = currentSlug || window.activeWalkthrough || '';
+    close();
+    if (typeof window.openGitHistoryModal === 'function') {
+      window.openGitHistoryModal(slug);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Clone Action
+  // ---------------------------------------------------------------------------
 
   async function doClone() {
     if (busy) return;
@@ -418,6 +753,44 @@
       return;
     }
 
+    let authData = { type: 'none' };
+    if (cloneProto === 'https') {
+      if (cloneMethod === 'token') {
+        authData = {
+          type: 'http',
+          auth_method: 'token',
+          username: valueOf('wg-clone-token-user'),
+          password: valueOf('wg-clone-token')
+        };
+      } else {
+        authData = {
+          type: 'http',
+          auth_method: 'user_pass',
+          username: valueOf('wg-clone-auth-user'),
+          password: valueOf('wg-clone-auth-pass')
+        };
+      }
+    } else if (cloneProto === 'ssh') {
+      if (cloneMethod === 'key') {
+        authData = {
+          type: 'ssh_key',
+          auth_method: 'key',
+          key_content: valueOf('wg-clone-ssh-key'),
+          passphrase: valueOf('wg-clone-ssh-passphrase')
+        };
+        if (generatedCloneKeyPath) {
+          authData.key_path = generatedCloneKeyPath;
+        }
+      } else {
+        authData = {
+          type: 'ssh_password',
+          auth_method: 'user_pass',
+          username: valueOf('wg-clone-sshpass-user'),
+          password: valueOf('wg-clone-sshpass-pass')
+        };
+      }
+    }
+
     setBusy(true);
     try {
       const result = await api('/walkthroughs/git/clone', {
@@ -425,7 +798,8 @@
         body: JSON.stringify({
           url: url,
           branch: valueOf('wg-clone-branch'),
-          name: valueOf('wg-clone-name')
+          name: valueOf('wg-clone-name'),
+          auth: authData
         })
       });
       if (!result || !result.ok) {
@@ -441,21 +815,41 @@
     }
   }
 
-  function open(slug, expandNewRepo) {
+  // ---------------------------------------------------------------------------
+  // Modal Open & Close
+  // ---------------------------------------------------------------------------
+
+  function open(slug, openAddTab) {
     currentSlug = String(slug || window.activeWalkthrough || 'default').trim();
     currentStatus = null;
+    generatedCloneKeyPath = null;
+    generatedRemoteKeyPath = null;
+    userEditedRemoteAuth = false;
 
-    ['wg-url', 'wg-branch', 'wg-message', 'wg-clone-url', 'wg-clone-branch', 'wg-clone-name', 'wg-create-repo-name', 'wg-create-repo-url'].forEach((id) => {
+    // Reset inputs
+    ['wg-url', 'wg-branch', 'wg-clone-url', 'wg-clone-branch', 'wg-clone-name', 'wg-create-repo-name', 'wg-create-repo-url',
+     'wg-clone-token', 'wg-clone-token-user', 'wg-clone-auth-user', 'wg-clone-auth-pass',
+     'wg-clone-sshpass-user', 'wg-clone-sshpass-pass', 'wg-clone-ssh-key', 'wg-clone-ssh-passphrase',
+     'wg-remote-token', 'wg-remote-token-user', 'wg-remote-user', 'wg-remote-pass',
+     'wg-remote-sshpass-user', 'wg-remote-sshpass-pass', 'wg-remote-ssh-key', 'wg-remote-ssh-passphrase'].forEach((id) => {
       const el = byId(id);
       if (el) el.value = '';
     });
+
+    const clonePubWrap = byId('wg-clone-pubkey-wrap');
+    if (clonePubWrap) clonePubWrap.style.display = 'none';
+    const cloneSshInfo = byId('wg-clone-ssh-info');
+    if (cloneSshInfo) cloneSshInfo.textContent = 'Private Key';
+
     const logWrap = byId('wg-log-wrap');
     if (logWrap) logWrap.style.display = 'none';
 
-    const cloneDetails = byId('wg-clone-section');
-    if (cloneDetails) {
-      cloneDetails.open = !!expandNewRepo;
-    }
+    // Reset clone auth controls
+    setCloneProto('none');
+    setCloneMethod('token');
+
+    // Switch tab according to request
+    switchTab(openAddTab ? 'add' : 'sync');
 
     const modal = byId('wg-modal');
     if (modal) modal.style.display = 'block';
@@ -479,6 +873,11 @@
   window.WalkthroughGit = {
     open: open,
     close: close,
+    switchTab: switchTab,
+    setRemoteProto: function(p) { setRemoteProto(p, true); },
+    setRemoteMethod: function(m) { setRemoteMethod(m, true); },
+    setCloneProto: setCloneProto,
+    setCloneMethod: setCloneMethod,
     refresh: refresh,
     switchRepo: switchRepo,
     createRepo: createRepo,
@@ -488,9 +887,10 @@
     fetch: doFetch,
     pull: doPull,
     push: doPush,
-    commit: doCommit,
-    openHistory: openHistory,
     unlink: doUnlink,
-    clone: doClone
+    openHistory: openHistory,
+    clone: doClone,
+    generateKey: generateKey,
+    copyPubkey: copyPubkey
   };
 })();
