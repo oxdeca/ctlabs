@@ -254,7 +254,7 @@ module Automation
     { running: false, error: e.message, identities: [], candidate_keys: [] }
   end
 
-  def self.ssh_agent_add_key(container, key_path, passphrase = nil, user = 'root')
+  def self.ssh_agent_add_key(container, key_path, passphrase = nil, user = 'root', lifetime: nil)
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
     sock = ensure_ssh_agent(container, u)
@@ -284,7 +284,7 @@ module Automation
       return { success: false, error: err }
     end
 
-    # Passphrase is confirmed valid -> execute ssh-add with SSH_ASKPASS
+    # Passphrase is confirmed valid -> execute ssh-add with SSH_ASKPASS and optional lifetime
     tmp_askpass = "/tmp/.ctlabs_askpass_#{Process.pid}_#{rand(100000)}.sh"
     askpass_script = <<~SH
       #!/bin/sh
@@ -293,14 +293,21 @@ module Automation
       CTL_EOF
     SH
 
+    lifetime_arg = ""
+    if lifetime && !lifetime.to_s.strip.empty?
+      clean_life = lifetime.to_s.strip
+      lifetime_arg = "-t #{clean_life} " if clean_life =~ /\A\d+[smhdw]?\z/i
+    end
+
     begin
       system("printf '%s' #{Shellwords.shellescape(askpass_script)} | #{engine} exec -i #{container} sh -c 'cat > #{tmp_askpass} && chmod 700 #{tmp_askpass} && chown #{u}:#{u} #{tmp_askpass} 2>/dev/null || true' >/dev/null 2>&1")
-      add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add '#{expanded_path}' < /dev/null 2>&1"
+      add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add #{lifetime_arg}'#{expanded_path}' < /dev/null 2>&1"
       out = `#{add_cmd}`.strip
       exit_code = $?.exitstatus
 
       if exit_code == 0
-        { success: true, message: out.empty? ? "Key #{File.basename(expanded_path)} added to agent." : out }
+        life_info = lifetime_arg.empty? ? "" : " (lifetime: #{lifetime.to_s.strip})"
+        { success: true, message: out.empty? ? "Key #{File.basename(expanded_path)} added to agent#{life_info}." : out }
       else
         { success: false, error: out.empty? ? "Failed to add key to agent (exit code #{exit_code})" : out }
       end
@@ -309,7 +316,7 @@ module Automation
     end
   end
 
-  def self.ssh_agent_load_raw_key(container, key_content, key_name: nil, passphrase: nil, save_to_disk: true, user: 'root')
+  def self.ssh_agent_load_raw_key(container, key_content, key_name: nil, passphrase: nil, save_to_disk: true, user: 'root', lifetime: nil)
     engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
     u = user.to_s.strip.empty? ? 'root' : user.to_s.strip
     sock = ensure_ssh_agent(container, u)
@@ -378,7 +385,7 @@ module Automation
         saved_info = " and saved to ~/.ssh/keys/#{base_name}"
       end
 
-      # Load key into ssh-agent
+      # Load key into ssh-agent with optional lifetime
       tmp_askpass = "/tmp/.ctlabs_askpass_#{Process.pid}_#{rand(100000)}.sh"
       askpass_script = <<~SH
         #!/bin/sh
@@ -387,14 +394,21 @@ module Automation
         CTL_EOF
       SH
 
+      lifetime_arg = ""
+      if lifetime && !lifetime.to_s.strip.empty?
+        clean_life = lifetime.to_s.strip
+        lifetime_arg = "-t #{clean_life} " if clean_life =~ /\A\d+[smhdw]?\z/i
+      end
+
       begin
         system("printf '%s' #{Shellwords.shellescape(askpass_script)} | #{engine} exec -i #{container} sh -c 'cat > #{tmp_askpass} && chmod 700 #{tmp_askpass} && chown #{u}:#{u} #{tmp_askpass} 2>/dev/null || true' >/dev/null 2>&1")
-        add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add '#{target_path}' < /dev/null 2>&1"
+        add_cmd = "#{engine} exec -u #{u} -e SSH_AUTH_SOCK='#{sock}' -e SSH_ASKPASS='#{tmp_askpass}' -e SSH_ASKPASS_REQUIRE=force #{container} ssh-add #{lifetime_arg}'#{target_path}' < /dev/null 2>&1"
         out = `#{add_cmd}`.strip
         exit_code = $?.exitstatus
 
         if exit_code == 0
-          msg = "Key #{base_name} added to agent#{saved_info}."
+          life_info = lifetime_arg.empty? ? "" : " (lifetime: #{lifetime.to_s.strip})"
+          msg = "Key #{base_name} added to agent#{saved_info}#{life_info}."
           { success: true, message: msg, key_name: base_name, target_path: target_path }
         else
           { success: false, error: out.empty? ? "Failed to add key to agent (exit code #{exit_code})" : out }

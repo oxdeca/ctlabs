@@ -103,6 +103,88 @@ class TerminalController < BaseController
   end
 
   # ---------------------------------------------------------------------------
+  # Encrypted Environment Vault Endpoints
+  # ---------------------------------------------------------------------------
+  get '/terminal/:node_name/env_vault/status' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Environment vaults are only supported on controller terminals' }.to_json
+    end
+
+    status_data = TerminalService.env_vault_status(node_name)
+    status_data.to_json
+  end
+
+  post '/terminal/:node_name/env_vault/save' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Environment vaults are only supported on controller terminals' }.to_json
+    end
+
+    begin
+      payload = JSON.parse(request.body.read) rescue {}
+      files = payload['files'] || []
+      password = (payload['password'] || '').to_s
+      lifetime_seconds = (payload['lifetime_seconds'] || 28800).to_i
+
+      res = TerminalService.save_env_vault(node_name, files, password, lifetime_seconds)
+      res.to_json
+    rescue ArgumentError => e
+      status 400
+      { ok: false, error: e.message }.to_json
+    rescue => e
+      status 500
+      { ok: false, error: e.message }.to_json
+    end
+  end
+
+  post '/terminal/:node_name/env_vault/unlock' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Environment vaults are only supported on controller terminals' }.to_json
+    end
+
+    begin
+      payload = JSON.parse(request.body.read) rescue {}
+      password = (payload['password'] || '').to_s
+
+      res = TerminalService.unlock_env_vault(node_name, password)
+      res.to_json
+    rescue ArgumentError => e
+      status 400
+      { ok: false, error: e.message }.to_json
+    rescue => e
+      status 500
+      { ok: false, error: e.message }.to_json
+    end
+  end
+
+  post '/terminal/:node_name/env_vault/lock' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Environment vaults are only supported on controller terminals' }.to_json
+    end
+
+    res = TerminalService.lock_env_vault(node_name)
+    res.to_json
+  end
+
+  post '/terminal/:node_name/env_vault/purge' do
+    content_type :json
+    node_name = params[:node_name]
+    unless TerminalService.is_controller?(node_name)
+      halt 403, { ok: false, error: 'Environment vaults are only supported on controller terminals' }.to_json
+    end
+
+    res = TerminalService.purge_env_vault(node_name)
+    res.to_json
+  end
+
+  # ---------------------------------------------------------------------------
   # SSH Agent Endpoints
   # ---------------------------------------------------------------------------
   get '/terminal/:node_name/ssh_agent' do
@@ -136,11 +218,13 @@ class TerminalController < BaseController
     key_path     = (payload['key_path'] || params['key_path']).to_s.strip
     passphrase   = (payload['passphrase'] || params['passphrase']).to_s
     save_to_disk = payload.key?('save_to_disk') ? !!payload['save_to_disk'] : true
+    lifetime     = (payload['lifetime'] || params['lifetime']).to_s.strip
+    lifetime     = nil if lifetime.empty?
 
     result = if !key_content.strip.empty?
-      Automation.ssh_agent_load_raw_key(container, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: user)
+      Automation.ssh_agent_load_raw_key(container, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: user, lifetime: lifetime)
     elsif !key_path.empty?
-      Automation.ssh_agent_add_key(container, key_path, passphrase, user)
+      Automation.ssh_agent_add_key(container, key_path, passphrase, user, lifetime: lifetime)
     else
       { success: false, error: 'Key file/content or key path is required' }
     end

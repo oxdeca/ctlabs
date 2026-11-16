@@ -432,11 +432,13 @@ class ControllerController < BaseController
     key_path     = (payload['key_path'] || params['key_path']).to_s.strip
     passphrase   = (payload['passphrase'] || params['passphrase']).to_s
     save_to_disk = payload.key?('save_to_disk') ? !!payload['save_to_disk'] : true
+    lifetime     = (payload['lifetime'] || params['lifetime']).to_s.strip
+    lifetime     = nil if lifetime.empty?
 
     result = if !key_content.strip.empty?
-      Automation.ssh_agent_load_raw_key(ctl_name, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: 'root')
+      Automation.ssh_agent_load_raw_key(ctl_name, key_content, key_name: key_name, passphrase: passphrase, save_to_disk: save_to_disk, user: 'root', lifetime: lifetime)
     elsif !key_path.empty?
-      Automation.ssh_agent_add_key(ctl_name, key_path, passphrase, 'root')
+      Automation.ssh_agent_add_key(ctl_name, key_path, passphrase, 'root', lifetime: lifetime)
     else
       { success: false, error: 'Key file/content or key path is required' }
     end

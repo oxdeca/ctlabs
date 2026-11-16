@@ -126,6 +126,23 @@
       max-height: 85vh;
       overflow-y: auto;
     }
+    /* Dedicated Session Info Popover Menu */
+    #session-menu {
+      display: none;
+      position: absolute;
+      top: 36px;
+      right: 12px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      z-index: 1000;
+      font-size: 0.9em;
+      width: 320px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
     .settings-tab-btn {
       padding: 4px 6px;
       font-size: 0.76em;
@@ -627,96 +644,301 @@
       <span id="status" class="status" title="Connecting...">
         <i class="fas fa-circle-notch fa-spin" style="color: #38bdf8;"></i>
       </span>
+
+      <!-- Dedicated Session Info Popover Menu -->
+      <div id="session-menu">
+        <div style="font-weight: 600; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">
+          <span style="display: flex; align-items: center; gap: 6px; color: #f8fafc; font-size: 0.95em;">
+            <i class="fas fa-info-circle" style="color: #38bdf8;"></i>
+            <span>Session Details</span>
+          </span>
+          <span id="session-close" style="cursor: pointer; color: #94a3b8; font-size: 1.1em; line-height: 1; padding: 0 3px;" title="Close session details">&times;</span>
+        </div>
+
+        <!-- Session Status & Node Info Card -->
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 0.84em;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #94a3b8;">Target Node:</span>
+            <span style="font-weight: 700; color: #38bdf8; font-family: monospace;"><%= ERB::Util.html_escape(@node_name) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #94a3b8;">Connection:</span>
+            <span id="session-conn-badge" style="background: #10b981; color: #fff; font-size: 0.8em; font-weight: 600; padding: 2px 8px; border-radius: 4px;">Connected</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #94a3b8;">Session Uptime:</span>
+            <span id="session-uptime-display" style="font-weight: 600; color: #f8fafc; font-variant-numeric: tabular-nums;">00:00:00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="color: #94a3b8;">Terminal Size:</span>
+            <span id="session-geo-display" style="font-weight: 600; color: #cbd5e1; font-family: monospace;">-</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: #94a3b8;">Active Sessions:</span>
+            <span id="session-count-display" style="font-weight: 600; color: #38bdf8;">1 of 3</span>
+          </div>
+        </div>
+
+        <% if @is_controller %>
+        <!-- Environment Files Status Card -->
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 0.84em;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-weight: 600; color: #cbd5e1; display: flex; align-items: center; gap: 5px;">
+              <i class="fas fa-shield-alt" style="color: #38bdf8;"></i>
+              <span>Environment Vault</span>
+            </span>
+            <span id="session-env-badge" style="font-size: 0.8em; padding: 1px 6px; border-radius: 4px; background: #334155; color: #94a3b8;">Checking...</span>
+          </div>
+          <div id="session-env-details" style="color: #94a3b8; font-size: 0.82em; margin-bottom: 8px;">
+            Checking vault status...
+          </div>
+          <div id="session-env-actions" style="display: flex; gap: 6px;">
+            <button type="button" id="session-env-open-btn" style="flex: 1; background: #1e3a8a; border: 1px solid #2563eb; color: #ffffff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; display: flex; align-items: center; justify-content: center; gap: 4px;">
+              <i class="fas fa-key"></i> <span>Manage Vault</span>
+            </button>
+            <button type="button" id="session-env-lock-btn" style="display: none; background: #475569; border: 1px solid #64748b; color: #ffffff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; align-items: center; justify-content: center; gap: 4px;">
+              <i class="fas fa-lock"></i> <span>Lock</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- SSH Agent Status Card -->
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 0.84em;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-weight: 600; color: #cbd5e1; display: flex; align-items: center; gap: 5px;">
+              <i class="fas fa-key" style="color: #14b8a6;"></i>
+              <span>SSH Agent</span>
+            </span>
+            <span id="session-ssh-badge" style="font-size: 0.8em; padding: 1px 6px; border-radius: 4px; background: #334155; color: #94a3b8;">Checking...</span>
+          </div>
+          <div id="session-ssh-details" style="color: #94a3b8; font-size: 0.82em; margin-bottom: 8px;">
+            Checking SSH identities...
+          </div>
+          <button type="button" id="session-ssh-manage-btn" style="width: 100%; box-sizing: border-box; background: #0f766e; border: 1px solid #14b8a6; color: #ffffff; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8em; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <i class="fas fa-shield-alt"></i> Manage SSH Keys
+          </button>
+        </div>
+        <% end %>
+
+        <!-- Session Quick Actions -->
+        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px; border-top: 1px solid #334155; padding-top: 8px;">
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="session-reconnect-btn" style="flex: 1; background: #2563eb; border: none; color: #ffffff; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fas fa-redo"></i> Reconnect
+            </button>
+            <button type="button" id="session-disconnect-btn" style="flex: 1; background: #475569; border: none; color: #ffffff; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <i class="fas fa-plug-circle-xmark"></i> Disconnect
+            </button>
+          </div>
+          <button type="button" id="session-clean-all-btn" style="width: 100%; box-sizing: border-box; background: #dc2626; border: none; color: #ffffff; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 0.82em; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+            <i class="fas fa-trash-alt"></i> Clean All Sessions
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
   <% if @is_controller %>
   <!-- Env Files Modal Backdrop -->
   <div id="env-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 2000; align-items: center; justify-content: center;">
-    <div id="env-modal" style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; width: 560px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
+    <div id="env-modal" style="background: #1e293b; border: 1px solid #334155; border-radius: 8px; width: 580px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
       
       <!-- Modal Header -->
       <div style="padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; background: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 1em; color: #f8fafc;">
           <i class="fas fa-shield-alt" style="color: #38bdf8;"></i>
-          <span>Controller Environment Files (<%= ERB::Util.html_escape(@node_name) %>)</span>
+          <span>Encrypted Environment Vault (<%= ERB::Util.html_escape(@node_name) %>)</span>
         </div>
         <button id="env-modal-close" style="background: transparent; border: none; color: #94a3b8; font-size: 1.3em; cursor: pointer; padding: 0 4px; line-height: 1;">&times;</button>
       </div>
 
       <!-- Modal Body -->
       <div style="padding: 16px; overflow-y: auto; flex: 1; font-size: 0.88em; line-height: 1.4;">
-        <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 0.85em;">
-          Select local files from your browser machine (e.g. GCP service account keys or Kubeconfig). Files are securely staged inside <code><%= ERB::Util.html_escape(@node_name) %></code> (permissions 0700/0600) and set as environment variables. Files are automatically deleted when the terminal session disconnects.
-        </p>
+        
+        <!-- Feedback Alert Box -->
+        <div id="env-feedback" style="display: none; margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; font-size: 0.85em;"></div>
 
-        <!-- Active Files List -->
-        <div style="margin-bottom: 14px;">
-          <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px; display: flex; justify-content: space-between;">
-            <span>Configured Environment Files:</span>
-            <span id="env-file-count" style="color: #64748b;">0 files</span>
-          </div>
-          <div id="env-files-list" style="border: 1px solid #334155; border-radius: 6px; background: #0f172a; min-height: 56px; max-height: 150px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px;">
-            <div id="env-empty-msg" style="color: #64748b; font-style: italic; text-align: center; padding: 14px 8px;">No environment files configured.</div>
-          </div>
-        </div>
+        <!-- PANEL 1: Vault Exists & is LOCKED -->
+        <div id="env-panel-locked" style="display: none;">
+          <div style="background: #0f172a; border: 1px solid #d97706; border-radius: 6px; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: #f59e0b; font-weight: 600; font-size: 0.95em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-lock"></i> Encrypted Vault Stored on Host
+              </span>
+              <span id="env-locked-expiry-badge" style="background: #78350f; color: #fde68a; font-size: 0.78em; padding: 2px 8px; border-radius: 4px;">Expires in --:--</span>
+            </div>
+            <p style="color: #cbd5e1; font-size: 0.85em; margin: 0 0 10px 0;">
+              An encrypted environment vault exists on the server host. Enter your vault password to decrypt and inject environment variables into this terminal session.
+            </p>
+            <div style="background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 8px 10px; margin-bottom: 12px; font-size: 0.82em;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #94a3b8;">Configured Variables:</span>
+                <span id="env-locked-var-list" style="color: #38bdf8; font-weight: 600; font-family: monospace;">-</span>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">Files Encrypted:</span>
+                <span id="env-locked-file-count" style="color: #cbd5e1;">-</span>
+              </div>
+            </div>
 
-        <!-- Add File Box -->
-        <div style="border: 1px solid #334155; border-radius: 6px; padding: 12px; background: #0f172a;">
-          <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <i class="fas fa-plus-circle" style="color: #10b981;"></i>
-            <span>Add Environment File</span>
-          </div>
-          
-          <div style="margin-bottom: 10px;">
-            <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Preset / Variable:</label>
-            <select id="env-preset-select" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.9em;">
-              <option value="GOOGLE_APPLICATION_CREDENTIALS">GOOGLE_APPLICATION_CREDENTIALS (GCP Service Account JSON)</option>
-              <option value="KUBECONFIG">KUBECONFIG (Kubernetes Config)</option>
-              <option value="CUSTOM">Custom Variable Name...</option>
-            </select>
-          </div>
+            <div style="margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                <label style="color: #94a3b8; font-size: 0.82em;">Vault Password:</label>
+                <a href="javascript:void(0)" id="env-unlock-pass-toggle" style="font-size: 0.78em; color: #38bdf8; text-decoration: none;">
+                  <i id="env-unlock-pass-icon" class="fas fa-eye"></i> Show
+                </a>
+              </div>
+              <input type="password" id="env-unlock-password" placeholder="Enter password to unlock vault" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #f8fafc; border: 1px solid #475569; padding: 7px 10px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+            </div>
 
-          <div id="env-custom-var-group" style="display: none; margin-bottom: 10px;">
-            <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Environment Variable Name:</label>
-            <input type="text" id="env-custom-var-input" placeholder="e.g. AWS_SHARED_CREDENTIALS_FILE" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
-          </div>
-
-          <div style="margin-bottom: 10px;">
-            <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Local File:</label>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <input type="file" id="env-file-input" style="display: none;" />
-              <button type="button" id="env-file-browse-btn" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">
-                <i class="fas fa-folder-open"></i> Choose File...
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <button type="button" id="env-btn-purge-locked" style="background: #334155; border: 1px solid #ef4444; color: #f87171; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-trash-alt"></i> Purge Vault
               </button>
-              <span id="env-selected-filename" style="color: #94a3b8; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">No file chosen</span>
+              <button type="button" id="env-btn-unlock-apply" style="background: #10b981; border: none; color: #fff; padding: 6px 18px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-unlock-alt"></i> Unlock & Apply
+              </button>
             </div>
           </div>
 
-          <div style="text-align: right; margin-top: 10px;">
-            <button type="button" id="env-add-btn" disabled style="background: #2563eb; opacity: 0.6; cursor: not-allowed; border: none; color: #fff; padding: 5px 14px; border-radius: 4px; font-weight: 500; font-size: 0.85em; display: inline-flex; align-items: center; gap: 5px;">
-              <i class="fas fa-plus"></i> Add to List
-            </button>
+          <div style="text-align: center; margin-top: 10px;">
+            <a href="javascript:void(0)" id="env-link-reconfig" style="color: #38bdf8; font-size: 0.82em; text-decoration: none;">
+              <i class="fas fa-edit"></i> Or overwrite / upload new environment files
+            </a>
           </div>
         </div>
 
-        <!-- Remember checkbox -->
-        <div style="margin-top: 12px; display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="env-remember-chk" checked style="cursor: pointer;" />
-          <label for="env-remember-chk" style="color: #94a3b8; font-size: 0.85em; cursor: pointer;">
-            Remember files in this browser for <%= ERB::Util.html_escape(@node_name) %> (saved in localStorage)
-          </label>
+        <!-- PANEL 2: Vault is UNLOCKED & ACTIVE -->
+        <div id="env-panel-unlocked" style="display: none;">
+          <div style="background: #0f172a; border: 1px solid #10b981; border-radius: 6px; padding: 14px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: #10b981; font-weight: 600; font-size: 0.95em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-check-circle"></i> Vault Active & Injected
+              </span>
+              <span id="env-unlocked-expiry-badge" style="background: #064e3b; color: #a7f3d0; font-size: 0.78em; padding: 2px 8px; border-radius: 4px;">Expires in --:--</span>
+            </div>
+            <p style="color: #cbd5e1; font-size: 0.85em; margin: 0 0 10px 0;">
+              Plaintext files are staged in <code>~/.ctlabs_env/</code> inside the container (mode 0600). Locking purges plaintext files immediately while keeping the encrypted vault on disk.
+            </p>
+            <div id="env-unlocked-active-list" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+              <button type="button" id="env-btn-purge-unlocked" style="background: #334155; border: 1px solid #ef4444; color: #f87171; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; display: flex; align-items: center; gap: 6px;">
+                <i class="fas fa-trash-alt"></i> Purge Vault
+              </button>
+              <div style="display: flex; gap: 8px;">
+                <button type="button" id="env-btn-edit-files" style="background: #334155; border: 1px solid #475569; color: #cbd5e1; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em;">
+                  <i class="fas fa-edit"></i> Edit Files
+                </button>
+                <button type="button" id="env-btn-lock-now" style="background: #d97706; border: none; color: #ffffff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85em; display: flex; align-items: center; gap: 6px;">
+                  <i class="fas fa-lock"></i> Lock Vault Now
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div id="env-feedback" style="display: none; margin-top: 10px; padding: 8px 12px; border-radius: 4px; font-size: 0.85em;"></div>
+        <!-- PANEL 3: Configuration & File Upload -->
+        <div id="env-panel-config" style="display: none;">
+          <p style="margin: 0 0 12px 0; color: #94a3b8; font-size: 0.85em;">
+            Select files from your machine (e.g. GCP service account keys or Kubeconfig). Files are encrypted with <strong>AES-256-GCM + PBKDF2</strong> on disk and automatically purged when the max lifetime expires.
+          </p>
+
+          <!-- Active Files List -->
+          <div style="margin-bottom: 14px;">
+            <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 6px; display: flex; justify-content: space-between;">
+              <span>Configured Environment Files:</span>
+              <span id="env-file-count" style="color: #64748b;">0 files</span>
+            </div>
+            <div id="env-files-list" style="border: 1px solid #334155; border-radius: 6px; background: #0f172a; min-height: 56px; max-height: 140px; overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 6px;">
+              <div id="env-empty-msg" style="color: #64748b; font-style: italic; text-align: center; padding: 14px 8px;">No environment files configured.</div>
+            </div>
+          </div>
+
+          <!-- Add File Box -->
+          <div style="border: 1px solid #334155; border-radius: 6px; padding: 12px; background: #0f172a; margin-bottom: 14px;">
+            <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-plus-circle" style="color: #10b981;"></i>
+              <span>Add Environment File</span>
+            </div>
+            
+            <div style="margin-bottom: 10px;">
+              <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Preset / Variable:</label>
+              <select id="env-preset-select" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.9em;">
+                <option value="GOOGLE_APPLICATION_CREDENTIALS">GOOGLE_APPLICATION_CREDENTIALS (GCP Service Account JSON)</option>
+                <option value="KUBECONFIG">KUBECONFIG (Kubernetes Config)</option>
+                <option value="CUSTOM">Custom Variable Name...</option>
+              </select>
+            </div>
+
+            <div id="env-custom-var-group" style="display: none; margin-bottom: 10px;">
+              <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Environment Variable Name:</label>
+              <input type="text" id="env-custom-var-input" placeholder="e.g. AWS_SHARED_CREDENTIALS_FILE" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.9em; font-family: monospace;" />
+            </div>
+
+            <div style="margin-bottom: 10px;">
+              <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Local File:</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="file" id="env-file-input" style="display: none;" />
+                <button type="button" id="env-file-browse-btn" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; white-space: nowrap;">
+                  <i class="fas fa-folder-open"></i> Choose File...
+                </button>
+                <span id="env-selected-filename" style="color: #94a3b8; font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;">No file chosen</span>
+              </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 10px;">
+              <button type="button" id="env-add-btn" disabled style="background: #2563eb; opacity: 0.6; cursor: not-allowed; border: none; color: #fff; padding: 5px 14px; border-radius: 4px; font-weight: 500; font-size: 0.85em; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="fas fa-plus"></i> Add to List
+              </button>
+            </div>
+          </div>
+
+          <!-- Encryption & Lifetime Settings -->
+          <div style="border: 1px solid #334155; border-radius: 6px; padding: 12px; background: #0f172a;">
+            <div style="font-weight: 600; color: #cbd5e1; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-key" style="color: #f59e0b;"></i>
+              <span>Vault Encryption & Lifetime</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <label style="color: #94a3b8; font-size: 0.8em;">Vault Password:</label>
+                  <a href="javascript:void(0)" id="env-vault-pass-toggle" style="font-size: 0.76em; color: #38bdf8; text-decoration: none;">
+                    <i id="env-vault-pass-icon" class="fas fa-eye"></i> Show
+                  </a>
+                </div>
+                <input type="password" id="env-vault-password" placeholder="Password (min 4 chars)" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.85em;" />
+              </div>
+              <div>
+                <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Confirm Password:</label>
+                <input type="password" id="env-vault-password-confirm" placeholder="Repeat password" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.85em;" />
+              </div>
+            </div>
+
+            <div>
+              <label style="display: block; color: #94a3b8; font-size: 0.8em; margin-bottom: 4px;">Max Lifetime (Auto-purge after):</label>
+              <select id="env-vault-lifetime" style="width: 100%; box-sizing: border-box; background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 6px 8px; border-radius: 4px; font-size: 0.85em;">
+                <option value="3600">1 Hour (3600s)</option>
+                <option value="14400">4 Hours (14400s)</option>
+                <option value="28800" selected>8 Hours (28800s) - Recommended</option>
+                <option value="43200">12 Hours (43200s)</option>
+                <option value="86400">24 Hours (86400s)</option>
+                <option value="604800">7 Days (604800s)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
       </div>
 
       <!-- Modal Footer -->
       <div style="padding: 10px 16px; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 10px; background: #0f172a; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
-        <button id="env-modal-cancel" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Cancel</button>
-        <button id="env-modal-apply" style="background: #10b981; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9em; display: flex; align-items: center; gap: 6px;">
-          <i class="fas fa-check"></i>
-          <span>Save & Apply</span>
+        <button id="env-modal-cancel" style="background: #334155; border: 1px solid #475569; color: #f8fafc; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Close</button>
+        <button id="env-modal-apply" style="display: none; background: #10b981; border: none; color: #fff; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.9em; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fas fa-lock"></i>
+          <span>Encrypt & Apply</span>
         </button>
       </div>
 
@@ -842,6 +1064,20 @@
                 </a>
               </div>
               <input type="password" id="term-ssh-passphrase" placeholder="Key Passphrase" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-family: monospace; font-size: 0.85em; padding: 6px 8px;">
+            </div>
+
+            <!-- Key Lifetime in Agent -->
+            <div style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 0.8em; color: #94a3b8; margin-bottom: 4px;">
+                <i class="fas fa-hourglass-half" style="color: #14b8a6; margin-right: 4px;"></i>Key Lifetime in Agent:
+              </label>
+              <select id="term-ssh-lifetime" style="width: 100%; box-sizing: border-box; background: #0b1120; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px; font-size: 0.85em; padding: 6px 8px;">
+                <option value="1h">1 Hour (1h)</option>
+                <option value="4h">4 Hours (4h)</option>
+                <option value="8h" selected>8 Hours (8h) - Recommended</option>
+                <option value="24h">24 Hours (24h)</option>
+                <option value="">No Limit / Until agent cleared</option>
+              </select>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 8px;">
@@ -1180,29 +1416,162 @@
         });
       }
 
-      function loadSavedFiles() {
-        if (!isController) return;
-        try {
-          const raw = localStorage.getItem(storageKey);
-          if (raw) {
-            configuredFiles = JSON.parse(raw);
-            if (!Array.isArray(configuredFiles)) configuredFiles = [];
-          }
-        } catch(e) {
-          configuredFiles = [];
-        }
-        updateActiveList();
+      // -----------------------------------------------------------------------
+      // Encrypted Environment Vault & Staging Management
+      // -----------------------------------------------------------------------
+      let currentVaultStatus = { exists: false, locked: true, remaining_seconds: 0, env_vars: [] };
+      let vaultCountdownInterval = null;
+
+      function formatSecondsToRemaining(sec) {
+        if (!sec || sec <= 0) return '00h 00m 00s';
+        const d = Math.floor(sec / 86400);
+        const h = Math.floor((sec % 86400) / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        if (d > 0) return `${d}d ${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m`;
+        return `${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`;
       }
 
-      function saveStorage() {
+      async function checkVaultStatus() {
         if (!isController) return;
-        const rememberChk = document.getElementById('env-remember-chk');
-        if (rememberChk && rememberChk.checked) {
-          localStorage.setItem(storageKey, JSON.stringify(configuredFiles));
-        } else {
-          localStorage.removeItem(storageKey);
+        try {
+          const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/env_vault/status?_=${Date.now()}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          currentVaultStatus = data;
+          updateVaultUI();
+        } catch(e) {}
+      }
+      window.checkVaultStatus = checkVaultStatus;
+
+      function updateVaultUI() {
+        const envBadge = document.getElementById('env-badge');
+        const envDot = document.getElementById('settings-env-dot');
+        const tabEnvBadge = document.getElementById('settings-tab-env-badge');
+        const envQuickSummary = document.getElementById('env-quick-summary');
+
+        const sessionEnvBadge = document.getElementById('session-env-badge');
+        const sessionEnvDetails = document.getElementById('session-env-details');
+        const sessionEnvLockBtn = document.getElementById('session-env-lock-btn');
+        const sessionEnvOpenBtn = document.getElementById('session-env-open-btn');
+
+        const count = currentVaultStatus.file_count || (currentVaultStatus.env_vars ? currentVaultStatus.env_vars.length : 0);
+        const vars = currentVaultStatus.env_vars || [];
+        const remStr = formatSecondsToRemaining(currentVaultStatus.remaining_seconds);
+
+        if (envDot) envDot.style.display = (currentVaultStatus.exists || count > 0) ? 'block' : 'none';
+        if (envBadge) {
+          if (count > 0) {
+            envBadge.textContent = count;
+            envBadge.style.display = 'inline-block';
+            envBadge.style.background = currentVaultStatus.locked ? '#d97706' : '#10b981';
+          } else {
+            envBadge.style.display = 'none';
+          }
+        }
+        if (tabEnvBadge) {
+          if (count > 0) {
+            tabEnvBadge.textContent = count;
+            tabEnvBadge.style.display = 'inline-block';
+            tabEnvBadge.style.background = currentVaultStatus.locked ? '#d97706' : '#10b981';
+          } else {
+            tabEnvBadge.style.display = 'none';
+          }
+        }
+
+        if (envQuickSummary) {
+          if (currentVaultStatus.exists) {
+            if (currentVaultStatus.locked) {
+              envQuickSummary.innerHTML = `<span style="color: #f59e0b;"><i class="fas fa-lock"></i> Encrypted Vault:</span> ${vars.join(', ')} (Expires in ${remStr})`;
+            } else {
+              envQuickSummary.innerHTML = `<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Unlocked Vault:</span> ${vars.join(', ')} (Expires in ${remStr})`;
+            }
+            envQuickSummary.style.display = 'block';
+          } else if (configuredFiles.length > 0) {
+            envQuickSummary.innerHTML = `<span style="color: #38bdf8;"><i class="fas fa-info-circle"></i> Configured:</span> ${configuredFiles.map(f => f.env_var).join(', ')}`;
+            envQuickSummary.style.display = 'block';
+          } else {
+            envQuickSummary.style.display = 'none';
+          }
+        }
+
+        // Session menu card
+        if (sessionEnvBadge && sessionEnvDetails) {
+          if (currentVaultStatus.exists) {
+            if (currentVaultStatus.locked) {
+              sessionEnvBadge.textContent = 'Locked (Encrypted)';
+              sessionEnvBadge.style.background = '#d97706';
+              sessionEnvBadge.style.color = '#ffffff';
+              sessionEnvDetails.textContent = `${count} variables on disk · Expires in ${remStr}`;
+              if (sessionEnvLockBtn) sessionEnvLockBtn.style.display = 'none';
+              if (sessionEnvOpenBtn) {
+                sessionEnvOpenBtn.innerHTML = '<i class="fas fa-unlock-alt"></i> <span>Unlock Vault</span>';
+                sessionEnvOpenBtn.style.background = '#047857';
+                sessionEnvOpenBtn.style.borderColor = '#10b981';
+              }
+            } else {
+              sessionEnvBadge.textContent = 'Active (Unlocked)';
+              sessionEnvBadge.style.background = '#10b981';
+              sessionEnvBadge.style.color = '#ffffff';
+              sessionEnvDetails.textContent = `${vars.join(', ')} · Expires in ${remStr}`;
+              if (sessionEnvLockBtn) sessionEnvLockBtn.style.display = 'inline-flex';
+              if (sessionEnvOpenBtn) {
+                sessionEnvOpenBtn.innerHTML = '<i class="fas fa-key"></i> <span>Manage Vault</span>';
+                sessionEnvOpenBtn.style.background = '#1e3a8a';
+                sessionEnvOpenBtn.style.borderColor = '#2563eb';
+              }
+            }
+          } else {
+            sessionEnvBadge.textContent = 'Not Configured';
+            sessionEnvBadge.style.background = '#334155';
+            sessionEnvBadge.style.color = '#94a3b8';
+            sessionEnvDetails.textContent = 'No environment files saved on host.';
+            if (sessionEnvLockBtn) sessionEnvLockBtn.style.display = 'none';
+            if (sessionEnvOpenBtn) {
+              sessionEnvOpenBtn.innerHTML = '<i class="fas fa-plus"></i> <span>Configure Vault</span>';
+              sessionEnvOpenBtn.style.background = '#1e3a8a';
+              sessionEnvOpenBtn.style.borderColor = '#2563eb';
+            }
+          }
+        }
+
+        // Inside Modal
+        const lockedExpiry = document.getElementById('env-locked-expiry-badge');
+        const lockedVarList = document.getElementById('env-locked-var-list');
+        const lockedFileCount = document.getElementById('env-locked-file-count');
+        const unlockedExpiry = document.getElementById('env-unlocked-expiry-badge');
+        const unlockedList = document.getElementById('env-unlocked-active-list');
+
+        if (lockedExpiry) lockedExpiry.textContent = `Expires in ${remStr}`;
+        if (lockedVarList) lockedVarList.textContent = vars.length > 0 ? vars.join(', ') : 'None';
+        if (lockedFileCount) lockedFileCount.textContent = `${count} file(s) (${currentVaultStatus.filenames?.join(', ') || ''})`;
+        if (unlockedExpiry) unlockedExpiry.textContent = `Expires in ${remStr}`;
+
+        if (unlockedList) {
+          unlockedList.innerHTML = '';
+          vars.forEach((v, idx) => {
+            const fname = (currentVaultStatus.filenames && currentVaultStatus.filenames[idx]) || `${v.toLowerCase()}.dat`;
+            const div = document.createElement('div');
+            div.style.cssText = 'background: #1e293b; border: 1px solid #334155; padding: 6px 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;';
+            div.innerHTML = `
+              <span style="font-family: monospace; font-weight: 600; color: #38bdf8;">${escapeHtml(v)}</span>
+              <span style="color: #94a3b8; font-size: 0.82em; font-family: monospace;">~/.ctlabs_env/${escapeHtml(fname)}</span>
+            `;
+            unlockedList.appendChild(div);
+          });
         }
       }
+
+      if (vaultCountdownInterval) clearInterval(vaultCountdownInterval);
+      vaultCountdownInterval = setInterval(() => {
+        if (currentVaultStatus && currentVaultStatus.remaining_seconds > 0) {
+          currentVaultStatus.remaining_seconds--;
+          updateVaultUI();
+          if (currentVaultStatus.remaining_seconds === 0) {
+            checkVaultStatus();
+          }
+        }
+      }, 1000);
 
       async function stageEnvFiles(files) {
         if (!files || files.length === 0) return null;
@@ -1218,7 +1587,7 @@
       }
 
       if (isController) {
-        loadSavedFiles();
+        checkVaultStatus();
 
         const envBtn = document.getElementById('env-files-btn');
         const modalBackdrop = document.getElementById('env-modal-backdrop');
@@ -1234,15 +1603,46 @@
         const addBtn = document.getElementById('env-add-btn');
         const feedbackEl = document.getElementById('env-feedback');
 
-        const showModal = () => {
+        const panelLocked = document.getElementById('env-panel-locked');
+        const panelUnlocked = document.getElementById('env-panel-unlocked');
+        const panelConfig = document.getElementById('env-panel-config');
+
+        const showModal = async () => {
           if (settingsMenu) settingsMenu.style.display = 'none';
+          if (sessionMenu) sessionMenu.style.display = 'none';
           modalBackdrop.style.display = 'flex';
-          feedbackEl.style.display = 'none';
+          if (feedbackEl) feedbackEl.style.display = 'none';
+
+          await checkVaultStatus();
+
+          if (currentVaultStatus.exists) {
+            if (currentVaultStatus.locked) {
+              if (panelLocked) panelLocked.style.display = 'block';
+              if (panelUnlocked) panelUnlocked.style.display = 'none';
+              if (panelConfig) panelConfig.style.display = 'none';
+              if (modalApply) modalApply.style.display = 'none';
+              const unlockPass = document.getElementById('env-unlock-password');
+              if (unlockPass) {
+                unlockPass.value = '';
+                unlockPass.focus();
+              }
+            } else {
+              if (panelLocked) panelLocked.style.display = 'none';
+              if (panelUnlocked) panelUnlocked.style.display = 'block';
+              if (panelConfig) panelConfig.style.display = 'none';
+              if (modalApply) modalApply.style.display = 'none';
+            }
+          } else {
+            if (panelLocked) panelLocked.style.display = 'none';
+            if (panelUnlocked) panelUnlocked.style.display = 'none';
+            if (panelConfig) panelConfig.style.display = 'block';
+            if (modalApply) modalApply.style.display = 'inline-flex';
+          }
         };
 
         const hideModal = () => {
           modalBackdrop.style.display = 'none';
-          feedbackEl.style.display = 'none';
+          if (feedbackEl) feedbackEl.style.display = 'none';
           pendingFile = null;
           if (fileInput) fileInput.value = '';
           if (filenameDisplay) filenameDisplay.textContent = 'No file chosen';
@@ -1259,6 +1659,148 @@
         if (modalBackdrop) {
           modalBackdrop.addEventListener('click', (e) => {
             if (e.target === modalBackdrop) hideModal();
+          });
+        }
+
+        // Toggle to re-config panel
+        const reconfigLink = document.getElementById('env-link-reconfig');
+        if (reconfigLink) {
+          reconfigLink.addEventListener('click', () => {
+            if (panelLocked) panelLocked.style.display = 'none';
+            if (panelUnlocked) panelUnlocked.style.display = 'none';
+            if (panelConfig) panelConfig.style.display = 'block';
+            if (modalApply) modalApply.style.display = 'inline-flex';
+          });
+        }
+
+        const editFilesBtn = document.getElementById('env-btn-edit-files');
+        if (editFilesBtn) {
+          editFilesBtn.addEventListener('click', () => {
+            if (panelLocked) panelLocked.style.display = 'none';
+            if (panelUnlocked) panelUnlocked.style.display = 'none';
+            if (panelConfig) panelConfig.style.display = 'block';
+            if (modalApply) modalApply.style.display = 'inline-flex';
+          });
+        }
+
+        // Unlock action
+        const unlockBtn = document.getElementById('env-btn-unlock-apply');
+        const unlockPassInput = document.getElementById('env-unlock-password');
+        const unlockPassToggle = document.getElementById('env-unlock-pass-toggle');
+        if (unlockPassToggle && unlockPassInput) {
+          unlockPassToggle.addEventListener('click', () => {
+            const isPass = unlockPassInput.type === 'password';
+            unlockPassInput.type = isPass ? 'text' : 'password';
+            unlockPassToggle.innerHTML = isPass ? '<i class="fas fa-eye-slash"></i> Hide' : '<i class="fas fa-eye"></i> Show';
+          });
+        }
+
+        if (unlockBtn) {
+          unlockBtn.addEventListener('click', async () => {
+            const pwd = unlockPassInput ? unlockPassInput.value : '';
+            if (!pwd) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Please enter the vault password.';
+              return;
+            }
+            unlockBtn.disabled = true;
+            unlockBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Unlocking...';
+            try {
+              const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/env_vault/unlock`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd }),
+                credentials: 'same-origin'
+              });
+              const data = await res.json();
+              if (!res.ok || !data.ok) {
+                throw new Error(data.error || 'Incorrect password');
+              }
+              hideModal();
+              term.write('\r\n\x1b[32m[✓ Vault unlocked and decrypted files injected into terminal]\x1b[0m\r\n');
+              await checkVaultStatus();
+              // Reconnect terminal session to ensure env vars are active
+              intentionalReconnect = true;
+              if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
+                activeWs.close();
+              }
+              intentionalReconnect = false;
+              openSocket(data.token);
+            } catch(err) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Failed to unlock vault: ' + err.message;
+            } finally {
+              unlockBtn.disabled = false;
+              unlockBtn.innerHTML = '<i class="fas fa-unlock-alt"></i> Unlock & Apply';
+            }
+          });
+        }
+
+        // Lock action
+        const lockNow = async () => {
+          try {
+            const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/env_vault/lock`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Lock failed');
+            hideModal();
+            term.write('\r\n\x1b[33m[🔒 Vault locked: Decrypted plaintext environment files purged from container]\x1b[0m\r\n');
+            await checkVaultStatus();
+          } catch(err) {
+            alert('Failed to lock vault: ' + err.message);
+          }
+        };
+        window.lockVaultNow = lockNow;
+        const lockBtn = document.getElementById('env-btn-lock-now');
+        if (lockBtn) lockBtn.addEventListener('click', lockNow);
+
+        // Purge action
+        const purgeVault = async () => {
+          if (!confirm('Are you sure you want to permanently delete this encrypted vault from the server disk and purge all environment files?')) {
+            return;
+          }
+          try {
+            const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/env_vault/purge`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error || 'Purge failed');
+            configuredFiles = [];
+            updateActiveList();
+            term.write('\r\n\x1b[33m[Vault permanently purged from server disk]\x1b[0m\r\n');
+            await checkVaultStatus();
+            if (panelLocked) panelLocked.style.display = 'none';
+            if (panelUnlocked) panelUnlocked.style.display = 'none';
+            if (panelConfig) panelConfig.style.display = 'block';
+            if (modalApply) modalApply.style.display = 'inline-flex';
+          } catch(err) {
+            alert('Failed to purge vault: ' + err.message);
+          }
+        };
+        const purgeBtn1 = document.getElementById('env-btn-purge-locked');
+        const purgeBtn2 = document.getElementById('env-btn-purge-unlocked');
+        if (purgeBtn1) purgeBtn1.addEventListener('click', purgeVault);
+        if (purgeBtn2) purgeBtn2.addEventListener('click', purgeVault);
+
+        // Vault password toggle in config panel
+        const vaultPassToggle = document.getElementById('env-vault-pass-toggle');
+        const vaultPassInput = document.getElementById('env-vault-password');
+        const vaultPassConfirm = document.getElementById('env-vault-password-confirm');
+        if (vaultPassToggle && vaultPassInput) {
+          vaultPassToggle.addEventListener('click', () => {
+            const isPass = vaultPassInput.type === 'password';
+            vaultPassInput.type = isPass ? 'text' : 'password';
+            if (vaultPassConfirm) vaultPassConfirm.type = isPass ? 'text' : 'password';
+            vaultPassToggle.innerHTML = isPass ? '<i class="fas fa-eye-slash"></i> Hide' : '<i class="fas fa-eye"></i> Show';
           });
         }
 
@@ -1342,29 +1884,81 @@
             feedbackEl.style.display = 'block';
             feedbackEl.style.background = '#064e3b';
             feedbackEl.style.color = '#a7f3d0';
-            feedbackEl.textContent = `Added ${varName}. Click "Save & Apply" to inject into terminal.`;
+            feedbackEl.textContent = `Added ${varName}. Set password below and click "Encrypt & Apply".`;
           });
         }
 
         if (modalApply) {
           modalApply.addEventListener('click', async () => {
-            saveStorage();
-            hideModal();
+            if (configuredFiles.length === 0) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Please add at least one environment file.';
+              return;
+            }
+            const passInput = document.getElementById('env-vault-password');
+            const passConfirm = document.getElementById('env-vault-password-confirm');
+            const lifeSelect = document.getElementById('env-vault-lifetime');
+
+            const pwd = passInput ? passInput.value : '';
+            const confirmPwd = passConfirm ? passConfirm.value : '';
+            const lifetime = lifeSelect ? parseInt(lifeSelect.value, 10) : 28800;
+
+            if (!pwd || pwd.length < 4) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Password must be at least 4 characters to encrypt vault.';
+              if (passInput) passInput.focus();
+              return;
+            }
+            if (pwd !== confirmPwd) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Vault passwords do not match.';
+              if (passConfirm) passConfirm.focus();
+              return;
+            }
+
+            modalApply.disabled = true;
+            modalApply.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Encrypting...';
             try {
+              const res = await fetch(`/terminal/${encodeURIComponent(nodeName)}/env_vault/save`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  files: configuredFiles,
+                  password: pwd,
+                  lifetime_seconds: lifetime
+                }),
+                credentials: 'same-origin'
+              });
+              const data = await res.json();
+              if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to save encrypted vault');
+
+              if (passInput) passInput.value = '';
+              if (passConfirm) passConfirm.value = '';
+              hideModal();
+              term.write('\r\n\x1b[32m[✓ Environment files encrypted (AES-256-GCM) and saved to server]\x1b[0m\r\n');
+              await checkVaultStatus();
+
+              // Reconnect terminal session to inject
               intentionalReconnect = true;
               if (activeWs && (activeWs.readyState === WebSocket.OPEN || activeWs.readyState === WebSocket.CONNECTING)) {
-                term.write('\r\n\x1b[33m[Applying environment files and reconnecting terminal...]\x1b[0m\r\n');
                 activeWs.close();
               }
-              let token = null;
-              if (configuredFiles.length > 0) {
-                token = await stageEnvFiles(configuredFiles);
-              }
               intentionalReconnect = false;
-              openSocket(token);
-            } catch(e) {
-              intentionalReconnect = false;
-              term.write(`\r\n\x1b[31m[Failed to stage environment files: ${e.message}]\x1b[0m\r\n`);
+              openSocket(data.token);
+            } catch(err) {
+              feedbackEl.style.display = 'block';
+              feedbackEl.style.background = '#7f1d1d';
+              feedbackEl.style.color = '#fecaca';
+              feedbackEl.textContent = 'Failed to save vault: ' + err.message;
+            } finally {
+              modalApply.disabled = false;
+              modalApply.innerHTML = '<i class="fas fa-lock"></i> Encrypt & Apply';
             }
           });
         }
@@ -1655,14 +2249,21 @@
                 return;
               }
 
+              const lifeEl = document.getElementById('term-ssh-lifetime');
+              const lifetime = lifeEl ? lifeEl.value.trim() : '';
+
               payload = {
                 key_content: keyContent,
                 key_name: keyName,
                 passphrase: passphrase,
                 save_to_disk: saveToDisk
               };
+              if (lifetime) payload.lifetime = lifetime;
             } else {
               const keyPath = termSshKeyPath ? termSshKeyPath.value.trim() : '';
+              const lifeEl = document.getElementById('term-ssh-lifetime');
+              const lifetime = lifeEl ? lifeEl.value.trim() : '';
+
               if (!keyPath) {
                 showTermSshAlert('Please enter the container key path.', 'error');
                 return;
@@ -1671,6 +2272,7 @@
                 key_path: keyPath,
                 passphrase: passphrase
               };
+              if (lifetime) payload.lifetime = lifetime;
             }
 
             if (termSshSubmitBtn) {
@@ -2731,6 +3333,8 @@
       settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (openNodeMenu) openNodeMenu.style.display = 'none';
+        const sessionMenu = document.getElementById('session-menu');
+        if (sessionMenu) sessionMenu.style.display = 'none';
         const willOpen = settingsMenu.style.display !== 'block';
         settingsMenu.style.display = willOpen ? 'block' : 'none';
         if (willOpen && typeof window.loadTermSshAgentStatus === 'function') {
@@ -3467,6 +4071,124 @@
       const settingsSessionsCount = document.getElementById('settings-sessions-count');
       const settingsTabSessionsBadge = document.getElementById('settings-tab-sessions-badge');
 
+      // Dedicated Session Popover Menu Elements
+      const sessionMenu = document.getElementById('session-menu');
+      const sessionClose = document.getElementById('session-close');
+      let sessionStartTime = null;
+      let sessionUptimeInterval = null;
+
+      function updateSessionUptime() {
+        const uptimeEl = document.getElementById('session-uptime-display');
+        if (!uptimeEl) return;
+        if (!sessionStartTime) {
+          uptimeEl.textContent = '00:00:00';
+          return;
+        }
+        const diff = Math.floor((Date.now() - sessionStartTime) / 1000);
+        const hrs = Math.floor(diff / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+        const secs = (diff % 60).toString().padStart(2, '0');
+        uptimeEl.textContent = `${hrs}:${mins}:${secs}`;
+      }
+
+      function updateSessionMenu() {
+        if (!sessionMenu || sessionMenu.style.display !== 'block') return;
+        const connBadge = document.getElementById('session-conn-badge');
+        const geoEl = document.getElementById('session-geo-display');
+        const countEl = document.getElementById('session-count-display');
+
+        if (connBadge) {
+          if (statusEl && statusEl.classList.contains('connected')) {
+            connBadge.textContent = 'Connected';
+            connBadge.style.background = '#10b981';
+          } else if (statusEl && statusEl.classList.contains('connecting')) {
+            connBadge.textContent = 'Connecting...';
+            connBadge.style.background = '#d97706';
+          } else {
+            connBadge.textContent = 'Disconnected';
+            connBadge.style.background = '#ef4444';
+          }
+        }
+
+        if (geoEl && term) {
+          geoEl.textContent = `${term.cols} × ${term.rows}`;
+        }
+
+        if (countEl) {
+          countEl.textContent = `${currentSessionCount} of 3`;
+        }
+
+        if (isController && typeof window.checkVaultStatus === 'function') {
+          window.checkVaultStatus();
+        }
+        if (isController && typeof window.loadSessionSshStatus === 'function') {
+          window.loadSessionSshStatus();
+        }
+      }
+
+      if (sessionClose && sessionMenu) {
+        sessionClose.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+        });
+      }
+
+      const sessionReconnectBtn = document.getElementById('session-reconnect-btn');
+      if (sessionReconnectBtn) {
+        sessionReconnectBtn.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+          connectTerminal();
+        });
+      }
+
+      const sessionDisconnectBtn = document.getElementById('session-disconnect-btn');
+      if (sessionDisconnectBtn) {
+        sessionDisconnectBtn.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+          disconnectTerminal();
+        });
+      }
+
+      const sessionCleanAllBtn = document.getElementById('session-clean-all-btn');
+      if (sessionCleanAllBtn) {
+        sessionCleanAllBtn.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+          if (cleanAllBtn) cleanAllBtn.click();
+        });
+      }
+
+      const sessionEnvOpenBtn = document.getElementById('session-env-open-btn');
+      if (sessionEnvOpenBtn) {
+        sessionEnvOpenBtn.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+          const envBtn = document.getElementById('env-files-btn');
+          if (envBtn) envBtn.click();
+        });
+      }
+
+      const sessionEnvLockBtn = document.getElementById('session-env-lock-btn');
+      if (sessionEnvLockBtn) {
+        sessionEnvLockBtn.addEventListener('click', () => {
+          if (window.lockVaultNow) window.lockVaultNow();
+        });
+      }
+
+      const sessionSshManageBtn = document.getElementById('session-ssh-manage-btn');
+      if (sessionSshManageBtn) {
+        sessionSshManageBtn.addEventListener('click', () => {
+          sessionMenu.style.display = 'none';
+          const termSshManageBtn = document.getElementById('term-ssh-manage-btn');
+          if (termSshManageBtn) termSshManageBtn.click();
+        });
+      }
+
+      window.addEventListener('click', (e) => {
+        if (sessionMenu && sessionMenu.style.display === 'block') {
+          if (!sessionMenu.contains(e.target) && e.target !== statusEl && !statusEl.contains(e.target)) {
+            sessionMenu.style.display = 'none';
+          }
+        }
+      });
+
       const setDisconnectedState = () => {
         if (connectBtn) {
           connectBtn.className = 'term-conn-btn disconnected';
@@ -3479,6 +4201,7 @@
           statusEl.textContent = currentSessionCount;
           statusEl.title = `Disconnected · ${currentSessionCount}/3 active sessions (click to connect)`;
         }
+        updateSessionMenu();
       };
 
       const setConnectedState = () => {
@@ -3491,8 +4214,9 @@
         if (statusEl) {
           statusEl.className = 'status connected';
           statusEl.textContent = currentSessionCount;
-          statusEl.title = `Connected · ${currentSessionCount}/3 active sessions (click Settings to manage)`;
+          statusEl.title = `Connected · ${currentSessionCount}/3 active sessions (click for session details)`;
         }
+        updateSessionMenu();
       };
 
       const setConnectingState = () => {
@@ -3507,6 +4231,7 @@
           statusEl.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
           statusEl.title = 'Connecting...';
         }
+        updateSessionMenu();
       };
 
       const updateSessionCount = async () => {
@@ -3594,10 +4319,15 @@
         activeWs = ws;
 
         ws.onopen = () => {
+          sessionStartTime = Date.now();
+          if (sessionUptimeInterval) clearInterval(sessionUptimeInterval);
+          sessionUptimeInterval = setInterval(updateSessionUptime, 1000);
+          updateSessionUptime();
           setConnectedState();
           term.focus();
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
           updateSessionCount();
+          updateSessionMenu();
           if (token && configuredFiles.length > 0) {
             const names = configuredFiles.map(f => f.env_var).join(', ');
             term.write(`\r\n\x1b[32m[✓ Controller environment files active: ${names}]\x1b[0m\r\n`);
@@ -3625,8 +4355,12 @@
 
         ws.onclose = () => {
           if (intentionalReconnect) return;
+          sessionStartTime = null;
+          if (sessionUptimeInterval) clearInterval(sessionUptimeInterval);
+          updateSessionUptime();
           setDisconnectedState();
           updateSessionCount();
+          updateSessionMenu();
           if (intentionalDisconnect) {
             intentionalDisconnect = false;
             term.write('\r\n\x1b[33m[Disconnected by user — Session terminated]\x1b[0m\r\n');
@@ -3718,15 +4452,13 @@
           e.stopPropagation();
           if (statusEl.classList.contains('disconnected')) {
             connectTerminal();
-          } else if (statusEl.classList.contains('connected')) {
+          } else {
             if (openNodeMenu) openNodeMenu.style.display = 'none';
-            const willOpen = settingsMenu.style.display !== 'block';
-            settingsMenu.style.display = willOpen ? 'block' : 'none';
+            if (settingsMenu) settingsMenu.style.display = 'none';
+            const willOpen = sessionMenu.style.display !== 'block';
+            sessionMenu.style.display = willOpen ? 'block' : 'none';
             if (willOpen) {
-              switchSettingsTab('terminal');
-              if (typeof window.loadTermSshAgentStatus === 'function') {
-                window.loadTermSshAgentStatus();
-              }
+              updateSessionMenu();
             }
           }
         });

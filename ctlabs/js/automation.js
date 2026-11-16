@@ -2051,15 +2051,21 @@ window.submitSshAgentAddKey = async function(event) {
       return;
     }
 
+    const lifeInput = document.getElementById('ssh-agent-lifetime');
+    const lifetime = lifeInput ? lifeInput.value.trim() : '';
+
     payload = {
       key_content: keyContent,
       key_name: keyName,
       passphrase: passphrase,
       save_to_disk: saveToDisk
     };
+    if (lifetime) payload.lifetime = lifetime;
   } else {
     const keyInput = document.getElementById('ssh-agent-key-path');
     const keyPath = (keyInput ? keyInput.value : '').trim();
+    const lifeInput = document.getElementById('ssh-agent-lifetime');
+    const lifetime = lifeInput ? lifeInput.value.trim() : '';
 
     if (!keyPath) {
       if (alertEl) {
@@ -2074,6 +2080,7 @@ window.submitSshAgentAddKey = async function(event) {
       key_path: keyPath,
       passphrase: passphrase
     };
+    if (lifetime) payload.lifetime = lifetime;
   }
 
   let originalHtml = '';

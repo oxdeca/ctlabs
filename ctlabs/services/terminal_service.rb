@@ -12,12 +12,14 @@ require 'base64'
 require 'open3'
 require 'shellwords'
 require 'fileutils'
+require 'openssl'
 require 'set'
 
 require_relative 'recording_service'
 
 class TerminalService
   ENV_DIR_NAME = (ENV['CTLABS_ENV_DIR'] || ENV['CTLABS_ENV_DIR_NAME'] || '.ctlabs_env').to_s.sub(%r{\A/+}, '')
+  ENV_VAULTS_DIR = '/srv/ctlabs-server/env-vaults'
 
   def self.env_dir_name
     ENV_DIR_NAME
@@ -25,6 +27,11 @@ class TerminalService
 
   def self.env_dir_for_user(base_dir)
     "#{base_dir}/#{ENV_DIR_NAME}"
+  end
+
+  def self.vault_path_for(node_name)
+    safe = node_name.to_s.gsub(/[^a-zA-Z0-9_.-]/, '_')
+    File.join(ENV_VAULTS_DIR, "#{safe}.vault.json")
   end
 
   DISCONNECT_GRACE_PERIOD = 45 # seconds
@@ -123,6 +130,7 @@ class TerminalService
       end
     end
     cleanup_stale_pty_sessions
+    sweep_expired_env_vaults!
   end
 
   def self.cleanup_stale_pty_sessions
@@ -294,6 +302,329 @@ class TerminalService
     nodes
   end
 
+  # ---------------------------------------------------------------------------
+  # Encrypted Environment Vaults & Lifecycle Management
+  # ---------------------------------------------------------------------------
+  def self.encrypt_env_payload(files_array, password)
+    raise ArgumentError, 'Password must be at least 4 characters' if password.to_s.length < 4
+    salt = SecureRandom.random_bytes(16)
+    key = OpenSSL::PKCS5.pbkdf2_hmac(password.to_s, salt, 100_000, 32, OpenSSL::Digest::SHA256.new)
+    iv = SecureRandom.random_bytes(12)
+
+    cipher = OpenSSL::Cipher.new('aes-256-gcm')
+    cipher.encrypt
+    cipher.key = key
+    cipher.iv = iv
+    ciphertext = cipher.update(JSON.generate(files_array)) + cipher.final
+    tag = cipher.auth_tag
+
+    {
+      salt_hex: salt.unpack1('H*'),
+      iv_hex: iv.unpack1('H*'),
+      tag_hex: tag.unpack1('H*'),
+      ciphertext_b64: Base64.strict_encode64(ciphertext)
+    }
+  end
+
+  def self.decrypt_env_payload(vault_data, password)
+    raise ArgumentError, 'Password is required' if password.to_s.empty?
+    raise ArgumentError, 'Invalid vault format' unless vault_data.is_a?(Hash) && vault_data['cipher'] && vault_data['kdf']
+
+    salt = [vault_data.dig('kdf', 'salt')].pack('H*')
+    iterations = (vault_data.dig('kdf', 'iterations') || 100_000).to_i
+    iv = [vault_data.dig('cipher', 'iv')].pack('H*')
+    tag = [vault_data.dig('cipher', 'auth_tag')].pack('H*')
+    ciphertext = Base64.strict_decode64(vault_data.dig('cipher', 'ciphertext').to_s)
+
+    key = OpenSSL::PKCS5.pbkdf2_hmac(password.to_s, salt, iterations, 32, OpenSSL::Digest::SHA256.new)
+
+    decipher = OpenSSL::Cipher.new('aes-256-gcm')
+    decipher.decrypt
+    decipher.key = key
+    decipher.iv = iv
+    decipher.auth_tag = tag
+
+    decrypted_json = decipher.update(ciphertext) + decipher.final
+    JSON.parse(decrypted_json)
+  rescue OpenSSL::Cipher::CipherError, ArgumentError
+    raise ArgumentError, 'Incorrect password or corrupted encrypted vault'
+  rescue JSON::ParserError
+    raise ArgumentError, 'Corrupted decrypted payload'
+  end
+
+  def self.save_env_vault(node_name, files, password, lifetime_seconds = 28800)
+    raise ArgumentError, 'Files must be an array' unless files.is_a?(Array)
+    raise ArgumentError, 'No files provided' if files.empty?
+    raise ArgumentError, 'Too many files (max 10 allowed)' if files.size > 10
+
+    lifetime = lifetime_seconds.to_i
+    lifetime = 28800 if lifetime <= 0
+    # Clamp lifetime between 5 minutes (300s) and 30 days (2592000s)
+    lifetime = [[lifetime, 300].max, 2592000].min
+
+    # Normalize and validate file structures
+    normalized = []
+    files.each do |f|
+      next unless f.is_a?(Hash)
+      var_name = f['env_var'].to_s.strip.upcase
+      raise ArgumentError, "Invalid environment variable name: #{var_name}" unless var_name =~ /\A[A-Z_][A-Z0-9_]*\z/
+
+      raw_fname = f['filename'].to_s.strip
+      fname = File.basename(raw_fname).gsub(/[^a-zA-Z0-9_.-]/, '_')
+      fname = "#{var_name.downcase}.dat" if fname.empty? || fname == '.' || fname == '..'
+
+      b64 = f['content_base64'].to_s.sub(/\Adata:[^;]+;base64,/, '')
+      content = begin
+        Base64.decode64(b64)
+      rescue => e
+        raise ArgumentError, "Invalid base64 encoding for #{var_name}: #{e.message}"
+      end
+      if content.bytesize > 5 * 1024 * 1024
+        raise ArgumentError, "File for #{var_name} exceeds 5MB limit"
+      end
+
+      normalized << {
+        'env_var' => var_name,
+        'filename' => fname,
+        'content_base64' => Base64.strict_encode64(content)
+      }
+    end
+
+    raise ArgumentError, 'No valid files provided' if normalized.empty?
+
+    enc = encrypt_env_payload(normalized, password)
+    now = Time.now.to_i
+    expires_at = now + lifetime
+
+    metadata = {
+      'file_count' => normalized.size,
+      'env_vars' => normalized.map { |f| f['env_var'] },
+      'filenames' => normalized.map { |f| f['filename'] }
+    }
+
+    vault_data = {
+      'version' => 1,
+      'node_name' => node_name,
+      'created_at' => now,
+      'lifetime_seconds' => lifetime,
+      'expires_at' => expires_at,
+      'kdf' => {
+        'algorithm' => 'PBKDF2-HMAC-SHA256',
+        'iterations' => 100_000,
+        'salt' => enc[:salt_hex]
+      },
+      'cipher' => {
+        'algorithm' => 'aes-256-gcm',
+        'iv' => enc[:iv_hex],
+        'auth_tag' => enc[:tag_hex],
+        'ciphertext' => enc[:ciphertext_b64]
+      },
+      'metadata' => metadata
+    }
+
+    FileUtils.mkdir_p(ENV_VAULTS_DIR, mode: 0o700)
+    vpath = vault_path_for(node_name)
+    File.write(vpath, JSON.pretty_generate(vault_data))
+    File.chmod(0o600, vpath)
+
+    # Immediately unlock and stage for current session
+    token, summary = stage_env_files(node_name, normalized)
+    @@env_mutex.synchronize do
+      if @@staged_env[token]
+        @@staged_env[token][:expires_at] = expires_at
+        @@staged_env[token][:vault_unlocked] = true
+      end
+    end
+
+    {
+      ok: true,
+      token: token,
+      expires_at: expires_at,
+      remaining_seconds: lifetime,
+      files: summary
+    }
+  end
+
+  def self.unlock_env_vault(node_name, password)
+    sweep_expired_env_vaults!
+    vpath = vault_path_for(node_name)
+    unless File.file?(vpath)
+      raise ArgumentError, "No encrypted environment vault found for #{node_name}"
+    end
+
+    raw = File.read(vpath)
+    vault_data = JSON.parse(raw) rescue nil
+    raise ArgumentError, 'Corrupted vault file on disk' unless vault_data
+
+    now = Time.now.to_i
+    if vault_data['expires_at'] && now >= vault_data['expires_at'].to_i
+      purge_env_vault(node_name)
+      raise ArgumentError, 'Vault has expired and was removed'
+    end
+
+    decrypted_files = decrypt_env_payload(vault_data, password)
+    token, summary = stage_env_files(node_name, decrypted_files)
+
+    expires_at = vault_data['expires_at'].to_i
+    remaining = [expires_at - now, 0].max
+
+    @@env_mutex.synchronize do
+      if @@staged_env[token]
+        @@staged_env[token][:expires_at] = expires_at
+        @@staged_env[token][:vault_unlocked] = true
+      end
+    end
+
+    # Also proactively apply into running container if reachable
+    target = resolve_node_target(node_name)
+    if target
+      engine = target[:engine] || (system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker')
+      exec_name = target[:container] || node_name
+      node_user = target[:user]
+      begin
+        apply_staged_env_files(engine, exec_name, node_user, token)
+      rescue => e
+        puts "[Unlock Env Proactive Stage Error] #{e.message}"
+      end
+    end
+
+    {
+      ok: true,
+      token: token,
+      files: summary,
+      expires_at: expires_at,
+      remaining_seconds: remaining
+    }
+  end
+
+  def self.env_vault_status(node_name)
+    sweep_expired_env_vaults!
+    vpath = vault_path_for(node_name)
+    has_vault = File.file?(vpath)
+
+    unlocked_token = nil
+    expires_at = nil
+    remaining = 0
+    now = Time.now.to_i
+
+    @@env_mutex.synchronize do
+      match = @@staged_env.find { |_, v| v[:node_name] == node_name && v[:files] && !v[:files].empty? }
+      if match
+        unlocked_token = match[0]
+        expires_at = match[1][:expires_at]
+      end
+    end
+
+    if has_vault
+      vault_data = JSON.parse(File.read(vpath)) rescue {}
+      expires_at ||= vault_data['expires_at']
+      remaining = [expires_at.to_i - now, 0].max if expires_at
+      meta = vault_data['metadata'] || {}
+
+      {
+        ok: true,
+        exists: true,
+        locked: unlocked_token.nil?,
+        token: unlocked_token,
+        created_at: vault_data['created_at'],
+        lifetime_seconds: vault_data['lifetime_seconds'],
+        expires_at: expires_at,
+        remaining_seconds: remaining,
+        is_expired: (remaining <= 0),
+        file_count: meta['file_count'] || (meta['env_vars'] || []).size,
+        env_vars: meta['env_vars'] || [],
+        filenames: meta['filenames'] || []
+      }
+    elsif unlocked_token
+      remaining = [expires_at.to_i - now, 0].max if expires_at
+      {
+        ok: true,
+        exists: false,
+        locked: false,
+        token: unlocked_token,
+        expires_at: expires_at,
+        remaining_seconds: remaining,
+        file_count: 0,
+        env_vars: [],
+        filenames: []
+      }
+    else
+      {
+        ok: true,
+        exists: false,
+        locked: true,
+        remaining_seconds: 0
+      }
+    end
+  end
+
+  def self.lock_env_vault(node_name)
+    tokens_to_delete = []
+    @@env_mutex.synchronize do
+      @@staged_env.each do |t, v|
+        tokens_to_delete << t if v[:node_name] == node_name
+      end
+      tokens_to_delete.each { |t| @@staged_env.delete(t) }
+    end
+
+    target = resolve_node_target(node_name)
+    if target
+      engine = target[:engine] || (system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker')
+      container = target[:container] || node_name
+      user = target[:user] || 'root'
+      home = resolve_home_dir(engine, container, user) || (user == 'root' ? '/root' : "/home/#{user}")
+      env_dir = env_dir_for_user(home)
+      system("#{engine} exec #{container} sh -c 'rm -rf #{env_dir}/*' >/dev/null 2>&1")
+      if home != '/root'
+        root_env = env_dir_for_user('/root')
+        system("#{engine} exec #{container} sh -c 'rm -rf #{root_env}/*' >/dev/null 2>&1")
+      end
+    end
+
+    { ok: true, locked: true }
+  end
+
+  def self.purge_env_vault(node_name)
+    lock_env_vault(node_name)
+    vpath = vault_path_for(node_name)
+    File.delete(vpath) if File.file?(vpath)
+    { ok: true, purged: true }
+  end
+
+  def self.sweep_expired_env_vaults!
+    now = Time.now.to_i
+    if Dir.exist?(ENV_VAULTS_DIR)
+      Dir.glob(File.join(ENV_VAULTS_DIR, '*.vault.json')).each do |vpath|
+        begin
+          data = JSON.parse(File.read(vpath)) rescue nil
+          next unless data && data['expires_at']
+          if now >= data['expires_at'].to_i
+            node = data['node_name']
+            File.delete(vpath) rescue nil
+            lock_env_vault(node) if node rescue nil
+          end
+        rescue => e
+          puts "[Vault Sweep Error] #{vpath}: #{e.message}"
+        end
+      end
+    end
+
+    # Also sweep expired in-memory staging
+    @@env_mutex.synchronize do
+      expired_tokens = []
+      @@staged_env.each do |token, val|
+        if val[:expires_at] && now >= val[:expires_at].to_i
+          expired_tokens << token
+        end
+      end
+      expired_tokens.each do |token|
+        node = @@staged_env[token][:node_name]
+        @@staged_env.delete(token)
+        lock_env_vault(node) if node rescue nil
+      end
+    end
+  end
+
   def self.stage_env_files(node_name, files)
     raise ArgumentError, 'Files must be an array' unless files.is_a?(Array)
     raise ArgumentError, 'Too many files (max 10 allowed)' if files.size > 10
@@ -332,7 +663,7 @@ class TerminalService
     token = SecureRandom.hex(16)
     @@env_mutex.synchronize do
       cutoff = Time.now - 900
-      @@staged_env.reject! { |_, v| v[:created_at] && v[:created_at] < cutoff }
+      @@staged_env.reject! { |_, v| v[:created_at] && v[:created_at] < cutoff && !v[:vault_unlocked] }
       @@staged_env[token] = {
         node_name: node_name,
         created_at: Time.now,
@@ -382,6 +713,16 @@ class TerminalService
       system("#{engine} exec #{exec_name} sh -c 'mkdir -p -m 700 #{root_env_dir} && cp -f #{target_dir}/* #{root_env_dir}/ 2>/dev/null' >/dev/null 2>&1")
     end
 
+    # Write session metadata inside container with 0600
+    meta = {
+      'node_name' => staged[:node_name],
+      'created_at' => staged[:created_at] ? staged[:created_at].to_i : Time.now.to_i,
+      'expires_at' => staged[:expires_at] ? staged[:expires_at].to_i : (Time.now.to_i + 28800),
+      'env_vars' => env_map.keys
+    }
+    meta_path = "#{target_dir}/.session_env.json"
+    system("#{engine} exec -i #{exec_name} sh -c \"cat > #{meta_path} && chmod 600 #{meta_path}\" << 'CTL_EOF'\n#{JSON.generate(meta)}\nCTL_EOF")
+
     @@env_mutex.synchronize do
       if @@staged_env[env_token]
         @@staged_env[env_token][:engine] = engine
@@ -395,10 +736,17 @@ class TerminalService
 
   def self.cleanup_env_files(env_token)
     return if env_token.to_s.empty?
+    node_name = nil
     @@env_mutex.synchronize do
-      @@staged_env.delete(env_token)
+      if @@staged_env[env_token]
+        node_name = @@staged_env[env_token][:node_name]
+        # Only delete from memory if not an active vault
+        unless @@staged_env[env_token][:vault_unlocked]
+          @@staged_env.delete(env_token)
+        end
+      end
     end
-    # Keep the user's environment files preserved in ~/.ctlabs_env/ as requested.
+    sweep_expired_env_vaults!
   end
 
   # Login names come from lab/profile YAML, so they are interpolated into a
@@ -567,12 +915,21 @@ class TerminalService
       end
 
       # Inject user-provided environment files on controller containers
-      if is_controller_container && env_token && !env_token.to_s.empty?
-        begin
-          staged_vars = apply_staged_env_files(engine, exec_name, node_user, env_token)
-          staged_vars.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
-        rescue => e
-          puts "[Terminal Env Files Error] #{e.message}"
+      if is_controller_container
+        token_to_use = env_token
+        if (!token_to_use || token_to_use.to_s.empty?)
+          @@env_mutex.synchronize do
+            match = @@staged_env.find { |_, v| v[:node_name] == node_name && v[:files] && !v[:files].empty? }
+            token_to_use = match[0] if match
+          end
+        end
+        if token_to_use && !token_to_use.to_s.empty?
+          begin
+            staged_vars = apply_staged_env_files(engine, exec_name, node_user, token_to_use)
+            staged_vars.each { |key, value| cmd.push('-e', "#{key}=#{value}") }
+          rescue => e
+            puts "[Terminal Env Files Error] #{e.message}"
+          end
         end
       end
 

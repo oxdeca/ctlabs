@@ -126,6 +126,20 @@
             <input type="password" id="ssh-agent-passphrase" placeholder="Key Passphrase" class="w3-input w3-small w3-round" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569; font-family: monospace;">
           </div>
 
+          <!-- Key Lifetime Selector -->
+          <div class="w3-margin-bottom">
+            <label style="font-size: 0.85em; color: #94a3b8; display: block; margin-bottom: 4px;">
+              <i class="fas fa-hourglass-half w3-text-teal" style="margin-right: 4px;"></i>Key Lifetime in Agent
+            </label>
+            <select id="ssh-agent-lifetime" class="w3-select w3-small w3-round" style="background-color: #0b1120; color: #e2e8f0; border: 1px solid #475569;">
+              <option value="1h">1 Hour (1h)</option>
+              <option value="4h">4 Hours (4h)</option>
+              <option value="8h" selected>8 Hours (8h) - Recommended</option>
+              <option value="24h">24 Hours (24h)</option>
+              <option value="">No Limit / Until agent cleared</option>
+            </select>
+          </div>
+
           <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
             <button type="button" onclick="document.getElementById('ssh-agent-modal').style.display='none'" class="w3-button w3-round" style="background-color: #334155; color: #cbd5e1; font-size: 13px; font-weight: 500; padding: 6px 16px;">
               Cancel
