@@ -1761,6 +1761,132 @@ class RecordingService
     }
   end
 
+  # Formats numeric dimension to include standard 'px' unit for Pandoc attributes
+  def self.format_docx_dimension(val)
+    return nil if val.nil? || val.to_s.strip.empty?
+    v = val.to_s.strip
+    v =~ /\A\d+\z/ ? "#{v}px" : v
+  end
+
+  # Preprocesses Markdown content specifically for Pandoc DOCX export:
+  # - Translates extended markdown image dimensions (e.g. =400, =400x300, =50%) to Pandoc attributes {width=... height=...}
+  # - Translates Obsidian pipe syntax dimensions (e.g. ![alt|400](...), ![400](...)) to Pandoc attributes
+  # - Normalizes curly attribute dimensions (e.g. {width=400}, {400x300})
+  # - Converts HTML <img> tags with width/height/style to Markdown images with Pandoc attributes
+  # - Resolves relative / scoped image paths to absolute filesystem paths on disk so Pandoc embeds them into DOCX
+  def self.preprocess_markdown_for_docx(content, walkthrough: nil)
+    # 1. Convert HTML <img> tags to Markdown images with attributes
+    processed = content.to_s.gsub(/<img\s+([^>]+)>/i) do |match|
+      attrs_str = $1
+      src = attrs_str[/src=["']?([^"'\s>]+)["']?/i, 1]
+      next match unless src
+
+      alt = attrs_str[/alt=["']([^"']*)["']/i, 1] || ''
+      w = attrs_str[/width=["']?(\d+(?:%|px)?)["']?/i, 1]
+      h = attrs_str[/height=["']?(\d+(?:%|px)?)["']?/i, 1]
+
+      if (style = attrs_str[/style=["']([^"']*)["']/i, 1])
+        w ||= style[/width\s*:\s*(\d+(?:%|px|in|cm)?)/i, 1]
+        h ||= style[/height\s*:\s*(\d+(?:%|px|in|cm)?)/i, 1]
+      end
+
+      attr_list = []
+      attr_list << "width=#{format_docx_dimension(w)}" if w
+      attr_list << "height=#{format_docx_dimension(h)}" if h
+      attr_suffix = attr_list.empty? ? '' : "{#{attr_list.join(' ')}}"
+
+      "![#{alt}](#{src})#{attr_suffix}"
+    end
+
+    # 2. Process Markdown images: ![alt](target){attrs}
+    processed.gsub(/!\[(?<alt>[^\]]*)\]\((?<target>[^)]+)\)(?:\{(?<attrs>[^}]+)\})?/) do
+      alt = $~[:alt] || ''
+      target = $~[:target] || ''
+      attrs = $~[:attrs]
+
+      width = nil
+      height = nil
+      clean_alt = alt.strip
+
+      # Check target for =WxH or =W (e.g. "path/to/img.png =400x300" or "path/to/img.png =400")
+      if target =~ /\s+=(\d+(?:%|px)?)(?:\s*x\s*(\d+(?:%|px)?))?/i
+        width = $1
+        height = $2
+        target = target.sub(/\s+=(\d+(?:%|px)?)(?:\s*x\s*(\d+(?:%|px)?))?/i, '').strip
+      end
+
+      # Check curly attrs if present
+      other_attrs = []
+      if attrs && !attrs.strip.empty?
+        attrs_trimmed = attrs.strip
+        if (dim_m = attrs_trimmed.match(/\A(\d+(?:%|px)?)\s*x\s*(\d+(?:%|px)?)\z/i))
+          width ||= dim_m[1]
+          height ||= dim_m[2]
+        elsif (single_m = attrs_trimmed.match(/\A(\d+(?:%|px)?)\z/i))
+          width ||= single_m[1]
+        else
+          # Key-value attrs: width=..., height=...
+          if (w_m = attrs_trimmed.match(/width\s*[:=]\s*["']?(\d+(?:%|px|in|cm)?)["']?/i))
+            width ||= w_m[1]
+          end
+          if (h_m = attrs_trimmed.match(/height\s*[:=]\s*["']?(\d+(?:%|px|in|cm)?)["']?/i))
+            height ||= h_m[1]
+          end
+          # Retain other attributes (classes, IDs, etc.)
+          cleaned = attrs_trimmed.gsub(/width\s*[:=]\s*["']?(\d+(?:%|px|in|cm)?)["']?/i, '')
+                                 .gsub(/height\s*[:=]\s*["']?(\d+(?:%|px|in|cm)?)["']?/i, '')
+                                 .strip
+          other_attrs << cleaned unless cleaned.empty?
+        end
+      end
+
+      # Check alt for Obsidian pipe syntax (e.g. "alt text|400x300", "alt text|400", "400x300", "400")
+      if clean_alt =~ /\A(.*)\|(.*)\z/
+        clean_alt = $1.strip
+        dim_candidate = $2.strip
+        if (dim_m = dim_candidate.match(/\A(\d+(?:%|px)?)\s*x\s*(\d+(?:%|px)?)\z/i))
+          width ||= dim_m[1]
+          height ||= dim_m[2]
+        elsif dim_candidate =~ /\A\d+(?:%|px)?\z/i
+          width ||= dim_candidate
+        end
+      elsif clean_alt =~ /\A(\d+(?:%|px)?)\s*x\s*(\d+(?:%|px)?)\z/i
+        width ||= $1
+        height ||= $2
+        clean_alt = ''
+      elsif clean_alt =~ /\A\d+(?:%|px)?\z/i
+        width ||= clean_alt
+        clean_alt = ''
+      end
+
+      # Extract URL and optional title from target
+      url = target
+      title_part = ''
+      if target =~ /\A(\S+)\s+(["'].*)\z/
+        url = $1
+        title_part = " #{$2}"
+      end
+
+      # Resolve image path to real filesystem path if not already an existing file
+      unless File.file?(url)
+        if url =~ %r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}
+          img_name = $1
+          real_path = image_path(img_name, walkthrough: walkthrough)
+          url = real_path if real_path && File.file?(real_path)
+        end
+      end
+
+      attr_list = []
+      attr_list << "width=#{format_docx_dimension(width)}" if width
+      attr_list << "height=#{format_docx_dimension(height)}" if height
+      attr_list.concat(other_attrs) unless other_attrs.empty?
+
+      attr_suffix = attr_list.empty? ? '' : "{#{attr_list.join(' ')}}"
+
+      "![#{clean_alt}](#{url}#{title_part})#{attr_suffix}"
+    end
+  end
+
   # Converts Markdown content into a Microsoft Word (.docx) document via pandoc,
   # embedding all referenced images directly into the document.
   def self.convert_markdown_to_docx(content, filename: nil, walkthrough: nil)
@@ -1786,18 +1912,9 @@ class RecordingService
 
     target_docx = File.join(dir, "export_note_#{SecureRandom.hex(4)}_#{clean_name}")
 
-    # Resolve all relative and /recordings/images/ image paths to absolute filesystem paths so pandoc embeds them
-    rewritten = content.to_s.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}) do |match|
-      img_name = $1
-      real_path = image_path(img_name, walkthrough: walkthrough)
-      real_path && File.file?(real_path) ? real_path : match
-    end
-
-    rewritten = rewritten.gsub(/src=["'](?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.\/)?|\/)images\/([a-zA-Z0-9_.-]+)["']/) do |match|
-      img_name = $1
-      real_path = image_path(img_name, walkthrough: walkthrough)
-      real_path && File.file?(real_path) ? "src=\"#{real_path}\"" : match
-    end
+    # Preprocess markdown to convert extended image syntax (=400, pipe, curly, html)
+    # and resolve image paths so pandoc embeds them with correct dimensions into DOCX
+    rewritten = preprocess_markdown_for_docx(content, walkthrough: walkthrough)
 
     Dir.mktmpdir('ctlabs-docx') do |tmpdir|
       tmp_md = File.join(tmpdir, 'input.md')
