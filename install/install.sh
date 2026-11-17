@@ -55,6 +55,7 @@ PKGS=(
   'vim'
   'git'
   'graphviz'
+  'pandoc'
   'epel-release'
   'htop'
   'ruby'
