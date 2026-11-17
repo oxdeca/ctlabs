@@ -51,18 +51,71 @@ class GraphvizTemplateContext
     DOT
   end
 
-  def node(id, name: nil, ip: nil, subtitle: nil, icon: nil, color: '#38bdf8', fillcolor: '#0f172a', **attr)
+  def node(id, name: nil, ip: nil, subtitle: nil, icon: nil, color: '#38bdf8', fillcolor: '#0f172a',
+           text_color: nil, fontcolor: nil, font: nil, fontname: nil, font_size: 14,
+           subtitle_color: nil, border: 0, cellborder: 0, cellpadding: 4, cellspacing: 0, **attr)
     display_name = name || id
     details = ip || subtitle
-    sub_row = details ? %(<tr><td><font color="#94a3b8" point-size="11">#{h(details)}</font></td></tr>) : ''
+    title_col = text_color || fontcolor || color
+    sub_col = subtitle_color || '#94a3b8'
+    font_face = font || fontname
+    face_attr = font_face ? %( face="#{h(font_face)}") : ''
+    sub_row = details ? %(<tr><td><font color="#{sub_col}"#{face_attr} point-size="11">#{h(details)}</font></td></tr>) : ''
     icon_str = icon ? "#{icon} " : ''
     extra = format_dot_attrs(attr)
     extra_prefix = extra.empty? ? '' : ", #{extra}"
     <<~DOT
       #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}"#{extra_prefix}, label=<
-        <table border="0" cellborder="0" cellspacing="0" cellpadding="4">
-          <tr><td><b><font color="#{color}" point-size="14">#{icon_str}#{h(display_name)}</font></b></td></tr>
+        <table border="#{border}" cellborder="#{cellborder}" cellspacing="#{cellspacing}" cellpadding="#{cellpadding}">
+          <tr><td><b><font color="#{title_col}"#{face_attr} point-size="#{font_size}">#{icon_str}#{h(display_name)}</font></b></td></tr>
           #{sub_row}
+        </table>
+      >];
+    DOT
+  end
+
+  def plain_node(id, label: nil, shape: 'box', color: '#38bdf8', fillcolor: '#0f172a',
+                 text_color: nil, fontcolor: nil, font: nil, fontname: nil,
+                 fontsize: 13, style: 'rounded,filled', **attr)
+    display_label = label || id
+    tc = text_color || fontcolor || '#f8fafc'
+    fn = font || fontname || 'Helvetica, Arial, sans-serif'
+    extra = format_dot_attrs(attr)
+    extra_suffix = extra.empty? ? '' : ", #{extra}"
+    %(#{safe_id(id)} [shape=#{shape}, style="#{style}", color="#{color}", fillcolor="#{fillcolor}", fontcolor="#{tc}", fontname="#{fn}", fontsize="#{fontsize}"#{extra_suffix}, label=#{h(display_label).inspect}];\n)
+  end
+
+  def html_node(id, title: nil, content: nil, subtitle: nil, icon: nil, color: '#38bdf8', fillcolor: '#0f172a', bgcolor: nil,
+                text_color: nil, fontcolor: nil, font: nil, fontname: nil, font_size: 13,
+                subtitle_color: nil, border: 1, cellborder: 0, cellpadding: 6, cellspacing: 0, html: nil, **attr, &block)
+    table_bg = bgcolor || fillcolor
+    title_col = text_color || fontcolor || color
+    sub_col = subtitle_color || '#cbd5e1'
+    font_face = font || fontname
+    face_attr = font_face ? %( face="#{h(font_face)}") : ''
+    icon_str = icon ? "#{icon} " : ''
+    display_title = title || (id unless html || block_given? || content || subtitle)
+
+    header_row = display_title ? %(<tr><td align="center"><b><font color="#{title_col}"#{face_attr} point-size="#{font_size}">#{icon_str}#{h(display_title)}</font></b></td></tr>) : ''
+
+    body_html = if block_given?
+                  yield.to_s
+                elsif html
+                  html.to_s
+                elsif content || subtitle
+                  c = content || subtitle
+                  %(<tr><td align="left"><font color="#{sub_col}"#{face_attr} point-size="11">#{h(c)}</font></td></tr>)
+                else
+                  ''
+                end
+
+    extra = format_dot_attrs(attr)
+    extra_prefix = extra.empty? ? '' : ", #{extra}"
+    <<~DOT
+      #{safe_id(id)} [shape=plain, style="", margin="0"#{extra_prefix}, label=<
+        <table border="#{border}" cellborder="#{cellborder}" cellspacing="#{cellspacing}" cellpadding="#{cellpadding}" bgcolor="#{table_bg}" color="#{color}">
+          #{header_row}
+          #{body_html}
         </table>
       >];
     DOT
@@ -106,10 +159,13 @@ class GraphvizTemplateContext
     node(id, name: name, subtitle: (details.empty? ? nil : details), icon: icon, color: color, fillcolor: fillcolor, **attr)
   end
 
-  def badge(id, text, color: '#38bdf8', bg: '#0f172a', **attr)
+  def badge(id, text, color: '#38bdf8', bg: '#0f172a', text_color: nil, fontcolor: nil, font: nil, fontname: nil, fontsize: 12, **attr)
+    tc = text_color || fontcolor || color
+    fn = font || fontname
+    fn_attr = fn ? %(, fontname="#{fn}") : ''
     extra = format_dot_attrs(attr)
     extra_suffix = extra.empty? ? '' : ", #{extra}"
-    %(#{safe_id(id)} [shape=box, style="rounded,filled", color="#{color}", fillcolor="#{bg}", fontcolor="#{color}", fontsize="12", label=#{h(text).inspect}#{extra_suffix}];\n)
+    %(#{safe_id(id)} [shape=box, style="rounded,filled", color="#{color}", fillcolor="#{bg}", fontcolor="#{tc}", fontsize="#{fontsize}"#{fn_attr}, label=#{h(text).inspect}#{extra_suffix}];\n)
   end
 
   def same_rank(*nodes)
@@ -136,25 +192,33 @@ class GraphvizTemplateContext
     %(#{safe_id(id)} [style=invis, shape=point, width=#{width}, height=#{height}, label=""#{extra_suffix}];\n)
   end
 
-  def invis_edge(from, to, minlen: 2, weight: 1, **attr)
+  def invis_edge(from, to, minlen: 2, weight: 1, directed: true, op: nil, **attr)
+    edge_op = op || (directed ? '->' : '--')
     attrs = ['style=invis']
     attrs << "minlen=#{minlen}" if minlen
     attrs << "weight=#{weight}" if weight
     extra = format_dot_attrs(attr)
     attrs << extra unless extra.empty?
-    "#{safe_endpoint(from)} -> #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
+    "#{safe_endpoint(from)} #{edge_op} #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
   end
 
-  def stack_vertical(*nodes, minlen: 2, weight: 10, **attr)
+  def stack_vertical(*nodes, minlen: 2, weight: 10, directed: true, op: nil, **attr)
     flat = nodes.flatten
     return '' if flat.size < 2
-    flat.each_cons(2).map { |a, b| invis_edge(a, b, minlen: minlen, weight: weight, **attr) }.join
+    flat.each_cons(2).map { |a, b| invis_edge(a, b, minlen: minlen, weight: weight, directed: directed, op: op, **attr) }.join
   end
 
-  def table_node(id, title: nil, rows: [], icon: '📊', color: '#38bdf8', fillcolor: '#0f172a', **attr)
+  def table_node(id, title: nil, rows: [], icon: '📊', color: '#38bdf8', fillcolor: '#0f172a',
+                 text_color: nil, fontcolor: nil, font: nil, fontname: nil, font_size: 13,
+                 key_color: '#cbd5e1', val_color: '#94a3b8',
+                 border: 0, cellborder: 0, cellpadding: 4, cellspacing: 0, **attr)
+    font_face = font || fontname
+    face_attr = font_face ? %( face="#{h(font_face)}") : ''
+    title_col = text_color || fontcolor || color
+
     rows_html = rows.map do |r|
       k, v = r.is_a?(Array) ? r : [r.to_s, '']
-      %(<tr><td align="left"><font color="#cbd5e1" point-size="11">#{h(k)}</font></td><td align="right"><font color="#94a3b8" point-size="11">#{h(v)}</font></td></tr>)
+      %(<tr><td align="left"><font color="#{key_color}"#{face_attr} point-size="11">#{h(k)}</font></td><td align="right"><font color="#{val_color}"#{face_attr} point-size="11">#{h(v)}</font></td></tr>)
     end.join("\n")
 
     icon_str = icon ? "#{icon} " : ''
@@ -162,8 +226,8 @@ class GraphvizTemplateContext
     extra_prefix = extra.empty? ? '' : ", #{extra}"
     <<~DOT
       #{safe_id(id)} [color="#{color}", fillcolor="#{fillcolor}"#{extra_prefix}, label=<
-        <table border="0" cellborder="0" cellspacing="0" cellpadding="4">
-          <tr><td colspan="2"><b><font color="#{color}" point-size="13">#{icon_str}#{h(title || id)}</font></b></td></tr>
+        <table border="#{border}" cellborder="#{cellborder}" cellspacing="#{cellspacing}" cellpadding="#{cellpadding}">
+          <tr><td colspan="2"><b><font color="#{title_col}"#{face_attr} point-size="#{font_size}">#{icon_str}#{h(title || id)}</font></b></td></tr>
           <hr/>
           #{rows_html}
         </table>
@@ -171,24 +235,37 @@ class GraphvizTemplateContext
     DOT
   end
 
-  def link(from, to, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
+  def link(from, to, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, directed: true, op: nil, **attr)
+    edge_op = op || (directed ? '->' : '--')
     attrs = [%(color="#{color}"), %(penwidth="#{penwidth}")]
     attrs << %(label="#{h(label)}") if label
     attrs << %(style="#{style}") if style
     attrs << %(dir="#{dir}") if dir
     extra = format_dot_attrs(attr)
     attrs << extra unless extra.empty?
-    "#{safe_endpoint(from)} -> #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
+    "#{safe_endpoint(from)} #{edge_op} #{safe_endpoint(to)} [#{attrs.join(', ')}];\n"
   end
 
-  def links(from, *to_nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
-    to_nodes.flatten.map { |to| link(from, to, label: label, color: color, style: style, penwidth: penwidth, dir: dir, **attr) }.join
+  def ulink(from, to, label: nil, color: '#64748b', style: nil, penwidth: 2, **attr)
+    link(from, to, label: label, color: color, style: style, penwidth: penwidth, directed: false, **attr)
   end
 
-  def chain(*nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, **attr)
+  def links(from, *to_nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, directed: true, op: nil, **attr)
+    to_nodes.flatten.map { |to| link(from, to, label: label, color: color, style: style, penwidth: penwidth, dir: dir, directed: directed, op: op, **attr) }.join
+  end
+
+  def ulinks(from, *to_nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, **attr)
+    links(from, *to_nodes, label: label, color: color, style: style, penwidth: penwidth, directed: false, **attr)
+  end
+
+  def chain(*nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, dir: nil, directed: true, op: nil, **attr)
     flat = nodes.flatten
     return '' if flat.size < 2
-    flat.each_cons(2).map { |a, b| link(a, b, label: label, color: color, style: style, penwidth: penwidth, dir: dir, **attr) }.join
+    flat.each_cons(2).map { |a, b| link(a, b, label: label, color: color, style: style, penwidth: penwidth, dir: dir, directed: directed, op: op, **attr) }.join
+  end
+
+  def uchain(*nodes, label: nil, color: '#64748b', style: nil, penwidth: 2, **attr)
+    chain(*nodes, label: label, color: color, style: style, penwidth: penwidth, directed: false, **attr)
   end
 
   def cluster_start(id, label: nil, color: '#475569', fillcolor: '#131d31', fontcolor: '#cbd5e1', style: 'rounded,filled', **attr)

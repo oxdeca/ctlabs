@@ -1664,17 +1664,39 @@
   }
 
   const MD_GRAPHVIZ_SNIPPETS = {
-    stack_vertical: `// Force vertical stack order (top to bottom)
-node_top -> node_bottom [style=invis, minlen=2];`,
-    same_rank: `{ rank=same; node_a; node_b; }`,
-    rank_source: `{ rank=source; ingress_node; }`,
-    rank_sink: `{ rank=sink; egress_node; }`,
-    spacer_node: `spacer_1 [style=invis, shape=point, width=0.1, label=""];`,
-    invis_edge: `node_a -> node_b [style=invis, minlen=2];`,
-    cluster_stack: `// Order subgraphs vertically
-cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
-    layout_tb: `rankdir="TB";`,
-    layout_lr: `rankdir="LR";`,
+    // ERB Loops & Logic (On top!)
+    header: '<%= graph_header("Network Topology", rankdir: "LR") %>',
+    loop: `<% (1..3).each do |i| %>
+  <%= host("node0" + i.to_s, name: "Node " + i.to_s, ip: "10.0.1." + (10 + i).to_s) %>
+<% end %>`,
+    condition: `<% if true %>
+  <%= badge("env", "PRODUCTION", color: "#ef4444") %>
+<% else %>
+  <%= badge("env", "STAGING", color: "#f59e0b") %>
+<% end %>`,
+
+    // General Nodes & HTML Formatting
+    plain_node: '<%= plain_node("node1", label: "Application Server", shape: "box") %>',
+    plain_node_dot: `node1 [label="Application Server", shape=box, style="rounded,filled", color="#38bdf8", fillcolor="#0f172a", fontcolor="#f8fafc"];`,
+    html_node: '<%= html_node("web01", title: "Web Frontend", content: "Nginx • Port 443", color: "#38bdf8", text_color: "#38bdf8", font: "Helvetica") %>',
+    html_node_dot: `html_card [shape=plain, label=<
+  <table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#0f172a" color="#38bdf8">
+    <tr>
+      <td bgcolor="#1e293b" align="center"><font color="#38bdf8" face="Helvetica, Arial, sans-serif" point-size="13"><b>Web Service</b></font></td>
+    </tr>
+    <tr>
+      <td align="left"><font color="#cbd5e1" face="Helvetica, Arial, sans-serif" point-size="11">Status: Active</font></td>
+    </tr>
+    <tr>
+      <td align="left"><font color="#94a3b8" face="Helvetica, Arial, sans-serif" point-size="11">Port: 443</font></td>
+    </tr>
+  </table>
+>];`,
+    html_font_attr: `<font color="#38bdf8" face="Helvetica, Arial, sans-serif" point-size="12">Label Text</font>`,
+    table_node: '<%= table_node("metrics", title: "Node Metrics", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
+    badge: '<%= badge("status", "HEALTHY", color: "#22c55e") %>',
+
+    // Network & Hardware
     host: '<%= host("web1", name: "Web Server", ip: "192.168.1.10") %>',
     router: '<%= router("rtr1", name: "Core Router", ip: "10.0.0.1") %>',
     switch: '<%= switch("sw1", name: "Access Switch", subtitle: "VLAN 10") %>',
@@ -1682,10 +1704,12 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
     gateway: '<%= gateway("gw1", name: "NAT Gateway", ip: "192.168.1.1") %>',
     loadbalancer: '<%= loadbalancer("lb1", name: "Load Balancer", ip: "192.168.1.1") %>',
     cloud: '<%= cloud("inet", name: "Internet / WAN", subtitle: "Public Cloud") %>',
+
+    // Workloads & Data
     database: '<%= database("db1", name: "Primary DB", ip: "10.0.2.10", engine: "PostgreSQL 16") %>',
     k8s_pod: '<%= k8s_pod("api_pod", name: "API Service", namespace: "prod", ip: "10.244.1.5") %>',
-    table_node: '<%= table_node("metrics", title: "Node Metrics", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
-    badge: '<%= badge("status", "HEALTHY", color: "#22c55e") %>',
+
+    // Clusters & Edges
     cluster: `<% cluster("app_tier", label: "Application Tier (10.0.1.0/24)", color: "#38bdf8") do %>
   <%= host("app01", name: "App 01", ip: "10.0.1.11") %>
   <%= host("app02", name: "App 02", ip: "10.0.1.12") %>
@@ -1698,17 +1722,17 @@ cluster_a_anchor -> cluster_b_anchor [style=invis, minlen=2];`,
   <% end %>
 <% end %>`,
     link: '<%= link("src_id", "dst_id", label: "10 Gbps") %>',
+    link_undirected: '<%= link("node_a", "node_b", directed: false, label: "trunk") %>',
     links: '<%= links("rtr1", "app01", "app02") %>',
     chain: '<%= chain("client", "fw1", "rtr1", "app01") %>',
-    loop: `<% (1..3).each do |i| %>
-  <%= host("node0" + i.to_s, name: "Node " + i.to_s, ip: "10.0.1." + (10 + i).to_s) %>
-<% end %>`,
-    condition: `<% if true %>
-  <%= badge("env", "PRODUCTION", color: "#ef4444") %>
-<% else %>
-  <%= badge("env", "STAGING", color: "#f59e0b") %>
-<% end %>`,
-    header: '<%= graph_header("Network Topology", rankdir: "LR") %>'
+
+    // Layout & Alignment (General: no graph-type specific edges)
+    layout_tb: `rankdir="TB";`,
+    layout_lr: `rankdir="LR";`,
+    same_rank: `{ rank=same; node_a; node_b; }`,
+    rank_source: `{ rank=source; ingress_node; }`,
+    rank_sink: `{ rank=sink; egress_node; }`,
+    spacer_node: `spacer_1 [style=invis, shape=point, width=0.1, label=""];`
   };
 
   const MD_GRAPHVIZ_TEMPLATES = {
