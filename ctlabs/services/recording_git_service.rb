@@ -32,6 +32,8 @@ class RecordingGitService
     temp_*
     export_*.zip
     export_note_*.zip
+    export_*.docx
+    export_note_*.docx
     .DS_Store
   GITIGNORE
 

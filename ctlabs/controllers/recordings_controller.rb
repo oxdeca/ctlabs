@@ -1103,6 +1103,11 @@ class RecordingsController < BaseController
     redirect "/recordings/images/#{filename}"
   end
 
+  get '/recordings/:id/docx' do
+    fn_param = params[:filename] ? "&filename=#{Rack::Utils.escape_path(params[:filename])}" : ""
+    redirect "/recordings/#{Rack::Utils.escape_path(params[:id])}?download=1&format=docx#{fn_param}"
+  end
+
   get '/recordings/:id' do
     headers 'Access-Control-Allow-Origin' => '*'
     path = RecordingService.path_for(params[:id])
@@ -1134,6 +1139,39 @@ class RecordingsController < BaseController
     end
 
     is_md = path.end_with?(RecordingService::MD_EXT)
+    if is_md && (params[:format] == 'docx' || params[:docx] == '1')
+      custom_name = params[:filename].to_s.strip
+      custom_name = File.basename(custom_name)
+      custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+
+      base_name = if !custom_name.empty? && custom_name != '.docx'
+                    File.basename(custom_name, '.*')
+                  else
+                    File.basename(path, RecordingService::MD_EXT)
+                  end
+
+      docx_filename = if !custom_name.empty? && custom_name != '.docx'
+                        custom_name.downcase.end_with?('.docx') ? custom_name : "#{custom_name}.docx"
+                      else
+                        "#{base_name}.docx"
+                      end
+
+      walkthrough = params[:walkthrough].to_s.strip
+      walkthrough = RecordingService.walkthrough_for(path) if walkthrough.empty?
+
+      content = File.read(path, encoding: 'UTF-8') rescue ''
+      res = RecordingService.convert_markdown_to_docx(content, filename: docx_filename, walkthrough: walkthrough)
+
+      if res[:ok]
+        return send_file res[:path],
+                         filename:    docx_filename,
+                         type:        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                         disposition: 'attachment'
+      else
+        halt 500, (res[:error] || 'Failed to export DOCX')
+      end
+    end
+
     if is_md && (params[:bundle] == '1' || params[:format] == 'zip')
       custom_name = params[:filename].to_s.strip
       custom_name = File.basename(custom_name)

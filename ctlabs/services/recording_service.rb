@@ -1760,4 +1760,58 @@ class RecordingService
       dir:          walkthrough_dir(key)
     }
   end
+
+  # Converts Markdown content into a Microsoft Word (.docx) document via pandoc,
+  # embedding all referenced images directly into the document.
+  def self.convert_markdown_to_docx(content, filename: nil, walkthrough: nil)
+    require 'open3'
+    require 'tmpdir'
+
+    pandoc_bin = `which pandoc 2>/dev/null`.strip
+    if pandoc_bin.empty? || !File.executable?(pandoc_bin)
+      return { ok: false, error: 'pandoc is not installed on the system. Please ensure pandoc is installed.' }
+    end
+
+    # Clean up older export note docx files (>1 hour old)
+    Dir.glob(File.join(dir, 'export_note_*_*.docx')).each do |old_docx|
+      File.delete(old_docx) rescue nil if File.mtime(old_docx) < (Time.now - 3600)
+    end
+
+    clean_name = if filename && !filename.to_s.strip.empty?
+                   File.basename(filename.to_s.strip).gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+                 else
+                   "note_#{Time.now.strftime('%Y%m%d_%H%M%S')}.docx"
+                 end
+    clean_name = "#{clean_name}.docx" unless clean_name.downcase.end_with?('.docx')
+
+    target_docx = File.join(dir, "export_note_#{SecureRandom.hex(4)}_#{clean_name}")
+
+    # Resolve all relative and /recordings/images/ image paths to absolute filesystem paths so pandoc embeds them
+    rewritten = content.to_s.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}) do |match|
+      img_name = $1
+      real_path = image_path(img_name, walkthrough: walkthrough)
+      real_path && File.file?(real_path) ? real_path : match
+    end
+
+    rewritten = rewritten.gsub(/src=["'](?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.\/)?|\/)images\/([a-zA-Z0-9_.-]+)["']/) do |match|
+      img_name = $1
+      real_path = image_path(img_name, walkthrough: walkthrough)
+      real_path && File.file?(real_path) ? "src=\"#{real_path}\"" : match
+    end
+
+    Dir.mktmpdir('ctlabs-docx') do |tmpdir|
+      tmp_md = File.join(tmpdir, 'input.md')
+      File.write(tmp_md, rewritten, encoding: 'UTF-8')
+
+      stdout, stderr, status = Open3.capture3(pandoc_bin, '-f', 'markdown', '-t', 'docx', '-o', target_docx, tmp_md)
+      unless status.success? && File.file?(target_docx)
+        err_msg = stderr.strip.empty? ? 'Unknown error during pandoc conversion' : stderr.strip
+        return { ok: false, error: "Failed to convert Markdown to DOCX: #{err_msg}" }
+      end
+    end
+
+    { ok: true, path: target_docx }
+  rescue StandardError => e
+    { ok: false, error: "DOCX generation error: #{e.message}" }
+  end
 end

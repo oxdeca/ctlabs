@@ -895,7 +895,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     if (!exportNoteFilenameInput) return;
     let val = exportNoteFilenameInput.value.trim();
     if (val) {
-      val = val.replace(/\.(zip|md)$/i, '');
+      val = val.replace(/\.(zip|md|docx)$/i, '');
       exportNoteFilenameInput.value = `${val}.${targetExt}`;
     }
     if (exportNoteFilenameHint) {
@@ -905,6 +905,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
 
   function openExportNoteModal() {
     if (!activeId || activeDataType !== 'markdown') return;
+    if (typeof saveMarkdownContent === 'function') {
+      try { saveMarkdownContent(false); } catch (e) {}
+    }
     const currentTitle = (editTitle && editTitle.value) ? editTitle.value : activeId;
     if (exportNoteTitleSpan) {
       exportNoteTitleSpan.textContent = `“${currentTitle}”`;
@@ -932,7 +935,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
 
   document.querySelectorAll('input[name="export-note-format"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      const ext = radio.value === 'raw' ? 'md' : 'zip';
+      let ext = 'zip';
+      if (radio.value === 'raw') ext = 'md';
+      else if (radio.value === 'docx') ext = 'docx';
       updateExportNoteFilenameExtension(ext);
     });
   });
@@ -949,19 +954,22 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
   if (confirmExportNoteBtn) {
     confirmExportNoteBtn.addEventListener('click', () => {
       if (!activeId) return;
-      const selectedFormat = document.querySelector('input[name="export-note-format"]:checked');
-      const isBundle = selectedFormat ? (selectedFormat.value === 'bundle') : true;
-      let filename = exportNoteFilenameInput ? exportNoteFilenameInput.value.trim() : '';
-      if (filename) {
-        const expectedExt = isBundle ? '.zip' : '.md';
-        const wrongExt = isBundle ? '.md' : '.zip';
-        if (filename.toLowerCase().endsWith(wrongExt)) {
-          filename = filename.slice(0, -wrongExt.length) + expectedExt;
-        } else if (!filename.toLowerCase().endsWith(expectedExt)) {
-          filename += expectedExt;
-        }
+      if (typeof saveMarkdownContent === 'function') {
+        try { saveMarkdownContent(false); } catch (e) {}
       }
-      let url = '/recordings/' + encodeURIComponent(activeId) + '?download=1' + (isBundle ? '&bundle=1' : '');
+      const selectedFormat = document.querySelector('input[name="export-note-format"]:checked');
+      const format = selectedFormat ? selectedFormat.value : 'bundle';
+      let filename = exportNoteFilenameInput ? exportNoteFilenameInput.value.trim() : '';
+      const expectedExt = (format === 'docx') ? '.docx' : (format === 'raw' ? '.md' : '.zip');
+      if (filename) {
+        filename = filename.replace(/\.(zip|md|docx)$/i, '') + expectedExt;
+      }
+      let url = '/recordings/' + encodeURIComponent(activeId) + '?download=1';
+      if (format === 'bundle') {
+        url += '&bundle=1';
+      } else if (format === 'docx') {
+        url += '&format=docx';
+      }
       if (filename) {
         url += '&filename=' + encodeURIComponent(filename);
       }
