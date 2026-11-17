@@ -1769,14 +1769,28 @@ class RecordingService
   end
 
   # Preprocesses Markdown content specifically for Pandoc DOCX export:
+  # - Unwraps images linked to steps (e.g. [![image](...)](step)) so they render as standard inline figures;
+  #   OpenXML strictly forbids <w:drawing> inside text <w:hyperlink> elements, which causes Word to suppress them
   # - Translates extended markdown image dimensions (e.g. =400, =400x300, =50%) to Pandoc attributes {width=... height=...}
   # - Translates Obsidian pipe syntax dimensions (e.g. ![alt|400](...), ![400](...)) to Pandoc attributes
   # - Normalizes curly attribute dimensions (e.g. {width=400}, {400x300})
   # - Converts HTML <img> tags with width/height/style to Markdown images with Pandoc attributes
   # - Resolves relative / scoped image paths to absolute filesystem paths on disk so Pandoc embeds them into DOCX
   def self.preprocess_markdown_for_docx(content, walkthrough: nil)
+    # 0. Unwrap linked images: [![alt](img_url)](step_or_page_link) or [<img ...>](link)
+    # Microsoft Word / OpenXML strictly forbids <w:drawing> inside text <w:hyperlink> elements.
+    # When Pandoc wraps an image in <w:hyperlink>, Word suppresses the picture upon opening.
+    # In addition, step links (e.g. #step-*, step:*, /recordings/*) are internal web-app UI routes.
+    # Unwrapping the image ensures the picture is cleanly embedded, sized, and rendered in Word.
+    processed = content.to_s.gsub(/\[\s*(!\[[^\]]*\]\([^)]+\)(?:\{[^}]+\})?)\s*\]\s*\([^)]+\)/) do
+      $1
+    end
+    processed = processed.gsub(/<a\s+[^>]*>\s*(<img\s+[^>]+>)\s*<\/a>/im) do
+      $1
+    end
+
     # 1. Convert HTML <img> tags to Markdown images with attributes
-    processed = content.to_s.gsub(/<img\s+([^>]+)>/i) do |match|
+    processed = processed.gsub(/<img\s+([^>]+)>/i) do |match|
       attrs_str = $1
       src = attrs_str[/src=["']?([^"'\s>]+)["']?/i, 1]
       next match unless src
@@ -1869,8 +1883,14 @@ class RecordingService
 
       # Resolve image path to real filesystem path if not already an existing file
       unless File.file?(url)
-        if url =~ %r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}
-          img_name = $1
+        clean_url = url.to_s.sub(/[?#].*\z/, '')
+        img_name = if clean_url =~ %r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}
+                     $1
+                   elsif clean_url =~ /\A(?:(?:\.?\/)?(?:recordings?\/+)+[^\/]+\/)?([a-zA-Z0-9_.-]+\.(?:png|jpe?g|svg|gif|webp))\z/i
+                     $1
+                   end
+
+        if img_name
           real_path = image_path(img_name, walkthrough: walkthrough)
           url = real_path if real_path && File.file?(real_path)
         end
