@@ -1747,6 +1747,139 @@ class RecordingService
     false
   end
 
+  DOCX_REFERENCE_PATH = File.expand_path('../config/reference.docx', __dir__)
+
+  def self.docx_reference_path
+    if File.file?(DOCX_REFERENCE_PATH) && File.size(DOCX_REFERENCE_PATH) > 1000
+      DOCX_REFERENCE_PATH
+    else
+      ensure_docx_reference_template!(DOCX_REFERENCE_PATH)
+    end
+  end
+
+  def self.ensure_docx_reference_template!(target_path = nil)
+    target_path ||= DOCX_REFERENCE_PATH
+    return target_path if File.file?(target_path) && File.size(target_path) > 1000
+
+    pandoc_bin = `which pandoc 2>/dev/null`.strip
+    return nil if pandoc_bin.empty? || !File.executable?(pandoc_bin)
+
+    require 'zip'
+    require 'open3'
+    require 'fileutils'
+    require 'stringio'
+
+    FileUtils.mkdir_p(File.dirname(target_path))
+
+    stdout, _, status = Open3.capture3(pandoc_bin, '--print-default-data-file', 'reference.docx')
+    return nil unless status.success? && !stdout.empty?
+
+    input_stream = Zip::InputStream.open(StringIO.new(stdout))
+    entries = {}
+    while (entry = input_stream.get_next_entry)
+      entries[entry.name] = input_stream.read
+    end
+
+    styles_xml = entries['word/styles.xml']
+    return nil unless styles_xml
+
+    new_blocktext = <<-'XML'.strip
+  <w:style w:type="paragraph" w:styleId="BlockText">
+    <w:name w:val="Block Text" />
+    <w:basedOn w:val="Normal" />
+    <w:next w:val="Normal" />
+    <w:uiPriority w:val="9" />
+    <w:unhideWhenUsed />
+    <w:qFormat />
+    <w:pPr>
+      <w:pBdr>
+        <w:top w:val="single" w:sz="4" w:space="8" w:color="BAE6FD" />
+        <w:left w:val="single" w:sz="24" w:space="14" w:color="0284C7" />
+        <w:bottom w:val="single" w:sz="4" w:space="8" w:color="BAE6FD" />
+        <w:right w:val="single" w:sz="4" w:space="12" w:color="BAE6FD" />
+        <w:between w:val="none" />
+      </w:pBdr>
+      <w:shd w:val="clear" w:color="auto" w:fill="F0F9FF" />
+      <w:spacing w:before="120" w:after="120" w:line="260" w:lineRule="auto" />
+      <w:ind w:firstLine="0" w:left="280" w:right="200" />
+    </w:pPr>
+    <w:rPr>
+      <w:color w:val="1E293B" />
+      <w:sz w:val="21" />
+      <w:szCs w:val="21" />
+    </w:rPr>
+  </w:style>
+    XML
+
+    styles_xml = styles_xml.sub(/<w:style[^>]+w:styleId="BlockText".*?<\/w:style>/m, new_blocktext)
+
+    source_code_style = <<-'XML'.strip
+  <w:style w:type="paragraph" w:customStyle="1" w:styleId="SourceCode">
+    <w:name w:val="Source Code" />
+    <w:basedOn w:val="Normal" />
+    <w:link w:val="VerbatimChar" />
+    <w:uiPriority w:val="9" />
+    <w:pPr>
+      <w:pBdr>
+        <w:top w:val="single" w:sz="6" w:space="6" w:color="CBD5E1" />
+        <w:left w:val="single" w:sz="6" w:space="10" w:color="CBD5E1" />
+        <w:bottom w:val="single" w:sz="6" w:space="6" w:color="CBD5E1" />
+        <w:right w:val="single" w:sz="6" w:space="10" w:color="CBD5E1" />
+        <w:between w:val="none" />
+      </w:pBdr>
+      <w:shd w:val="clear" w:color="auto" w:fill="F8FAFC" />
+      <w:wordWrap w:val="off" />
+      <w:spacing w:before="120" w:after="120" w:line="240" w:lineRule="auto" />
+      <w:ind w:left="240" w:right="240" />
+    </w:pPr>
+    <w:rPr>
+      <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas" />
+      <w:color w:val="0F172A" />
+      <w:sz w:val="19" />
+      <w:szCs w:val="19" />
+    </w:rPr>
+  </w:style>
+    XML
+
+    styles_xml = styles_xml.sub('</w:styles>', "#{source_code_style}\n</w:styles>")
+
+    new_verbatim = <<-'XML'.strip
+  <w:style w:type="character" w:customStyle="1" w:styleId="VerbatimChar">
+    <w:name w:val="Verbatim Char" />
+    <w:basedOn w:val="BodyTextChar" />
+    <w:rPr>
+      <w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas" />
+      <w:color w:val="0369A1" />
+      <w:sz w:val="20" />
+      <w:szCs w:val="20" />
+      <w:shd w:val="clear" w:color="auto" w:fill="F1F5F9" />
+    </w:rPr>
+  </w:style>
+    XML
+
+    styles_xml = styles_xml.sub(/<w:style[^>]+w:styleId="VerbatimChar".*?<\/w:style>/m, new_verbatim)
+    entries['word/styles.xml'] = styles_xml
+
+    prev_zip64 = Zip.write_zip64_support rescue false
+    Zip.write_zip64_support = false if defined?(Zip.write_zip64_support)
+
+    begin
+      out_io = Zip::OutputStream.write_buffer do |zos|
+        entries.each do |name, data|
+          zos.put_next_entry(name)
+          zos.write(data)
+        end
+      end
+      File.binwrite(target_path, out_io.string)
+    ensure
+      Zip.write_zip64_support = prev_zip64 if defined?(Zip.write_zip64_support)
+    end
+
+    target_path
+  rescue StandardError => e
+    nil
+  end
+
   # Everything the ZIP export needs: the resolved set name/membership, in the
   # exact order the page shows them.
   def self.export_bundle(slug = 'default')
@@ -1776,6 +1909,7 @@ class RecordingService
   # - Normalizes curly attribute dimensions (e.g. {width=400}, {400x300})
   # - Converts HTML <img> tags with width/height/style to Markdown images with Pandoc attributes
   # - Resolves relative / scoped image paths to absolute filesystem paths on disk so Pandoc embeds them into DOCX
+  # - Converts GitHub-style callout alert syntax (> [!NOTE]) to bold callout headings inside styled blockquotes
   def self.preprocess_markdown_for_docx(content, walkthrough: nil)
     # 0. Unwrap linked images: [![alt](img_url)](step_or_page_link) or [<img ...>](link)
     # Microsoft Word / OpenXML strictly forbids <w:drawing> inside text <w:hyperlink> elements.
@@ -1787,6 +1921,22 @@ class RecordingService
     end
     processed = processed.gsub(/<a\s+[^>]*>\s*(<img\s+[^>]+>)\s*<\/a>/im) do
       $1
+    end
+
+    # 1. Format GitHub-style alert callouts (> [!NOTE], > [!TIP], > [!WARNING], etc.) inside blockquotes
+    processed = processed.gsub(/^([ \t]*>[ \t]*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(.*)$/i) do
+      prefix = $1
+      tag = $2.upcase
+      rest = $3.to_s.strip
+      label = case tag
+              when 'NOTE' then 'Note:'
+              when 'TIP' then 'Tip:'
+              when 'IMPORTANT' then 'Important:'
+              when 'WARNING' then 'Warning:'
+              when 'CAUTION' then 'Caution:'
+              else "#{tag.capitalize}:"
+              end
+      rest.empty? ? "#{prefix}**#{label}**" : "#{prefix}**#{label}** #{rest}"
     end
 
     # 1. Convert HTML <img> tags to Markdown images with attributes
@@ -1940,7 +2090,12 @@ class RecordingService
       tmp_md = File.join(tmpdir, 'input.md')
       File.write(tmp_md, rewritten, encoding: 'UTF-8')
 
-      stdout, stderr, status = Open3.capture3(pandoc_bin, '-f', 'markdown', '-t', 'docx', '-o', target_docx, tmp_md)
+      pandoc_args = [pandoc_bin, '-f', 'markdown', '-t', 'docx']
+      ref_doc = docx_reference_path
+      pandoc_args << "--reference-doc=#{ref_doc}" if ref_doc && File.file?(ref_doc)
+      pandoc_args.concat(['-o', target_docx, tmp_md])
+
+      stdout, stderr, status = Open3.capture3(*pandoc_args)
       unless status.success? && File.file?(target_docx)
         err_msg = stderr.strip.empty? ? 'Unknown error during pandoc conversion' : stderr.strip
         return { ok: false, error: "Failed to convert Markdown to DOCX: #{err_msg}" }
