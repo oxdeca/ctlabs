@@ -33,6 +33,7 @@
   const editTitle = document.getElementById('edit-title');
   const stepContextMenu = document.getElementById('step-context-menu');
   const stepContextTitle = document.getElementById('step-context-title');
+  const stepContextEditTitle = document.getElementById('step-context-edit-title');
   const stepContextEdit = document.getElementById('step-context-edit');
   const stepContextCopyLink = document.getElementById('step-context-copy-link');
   let stepContextBtn = null;
@@ -52,6 +53,7 @@
   const mdImgFileInput = document.getElementById('md-img-file-input');
   const mdGraphvizBtn = document.getElementById('md-graphviz-btn');
   const mdSaveBtn = document.getElementById('md-save-btn');
+  const mdGitWrapper = document.getElementById('md-git-wrapper');
   const mdGitCommitBtn = document.getElementById('md-git-commit-btn');
   const mdGitHistoryBtn = document.getElementById('md-git-history-btn');
   const mdSettingsWrapper = document.getElementById('md-settings-wrapper');
@@ -815,6 +817,108 @@
     stepContextMenu.style.top = y + 'px';
   });
 
+  function saveStepTitle(id, newTitle, btn) {
+    const activeWalkthrough = (window.activeWalkthrough || (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : ''));
+    const body = new URLSearchParams({
+      title: newTitle,
+      walkthrough: activeWalkthrough
+    });
+
+    fetch(`/recordings/${encodeURIComponent(id)}/meta`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Accept': 'application/json'
+      },
+      body: body,
+      credentials: 'same-origin'
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.ok) {
+        if (btn) {
+          btn.setAttribute('data-title', newTitle);
+          const titleSpan = btn.querySelector('.item-title');
+          if (titleSpan) titleSpan.textContent = newTitle;
+          const currentActive = document.querySelector('.rec-item.active');
+          if (btn === currentActive) {
+            const step = btn.getAttribute('data-step');
+            if (titleEl) {
+              const span = titleEl.querySelector('span');
+              const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
+              if (span) span.textContent = fullTitleText;
+              titleEl.title = fullTitleText;
+            }
+          }
+        }
+      }
+    })
+    .catch(err => {
+      console.error('Failed to update step title:', err);
+    });
+  }
+
+  const renameStepModal = document.getElementById('rename-step-modal');
+  const renameStepForm = document.getElementById('rename-step-form');
+  const renameStepInput = document.getElementById('rename-step-input');
+  const closeRenameStepModal = document.getElementById('close-rename-step-modal');
+  const cancelRenameStepBtn = document.getElementById('cancel-rename-step-btn');
+  let stepBeingRenamed = null;
+
+  function openRenameStepModal(btn) {
+    if (!btn || !renameStepModal || !renameStepInput) return;
+    stepBeingRenamed = btn;
+    const titleSpan = btn.querySelector('.item-title');
+    const currentTitle = (btn.getAttribute('data-title') || (titleSpan ? titleSpan.textContent : '') || '').trim();
+    renameStepInput.value = currentTitle;
+    renameStepModal.style.display = 'block';
+    setTimeout(() => {
+      renameStepInput.focus();
+      renameStepInput.select();
+    }, 50);
+  }
+
+  function closeRenameStepModalFn() {
+    if (renameStepModal) renameStepModal.style.display = 'none';
+    stepBeingRenamed = null;
+  }
+
+  if (closeRenameStepModal) closeRenameStepModal.addEventListener('click', closeRenameStepModalFn);
+  if (cancelRenameStepBtn) cancelRenameStepBtn.addEventListener('click', closeRenameStepModalFn);
+  if (renameStepModal) {
+    renameStepModal.addEventListener('click', (e) => {
+      if (e.target === renameStepModal) closeRenameStepModalFn();
+    });
+  }
+
+  if (renameStepForm) {
+    renameStepForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!stepBeingRenamed) {
+        closeRenameStepModalFn();
+        return;
+      }
+      const newTitle = renameStepInput.value.trim();
+      const id = stepBeingRenamed.getAttribute('data-id');
+      const targetBtn = stepBeingRenamed;
+      closeRenameStepModalFn();
+
+      if (id && newTitle) {
+        saveStepTitle(id, newTitle, targetBtn);
+      }
+    });
+  }
+
+  if (stepContextEditTitle) {
+    stepContextEditTitle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!stepContextBtn) return;
+      const targetBtn = stepContextBtn;
+      hideStepContextMenu();
+      openRenameStepModal(targetBtn);
+    });
+  }
+
   if (stepContextEdit) {
     stepContextEdit.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -860,8 +964,32 @@
   document.addEventListener('scroll', hideStepContextMenu, true);
   window.addEventListener('resize', hideStepContextMenu);
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') hideStepContextMenu();
+    if (e.key === 'Escape') {
+      hideStepContextMenu();
+      if (renameStepModal && renameStepModal.style.display === 'block') {
+        closeRenameStepModalFn();
+      }
+    }
   });
+
+  document.addEventListener('dblclick', (e) => {
+    const titleSpan = e.target.closest('.item-title');
+    if (titleSpan) {
+      const btn = titleSpan.closest('.rec-item');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        openRenameStepModal(btn);
+      }
+    }
+  });
+
+  if (titleEl) {
+    titleEl.addEventListener('dblclick', () => {
+      const activeBtn = document.querySelector('.rec-item.active');
+      if (activeBtn) openRenameStepModal(activeBtn);
+    });
+  }
 
 // --- Metadata & Note Save Handler ---
 if (metaForm) {
@@ -938,7 +1066,8 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     if (typeof saveMarkdownContent === 'function') {
       try { saveMarkdownContent(false); } catch (e) {}
     }
-    const currentTitle = (editTitle && editTitle.value) ? editTitle.value : activeId;
+    const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+    const currentTitle = (activeBtn && activeBtn.getAttribute('data-title')) || (titleEl && titleEl.textContent ? titleEl.textContent.trim().replace(/^#\d+:\s*/, '') : ((editTitle && editTitle.value) ? editTitle.value : activeId));
     if (exportNoteTitleSpan) {
       exportNoteTitleSpan.textContent = `“${currentTitle}”`;
     }
@@ -2223,9 +2352,8 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     actionsEl.style.display = 'flex';
     downloadEl.href = src + '?download=1';
     deleteForm.action = src + '/delete';
-    metaForm.action = src + '/meta';
-    
-    editTitle.value = title || '';
+    if (metaForm) metaForm.action = src + '/meta';
+    if (editTitle) editTitle.value = title || '';
 
     const deleteBtn = deleteForm ? deleteForm.querySelector('button') : null;
     if (deleteBtn) {
@@ -2252,8 +2380,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload picture or import markdown / zip note (or drag & drop)';
       if (mdGraphvizBtn) mdGraphvizBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
       if (mdSaveBtn) mdSaveBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
-      if (mdGitCommitBtn) mdGitCommitBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
-      if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
+      if (mdGitWrapper) mdGitWrapper.style.display = (mdMode === 'preview') ? 'none' : 'inline-block';
       const mdTabEditBtn = document.getElementById('md-tab-edit');
       const mdTabViewBtn = document.getElementById('md-tab-preview');
       if (mdTabEditBtn) mdTabEditBtn.style.display = (mdMode === 'preview') ? 'inline-flex' : 'none';
@@ -2281,8 +2408,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
       if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
       if (mdSaveBtn) mdSaveBtn.style.display = 'none';
-      if (mdGitCommitBtn) mdGitCommitBtn.style.display = 'none';
-      if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = 'none';
+      if (mdGitWrapper) mdGitWrapper.style.display = 'none';
+      const mdTabEditVideo = document.getElementById('md-tab-edit');
+      if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       if (titleIcon) {
         titleIcon.className = 'fas fa-video';
         titleIcon.style.color = '#f43f5e';
@@ -2303,8 +2431,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (mdInsertImgBtn) mdInsertImgBtn.title = 'Import recording / walkthrough';
       if (mdGraphvizBtn) mdGraphvizBtn.style.display = 'none';
       if (mdSaveBtn) mdSaveBtn.style.display = 'none';
-      if (mdGitCommitBtn) mdGitCommitBtn.style.display = 'none';
-      if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = 'none';
+      if (mdGitWrapper) mdGitWrapper.style.display = 'none';
+      const mdTabEditVideo = document.getElementById('md-tab-edit');
+      if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       if (titleIcon) {
         titleIcon.className = 'fas fa-play-circle w3-text-green';
         titleIcon.style.color = '';

@@ -400,13 +400,13 @@
               <button type="button" id="sidebar-expand-btn" title="Show sidebar" style="display: none; background: #0284c7; color: #ffffff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; align-items: center; gap: 6px; flex-shrink: 0;">
                 <i class="fas fa-chevron-right"></i> <i class="fas fa-bars"></i> Steps
               </button>
-              <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden;" title="Select a recording">
+              <div id="rec-title" style="color: #f8fafc; font-weight: 600; display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; cursor: pointer;" title="Select a recording">
                 <i id="rec-title-icon" class="fas fa-play-circle w3-text-green" style="flex-shrink: 0;"></i>
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">Select a recording</span>
               </div>
             </div>
 
-            <!-- Center Zone: Pinned Step Navigation (Previous / Next) -->
+            <!-- Center Zone: Step Navigation (Previous / Next) -->
             <div style="flex: 0 0 auto; display: flex; align-items: center; justify-content: center;">
               <div id="step-nav" style="display: flex; align-items: center; gap: 4px; background: #0f172a; padding: 3px 6px; border-radius: 6px; border: 1px solid #334155;">
                 <button type="button" id="step-prev-btn" title="Previous step (Alt+Left, PageUp)" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; padding: 4px 10px; border-radius: 4px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 68px; gap: 6px; transition: all 0.15s ease;">
@@ -421,34 +421,26 @@
               </div>
             </div>
 
-            <!-- Right Zone: Metadata Editor & Actions -->
+            <!-- Right Zone: Actions -->
             <div style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end;">
               <div id="rec-actions" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
-                <form id="meta-form" method="post" action="#" style="display: flex; align-items: center; gap: 6px; margin: 0;">
-                  <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
-                  <!-- 1. Title -->
-                  <input type="text" name="title" id="edit-title" placeholder="Step title..." title="Step title" style="width: 170px; max-width: 210px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.85em; height: 28px;" />
-                  <!-- 2. Save -->
-                  <button type="submit" id="rec-save-btn" class="w3-button w3-small" style="background: #10b981; color: #ffffff; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 0.82em; display: inline-flex; align-items: center; gap: 5px; height: 28px; border: none; cursor: pointer; flex-shrink: 0;" title="Save (Ctrl+S)">
-                    <i class="fas fa-save"></i> Save
-                  </button>
-                  <span id="md-save-status" style="font-size: 0.8em; color: #10b981; display: none; font-weight: 500; align-items: center; gap: 4px; white-space: nowrap;">
-                    <i class="fas fa-check-circle"></i> Saved
-                  </span>
-                </form>
+                <!-- 1. Edit (Markdown document in view mode) -->
+                <button type="button" id="md-tab-edit" title="Edit document" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-edit" style="color: #38bdf8;"></i>
+                </button>
 
-                <!-- 3. Import (Picture Upload / Insert / Markdown Import) -->
+                <!-- 2. Import (Picture Upload / Insert / Markdown Import) -->
                 <button type="button" id="md-insert-img-btn" title="Upload picture or import markdown / zip note (or drag & drop)" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-upload" style="color: #38bdf8;"></i>
                 </button>
                 <input type="file" id="md-img-file-input" accept=".zip,.md,image/*" multiple style="display: none;" />
 
-                <!-- 4. Export (Download / Package) -->
+                <!-- 3. Export (Download / Package) -->
                 <a id="rec-download" href="#" class="w3-button w3-small w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'" title="Export / Download">
                   <i class="fas fa-download" style="color: #38bdf8;"></i>
                 </a>
 
-                <!-- 5. Delete -->
+                <!-- 4. Delete -->
                 <form id="rec-delete" method="post" action="#" style="margin: 0; display: inline-flex;" onsubmit="return confirm('Delete this step? This cannot be undone.')">
                   <input type="hidden" name="walkthrough" value="<%= ERB::Util.html_escape(@active_walkthrough.to_s) %>" />
                   <button type="submit" class="w3-button w3-small w3-round w3-red" style="padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px; flex-shrink: 0;" title="Delete this step">
@@ -471,11 +463,8 @@
 
           <!-- Markdown Step Container -->
           <div id="md-container" style="flex: 1; min-height: 0; display: none; flex-direction: column; background: #0f172a;">
-            <div id="md-editor-toolbar" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155; min-height: 38px;">
-              <div style="display: flex; align-items: center; gap: 4px;">
-              </div>
-
-              <!-- Editor Actions & Mode Toggle -->
+            <div id="md-editor-toolbar" style="display: none; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155; min-height: 38px;">
+              <!-- Left Side: View, Diagram, Emoji (shown in edit/split mode) -->
               <div style="display: flex; align-items: center; gap: 6px;">
                 <!-- View Mode Button (shown in edit/split mode to jump to view mode) -->
                 <button type="button" id="md-tab-preview" title="View rendered document" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #38bdf8; background: #0284c7; color: #ffffff; cursor: pointer; align-items: center; gap: 5px; height: 26px; font-weight: 500; transition: background 0.15s;" onmouseover="this.style.background='#0369a1'" onmouseout="this.style.background='#0284c7'">
@@ -483,45 +472,20 @@
                   <span style="font-weight: 500;">View</span>
                 </button>
 
-                <!-- Edit Button (shown in view mode to enter edit mode) -->
-                <button type="button" id="md-tab-edit" title="Edit document" style="display: inline-flex; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; font-weight: 500; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-edit" style="color: #38bdf8; font-size: 0.9em;"></i>
-                  <span style="font-weight: 500;">Edit</span>
-                </button>
-
-                <button type="button" id="md-tab-split" style="display: none;"></button>
                 <!-- Graphviz Diagram Editor -->
                 <button type="button" id="md-graphviz-btn" title="Graphviz diagram editor (Ctrl+Shift+G)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-project-diagram" style="color: #38bdf8; font-size: 0.95em;"></i>
                   <span style="font-weight: 500;">Diagram</span>
                 </button>
 
-                <!-- Note Save Button (Disk) -->
-                <button type="button" id="md-save-btn" title="Save note to disk (Ctrl+S)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i>
-                  <span id="md-save-btn-text" style="font-weight: 500;">Save</span>
-                </button>
-
-                <!-- Note Git Commit Button -->
-                <button type="button" id="md-git-commit-btn" title="Commit note changes to Git (Ctrl+Shift+C)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-code-branch" style="color: #10b981; font-size: 0.9em;"></i>
-                  <span style="font-weight: 500;">Commit</span>
-                </button>
-
-                <!-- Note Version History Button -->
-                <button type="button" id="md-git-history-btn" title="Note Version History (revisions, diffs &amp; restore)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-history" style="color: #38bdf8; font-size: 0.9em;"></i>
-                  <span style="font-weight: 500;">History</span>
-                </button>
-
                 <!-- Emoji Helper Dropdown -->
-                <div id="md-emoji-wrapper" style="position: relative; display: flex; align-items: center; gap: 6px;">
+                <div id="md-emoji-wrapper" style="position: relative; display: none; align-items: center; gap: 6px;">
                   <button type="button" id="md-emoji-btn" title="Insert Emoji (:shortcode: or character, Ctrl+E)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                     <span style="font-size: 1.1em; line-height: 1;">😃</span>
                     <span style="font-weight: 500;">Emoji</span>
                   </button>
 
-                  <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; width: 360px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: hidden;">
+                  <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; width: 360px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: hidden;">
                     <div style="padding: 8px 10px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
                       <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; padding: 3px 8px;">
                         <i class="fas fa-search" style="color: #94a3b8; font-size: 0.8em;"></i>
@@ -619,6 +583,37 @@
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- Right Side: Save, Git, Settings (in edit mode) -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" id="md-tab-split" style="display: none;"></button>
+
+                <!-- Note Save Button (Disk) -->
+                <button type="button" id="md-save-btn" title="Save note to disk (Ctrl+S)" style="display: none; padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; gap: 5px; height: 26px; transition: all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i>
+                  <span id="md-save-btn-text" style="font-weight: 500;">Save</span>
+                </button>
+
+                <!-- Note Git Actions Dropdown (Commit & History) -->
+                <div id="md-git-wrapper" style="position: relative; display: none;">
+                  <button type="button" id="md-git-btn" title="Git repository actions (Commit, History)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                    <i class="fas fa-code-branch" style="color: #10b981; font-size: 0.9em;"></i>
+                    <span style="font-weight: 500;">Git</span>
+                    <i class="fas fa-caret-down" style="font-size: 0.75em; opacity: 0.7; margin-left: 1px;"></i>
+                  </button>
+                  <div id="md-git-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 210px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                    <button type="button" id="md-git-commit-btn" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-code-branch" style="color: #10b981; width: 14px; text-align: center;"></i> Commit note
+                      </span>
+                      <span style="font-size: 0.75em; color: #64748b; font-family: ui-monospace, monospace;">^⇧C</span>
+                    </button>
+                    <button type="button" id="md-git-history-btn" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <i class="fas fa-history" style="color: #38bdf8; width: 14px; text-align: center;"></i> Version history &amp; diffs
+                    </button>
+                  </div>
+                </div>
 
                 <!-- Markdown Editor Settings Dropdown -->
                 <div id="md-settings-wrapper" style="position: relative; display: none;">
@@ -671,13 +666,19 @@
                 <div style="flex: 1; min-height: 0; position: relative;">
                   <textarea id="md-textarea" placeholder="# Enter Markdown text here..." spellcheck="false" style="width: 100%; height: 100%; resize: none; background: #090d16; color: #f1f5f9; border: none; padding: 16px; font-family: ui-monospace, monospace !important; font-size: 0.8em; line-height: 1.6; outline: none; box-sizing: border-box;"></textarea>
                 </div>
-                <!-- Vim Mode Status Bar -->
-                <div id="md-vim-status-bar" style="display: none; padding: 4px 12px; background: #0f172a; border-top: 1px solid #334155; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none;">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span id="md-vim-status-mode" style="font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">-- NORMAL --</span>
-                    <span id="md-vim-status-key" style="color: #cbd5e1;"></span>
+                <!-- Markdown Editor Bottom Status Bar -->
+                <div id="md-status-bar" style="display: flex; padding: 4px 12px; background: #0f172a; border-top: 1px solid #334155; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.74em; color: #94a3b8; align-items: center; justify-content: space-between; user-select: none; min-height: 25px; box-sizing: border-box; flex-shrink: 0;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="md-vim-status-bar" style="display: none; align-items: center; gap: 8px;">
+                      <span id="md-vim-status-mode" style="font-weight: 700; color: #38bdf8; letter-spacing: 0.5px;">-- NORMAL --</span>
+                      <span id="md-vim-status-key" style="color: #cbd5e1;"></span>
+                    </div>
+                    <span id="md-save-status" style="display: none; align-items: center; font-weight: 500;"></span>
                   </div>
-                  <span style="color: #64748b; font-size: 0.9em;">:w save &bull; Esc normal mode</span>
+                  <div style="display: flex; align-items: center; gap: 12px; color: #64748b; font-size: 0.9em;">
+                    <span id="md-vim-hints" style="display: none;">:w save &bull; Esc normal mode</span>
+                    <span id="md-editor-cursor-pos" style="color: #94a3b8;">Ln 1, Col 1</span>
+                  </div>
                 </div>
               </div>
               <!-- Middle Resizer Bar (Split Mode) -->
@@ -1159,6 +1160,33 @@
       </div>
     </div>
 
+    <!-- Rename Step Modal -->
+    <div id="rename-step-modal" class="w3-modal" style="display: none; z-index: 10007;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 440px;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.05em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-pen"></i> Edit Step Title
+          </h3>
+          <span id="close-rename-step-modal" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <form id="rename-step-form" style="padding: 18px 16px; margin: 0;">
+          <div style="margin-bottom: 16px;">
+            <label for="rename-step-input" style="display: block; color: #94a3b8; font-size: 0.82em; font-weight: 600; text-transform: uppercase; margin-bottom: 6px;">
+              Step Title:
+            </label>
+            <input type="text" id="rename-step-input" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 10px; border-radius: 4px; font-size: 0.9em; outline: none;" placeholder="Enter step title..." autocomplete="off" />
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
+            <button type="button" id="cancel-rename-step-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
+            <button type="submit" id="save-rename-step-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fas fa-save"></i> Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Image Lightbox / Full Size Modal -->
     <div id="image-modal" style="display: none; position: fixed; z-index: 10000; inset: 0; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(6px); align-items: center; justify-content: center; flex-direction: column; padding: 20px 24px; box-sizing: border-box; overflow: hidden;">
       <!-- Top Action Bar -->
@@ -1202,8 +1230,11 @@
     <!-- Step Context Menu (right-click a step in the sidebar) -->
     <div id="step-context-menu" style="display: none; position: fixed; z-index: 10001; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); padding: 4px 0; user-select: none;">
       <div id="step-context-title" style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 700; border-bottom: 1px solid #334155; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+      <button type="button" id="step-context-edit-title" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-pen" style="color: #38bdf8; width: 14px; text-align: center;"></i> Edit step title
+      </button>
       <button type="button" id="step-context-edit" style="width: 100%; display: none; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-        <i class="fas fa-edit" style="color: #38bdf8; width: 14px; text-align: center;"></i> Edit step
+        <i class="fas fa-edit" style="color: #38bdf8; width: 14px; text-align: center;"></i> Edit markdown
       </button>
       <button type="button" id="step-context-copy-link" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-link" style="color: #38bdf8; width: 14px; text-align: center;"></i> Copy step link

@@ -114,6 +114,9 @@
 
   const mdSaveBtn = document.getElementById('md-save-btn');
   const mdSaveBtnText = document.getElementById('md-save-btn-text');
+  const mdGitWrapper = document.getElementById('md-git-wrapper');
+  const mdGitBtn = document.getElementById('md-git-btn');
+  const mdGitMenu = document.getElementById('md-git-menu');
   const mdGitCommitBtn = document.getElementById('md-git-commit-btn');
   const mdGitHistoryBtn = document.getElementById('md-git-history-btn');
   const gitHistoryBtn = document.getElementById('git-history-btn');
@@ -344,7 +347,11 @@
       mdSettingVimCheckbox.checked = mdVimMode;
     }
     if (mdVimStatusBar) {
-      mdVimStatusBar.style.display = mdVimMode ? 'flex' : 'none';
+      mdVimStatusBar.style.display = mdVimMode ? 'inline-flex' : 'none';
+    }
+    const hints = document.getElementById('md-vim-hints');
+    if (hints) {
+      hints.style.display = mdVimMode ? 'inline' : 'none';
     }
     if (mdCodeEditor) {
       const currentKeyMap = mdCodeEditor.getOption('keyMap') || 'default';
@@ -422,51 +429,95 @@
     return text;
   }
 
+  function updateCursorPos(line, ch) {
+    const el = document.getElementById('md-editor-cursor-pos');
+    if (el) el.textContent = `Ln ${line + 1}, Col ${ch + 1}`;
+  }
+
   function showMdStatus(state, msg) {
-    if (!mdSaveStatus) return;
     clearTimeout(mdSaveStatusTimer);
-    mdSaveStatus.style.display = 'inline-flex';
+    const saveStatusEl = mdSaveStatus || document.getElementById('md-save-status');
+    const saveIcon = mdSaveBtn ? mdSaveBtn.querySelector('i') : null;
+
     if (state === 'dirty') {
-      mdSaveStatus.innerHTML = '<i class="fas fa-pencil-alt" style="color: #f59e0b; margin-right: 4px;"></i> <span style="color: #cbd5e1;">Unsaved edits...</span>';
+      if (saveStatusEl) {
+        saveStatusEl.innerHTML = '<i class="fas fa-pencil-alt" style="color: #f59e0b; margin-right: 4px;"></i> <span style="color: #cbd5e1;">Unsaved edits...</span>';
+        saveStatusEl.style.display = 'inline-flex';
+      }
       if (mdSaveBtn) {
         mdSaveBtn.style.borderColor = '#38bdf8';
+        mdSaveBtn.style.background = '#1e293b';
         mdSaveBtn.style.color = '#38bdf8';
+        if (saveIcon) {
+          saveIcon.className = 'fas fa-save';
+          saveIcon.style.color = '#38bdf8';
+        }
         if (mdSaveBtnText) mdSaveBtnText.textContent = 'Save *';
         mdSaveBtn.title = 'Save uncommitted edits to disk (Ctrl+S)';
       }
     } else if (state === 'saving') {
       const text = msg || 'Saving...';
-      mdSaveStatus.innerHTML = `<i class="fas fa-spinner fa-spin" style="color: #38bdf8; margin-right: 4px;"></i> <span style="color: #94a3b8;">${text}</span>`;
+      if (saveStatusEl) {
+        saveStatusEl.innerHTML = `<i class="fas fa-spinner fa-spin" style="color: #38bdf8; margin-right: 4px;"></i> <span style="color: #94a3b8;">${text}</span>`;
+        saveStatusEl.style.display = 'inline-flex';
+      }
       if (mdSaveBtn) {
         mdSaveBtn.style.borderColor = '#38bdf8';
+        mdSaveBtn.style.background = '#1e293b';
         mdSaveBtn.style.color = '#94a3b8';
+        if (saveIcon) {
+          saveIcon.className = 'fas fa-spinner fa-spin';
+          saveIcon.style.color = '#38bdf8';
+        }
         if (mdSaveBtnText) mdSaveBtnText.textContent = 'Saving...';
       }
     } else if (state === 'saved') {
       const text = msg || 'Saved';
-      mdSaveStatus.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> <span style="color: #10b981;">${text}</span>`;
+      if (saveStatusEl) {
+        saveStatusEl.innerHTML = `<i class="fas fa-check-circle" style="color: #10b981; margin-right: 4px;"></i> <span style="color: #10b981; font-weight: 600;">${text}</span>`;
+        saveStatusEl.style.display = 'inline-flex';
+      }
       if (mdSaveBtn) {
         mdSaveBtn.style.borderColor = '#10b981';
-        mdSaveBtn.style.color = '#10b981';
-        if (mdSaveBtnText) mdSaveBtnText.textContent = 'Saved';
+        mdSaveBtn.style.background = '#065f46';
+        mdSaveBtn.style.color = '#ecfdf5';
+        if (saveIcon) {
+          saveIcon.className = 'fas fa-check';
+          saveIcon.style.color = '#34d399';
+        }
+        if (mdSaveBtnText) mdSaveBtnText.textContent = 'Saved!';
         setTimeout(() => {
           if (!mdIsDirty && mdSaveBtn) {
             mdSaveBtn.style.borderColor = '#475569';
+            mdSaveBtn.style.background = '#1e293b';
             mdSaveBtn.style.color = '#cbd5e1';
+            const curIcon = mdSaveBtn.querySelector('i');
+            if (curIcon) {
+              curIcon.className = 'fas fa-save';
+              curIcon.style.color = '#38bdf8';
+            }
             if (mdSaveBtnText) mdSaveBtnText.textContent = 'Save';
             mdSaveBtn.title = 'Save note to disk (Ctrl+S)';
           }
-        }, 2000);
+        }, 1800);
       }
       mdSaveStatusTimer = setTimeout(() => {
-        if (!mdIsDirty) mdSaveStatus.style.display = 'none';
+        if (!mdIsDirty && saveStatusEl) saveStatusEl.style.display = 'none';
       }, 2500);
     } else if (state === 'error') {
       const text = msg || 'Save failed';
-      mdSaveStatus.innerHTML = `<i class="fas fa-exclamation-triangle" style="color: #ef4444; margin-right: 4px;"></i> <span style="color: #ef4444;">${text}</span>`;
+      if (saveStatusEl) {
+        saveStatusEl.innerHTML = `<i class="fas fa-exclamation-triangle" style="color: #ef4444; margin-right: 4px;"></i> <span style="color: #ef4444;">${text}</span>`;
+        saveStatusEl.style.display = 'inline-flex';
+      }
       if (mdSaveBtn) {
         mdSaveBtn.style.borderColor = '#ef4444';
-        mdSaveBtn.style.color = '#ef4444';
+        mdSaveBtn.style.background = '#450a0a';
+        mdSaveBtn.style.color = '#f87171';
+        if (saveIcon) {
+          saveIcon.className = 'fas fa-exclamation-triangle';
+          saveIcon.style.color = '#ef4444';
+        }
         if (mdSaveBtnText) mdSaveBtnText.textContent = 'Save !';
       }
     }
@@ -673,6 +724,11 @@
 
       mdCodeEditor.on('change', () => {
         onMarkdownContentChanged();
+      });
+
+      mdCodeEditor.on('cursorActivity', () => {
+        const pos = mdCodeEditor.getCursor();
+        updateCursorPos(pos.line, pos.ch);
       });
 
       mdCodeEditor.on('paste', (cm, e) => {
@@ -908,6 +964,11 @@
   function setMdMode(mode) {
     currentMdMode = mode;
 
+    const mdEditorToolbar = document.getElementById('md-editor-toolbar');
+    if (mdEditorToolbar) {
+      mdEditorToolbar.style.display = (mode === 'preview') ? 'none' : 'flex';
+    }
+
     if (mdTabEdit) {
       mdTabEdit.style.display = (mode === 'preview') ? 'inline-flex' : 'none';
     }
@@ -939,11 +1000,15 @@
     if (mdSaveBtn) {
       mdSaveBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
     }
-    if (mdGitCommitBtn) {
-      mdGitCommitBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
-    }
-    if (mdGitHistoryBtn) {
-      mdGitHistoryBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
+    if (mdGitWrapper) {
+      mdGitWrapper.style.display = (mode === 'preview') ? 'none' : 'inline-block';
+      if (mode === 'preview' && mdGitMenu) {
+        mdGitMenu.style.display = 'none';
+        if (mdGitBtn) {
+          mdGitBtn.style.background = '#1e293b';
+          mdGitBtn.style.borderColor = '#475569';
+        }
+      }
     }
     if (mdSettingsWrapper) {
       mdSettingsWrapper.style.display = (mode === 'preview') ? 'none' : 'inline-block';
@@ -4763,6 +4828,49 @@
     }
   }
 
+  // --- Git Dropdown Menu (Commit & History) ---
+  function setupGitMenu() {
+    if (mdGitBtn && mdGitMenu) {
+      mdGitBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = mdGitMenu.style.display !== 'none';
+        mdGitMenu.style.display = isOpen ? 'none' : 'block';
+        mdGitBtn.style.background = isOpen ? '#1e293b' : '#334155';
+        mdGitBtn.style.borderColor = isOpen ? '#475569' : '#10b981';
+      });
+
+      document.addEventListener('click', (e) => {
+        if (mdGitMenu.style.display !== 'none') {
+          if (!mdGitMenu.contains(e.target) && e.target !== mdGitBtn && !mdGitBtn.contains(e.target)) {
+            mdGitMenu.style.display = 'none';
+            mdGitBtn.style.background = '#1e293b';
+            mdGitBtn.style.borderColor = '#475569';
+          }
+        }
+      });
+    }
+
+    if (mdGitCommitBtn) {
+      mdGitCommitBtn.addEventListener('click', () => {
+        if (mdGitMenu) mdGitMenu.style.display = 'none';
+        if (mdGitBtn) {
+          mdGitBtn.style.background = '#1e293b';
+          mdGitBtn.style.borderColor = '#475569';
+        }
+      });
+    }
+
+    if (mdGitHistoryBtn) {
+      mdGitHistoryBtn.addEventListener('click', () => {
+        if (mdGitMenu) mdGitMenu.style.display = 'none';
+        if (mdGitBtn) {
+          mdGitBtn.style.background = '#1e293b';
+          mdGitBtn.style.borderColor = '#475569';
+        }
+      });
+    }
+  }
+
   // --- Settings Menu & Auto-save Interval ---
   function setupSettingsMenu() {
     if (mdSettingsBtn && mdSettingsMenu) {
@@ -4843,6 +4951,7 @@
     if (mdInitialized) return;
     mdInitialized = true;
     setupSettingsMenu();
+    setupGitMenu();
     setupEmojiPicker();
     setupGraphvizEditor();
     setupGitHistory();
@@ -4901,6 +5010,16 @@
       mdTextarea.addEventListener('input', () => {
         onMarkdownContentChanged();
       });
+
+      function syncTextareaCursor() {
+        const text = mdTextarea.value.substring(0, mdTextarea.selectionStart);
+        const lines = text.split('\n');
+        const line = lines.length - 1;
+        const ch = lines[line].length;
+        updateCursorPos(line, ch);
+      }
+      mdTextarea.addEventListener('keyup', syncTextareaCursor);
+      mdTextarea.addEventListener('click', syncTextareaCursor);
 
       mdTextarea.addEventListener('paste', (e) => {
         const clipboard = e.clipboardData || window.clipboardData;
@@ -4963,6 +5082,16 @@
         target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       });
     }
+    // Global Ctrl+S shortcut handler when editing markdown
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        const activeDataType = getActiveDataType();
+        if (activeDataType === 'markdown' && (currentMdMode === 'edit' || currentMdMode === 'split')) {
+          e.preventDefault();
+          saveMarkdownContent(false);
+        }
+      }
+    });
   }
 
   if (document.readyState === 'loading') {
