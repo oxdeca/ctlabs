@@ -133,6 +133,7 @@
   const mdSettingsWrapper = document.getElementById('md-settings-wrapper');
   const mdSettingsBtn = document.getElementById('md-settings-btn');
   const mdSettingsMenu = document.getElementById('md-settings-menu');
+  const mdSettingSplitCheckbox = document.getElementById('md-setting-split-checkbox');
   const mdSettingWrapCheckbox = document.getElementById('md-setting-wrap-checkbox');
   const mdSettingVimCheckbox = document.getElementById('md-setting-vim-checkbox');
   const mdSettingAutosaveSelect = document.getElementById('md-setting-autosave-select');
@@ -178,6 +179,11 @@
         mdAutoSaveInterval = parsed;
       }
     }
+  } catch (e) {}
+
+  let mdSplitMode = false;
+  try {
+    mdSplitMode = localStorage.getItem('ctlabs_md_split_mode') === 'true';
   } catch (e) {}
 
   let mdWrapCode = false;
@@ -298,17 +304,25 @@
   function updateMdSettingsBtnUI() {
     if (mdSettingsBtn) {
       const icon = mdSettingsBtn.querySelector('i');
-      const isCustom = mdWrapCode || mdVimMode || (mdAutoSaveInterval !== 5000);
+      const isCustom = mdSplitMode || mdWrapCode || mdVimMode || (mdAutoSaveInterval !== 5000);
       if (icon) {
         icon.style.color = isCustom ? '#38bdf8' : '#94a3b8';
       }
       const hints = [];
+      if (mdSplitMode) hints.push('Split mode');
       if (mdWrapCode) hints.push('Wrap code');
       if (mdVimMode) hints.push('Vi mode');
       if (mdAutoSaveInterval === 0) hints.push('Autosave: Off');
       else hints.push(`Autosave: ${mdAutoSaveInterval / 1000}s`);
       mdSettingsBtn.title = hints.length > 0 ? `Editor settings (${hints.join(', ')})` : 'Editor settings';
     }
+  }
+
+  function updateMdSplitModeUI() {
+    if (mdSettingSplitCheckbox) {
+      mdSettingSplitCheckbox.checked = mdSplitMode;
+    }
+    updateMdSettingsBtnUI();
   }
 
   function updateMdWrapCodeUI() {
@@ -356,6 +370,7 @@
   }
 
   function updateMdSettingsUI() {
+    updateMdSplitModeUI();
     updateMdWrapCodeUI();
     updateMdVimModeUI();
     updateMdAutosaveUI();
@@ -892,20 +907,25 @@
   // --- Mode Switching ---
   function setMdMode(mode) {
     currentMdMode = mode;
-    [mdTabPreview, mdTabEdit, mdTabSplit].forEach(tab => {
-      if (!tab) return;
-      tab.classList.remove('active');
-      tab.style.background = '#1e293b';
-      tab.style.color = '#94a3b8';
-      tab.style.borderColor = '#475569';
-    });
 
-    const activeTab = (mode === 'preview') ? mdTabPreview : (mode === 'edit' ? mdTabEdit : mdTabSplit);
-    if (activeTab) {
-      activeTab.classList.add('active');
-      activeTab.style.background = '#0284c7';
-      activeTab.style.color = '#ffffff';
-      activeTab.style.borderColor = '#38bdf8';
+    if (mdTabEdit) {
+      mdTabEdit.style.display = (mode === 'preview') ? 'inline-flex' : 'none';
+    }
+    if (mdTabPreview) {
+      mdTabPreview.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
+    }
+    if (mdTabSplit) {
+      mdTabSplit.style.display = 'none';
+    }
+
+    if (mode === 'split') {
+      mdSplitMode = true;
+      try { localStorage.setItem('ctlabs_md_split_mode', 'true'); } catch (e) {}
+      updateMdSplitModeUI();
+    } else if (mode === 'edit') {
+      mdSplitMode = false;
+      try { localStorage.setItem('ctlabs_md_split_mode', 'false'); } catch (e) {}
+      updateMdSplitModeUI();
     }
 
     // Emoji, diagram, commit, history, and settings buttons are visible in edit or split mode
@@ -1232,7 +1252,7 @@
     }
 
     if (currentMdMode === 'preview') {
-      setMdMode('split');
+      setMdMode(mdSplitMode ? 'split' : 'edit');
     }
 
     if (mdSaveStatus) {
@@ -1451,7 +1471,7 @@
           snippet = code ? `:${code}:` : (entity || ch);
         }
 
-        if (currentMdMode === 'preview') setMdMode('split');
+        if (currentMdMode === 'preview') setMdMode(mdSplitMode ? 'split' : 'edit');
         const cm = getMdEditor();
         if (cm) {
           cm.replaceSelection(snippet, 'end');
@@ -3536,7 +3556,7 @@
 
   function openGraphvizModal(initialBase = '') {
     if (!mdGraphvizModal) return;
-    if (currentMdMode === 'preview') setMdMode('split');
+    if (currentMdMode === 'preview') setMdMode(mdSplitMode ? 'split' : 'edit');
     clearTimeout(mdGraphvizDebounceTimer);
     mdGraphvizRenderSeq += 1;
     setGraphvizError('');
@@ -4765,6 +4785,19 @@
       });
     }
 
+    if (mdSettingSplitCheckbox) {
+      mdSettingSplitCheckbox.addEventListener('change', () => {
+        mdSplitMode = mdSettingSplitCheckbox.checked;
+        try {
+          localStorage.setItem('ctlabs_md_split_mode', mdSplitMode ? 'true' : 'false');
+        } catch (e) {}
+        updateMdSplitModeUI();
+        if (currentMdMode === 'edit' || currentMdMode === 'split') {
+          setMdMode(mdSplitMode ? 'split' : 'edit');
+        }
+      });
+    }
+
     if (mdSettingWrapCheckbox) {
       mdSettingWrapCheckbox.addEventListener('change', () => {
         mdWrapCode = mdSettingWrapCheckbox.checked;
@@ -4815,7 +4848,7 @@
     setupGitHistory();
 
     if (mdTabPreview) mdTabPreview.addEventListener('click', () => setMdMode('preview'));
-    if (mdTabEdit) mdTabEdit.addEventListener('click', () => setMdMode('edit'));
+    if (mdTabEdit) mdTabEdit.addEventListener('click', () => setMdMode(mdSplitMode ? 'split' : 'edit'));
     if (mdTabSplit) mdTabSplit.addEventListener('click', () => setMdMode('split'));
 
     if (mdInsertImgBtn && mdImgFileInput) {
@@ -4944,6 +4977,20 @@
     getEditor: getMdEditor,
     setMode: setMdMode,
     getMode: () => currentMdMode,
+    enterEditMode: () => {
+      setMdMode(mdSplitMode ? 'split' : 'edit');
+    },
+    getSplitMode: () => mdSplitMode,
+    setSplitMode: (val) => {
+      mdSplitMode = !!val;
+      try {
+        localStorage.setItem('ctlabs_md_split_mode', mdSplitMode ? 'true' : 'false');
+      } catch (e) {}
+      updateMdSplitModeUI();
+      if (currentMdMode === 'edit' || currentMdMode === 'split') {
+        setMdMode(mdSplitMode ? 'split' : 'edit');
+      }
+    },
     loadContent: loadMarkdownContent,
     saveContent: saveMarkdownContent,
     commitNote: promptAndCommitNote,

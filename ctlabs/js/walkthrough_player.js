@@ -33,8 +33,10 @@
   const editTitle = document.getElementById('edit-title');
   const stepContextMenu = document.getElementById('step-context-menu');
   const stepContextTitle = document.getElementById('step-context-title');
+  const stepContextEdit = document.getElementById('step-context-edit');
   const stepContextCopyLink = document.getElementById('step-context-copy-link');
   let stepContextBtn = null;
+  let pendingMdEditMode = false;
   const recsList = document.getElementById('recs-list');
   const otherList = document.getElementById('other-list');
   const importBtn = document.getElementById('import-btn');
@@ -794,9 +796,14 @@
 
     const id = btn.getAttribute('data-id') || '';
     const step = btn.getAttribute('data-step') || '';
+    const dataType = btn.getAttribute('data-type') || 'terminal';
     const titleNode = btn.querySelector('.item-title');
     const title = (btn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || id || 'Step').trim();
     if (stepContextTitle) stepContextTitle.textContent = (step ? '#' + step + ' ' : '') + title;
+
+    if (stepContextEdit) {
+      stepContextEdit.style.display = (dataType === 'markdown') ? 'flex' : 'none';
+    }
 
     stepContextMenu.style.display = 'block';
     const rect = stepContextMenu.getBoundingClientRect();
@@ -807,6 +814,27 @@
     stepContextMenu.style.left = x + 'px';
     stepContextMenu.style.top = y + 'px';
   });
+
+  if (stepContextEdit) {
+    stepContextEdit.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!stepContextBtn) return;
+      const targetBtn = stepContextBtn;
+      hideStepContextMenu();
+
+      const currentActive = document.querySelector('.rec-item.active');
+      if (targetBtn === currentActive) {
+        if (window.MarkdownEditor && typeof window.MarkdownEditor.enterEditMode === 'function') {
+          window.MarkdownEditor.enterEditMode();
+        } else if (typeof setMdMode === 'function') {
+          setMdMode('edit');
+        }
+      } else {
+        pendingMdEditMode = true;
+        targetBtn.click();
+      }
+    });
+  }
 
   if (stepContextCopyLink) {
     stepContextCopyLink.addEventListener('click', (e) => {
@@ -869,7 +897,9 @@ if (newTitle && activeId) {
         const titleEl = document.getElementById('rec-title');
         if (titleEl) {
           const span = titleEl.querySelector('span');
-          if (span) span.textContent = (step ? '#' + step + ': ' : '') + newTitle;
+          const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
+          if (span) span.textContent = fullTitleText;
+          titleEl.title = fullTitleText;
         }
       }
       if (editTitle) editTitle.value = newTitle;
@@ -2187,7 +2217,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       player = null;
     }
     demoDiv.innerHTML = '';
-    titleEl.querySelector('span').textContent = (step ? '#' + step + ': ' : '') + (title || label);
+    const fullTitleText = (step ? '#' + step + ': ' : '') + (title || label);
+    titleEl.querySelector('span').textContent = fullTitleText;
+    titleEl.title = fullTitleText;
     actionsEl.style.display = 'flex';
     downloadEl.href = src + '?download=1';
     deleteForm.action = src + '/delete';
@@ -2208,9 +2240,13 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (videoContainer) videoContainer.style.display = 'none';
       if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
       if (mdContainer) mdContainer.style.display = 'flex';
-      const mdMode = (window.MarkdownEditor && typeof window.MarkdownEditor.getMode === 'function')
-        ? window.MarkdownEditor.getMode()
-        : ((typeof currentMdMode !== 'undefined') ? currentMdMode : 'preview');
+      let mdMode = 'preview';
+      if (pendingMdEditMode) {
+        pendingMdEditMode = false;
+        mdMode = (window.MarkdownEditor && typeof window.MarkdownEditor.getSplitMode === 'function' && window.MarkdownEditor.getSplitMode())
+          ? 'split'
+          : 'edit';
+      }
       if (mdSettingsWrapper) mdSettingsWrapper.style.display = (mdMode === 'preview') ? 'none' : 'inline-block';
       if (mdSettingsDivider) mdSettingsDivider.style.display = 'none';
       if (mdInsertImgBtn) mdInsertImgBtn.title = 'Upload picture or import markdown / zip note (or drag & drop)';
@@ -2218,6 +2254,10 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (mdSaveBtn) mdSaveBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
       if (mdGitCommitBtn) mdGitCommitBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
       if (mdGitHistoryBtn) mdGitHistoryBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
+      const mdTabEditBtn = document.getElementById('md-tab-edit');
+      const mdTabViewBtn = document.getElementById('md-tab-preview');
+      if (mdTabEditBtn) mdTabEditBtn.style.display = (mdMode === 'preview') ? 'inline-flex' : 'none';
+      if (mdTabViewBtn) mdTabViewBtn.style.display = (mdMode === 'preview') ? 'none' : 'inline-flex';
       if (titleIcon) {
         titleIcon.className = 'fab fa-markdown';
         titleIcon.style.color = '#38bdf8';
@@ -2228,9 +2268,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         loadMarkdownContent(id);
       }
       if (window.MarkdownEditor && typeof window.MarkdownEditor.setMode === 'function') {
-        window.MarkdownEditor.setMode(mdMode || 'preview');
+        window.MarkdownEditor.setMode(mdMode);
       } else if (typeof setMdMode === 'function') {
-        setMdMode(mdMode || 'preview');
+        setMdMode(mdMode);
       }
     } else if (activeDataType === 'video') {
       if (demoContainer) demoContainer.style.display = 'none';
