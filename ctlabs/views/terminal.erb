@@ -2023,6 +2023,9 @@
           const modalTbody = document.getElementById('term-ssh-identities-tbody');
           const candidateDatalist = document.getElementById('term-ssh-candidate-keys');
 
+          const sessionSshBadge = document.getElementById('session-ssh-badge');
+          const sessionSshDetails = document.getElementById('session-ssh-details');
+
           if (modalLoading) modalLoading.style.display = 'block';
           if (modalEmpty) modalEmpty.style.display = 'none';
           if (modalTable) modalTable.style.display = 'none';
@@ -2070,6 +2073,29 @@
               }
             }
 
+            if (sessionSshBadge && sessionSshDetails) {
+              if (data.running !== false) {
+                if (count > 0) {
+                  sessionSshBadge.textContent = `${count} ${count === 1 ? 'Key' : 'Keys'}`;
+                  sessionSshBadge.style.background = '#0d9488';
+                  sessionSshBadge.style.color = '#ffffff';
+                  const keyNames = identities.map(id => id.comment || id.type || 'Key').slice(0, 2).join(', ');
+                  const extra = count > 2 ? ` (+${count - 2} more)` : '';
+                  sessionSshDetails.innerHTML = `<span style="color: #2dd4bf;"><i class="fas fa-check-circle"></i></span> Active · ${escapeHtml(keyNames)}${extra}`;
+                } else {
+                  sessionSshBadge.textContent = '0 Keys';
+                  sessionSshBadge.style.background = '#475569';
+                  sessionSshBadge.style.color = '#cbd5e1';
+                  sessionSshDetails.innerHTML = '<span style="color: #94a3b8;"><i class="fas fa-info-circle"></i></span> Agent running, 0 keys in memory';
+                }
+              } else {
+                sessionSshBadge.textContent = 'Not Running';
+                sessionSshBadge.style.background = '#7f1d1d';
+                sessionSshBadge.style.color = '#fca5a5';
+                sessionSshDetails.innerHTML = `<span style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i></span> ${escapeHtml(data.error || 'Agent socket unavailable')}`;
+              }
+            }
+
             if (modalTbody) {
               modalTbody.innerHTML = '';
               identities.forEach(id => {
@@ -2103,6 +2129,14 @@
               statusInd.style.color = '#ef4444';
             }
             if (countEl) countEl.textContent = 'Unavailable';
+            if (sessionSshBadge) {
+              sessionSshBadge.textContent = 'Unavailable';
+              sessionSshBadge.style.background = '#7f1d1d';
+              sessionSshBadge.style.color = '#fca5a5';
+            }
+            if (sessionSshDetails) {
+              sessionSshDetails.innerHTML = `<span style="color: #ef4444;"><i class="fas fa-exclamation-circle"></i></span> Error: ${escapeHtml(err.message)}`;
+            }
           }
         }
 
@@ -2314,6 +2348,7 @@
         // Initial check of agent status
         loadTermSshAgentStatus();
         window.loadTermSshAgentStatus = loadTermSshAgentStatus;
+        window.loadSessionSshStatus = loadTermSshAgentStatus;
       }
 
       // =========================================================================
