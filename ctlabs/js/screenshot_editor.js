@@ -955,6 +955,64 @@
     return false;
   }
 
+  function isPointOnAnnotation(pt, ann, allowInterior = false) {
+    if (!pt || !ann) return false;
+    if (ann.type === 'arrow' || ann.type === 'badge' || ann.type === 'text' || ann.type === 'pen') {
+      return isPointInAnnotation(pt, ann);
+    }
+
+    if (allowInterior) {
+      return isPointInAnnotation(pt, ann);
+    }
+
+    const tol = Math.max(10, (ann.strokeWidth || 4) + 6);
+    let testPt = pt;
+    if (ann.rotation) {
+      const center = getAnnotationCenter(ann);
+      testPt = rotatePoint(pt.x, pt.y, center.x, center.y, -ann.rotation);
+    }
+
+    if (ann.type === 'rect' || ann.type === 'highlight') {
+      const x1 = ann.x1 !== undefined ? ann.x1 : ann.x;
+      const y1 = ann.y1 !== undefined ? ann.y1 : ann.y;
+      const x2 = ann.x2 !== undefined ? ann.x2 : (ann.x + (ann.w || 0));
+      const y2 = ann.y2 !== undefined ? ann.y2 : (ann.y + (ann.h || 0));
+      const rx = Math.min(x1, x2);
+      const ry = Math.min(y1, y2);
+      const rw = Math.abs(x2 - x1);
+      const rh = Math.abs(y2 - y1);
+      // Small box -> entire area is interactive
+      if (rw <= tol * 2.5 || rh <= tol * 2.5) {
+        return (testPt.x >= rx - tol && testPt.x <= rx + rw + tol && testPt.y >= ry - tol && testPt.y <= ry + rh + tol);
+      }
+      const inOuter = (testPt.x >= rx - tol && testPt.x <= rx + rw + tol && testPt.y >= ry - tol && testPt.y <= ry + rh + tol);
+      if (!inOuter) return false;
+      const inInner = (testPt.x > rx + tol && testPt.x < rx + rw - tol && testPt.y > ry + tol && testPt.y < ry + rh - tol);
+      return !inInner;
+    }
+
+    if (ann.type === 'ellipse') {
+      const x1 = ann.x1 !== undefined ? ann.x1 : ann.x;
+      const y1 = ann.y1 !== undefined ? ann.y1 : ann.y;
+      const x2 = ann.x2 !== undefined ? ann.x2 : (ann.x + (ann.w || 0));
+      const y2 = ann.y2 !== undefined ? ann.y2 : (ann.y + (ann.h || 0));
+      const rx = Math.abs(x2 - x1) / 2;
+      const ry = Math.abs(y2 - y1) / 2;
+      const cx = Math.min(x1, x2) + rx;
+      const cy = Math.min(y1, y2) + ry;
+      if (rx <= 0 || ry <= 0) return false;
+      if (rx <= tol * 2 || ry <= tol * 2) {
+        return isPointInAnnotation(pt, ann);
+      }
+      const distRatio = Math.pow((testPt.x - cx) / rx, 2) + Math.pow((testPt.y - cy) / ry, 2);
+      const minRatio = Math.pow(Math.max(0, rx - tol) / rx, 2);
+      const maxRatio = Math.pow((rx + tol) / rx, 2);
+      return distRatio >= minRatio && distRatio <= maxRatio;
+    }
+
+    return false;
+  }
+
   function getAnnotationHandles(ann) {
     if (!ann) return [];
 
@@ -1094,7 +1152,7 @@
     return null;
   }
 
-  function findAnnotationAt(ptOrX, maybeY) {
+  function findAnnotationAt(ptOrX, maybeY, checkBorderOnly = false) {
     let pt = ptOrX;
     if (typeof ptOrX === 'number' && typeof maybeY === 'number') {
       pt = { x: ptOrX, y: maybeY };
@@ -1102,8 +1160,14 @@
     if (!pt || typeof pt.x !== 'number' || typeof pt.y !== 'number') return null;
     // Search top-to-bottom (last drawn is on top)
     for (let i = annotations.length - 1; i >= 0; i--) {
-      if (isPointInAnnotation(pt, annotations[i])) {
-        return annotations[i];
+      if (checkBorderOnly) {
+        if (isPointOnAnnotation(pt, annotations[i])) {
+          return annotations[i];
+        }
+      } else {
+        if (isPointInAnnotation(pt, annotations[i])) {
+          return annotations[i];
+        }
       }
     }
     return null;
@@ -1292,6 +1356,7 @@
       const origSize = orig.fontSize || 13;
       const newSize = Math.max(8, Math.min(72, Math.round(origSize * scaleRatio)));
       ann.fontSize = newSize;
+      activeFontSize = newSize;
       if (fontSizeInput) fontSizeInput.value = newSize;
       dragStartData.hasMoved = true;
       return;
@@ -1501,7 +1566,15 @@
   }
 
   function updateToolbarForSelection() {
-    if (!selectedId) return;
+    const badgeGroup = document.getElementById('annotator-badge-group');
+    const fontGroup = document.getElementById('annotator-font-size-group');
+
+    if (!selectedId) {
+      if (badgeGroup) badgeGroup.style.display = (activeTool === 'badge') ? 'inline-flex' : 'none';
+      if (fontGroup) fontGroup.style.display = (activeTool === 'text' || activeTool === 'badge') ? 'inline-flex' : 'none';
+      return;
+    }
+
     const ann = annotations.find(a => a.id === selectedId);
     if (!ann) return;
 
@@ -1519,13 +1592,24 @@
       });
     }
 
-    if (ann.fontSize) {
-      activeFontSize = ann.fontSize;
-      if (fontSizeInput) fontSizeInput.value = ann.fontSize;
-    }
-
-    if (ann.type === 'badge' && ann.number) {
-      if (badgeNumInput) badgeNumInput.value = ann.number;
+    if (ann.type === 'badge') {
+      if (badgeGroup) badgeGroup.style.display = 'inline-flex';
+      if (fontGroup) fontGroup.style.display = 'inline-flex';
+      if (ann.number && badgeNumInput) badgeNumInput.value = ann.number;
+      if (ann.fontSize) {
+        activeFontSize = ann.fontSize;
+        if (fontSizeInput) fontSizeInput.value = ann.fontSize;
+      }
+    } else if (ann.type === 'text') {
+      if (fontGroup) fontGroup.style.display = 'inline-flex';
+      if (badgeGroup && activeTool !== 'badge') badgeGroup.style.display = 'none';
+      if (ann.fontSize) {
+        activeFontSize = ann.fontSize;
+        if (fontSizeInput) fontSizeInput.value = ann.fontSize;
+      }
+    } else {
+      if (badgeGroup && activeTool !== 'badge') badgeGroup.style.display = 'none';
+      if (fontGroup && activeTool !== 'text' && activeTool !== 'badge') fontGroup.style.display = 'none';
     }
   }
 
@@ -1632,6 +1716,12 @@
   }
 
   // --- Tool Switching ---
+  function getDefaultToolCursor(tool = activeTool) {
+    if (tool === 'select') return 'grab';
+    if (tool === 'text') return 'text';
+    return 'crosshair';
+  }
+
   function setActiveTool(tool) {
     commitTextInput();
     activeTool = tool;
@@ -1660,13 +1750,7 @@
 
     // Cursor styling
     if (stage) {
-      if (tool === 'select') {
-        stage.style.cursor = 'grab';
-      } else if (tool === 'text') {
-        stage.style.cursor = 'text';
-      } else {
-        stage.style.cursor = 'crosshair';
-      }
+      stage.style.cursor = getDefaultToolCursor(tool);
     }
   }
 
@@ -1828,32 +1912,50 @@
 
       const pt = screenToCanvasCoords(e.clientX, e.clientY);
 
-      // Handle Select tool
-      if (activeTool === 'select') {
-        if (selectedId) {
-          const selAnn = annotations.find(a => a.id === selectedId);
-          if (selAnn) {
-            const hitHandle = findHandleAt(pt, selAnn);
-            if (hitHandle) {
-              pushUndoState();
-              isDraggingHandle = true;
-              activeHandle = hitHandle.id;
-              dragHandleStart = {
-                x: pt.x,
-                y: pt.y,
-                center: getAnnotationCenter(selAnn),
-                originalAnn: JSON.parse(JSON.stringify(selAnn)),
-                hasMoved: false
-              };
-              stage.style.cursor = hitHandle.cursor;
-              if (stage.setPointerCapture) {
-                try { stage.setPointerCapture(e.pointerId); } catch (err) {}
-              }
-              return;
+      // Handle interaction with the currently selected element across ALL tools
+      if (selectedId) {
+        const selAnn = annotations.find(a => a.id === selectedId);
+        if (selAnn) {
+          const hitHandle = findHandleAt(pt, selAnn);
+          if (hitHandle) {
+            pushUndoState();
+            isDraggingHandle = true;
+            activeHandle = hitHandle.id;
+            dragHandleStart = {
+              x: pt.x,
+              y: pt.y,
+              center: getAnnotationCenter(selAnn),
+              originalAnn: JSON.parse(JSON.stringify(selAnn)),
+              hasMoved: false
+            };
+            stage.style.cursor = hitHandle.cursor;
+            if (stage.setPointerCapture) {
+              try { stage.setPointerCapture(e.pointerId); } catch (err) {}
             }
+            return;
+          }
+
+          // Clicking on the currently selected element itself -> move it!
+          if (isPointInAnnotation(pt, selAnn)) {
+            pushUndoState();
+            isDraggingAnnotation = true;
+            dragAnnStart = {
+              x: pt.x,
+              y: pt.y,
+              originalAnn: JSON.parse(JSON.stringify(selAnn)),
+              hasMoved: false
+            };
+            stage.style.cursor = 'move';
+            if (stage.setPointerCapture) {
+              try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+            }
+            return;
           }
         }
+      }
 
+      // Handle Select tool
+      if (activeTool === 'select') {
         const hit = findAnnotationAt(pt.x, pt.y);
         if (hit) {
           pushUndoState();
@@ -1889,7 +1991,28 @@
         }
       }
 
-      // If another tool is active and an item was selected, deselect it
+      // In drawing modes: clicking an existing element selects and moves it
+      const hitExisting = findAnnotationAt(pt.x, pt.y, true);
+      if (hitExisting) {
+        pushUndoState();
+        selectedId = hitExisting.id;
+        isDraggingAnnotation = true;
+        dragAnnStart = {
+          x: pt.x,
+          y: pt.y,
+          originalAnn: JSON.parse(JSON.stringify(hitExisting)),
+          hasMoved: false
+        };
+        updateToolbarForSelection();
+        renderAll();
+        stage.style.cursor = 'move';
+        if (stage.setPointerCapture) {
+          try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+        return;
+      }
+
+      // If clicked empty space, deselect prior selection before creating a new element
       if (selectedId) {
         selectedId = null;
         updateToolbarForSelection();
@@ -1991,7 +2114,7 @@
         return;
       }
 
-      if (activeTool === 'select' && !isDrawing) {
+      if (!isDrawing && !isDraggingHandle && !isDraggingAnnotation) {
         if (selectedId) {
           const selAnn = annotations.find(a => a.id === selectedId);
           if (selAnn) {
@@ -2000,11 +2123,24 @@
               stage.style.cursor = h.cursor;
               return;
             }
+            if (isPointInAnnotation(pt, selAnn)) {
+              stage.style.cursor = 'move';
+              return;
+            }
           }
         }
-        const hover = findAnnotationAt(pt.x, pt.y);
-        stage.style.cursor = hover ? 'move' : 'grab';
-        return;
+        if (activeTool === 'select') {
+          const hover = findAnnotationAt(pt.x, pt.y);
+          stage.style.cursor = hover ? 'move' : 'grab';
+          return;
+        } else {
+          const hover = findAnnotationAt(pt.x, pt.y, true);
+          if (hover) {
+            stage.style.cursor = 'move';
+            return;
+          }
+          stage.style.cursor = getDefaultToolCursor(activeTool);
+        }
       }
 
       if (!isDrawing || !dragStart || !overlayCtx) return;
@@ -2067,7 +2203,7 @@
       if (isPanning) {
         isPanning = false;
         panStart = null;
-        stage.style.cursor = (activeTool === 'select') ? 'grab' : 'crosshair';
+        stage.style.cursor = getDefaultToolCursor(activeTool);
         if (e && stage.releasePointerCapture && e.pointerId !== undefined) {
           try { stage.releasePointerCapture(e.pointerId); } catch (err) {}
         }
@@ -2090,7 +2226,18 @@
           }
           dragHandleStart = null;
         }
-        stage.style.cursor = (activeTool === 'select') ? 'grab' : 'crosshair';
+        if (selectedId && e && e.clientX !== undefined && e.clientY !== undefined) {
+          const pt = screenToCanvasCoords(e.clientX, e.clientY);
+          const selAnn = annotations.find(a => a.id === selectedId);
+          if (selAnn) {
+            const h = findHandleAt(pt, selAnn);
+            if (h) {
+              stage.style.cursor = h.cursor;
+              return;
+            }
+          }
+        }
+        stage.style.cursor = getDefaultToolCursor(activeTool);
         return;
       }
 
@@ -2109,7 +2256,22 @@
           }
           dragAnnStart = null;
         }
-        stage.style.cursor = (activeTool === 'select') ? 'grab' : 'crosshair';
+        if (selectedId && e && e.clientX !== undefined && e.clientY !== undefined) {
+          const pt = screenToCanvasCoords(e.clientX, e.clientY);
+          const selAnn = annotations.find(a => a.id === selectedId);
+          if (selAnn) {
+            const h = findHandleAt(pt, selAnn);
+            if (h) {
+              stage.style.cursor = h.cursor;
+              return;
+            }
+            if (isPointInAnnotation(pt, selAnn)) {
+              stage.style.cursor = 'move';
+              return;
+            }
+          }
+        }
+        stage.style.cursor = (activeTool === 'select') ? 'grab' : getDefaultToolCursor(activeTool);
         return;
       }
 
@@ -2256,10 +2418,20 @@
     stage.addEventListener('pointerup', endDrag);
     stage.addEventListener('pointercancel', endDrag);
 
-    // Double click to edit text annotation or fit
+    // Double click to edit text annotation, focus badge number, or fit
     stage.addEventListener('dblclick', (e) => {
       const pt = screenToCanvasCoords(e.clientX, e.clientY);
       const hit = findAnnotationAt(pt.x, pt.y);
+      if (hit && hit.type === 'badge') {
+        selectedId = hit.id;
+        updateToolbarForSelection();
+        renderAll();
+        if (badgeNumInput) {
+          badgeNumInput.focus();
+          badgeNumInput.select();
+        }
+        return;
+      }
       if (hit && hit.type === 'text') {
         selectedId = hit.id;
         editingTextAnnId = hit.id;
@@ -2412,7 +2584,7 @@
   window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') {
       spacePressed = false;
-      if (stage) stage.style.cursor = (activeTool === 'select') ? 'grab' : 'crosshair';
+      if (stage) stage.style.cursor = getDefaultToolCursor(activeTool);
     }
   });
 
