@@ -336,6 +336,12 @@ class NodesController < BaseController
       Node.remove_from_terraform!(node_name, yaml)
       LabRepository.write_formatted_yaml(lab_path, yaml)
 
+      if Lab.running? && Lab.current_name == lab_name
+        lab = Lab.new(cfg: lab_path, relative_path: lab_name)
+        lab.inventory
+        lab.dnsmasq
+      end
+
       content_type :json
       { success: true, message: "Node deleted and orphaned links removed." }.to_json
     rescue => e

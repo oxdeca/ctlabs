@@ -6,6 +6,8 @@
 #
 # Desc: creates the various graphs by generating modern graphviz code
 #
+require 'erb'
+
 class Graph
   attr_reader :colors
 
@@ -812,7 +814,7 @@ class Graph
 local=/mgmt.<%= @domain %>/
 
 <%- @nodes.each do |node| -%>
-<%-   ip = node.nics && node.nics['eth0'] -%>
+<%-   ip = node.nics && (node.nics['eth0'] || node.nics['tun0']) -%>
 <%-   if ip.to_s.strip.empty? && ['mgmt'].include?(node.plane) -%>
 <%-     ip = node.ipv4 -%>
 <%-   end -%>

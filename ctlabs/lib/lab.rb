@@ -1885,6 +1885,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
 
     @log.info "[ADHOC NODE] Started node #{node_name}"
     inventory
+    dnsmasq
 
     [node_cfg, data_links]
   end
