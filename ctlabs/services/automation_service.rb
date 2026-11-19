@@ -136,7 +136,12 @@ class AutomationService
         t.write(content)
         t.close
         system("docker cp #{Shellwords.escape(t.path)} #{cname}:#{Shellwords.escape(full_path)} 2>/dev/null")
-        system("docker exec #{cname} chmod +x #{Shellwords.escape(full_path)} 2>/dev/null") if filepath.end_with?('.py') || filepath.end_with?('.sh')
+        if filepath.end_with?('.py') || filepath.end_with?('.sh')
+          system("docker exec #{cname} chmod 0755 #{Shellwords.escape(full_path)} 2>/dev/null")
+        else
+          system("docker exec #{cname} chmod 0644 #{Shellwords.escape(full_path)} 2>/dev/null")
+        end
+        system("docker exec #{cname} chown ansible:ansible #{Shellwords.escape(full_path)} 2>/dev/null")
         t.unlink
       end
 
@@ -145,7 +150,7 @@ class AutomationService
         begin
           FileUtils.mkdir_p(File.dirname(full_path))
           File.write(full_path, content)
-          FileUtils.chmod("+x", full_path) if filepath.end_with?('.py') || filepath.end_with?('.sh')
+          FileUtils.chmod(filepath.end_with?('.py') || filepath.end_with?('.sh') ? 0755 : 0644, full_path)
         rescue => e
         end
       end

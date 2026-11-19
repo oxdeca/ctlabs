@@ -796,12 +796,17 @@ class Graph
   def to_data_ini(data, name, shared = 'inventory_data')
     @log.write "#{__method__}(): data=#{data},name=#{name},shared=#{shared}", "debug"
 
-    File.open("../../ctlabs-ansible/inventories/#{name}_data.ini", "w") do |f|
+    ans_path = "../../ctlabs-ansible/inventories/#{name}_data.ini"
+    File.open(ans_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
-    File.open("#{@pubdir}/#{shared}.ini", "w") do |f|
+    File.chmod(0644, ans_path) rescue nil
+
+    pub_path = "#{@pubdir}/#{shared}.ini"
+    File.open(pub_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
+    File.chmod(0644, pub_path) rescue nil
   end
 
   def get_dnsmasq
@@ -833,6 +838,7 @@ host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
     File.open(conf_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
+    File.chmod(0644, conf_path) rescue nil
     conf_path
   end
 
@@ -873,11 +879,16 @@ host-record=<%= node.name %>.mgmt.<%= @domain %>,<%= ip.to_s.split('/')[0] %>
   def to_ini(data, name, shared = 'inventory')
     @log.write "#{__method__}(): data=#{data},name=#{name},shared=#{shared}", "debug"
 
-    File.open("../../ctlabs-ansible/inventories/#{name}.ini", "w") do |f|
+    ans_path = "../../ctlabs-ansible/inventories/#{name}.ini"
+    File.open(ans_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
-    File.open("#{@pubdir}/#{shared}.ini", "w") do |f|
+    File.chmod(0644, ans_path) rescue nil
+
+    pub_path = "#{@pubdir}/#{shared}.ini"
+    File.open(pub_path, "w") do |f|
       f.write( ERB.new(data, trim_mode:'-').result(@binding))
     end
+    File.chmod(0644, pub_path) rescue nil
   end
 end

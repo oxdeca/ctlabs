@@ -92,9 +92,37 @@ class LabsController < BaseController
       yaml = YAML.load_file(source_path) || {}
 
       # Update metadata
+      source_base_name = File.basename(lab_name.to_s, '.yml')
       base_name = File.basename(new_lab_name, '.yml')
       yaml['name'] = base_name
       yaml['desc'] = new_desc unless new_desc.empty?
+
+      # If any controller node's play.inv points to the old lab's inventory (e.g. net01.ini), update it to base_name.ini
+      if yaml['topology'].is_a?(Array)
+        yaml['topology'].each do |top|
+          next unless top.is_a?(Hash)
+          ['nodes', 'planes'].each do |key|
+            container = top[key]
+            next unless container.is_a?(Hash)
+            if key == 'nodes'
+              container.each_value do |ncfg|
+                if ncfg.is_a?(Hash) && ncfg['play'].is_a?(Hash) && ncfg['play']['inv'].to_s == "#{source_base_name}.ini"
+                  ncfg['play']['inv'] = "#{base_name}.ini"
+                end
+              end
+            else
+              container.each_value do |plane_cfg|
+                next unless plane_cfg.is_a?(Hash) && plane_cfg['nodes'].is_a?(Hash)
+                plane_cfg['nodes'].each_value do |ncfg|
+                  if ncfg.is_a?(Hash) && ncfg['play'].is_a?(Hash) && ncfg['play']['inv'].to_s == "#{source_base_name}.ini"
+                    ncfg['play']['inv'] = "#{base_name}.ini"
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
 
       FileUtils.mkdir_p(File.dirname(new_lab_path))
       LabRepository.write_formatted_yaml(new_lab_path, yaml, original_base_path)

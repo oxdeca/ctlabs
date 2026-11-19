@@ -1303,6 +1303,7 @@ module Automation
                       end
 
       # generate ansible artifacts from lab topology + profiles
+      inventory if respond_to?(:inventory)
       build_play_setup(play_cfg, base_dir: ans_base_host)
       generate_setup_yml(play_cfg, base_dir: ans_base_host)
       generate_ctlabs_yml(play_cfg, base_dir: ans_base_host)
@@ -1349,6 +1350,23 @@ module Automation
                     else
                       [default_inv]
                     end
+
+        if !@standalone && !@name.to_s.empty?
+          # If inv_items contains an inventory file pointing to a different lab's ini (e.g. net01.ini when lab is net01a),
+          # map it to the current lab's default_inv so playbooks run against the active lab's inventory.
+          inv_items = inv_items.map do |item|
+            raw_item = item.to_s.strip
+            next raw_item if raw_item.include?('/') # explicit path or subdirectory is custom
+
+            base_item = File.basename(raw_item)
+            clean_item = base_item.sub(/\.ini\z/i, '')
+            if clean_item != @name && base_item =~ /\A[a-zA-Z0-9_\-]+\.ini\z/i
+              default_inv
+            else
+              raw_item
+            end
+          end.uniq
+        end
 
         if play_cfg['custom_inv'] && !play_cfg['custom_inv'].to_s.strip.empty?
           c_inv = play_cfg['custom_inv'].to_s.strip
