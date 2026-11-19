@@ -88,12 +88,8 @@ window.openAnsTab = function(tabId) {
       
   const activeTab = document.getElementById(tabId);
   if (activeTab) {
-    if (tabId === 'AnsSettings') {
-      activeTab.style.display = "block";
-    } else {
-      activeTab.style.display = "flex";
-      activeTab.style.flexDirection = "column";
-    }
+    activeTab.style.display = "flex";
+    activeTab.style.flexDirection = "column";
   }
 
   if (tabId === 'AnsSettings') {
@@ -104,10 +100,14 @@ window.openAnsTab = function(tabId) {
         envEl.style.height = Math.max(envEl.scrollHeight + 4, 90) + 'px';
       }, 0);
     }
+    if (window.cmEditors['editor-AnsPlaySetup']) {
+      setTimeout(() => window.cmEditors['editor-AnsPlaySetup'].refresh(), 30);
+      setTimeout(() => window.cmEditors['editor-AnsPlaySetup'].refresh(), 100);
+    }
   }
 
   const deleteBtn = document.getElementById('ans-delete-file-btn');
-  const isProtectedTab = ['AnsSettings', 'AnsCommands', 'AnsPlayProfiles', 'AnsSetupProfiles', 'AnsPlaySetup'].includes(tabId);
+  const isProtectedTab = ['AnsSettings', 'AnsCommands', 'AnsPlayProfiles', 'AnsSetupProfiles'].includes(tabId);
   if (deleteBtn) deleteBtn.style.display = isProtectedTab ? 'none' : 'inline-block';
 
   const taId = (tabId === 'AnsCommands') ? 'edit-ansible-commands' : 'editor-' + tabId;
@@ -593,6 +593,11 @@ window.loadAnsProfiles = async function() {
         // Initialize Play Setup editor
         const playSetupEd = window.initCodeEditor('editor-AnsPlaySetup', 'yaml');
         playSetupEd.setValue(data.json.setup_yaml || '');
+        if (playSetupEd && !playSetupEd.__vimAttached) {
+          playSetupEd.__vimAttached = true;
+          playSetupEd.on('focus', () => { if (window.updateAnsibleVimStatus) window.updateAnsibleVimStatus(); });
+          playSetupEd.on('blur', () => { if (window.updateAnsibleVimStatus) window.updateAnsibleVimStatus(); });
+        }
 
         // Render Workspaces dropdown and apply active profile
         window.renderAnsibleWorkspaceSelect();
@@ -626,6 +631,7 @@ window.loadAnsProfiles = async function() {
         }
 
         // --- NEW: Restore the exact active tab, or fallback to the right-most tab ---
+        if (savedActiveTab === 'AnsPlaySetup') savedActiveTab = 'AnsSettings';
         if (savedActiveTab && document.getElementById(savedActiveTab)) {
               window.openAnsTab(savedActiveTab);
         } else {
@@ -1398,7 +1404,7 @@ window.loadAnsProfiles = async function() {
   };
 
   window.deleteActiveAnsibleFile = async function() {
-      const activeTab = document.querySelector('.ans-tab[style*="display: block"]');
+      const activeTab = document.getElementById(window.currentAnsibleTab) || document.querySelector('.ans-tab:not([style*="display: none"])');
       if (!activeTab || activeTab.id === 'AnsSettings') return;
       const filepath = activeTab.getAttribute('data-filepath');
       if (!filepath) return;

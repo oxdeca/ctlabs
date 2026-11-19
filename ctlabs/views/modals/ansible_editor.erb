@@ -159,7 +159,6 @@
     <div class="w3-bar slim-scroll" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
       <button class="w3-bar-item w3-button ans-tablink w3-text-blue" data-target-tab="AnsSettings" onclick="window.openAnsTab('AnsSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h w3-text-blue"></i> Settings</button>
       <button class="w3-bar-item w3-button ans-tablink w3-text-teal" data-pinned="1" data-target-tab="AnsCommands" onclick="window.openAnsTab('AnsCommands')" style="flex-shrink: 0;"><i class="fas fa-terminal w3-text-teal"></i> Ad-Hoc / Runner</button>
-      <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlaySetup" onclick="window.openAnsTab('AnsPlaySetup')" style="flex-shrink: 0;"><i class="fas fa-layer-group w3-text-teal"></i> Play Setup</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsSetupProfiles" onclick="window.openAnsTab('AnsSetupProfiles')" style="flex-shrink: 0;"><i class="fas fa-server w3-text-orange"></i> Setup Profiles</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlayProfiles" onclick="window.openAnsTab('AnsPlayProfiles')" style="flex-shrink: 0;"><i class="fas fa-tags w3-text-pink"></i> Play Profiles</button>
       <button class="w3-bar-item w3-button w3-text-green w3-hover-text-light-green" onclick="window.openUnifiedBrowser('ansible')" title="Browse Workspace"><i class="fas fa-plus"></i></button>
@@ -167,69 +166,90 @@
 
     <div class="w3-container w3-padding slim-scroll" id="ans-editors-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative;">
 
-      <div id="AnsSettings" class="ans-tab" style="overflow-y: auto; height: 100%;">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 12px;">
+      <div id="AnsSettings" class="ans-tab" style="display: flex; flex-direction: column; height: 100%; min-height: 0; overflow-y: auto;">
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 12px; flex-shrink: 0;">
           <i class="fas fa-info-circle"></i> Playbook settings apply to standard playbook runs. For ad-hoc host targeting and custom scripts, use the <b>Ad-Hoc / Runner</b> tab.
         </div>
 
-        <!-- Workspace Profile Selector -->
-        <div class="w3-margin-bottom w3-padding w3-round" style="background-color: #0f172a; border: 1px solid #334155;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-            <label style="font-size: 0.85em; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">
-              <i class="fas fa-layer-group"></i> Workspace Profile
-            </label>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span id="ans-active-workspace-badge" style="font-size: 0.72em; background: #0369a1; color: #e0f2fe; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-family: monospace;">default</span>
+        <div style="flex-shrink: 0;">
+          <!-- Workspace Profile Selector -->
+          <div class="w3-margin-bottom w3-padding w3-round" style="background-color: #0f172a; border: 1px solid #334155;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+              <label style="font-size: 0.85em; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="fas fa-layer-group"></i> Workspace Profile
+              </label>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span id="ans-active-workspace-badge" style="font-size: 0.72em; background: #0369a1; color: #e0f2fe; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-family: monospace;">default</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <select id="edit-ansible-workspace" class="w3-select w3-small w3-round" style="background-color: #1e293b; color: #f8fafc; border: 1px solid #475569; flex: 1;" onchange="window.onAnsibleWorkspaceChange(this.value)">
+                <option value="default">default</option>
+              </select>
+              <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.promptNewAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Create new workspace profile">
+                <i class="fas fa-plus"></i> New
+              </button>
+              <button type="button" class="w3-button w3-indigo w3-round w3-small" onclick="window.promptCloneAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Clone current workspace profile">
+                <i class="fas fa-clone"></i> Clone
+              </button>
+              <button type="button" id="ans-delete-ws-btn" class="w3-button w3-red w3-round w3-small" onclick="window.promptDeleteAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Delete current workspace profile">
+                <i class="fas fa-trash-alt"></i> Delete
+              </button>
+            </div>
+            <div style="font-size: 0.78em; color: #64748b; margin-top: 6px;">
+              <i class="fas fa-info-circle"></i> Profiles store dedicated settings for repository, playbook, inventory, target host, tags, environment, execution script, and play setup.
             </div>
           </div>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <select id="edit-ansible-workspace" class="w3-select w3-small w3-round" style="background-color: #1e293b; color: #f8fafc; border: 1px solid #475569; flex: 1;" onchange="window.onAnsibleWorkspaceChange(this.value)">
-              <option value="default">default</option>
-            </select>
-            <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.promptNewAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Create new workspace profile">
-              <i class="fas fa-plus"></i> New
-            </button>
-            <button type="button" class="w3-button w3-indigo w3-round w3-small" onclick="window.promptCloneAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Clone current workspace profile">
-              <i class="fas fa-clone"></i> Clone
-            </button>
-            <button type="button" id="ans-delete-ws-btn" class="w3-button w3-red w3-round w3-small" onclick="window.promptDeleteAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Delete current workspace profile">
-              <i class="fas fa-trash-alt"></i> Delete
-            </button>
+
+          <div class="w3-margin-bottom">
+            <label>Repository / Root Directory</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="edit-ansible-root-dir" list="available-ansible-repos" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="/root/ctlabs-ansible" style="flex: 1;">
+              <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.browseAnsibleRootDir()" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;" title="Browse Repository Directory">
+                <i class="fas fa-folder-open"></i> Browse
+              </button>
+            </div>
+            <datalist id="available-ansible-repos"></datalist>
           </div>
-          <div style="font-size: 0.78em; color: #64748b; margin-top: 6px;">
-            <i class="fas fa-info-circle"></i> Profiles store dedicated settings for repository, playbook, inventory, target host, tags, environment, execution script, and play setup.
+
+          <div class="w3-margin-bottom">
+            <label>Playbook File</label>
+            <input type="text" id="edit-ansible-book" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. main.yml">
+          </div>
+
+          <div class="w3-margin-bottom">
+            <label>Inventory Files (List or comma-separated — prefilled with auto-generated inventory)</label>
+            <input type="text" id="edit-ansible-inv" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. controller.ini, custom_hosts.ini">
+          </div>
+
+          <div class="w3-margin-bottom">
+            <label>Tags (Comma separated)</label>
+            <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. setup, web, db">
+          </div>
+
+          <div class="w3-margin-bottom">
+            <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
+            <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 90px; height: 110px; overflow-y: auto; resize: vertical; line-height: 1.4;" rows="4" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='auto'; this.style.height = Math.max(this.scrollHeight + 4, 90) + 'px'"></textarea>
           </div>
         </div>
 
-        <div class="w3-margin-bottom">
-          <label>Repository / Root Directory</label>
-          <div style="display: flex; gap: 8px;">
-            <input type="text" id="edit-ansible-root-dir" list="available-ansible-repos" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="/root/ctlabs-ansible" style="flex: 1;">
-            <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.browseAnsibleRootDir()" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;" title="Browse Repository Directory">
-              <i class="fas fa-folder-open"></i> Browse
-            </button>
+        <!-- Play Setup Overrides -->
+        <div style="margin-top: 10px; display: flex; flex-direction: column; flex: 1; min-height: 200px;">
+          <div style="margin-bottom: 6px; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <label style="font-weight: 600; color: #f8fafc; font-size: 0.9em;">
+                <i class="fas fa-layer-group w3-text-teal"></i> Play Setup Overrides
+                <span style="font-weight: normal; color: #94a3b8; font-size: 0.85em;">(Per-lab <code>play.setup</code> YAML overrides — merges over role/setup profiles per-role)</span>
+              </label>
+              <span style="font-size: 10px; color: #64748b; font-family: monospace;">yaml</span>
+            </div>
+            <div style="font-size: 0.78em; color: #64748b; margin-top: 2px;">
+              <i class="fas fa-info-circle"></i> Supports top-level <code>vars:</code> and <code>{{ VAR }}</code> placeholders. Applied on next playbook run.
+            </div>
           </div>
-          <datalist id="available-ansible-repos"></datalist>
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label>Playbook File</label>
-          <input type="text" id="edit-ansible-book" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. main.yml">
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label>Inventory Files (List or comma-separated — prefilled with auto-generated inventory)</label>
-          <input type="text" id="edit-ansible-inv" class="w3-monospace w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. controller.ini, custom_hosts.ini">
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label>Tags (Comma separated)</label>
-          <input type="text" id="edit-ansible-tags" class="w3-input w3-small w3-round w3-hover-text-light-green" placeholder="e.g. setup, web, db">
-        </div>
-
-        <div class="w3-margin-bottom">
-          <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
-          <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 90px; height: 110px; overflow-y: auto; resize: vertical; line-height: 1.4;" rows="4" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='auto'; this.style.height = Math.max(this.scrollHeight + 4, 90) + 'px'"></textarea>
+          <div style="flex: 1; min-height: 140px; position: relative;">
+            <textarea id="editor-AnsPlaySetup"></textarea>
+          </div>
         </div>
       </div>
 
@@ -303,14 +323,7 @@
         </div>
       </div>
 
-      <div id="AnsPlaySetup" class="ans-tab" style="display: none; height: 100%; flex-direction: column;">
-        <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 8px; flex: none;">
-          <i class="fas fa-info-circle"></i> Per-lab <code>play.setup</code> overrides (from <code>play:</code> in this lab's YAML) — merges over role/setup profiles per-role. Supports <code>vars:</code> and <code>{{ VAR }}</code> expansions. Applied on next playbook run.
-        </div>
-        <div style="flex: 1; min-height: 0; position: relative;">
-          <textarea id="editor-AnsPlaySetup"></textarea>
-        </div>
-      </div>
+
 
       <div id="AnsSetupProfiles" class="ans-tab" style="display: none; height: 100%; flex-direction: column;">
         <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 8px; flex: none;">

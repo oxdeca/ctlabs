@@ -80,18 +80,26 @@ window.updateAnsibleVimStatus = function(e) {
 
     const prefs = window.AnsEditorPrefs.get();
     const activeTab = window.currentAnsibleTab || '';
-    const isEditorTab = activeTab && activeTab !== 'AnsSettings';
+    const isPlaySetupFocused = activeTab === 'AnsSettings' && window.cmEditors['editor-AnsPlaySetup'] && window.cmEditors['editor-AnsPlaySetup'].hasFocus();
+    const isEditorTab = (activeTab && activeTab !== 'AnsSettings') || isPlaySetupFocused;
 
+    const prevDisplay = bar.style.display;
     if (!prefs.vim || !isEditorTab) {
         bar.style.display = 'none';
+        if (prevDisplay !== 'none' && activeTab === 'AnsSettings' && window.cmEditors['editor-AnsPlaySetup']) {
+            setTimeout(() => window.cmEditors['editor-AnsPlaySetup'].refresh(), 20);
+        }
         return;
     }
     bar.style.display = 'flex';
+    if (prevDisplay !== 'flex' && activeTab === 'AnsSettings' && window.cmEditors['editor-AnsPlaySetup']) {
+        setTimeout(() => window.cmEditors['editor-AnsPlaySetup'].refresh(), 20);
+    }
 
     let mode = e ? e.mode : null;
     let subMode = e ? e.subMode : '';
     if (!mode) {
-        const taId = (activeTab === 'AnsCommands') ? 'edit-ansible-commands' : 'editor-' + activeTab;
+        const taId = (activeTab === 'AnsCommands') ? 'edit-ansible-commands' : (activeTab === 'AnsSettings' ? 'editor-AnsPlaySetup' : 'editor-' + activeTab);
         const ed = (activeTab && (window.cmEditors[taId] || window.cmEditors['editor-' + activeTab])) || null;
         if (ed && ed.state && ed.state.vim) {
             const vState = ed.state.vim;
