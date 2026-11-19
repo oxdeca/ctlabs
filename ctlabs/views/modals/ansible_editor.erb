@@ -91,26 +91,66 @@
       <span onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round">&times;</span>
       <div style="display: flex; align-items: center; justify-content: space-between; margin-right: 48px;">
         <h4 style="margin: 0; font-weight: 600;"><i class="fas fa-magic w3-text-purple"></i> Configure Ansible Playbook</h4>
-        <div id="ans-settings-wrapper" style="position: relative; display: inline-block;">
-          <button type="button" id="ans-settings-btn" onclick="window.toggleAnsibleSettingsMenu()" title="Editor settings (Wrap, Vim)" style="height: 28px; width: 28px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-            <i class="fas fa-cog" style="color: #94a3b8;"></i>
-          </button>
-          <div id="ans-settings-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
-            <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
-              Editor Settings
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <!-- Git Actions Menu -->
+          <div id="ans-git-wrapper" style="position: relative; display: inline-block;">
+            <button type="button" id="ans-git-btn" onclick="window.toggleAnsibleGitMenu()" title="Git Repository Actions" style="height: 28px; padding: 0 10px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 0.82em; font-weight: 500; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+              <i class="fas fa-code-branch" style="color: #10b981;"></i>
+              <span id="ans-git-branch-label">main</span>
+              <span id="ans-git-dirty-badge" style="display: none; width: 7px; height: 7px; border-radius: 50%; background-color: #f59e0b;" title="Uncommitted changes"></span>
+              <i class="fas fa-caret-down" style="font-size: 0.75em; opacity: 0.7;"></i>
+            </button>
+            <div id="ans-git-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+              <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+                <span>Git Repository</span>
+                <span id="ans-git-status-summary" style="font-size: 0.9em; text-transform: none; color: #38bdf8;">clean</span>
+              </div>
+              <button type="button" onclick="window.fetchAnsibleGitStatus(true)" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-sync-alt" style="color: #38bdf8; width: 14px; text-align: center;"></i> Refresh status
+              </button>
+              <button type="button" onclick="window.openAnsibleGitCommitModal()" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-check" style="color: #22c55e; width: 14px; text-align: center;"></i> Commit changes
+                </span>
+                <span id="ans-git-commit-count" style="display: none; background: #eab308; color: #0f172a; padding: 0 5px; border-radius: 10px; font-size: 0.75em; font-weight: 700;"></span>
+              </button>
+              <button type="button" onclick="window.ansibleGitPull()" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-arrow-down" style="color: #a855f7; width: 14px; text-align: center;"></i> Pull (rebase)
+              </button>
+              <button type="button" onclick="window.ansibleGitPush()" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-arrow-up" style="color: #ec4899; width: 14px; text-align: center;"></i> Push
+              </button>
+              <button type="button" onclick="window.openAnsibleGitBranchModal()" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-code-branch" style="color: #10b981; width: 14px; text-align: center;"></i> Switch branch
+              </button>
+              <button type="button" onclick="window.openAnsibleGitHistoryModal()" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-history" style="color: #eab308; width: 14px; text-align: center;"></i> History &amp; diffs
+              </button>
             </div>
-            <label id="ans-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-              <span style="display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap lines
-              </span>
-              <input type="checkbox" id="ans-setting-wrap-checkbox" onchange="window.setAnsibleEditorPref('wrap', this.checked)" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
-            </label>
-            <label id="ans-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-              <span style="display: flex; align-items: center; gap: 8px;">
-                <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
-              </span>
-              <input type="checkbox" id="ans-setting-vim-checkbox" onchange="window.setAnsibleEditorPref('vim', this.checked)" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
-            </label>
+          </div>
+
+          <!-- Settings Wrapper -->
+          <div id="ans-settings-wrapper" style="position: relative; display: inline-block;">
+            <button type="button" id="ans-settings-btn" onclick="window.toggleAnsibleSettingsMenu()" title="Editor settings (Wrap, Vim)" style="height: 28px; width: 28px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+              <i class="fas fa-cog" style="color: #94a3b8;"></i>
+            </button>
+            <div id="ans-settings-menu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+              <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                Editor Settings
+              </div>
+              <label id="ans-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap lines
+                </span>
+                <input type="checkbox" id="ans-setting-wrap-checkbox" onchange="window.setAnsibleEditorPref('wrap', this.checked)" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+              </label>
+              <label id="ans-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                <span style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
+                </span>
+                <input type="checkbox" id="ans-setting-vim-checkbox" onchange="window.setAnsibleEditorPref('vim', this.checked)" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
+              </label>
+            </div>
           </div>
         </div>
       </div>
@@ -118,6 +158,7 @@
 
     <div class="w3-bar slim-scroll" id="ans-tab-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex; overflow-x: auto; flex-shrink: 0;">
       <button class="w3-bar-item w3-button ans-tablink w3-text-blue" data-target-tab="AnsSettings" onclick="window.openAnsTab('AnsSettings')" style="flex-shrink: 0; background-color: #1e293b; border-bottom: 2px solid #38bdf8;"><i class="fas fa-sliders-h w3-text-blue"></i> Settings</button>
+      <button class="w3-bar-item w3-button ans-tablink w3-text-teal" data-pinned="1" data-target-tab="AnsCommands" onclick="window.openAnsTab('AnsCommands')" style="flex-shrink: 0;"><i class="fas fa-terminal w3-text-teal"></i> Ad-Hoc / Runner</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlaySetup" onclick="window.openAnsTab('AnsPlaySetup')" style="flex-shrink: 0;"><i class="fas fa-layer-group w3-text-teal"></i> Play Setup</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsSetupProfiles" onclick="window.openAnsTab('AnsSetupProfiles')" style="flex-shrink: 0;"><i class="fas fa-server w3-text-orange"></i> Setup Profiles</button>
       <button class="w3-bar-item w3-button ans-tablink" data-pinned="1" data-target-tab="AnsPlayProfiles" onclick="window.openAnsTab('AnsPlayProfiles')" style="flex-shrink: 0;"><i class="fas fa-tags w3-text-pink"></i> Play Profiles</button>
@@ -127,8 +168,37 @@
     <div class="w3-container w3-padding slim-scroll" id="ans-editors-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; position: relative;">
 
       <div id="AnsSettings" class="ans-tab" style="overflow-y: auto; height: 100%;">
-        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0;">
-          <i class="fas fa-info-circle"></i> Edits to the playbook configuration apply to the current run.
+        <div class="w3-panel w3-pale-yellow w3-leftbar w3-border-yellow w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 12px;">
+          <i class="fas fa-info-circle"></i> Playbook settings apply to standard playbook runs. For ad-hoc host targeting and custom scripts, use the <b>Ad-Hoc / Runner</b> tab.
+        </div>
+
+        <!-- Workspace Profile Selector -->
+        <div class="w3-margin-bottom w3-padding w3-round" style="background-color: #0f172a; border: 1px solid #334155;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label style="font-size: 0.85em; font-weight: 600; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">
+              <i class="fas fa-layer-group"></i> Workspace Profile
+            </label>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="ans-active-workspace-badge" style="font-size: 0.72em; background: #0369a1; color: #e0f2fe; padding: 2px 8px; border-radius: 12px; font-weight: 600; font-family: monospace;">default</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <select id="edit-ansible-workspace" class="w3-select w3-small w3-round" style="background-color: #1e293b; color: #f8fafc; border: 1px solid #475569; flex: 1;" onchange="window.onAnsibleWorkspaceChange(this.value)">
+              <option value="default">default</option>
+            </select>
+            <button type="button" class="w3-button w3-blue w3-round w3-small" onclick="window.promptNewAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Create new workspace profile">
+              <i class="fas fa-plus"></i> New
+            </button>
+            <button type="button" class="w3-button w3-indigo w3-round w3-small" onclick="window.promptCloneAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Clone current workspace profile">
+              <i class="fas fa-clone"></i> Clone
+            </button>
+            <button type="button" id="ans-delete-ws-btn" class="w3-button w3-red w3-round w3-small" onclick="window.promptDeleteAnsibleWorkspace()" style="padding: 4px 10px; font-size: 0.82em; white-space: nowrap;" title="Delete current workspace profile">
+              <i class="fas fa-trash-alt"></i> Delete
+            </button>
+          </div>
+          <div style="font-size: 0.78em; color: #64748b; margin-top: 6px;">
+            <i class="fas fa-info-circle"></i> Profiles store dedicated settings for repository, playbook, inventory, target host, tags, environment, execution script, and play setup.
+          </div>
         </div>
 
         <div class="w3-margin-bottom">
@@ -160,6 +230,76 @@
         <div class="w3-margin-bottom">
           <label>Environment & Profile Variables (One per line — passed to Ansible <code>-e</code> and expanded as <code>{{ VAR }}</code> in profiles)</label>
           <textarea id="edit-ansible-env" class="w3-input w3-small w3-round w3-hover-text-light-green slim-scroll" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569; font-family: monospace; min-height: 90px; height: 110px; overflow-y: auto; resize: vertical; line-height: 1.4;" rows="4" placeholder="CTLABS_HOST=192.168.1.100&#10;APP_ENV=production&#10;DEBUG=true" oninput="this.style.height='auto'; this.style.height = Math.max(this.scrollHeight + 4, 90) + 'px'"></textarea>
+        </div>
+      </div>
+
+      <div id="AnsCommands" class="ans-tab" style="display: none; height: 100%; flex-direction: column;">
+        <div class="w3-panel w3-pale-blue w3-leftbar w3-border-blue w3-small w3-text-black" style="padding: 8px; margin-top: 0; margin-bottom: 8px; flex: none;">
+          <i class="fas fa-info-circle"></i> Configure ad-hoc target host limit, extra CLI arguments, and custom execution scripts to run against specific hosts or override the standard playbook. Output streams below in real-time.
+        </div>
+
+        <div class="w3-row-padding" style="margin: 0 -4px 6px -4px; flex: none;">
+          <div class="w3-quarter" style="padding: 0 4px;">
+            <label style="font-size: 11px; color: #94a3b8; font-weight: 600;"><i class="fas fa-file-invoice w3-text-blue"></i> Inventory (-i)</label>
+            <input type="text" id="edit-ansible-adhoc-inv" class="w3-monospace w3-input w3-small w3-round" placeholder="e.g. net01.ini" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 2px;">
+          </div>
+          <div class="w3-quarter" style="padding: 0 4px;">
+            <label style="font-size: 11px; color: #94a3b8; font-weight: 600;"><i class="fas fa-bullseye w3-text-teal"></i> Target Host (-l)</label>
+            <input type="text" id="edit-ansible-limit" list="available-ansible-hosts" class="w3-monospace w3-input w3-small w3-round" placeholder="e.g. h4, all" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 2px;">
+            <datalist id="available-ansible-hosts"></datalist>
+          </div>
+          <div class="w3-quarter" style="padding: 0 4px;">
+            <label style="font-size: 11px; color: #94a3b8; font-weight: 600;"><i class="fas fa-tags w3-text-pink"></i> Ad-Hoc Tags (-t)</label>
+            <input type="text" id="edit-ansible-adhoc-tags" class="w3-monospace w3-input w3-small w3-round" placeholder="e.g. setup, ping" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 2px;">
+          </div>
+          <div class="w3-quarter" style="padding: 0 4px;">
+            <label style="font-size: 11px; color: #94a3b8; font-weight: 600;"><i class="fas fa-terminal w3-text-orange"></i> Extra Args</label>
+            <input type="text" id="edit-ansible-extra-args" class="w3-monospace w3-input w3-small w3-round" placeholder="e.g. -vvv --check" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 2px;">
+          </div>
+        </div>
+
+        <!-- Custom Execution Script / Commands Container -->
+        <div id="ans-adhoc-script-container" style="flex: 1; min-height: 80px; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 2px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; flex: none;">
+            <label style="font-size: 11px; color: #94a3b8; font-weight: 600;"><i class="fas fa-code"></i> Custom Execution Script / Commands <span style="font-weight: normal; color: #64748b;">(Optional: overrides playbook command)</span></label>
+            <span style="font-size: 10px; color: #64748b; font-family: monospace;">bash / shell</span>
+          </div>
+          <div style="flex: 1; min-height: 50px; position: relative;">
+            <textarea id="edit-ansible-commands"></textarea>
+          </div>
+        </div>
+
+        <!-- Draggable Horizontal Splitter / Resizer -->
+        <div id="ans-adhoc-drag-resizer" title="Drag to resize script editor and output console" style="height: 10px; cursor: row-resize; background-color: #1e293b; border-top: 1px solid #334155; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: center; flex: none; user-select: none; margin: 3px 0; border-radius: 2px;">
+          <div style="width: 40px; height: 3px; background-color: #64748b; border-radius: 2px;"></div>
+        </div>
+
+        <!-- Integrated In-Modal Output Console Container -->
+        <div id="ans-adhoc-console-container" style="height: 210px; min-height: 80px; display: flex; flex-direction: column; background: #0b1120; border: 1px solid #334155; border-radius: 6px; overflow: hidden; flex: none;">
+          <div style="padding: 4px 10px; background: #0f172a; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">
+                <i class="fas fa-terminal w3-text-teal"></i> Output Console
+              </span>
+              <span id="ans-modal-adhoc-status" class="w3-badge w3-tiny w3-round w3-dark-grey" style="font-family: monospace;">Idle</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span id="ans-modal-scroll-status" style="font-size: 10px; color: #64748b;"></span>
+              <button type="button" id="ans-modal-run-adhoc-btn" onclick="window.runAnsibleAdhocModal()" class="w3-button w3-teal w3-round w3-tiny" style="padding: 2px 8px; font-weight: 600;" title="Run ad-hoc execution">
+                <i class="fas fa-play"></i> Run Ad-Hoc
+              </button>
+              <button type="button" id="ans-modal-stop-adhoc-btn" onclick="window.stopAnsiblePlaybookModal()" class="w3-button w3-red w3-round w3-tiny" style="padding: 2px 8px; font-weight: 600; display: none;" title="Stop active execution">
+                <i class="fas fa-stop"></i> Stop
+              </button>
+              <button type="button" onclick="window.clearAnsibleModalOutput()" class="w3-button w3-dark-grey w3-round w3-tiny" style="padding: 2px 8px;" title="Clear console">
+                <i class="fas fa-eraser"></i> Clear
+              </button>
+              <a id="ans-modal-full-log-link" href="/logs/current" target="_blank" class="w3-button w3-dark-grey w3-round w3-tiny" style="padding: 2px 8px; color: #38bdf8;" title="Open full log in new tab">
+                <i class="fas fa-external-link-alt"></i>
+              </a>
+            </div>
+          </div>
+          <pre id="ans-modal-adhoc-output" class="log-terminal slim-scroll" style="flex: 1; margin: 0; padding: 8px 12px; font-family: monospace; font-size: 11px; line-height: 1.4; color: #f8fafc; overflow-y: auto; white-space: pre-wrap; word-break: break-all; background: #0b1120;"></pre>
         </div>
       </div>
 
@@ -201,18 +341,20 @@
       <span style="color: #64748b; font-size: 0.88em;">:w save &bull; :wq save &amp; close &bull; :q close &bull; Esc normal mode</span>
     </div>
 
-    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; flex-shrink: 0;">
+    <footer style="padding: 12px 20px; border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; width: 100%; box-sizing: border-box;">
       <div>
         <button type="button" id="ans-delete-file-btn" onclick="window.deleteActiveAnsibleFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
       </div>
-      <div>
+      <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
         <button type="button" onclick="document.getElementById('ansible-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
         <button type="button" id="ans-save-btn" onclick="window.saveAnsibleConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
+        <button type="button" id="ans-run-btn" onclick="window.saveAndRunAnsible()" class="w3-button w3-blue w3-round w3-small" title="Save configuration and run playbook/script now"><i class="fas fa-play"></i> Run Now</button>
       </div>
     </footer>
   </div>
 </div>
 
+<!-- File Browser Modal -->
 <div id="ans-file-browser-modal" class="w3-modal" style="z-index: 10000; padding-top: 15vh;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px;">
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
@@ -227,6 +369,114 @@
     <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
       <button onclick="document.getElementById('ans-file-browser-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
       <button onclick="window.confirmAnsibleFileBrowser()" class="w3-button w3-blue w3-round w3-small">Open File</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Git Commit Modal -->
+<div id="ans-git-commit-modal" class="w3-modal" style="z-index: 10001; padding-top: 15vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 540px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('ans-git-commit-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-check-circle w3-text-green"></i> Commit Changes to Git</h4>
+    </header>
+    <div class="w3-container w3-padding">
+      <div id="ans-git-commit-status-preview" style="margin-bottom: 12px; font-size: 0.82em; font-family: monospace; background: #0f172a; padding: 8px 12px; border-radius: 4px; border: 1px solid #334155; max-height: 120px; overflow-y: auto;">
+        Checking status...
+      </div>
+      <label style="font-size: 0.85em; color: #94a3b8;">Commit Message</label>
+      <input type="text" id="ans-git-commit-message" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 4px;" placeholder="e.g. Add inventory node and update playbook tags">
+    </div>
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button onclick="document.getElementById('ans-git-commit-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button id="ans-git-commit-submit-btn" onclick="window.confirmAnsibleGitCommit()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-check"></i> Commit</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Git History Modal with Split-View Diff Inspector -->
+<div id="ans-git-history-modal" class="w3-modal" style="z-index: 10002; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: 1100px; height: 88vh; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
+    <header style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none; position: relative;">
+      <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <i class="fas fa-history w3-text-amber"></i> Version History &amp; Diffs (Git)
+        <span id="ans-git-history-branch-badge" style="font-size: 0.75em; background: #334155; color: #cbd5e1; padding: 2px 8px; border-radius: 12px; font-weight: 400; font-family: monospace;">branch: main</span>
+        <span id="ans-git-history-working-badge" style="display: none; font-size: 0.72em; background: #78350f; color: #fde68a; padding: 2px 8px; border-radius: 12px; font-weight: 500;">
+          <i class="fas fa-pencil-alt" style="margin-right: 3px;"></i> Uncommitted
+        </span>
+      </h3>
+      <span onclick="document.getElementById('ans-git-history-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+    </header>
+
+    <!-- Quick Action / Refresh Bar -->
+    <div style="background: #131d31; padding: 8px 18px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" onclick="window.loadAnsibleGitHistory()" class="w3-button w3-round w3-small" style="background: #334155; color: #cbd5e1; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;" title="Refresh history & working tree status">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+        <button type="button" onclick="document.getElementById('ans-git-history-modal').style.display='none'; window.openAnsibleGitCommitModal();" class="w3-button w3-round w3-small" style="background: #10b981; color: #ffffff; padding: 5px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+          <i class="fas fa-check"></i> Commit Changes
+        </button>
+      </div>
+      <div style="font-size: 0.82em; color: #94a3b8; font-family: monospace;" id="ans-git-history-repo-label">
+        /root/ctlabs-ansible
+      </div>
+    </div>
+
+    <!-- Body: Commits List & Diff Inspector (Split View) -->
+    <div style="display: flex; flex: 1; min-height: 0; overflow: hidden;">
+      <!-- Left: Commits List -->
+      <div style="width: 380px; flex: none; border-right: 1px solid #334155; display: flex; flex-direction: column; background: #0f172a;">
+        <div style="padding: 8px 14px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 0.78em; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; display: flex; justify-content: space-between; align-items: center;">
+          <span>Revisions Log</span>
+          <span id="ans-git-commits-count" style="font-size: 0.85em; text-transform: none; color: #38bdf8;"></span>
+        </div>
+        <div id="ans-git-history-list" class="slim-scroll" style="flex: 1; overflow-y: auto; padding: 6px 8px; display: flex; flex-direction: column; gap: 6px;">
+          <div style="color: #64748b; font-size: 0.85em; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading revisions...</div>
+        </div>
+      </div>
+
+      <!-- Right: Diff Inspector -->
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #1e293b;">
+        <div id="ans-git-diff-header" style="padding: 10px 16px; border-bottom: 1px solid #334155; background: #131d31; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: none;">
+          <div>
+            <span id="ans-git-diff-title" style="font-weight: 600; color: #f8fafc; font-size: 0.92em;">Select a revision to view diff</span>
+            <div id="ans-git-diff-meta" style="color: #94a3b8; font-size: 0.78em; margin-top: 2px;"></div>
+          </div>
+        </div>
+        <div id="ans-git-diff-body" class="slim-scroll" style="flex: 1; overflow: auto; padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.82em; line-height: 1.45; white-space: pre-wrap; color: #cbd5e1; background: #0b1120;">
+          <span style="color: #64748b;">Select a commit from the list on the left to inspect file changes and unified diffs.</span>
+        </div>
+      </div>
+    </div>
+
+    <footer style="padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: flex-end; align-items: center; flex: none;">
+      <button type="button" onclick="document.getElementById('ans-git-history-modal').style.display='none'" class="w3-button w3-round w3-small" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
+    </footer>
+  </div>
+</div>
+
+<!-- Git Branch Modal -->
+<div id="ans-git-branch-modal" class="w3-modal" style="z-index: 10001; padding-top: 15vh;">
+  <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 520px;">
+    <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
+      <span onclick="document.getElementById('ans-git-branch-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
+      <h4 style="margin: 0;"><i class="fas fa-code-branch w3-text-teal"></i> Switch or Create Branch</h4>
+    </header>
+    <div class="w3-container w3-padding">
+      <div class="w3-margin-bottom">
+        <label style="font-size: 0.85em; color: #94a3b8;">Existing Branches</label>
+        <select id="ans-git-branch-select" class="w3-select w3-small w3-round" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 4px;">
+        </select>
+      </div>
+      <div class="w3-margin-bottom">
+        <label style="font-size: 0.85em; color: #94a3b8;">Or Create New Branch</label>
+        <input type="text" id="ans-git-new-branch-name" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #f8fafc; border: 1px solid #475569; margin-top: 4px;" placeholder="e.g. feature-ospf-setup">
+      </div>
+    </div>
+    <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; display: flex; justify-content: flex-end; gap: 8px;">
+      <button onclick="document.getElementById('ans-git-branch-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
+      <button onclick="window.confirmAnsibleGitBranch()" class="w3-button w3-teal w3-round w3-small"><i class="fas fa-exchange-alt"></i> Checkout Branch</button>
     </footer>
   </div>
 </div>

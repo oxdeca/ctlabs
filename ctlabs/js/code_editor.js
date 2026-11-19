@@ -54,7 +54,7 @@ if (typeof CodeMirror.defineSimpleMode === 'function') {
 
 // --- ANSIBLE EDITOR PREFERENCES (vim / line wrap) ---
 window.isAnsibleEditorId = function(id) {
-    return /^editor-(Ans|ans-tab-)/.test(id || '');
+    return /^(editor-(Ans|ans-tab-)|edit-ansible-commands)/.test(id || '');
 };
 
 window.AnsEditorPrefs = {
@@ -91,7 +91,8 @@ window.updateAnsibleVimStatus = function(e) {
     let mode = e ? e.mode : null;
     let subMode = e ? e.subMode : '';
     if (!mode) {
-        const ed = (activeTab && window.cmEditors['editor-' + activeTab]) || null;
+        const taId = (activeTab === 'AnsCommands') ? 'edit-ansible-commands' : 'editor-' + activeTab;
+        const ed = (activeTab && (window.cmEditors[taId] || window.cmEditors['editor-' + activeTab])) || null;
         if (ed && ed.state && ed.state.vim) {
             const vState = ed.state.vim;
             if (vState.insertMode) mode = 'insert';

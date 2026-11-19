@@ -119,7 +119,7 @@ class ControllerController < BaseController
     begin
       play      = Controller.controller_play
       setup_yaml = (play['setup'] || {}).to_yaml.sub(/\A---\s*\n/, '')
-      { json: { play: play, setup_yaml: setup_yaml } }.to_json
+      { json: { play: play, setup_yaml: setup_yaml, hosts: ['ctl-ctrl', 'localhost'] } }.to_json
     rescue => e
       status 400
       { error: e.message }.to_json
@@ -174,38 +174,68 @@ class ControllerController < BaseController
       play_cfg = Controller.controller_play
       play_cfg = {} unless play_cfg.is_a?(Hash)
 
-      params[:root_dir].to_s.strip.empty? ? play_cfg.delete('root_dir') : play_cfg['root_dir'] = params[:root_dir].strip
-      params[:book].to_s.strip.empty? ? play_cfg.delete('book') : play_cfg['book'] = params[:book].strip
+      # Workspaces support
+      if params[:workspaces] && !params[:workspaces].to_s.strip.empty?
+        begin
+          parsed_ws = JSON.parse(params[:workspaces])
+          play_cfg['workspaces'] = parsed_ws if parsed_ws.is_a?(Hash)
+        rescue => _e
+        end
+      end
+
+      active_ws = params[:workspace].to_s.strip
+      active_ws = 'default' if active_ws.empty?
+      play_cfg['workspace'] = active_ws
+
+      play_cfg['workspaces'] ||= {}
+      play_cfg['workspaces'][active_ws] ||= {}
+      ws_obj = play_cfg['workspaces'][active_ws]
+
+      params[:root_dir].to_s.strip.empty? ? ws_obj.delete('root_dir') : ws_obj['root_dir'] = params[:root_dir].strip
+      params[:book].to_s.strip.empty? ? ws_obj.delete('book') : ws_obj['book'] = params[:book].strip
 
       if params[:inv] && !params[:inv].to_s.strip.empty?
         inv_list = params[:inv].to_s.split(/[,\n]+/).map(&:strip).reject(&:empty?)
-        play_cfg['inv'] = inv_list.length > 1 ? inv_list : (inv_list.first || '')
+        ws_obj['inv'] = inv_list.length > 1 ? inv_list : (inv_list.first || '')
       else
-        play_cfg.delete('inv')
+        ws_obj.delete('inv')
       end
 
       if params[:custom_inv] && !params[:custom_inv].to_s.strip.empty?
-        play_cfg['custom_inv'] = params[:custom_inv].to_s.strip
+        ws_obj['custom_inv'] = params[:custom_inv].to_s.strip
       else
-        play_cfg.delete('custom_inv')
+        ws_obj.delete('custom_inv')
       end
 
+      params[:limit].to_s.strip.empty? ? ws_obj.delete('limit') : ws_obj['limit'] = params[:limit].strip
+      params[:extra_args].to_s.strip.empty? ? ws_obj.delete('extra_args') : ws_obj['extra_args'] = params[:extra_args].strip
+      params[:commands].to_s.strip.empty? ? ws_obj.delete('commands') : ws_obj['commands'] = params[:commands].strip
+
       env_str = params[:env].to_s.strip
-      env_str.empty? ? play_cfg.delete('env') : play_cfg['env'] = env_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
+      env_str.empty? ? ws_obj.delete('env') : ws_obj['env'] = env_str.split(/\r?\n/).map(&:strip).reject(&:empty?)
 
       if params[:tags] && !params[:tags].to_s.strip.empty?
-        play_cfg['tags'] = params[:tags].to_s.split(',').map(&:strip).reject(&:empty?)
+        ws_obj['tags'] = params[:tags].to_s.split(',').map(&:strip).reject(&:empty?)
       else
-        play_cfg.delete('tags')
+        ws_obj.delete('tags')
       end
 
       setup_str = params[:setup].to_s.strip
       if setup_str.empty?
-        play_cfg.delete('setup')
+        ws_obj.delete('setup')
       else
         parsed = YAML.safe_load(setup_str, aliases: true)
         raise 'must be a mapping of role -> config' unless parsed.is_a?(Hash)
-        play_cfg['setup'] = parsed
+        ws_obj['setup'] = parsed
+      end
+
+      # Mirror active workspace keys to top level of play_cfg for backwards compatibility
+      ['root_dir', 'book', 'inv', 'custom_inv', 'tags', 'limit', 'extra_args', 'env', 'commands', 'setup'].each do |k|
+        if ws_obj.key?(k)
+          play_cfg[k] = ws_obj[k]
+        else
+          play_cfg.delete(k)
+        end
       end
 
       Controller.update_controller_play(play_cfg)
@@ -225,21 +255,110 @@ class ControllerController < BaseController
     end
   end
 
+  # =========================================================================
+  # GIT OPERATIONS FOR CONTROLLER ANSIBLE REPOSITORY
+  # =========================================================================
+
+  get '/controller/ansible/git/status' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    AutomationService.git_status(root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+  end
+
+  post '/controller/ansible/git/commit' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    message = params[:message].to_s.strip
+    AutomationService.git_commit(message, root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+  end
+
+  post '/controller/ansible/git/pull' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    AutomationService.git_pull(root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+  end
+
+  post '/controller/ansible/git/push' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    AutomationService.git_push(root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+  end
+
+  get '/controller/ansible/git/history' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    limit = (params[:limit] || 30).to_i
+    AutomationService.git_history(root_dir.empty? ? nil : root_dir, limit: limit, container: controller_container).to_json
+  end
+
+  get '/controller/ansible/git/branches' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    AutomationService.git_branches(root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+  end
+
+  post '/controller/ansible/git/branch' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    branch = params[:branch].to_s.strip
+    create = params[:create] == 'true' || params[:create] == true
+    AutomationService.git_checkout(branch, root_dir.empty? ? nil : root_dir, create: create, container: controller_container).to_json
+  end
+
+  get '/controller/ansible/git/diff/:hash' do
+    content_type :json
+    root_dir = params[:root_dir].to_s.strip
+    hash = params[:hash].to_s.strip
+    if hash == 'working' || hash == 'workdir'
+      AutomationService.git_diff_working(root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+    else
+      AutomationService.git_diff(hash, root_dir.empty? ? nil : root_dir, container: controller_container).to_json
+    end
+  end
+
   post '/controller/playbook' do
     content_type :json
     halt 400, { error: 'Controller is not running. Start it with ctlabs.rb --controller=up' }.to_json unless Controller.running?
     halt 400, { error: 'Playbook already running for the controller' }.to_json if Automation.playbook_running?(controller_lab_name)
 
     log_path = LabLog.for_lab(lab_name: 'controller', action: 'run').path
+    initial_offset = (log_path && File.file?(log_path)) ? File.size(log_path) : 0
+    playbook_lock = Automation.acquire_playbook_lock!(controller_lab_name)
+
     Thread.new do
       begin
         controller = Controller.new(log: LabLog.append_to(log_path))
-        controller.lab.run_playbook(nil, log_path)
+        overrides = {}
+        overrides['workspace']  = params[:workspace].strip if params[:workspace] && !params[:workspace].to_s.strip.empty?
+        overrides['inv']        = params[:inv].strip if params[:inv] && !params[:inv].to_s.strip.empty?
+        overrides['limit']      = params[:limit].to_s.strip if params.key?(:limit)
+        if params.key?(:tags)
+          overrides['tags']     = params[:tags].to_s.split(',').map(&:strip).reject(&:empty?)
+        end
+        overrides['book']       = params[:book].strip if params[:book] && !params[:book].to_s.strip.empty?
+        overrides['commands']   = params[:commands].to_s.strip if params.key?(:commands)
+        overrides['extra_args'] = params[:extra_args].to_s.strip if params.key?(:extra_args)
+
+        run_arg = overrides.empty? ? nil : overrides
+        trigger_label = (overrides['commands'] || overrides['limit'] || overrides['inv'] || overrides['tags']) ? "Manual Controller Ansible ad-hoc execution triggered" : "Manual Controller Ansible playbook run triggered"
+        File.open(log_path, 'a') { |f| f.puts "\n--- #{trigger_label} ---\n" }
+        controller.lab.run_playbook(run_arg, log_path, lock: playbook_lock)
       rescue => e
         File.open(log_path, 'a') { |f| f.puts "\n⚠️ Controller playbook failed: #{e.message}\n" }
+      ensure
+        Automation.release_playbook_lock!(playbook_lock)
       end
     end
-    { success: true, log_url: "/logs?id=#{register_log(log_path)}" }.to_json
+    log_id = register_log(log_path) if log_path
+    { success: true, log_id: log_id, offset: initial_offset, log_url: (log_id ? "/logs?id=#{log_id}" : "/logs/current") }.to_json
+  end
+
+  get '/controller/playbook/status' do
+    running = Controller.playbook_running? rescue false
+    log_path = Controller.latest_playbook_log rescue nil
+    log_id = log_path ? register_log(log_path) : nil
+    content_type :json
+    { running: running, log_id: log_id }.to_json
   end
 
   post '/controller/playbook/stop' do

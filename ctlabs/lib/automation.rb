@@ -1269,7 +1269,7 @@ module Automation
     @log.write "#{__method__}(): wrote #{out_path} (template: #{tpl_path})", "debug"
   end
 
-  def run_playbook(play = nil, log_file_path = nil)
+  def run_playbook(play = nil, log_file_path = nil, lock: nil)
     @log.write "#{__method__}(): play=#{play.inspect}, log_file_path=#{log_file_path}", "debug"
 
     # VALIDATION: Lab must be running. The persistent controller is its own
@@ -1279,9 +1279,8 @@ module Automation
     end
 
     # ACQUIRE PLAYBOOK LOCK (prevents concurrent execution)
-    playbook_lock = nil
+    playbook_lock = lock || Automation.acquire_playbook_lock!(@relative_path)
     begin
-      playbook_lock = Automation.acquire_playbook_lock!(@relative_path)
 
       # A workload lab runs on its in-lab `ansible` node; the standalone
       # controller topology (ctl-ctrl) has no `ansible` node, so fall back to
@@ -1289,7 +1288,20 @@ module Automation
       ctrl = find_node('ansible') || @nodes.find { |n| n.type.to_s == 'controller' }
       raise "No 'ansible' controller node found in topology" if ctrl.nil?
 
-      play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
+      raw_play_cfg = ctrl.play.is_a?(Hash) ? ctrl.play : {}
+      play_cfg = Marshal.load(Marshal.dump(raw_play_cfg))
+
+      # Resolve active workspace profile if workspaces are defined
+      active_ws = (play.is_a?(Hash) && play['workspace']) || play_cfg['workspace'] || 'default'
+      if play_cfg['workspaces'].is_a?(Hash) && play_cfg['workspaces'][active_ws].is_a?(Hash)
+        ws_cfg = play_cfg['workspaces'][active_ws]
+        ['root_dir', 'root_dir_ctl', 'book', 'inv', 'custom_inv', 'tags', 'limit', 'hosts', 'extra_args', 'env', 'commands', 'setup'].each do |k|
+          play_cfg[k] = ws_cfg[k] if ws_cfg.key?(k)
+        end
+      end
+
+      # Runtime invocation overrides take precedence over both base play_cfg and workspace profile
+      play_cfg = play_cfg.merge(play) if play.is_a?(Hash)
 
       ans_base_host = play_cfg['root_dir'].to_s.strip.empty? ? ANSIBLE_DIR : play_cfg['root_dir'].to_s.strip
       ans_base_ctl  = if play_cfg['root_dir_ctl'].to_s.strip != ''
@@ -1328,8 +1340,27 @@ module Automation
       domain   = vars_map['CTLABS_DOMAIN'] || (@cfg['domain'] || @domain)
       host_ip  = vars_map['CTLABS_HOST'] || @server_ip
 
-      # Determine playbook command
-      if play.is_a?(String) && !play.strip.empty?
+      custom_script = play_cfg['commands'].to_s.strip
+
+      inv_raw = play_cfg['inv']
+      inv_first = if inv_raw.is_a?(Array)
+                    inv_raw.first
+                  elsif inv_raw.is_a?(String) && !inv_raw.strip.empty?
+                    inv_raw.split(/[,\s\n]+/).first
+                  else
+                    @standalone ? 'controller.ini' : "#{@name}.ini"
+                  end
+      resolved_inv = inv_first.to_s.strip
+      unless resolved_inv.empty? || resolved_inv.include?('/')
+        resolved_inv += '.ini' unless resolved_inv =~ /\.(ini|ya?ml|json|cfg|py|sh)$/i
+        resolved_inv = "./inventories/#{resolved_inv}"
+      end
+
+      # Determine playbook / script command
+      if !custom_script.empty?
+        # Custom execution script overrides standard ansible-playbook command (mirrors terraform custom script)
+        play_cmd = custom_script
+      elsif play.is_a?(String) && !play.strip.empty?
         play_cmd = play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
       elsif ctrl.play.is_a?(String) && !ctrl.play.strip.empty?
         play_cmd = ctrl.play.strip + " -e CTLABS_DOMAIN=#{domain} -e CTLABS_HOST=#{host_ip}"
@@ -1390,8 +1421,23 @@ module Automation
         play_env += " -e @#{inner_setup_file}"
         play_env += " #{(play_cfg['env'] || []).map { |e| " -e #{e}" }.join}"
         play_book = " #{play_book_path}"
-        play_tags = play_cfg['tags'] ? " -t #{play_cfg['tags'].join(',')}" : ''
-        play_cmd  = "ansible-playbook -b#{play_inv}#{play_book}#{play_tags}#{play_env}"
+
+        tags_val = play_cfg['tags']
+        play_tags = if tags_val.is_a?(Array) && !tags_val.empty?
+                      " -t #{tags_val.map(&:to_s).map(&:strip).reject(&:empty?).join(',')}"
+                    elsif tags_val.is_a?(String) && !tags_val.strip.empty?
+                      " -t #{tags_val.strip}"
+                    else
+                      ''
+                    end
+
+        limit_val = (play_cfg['limit'] || play_cfg['hosts']).to_s.strip
+        play_limit = !limit_val.empty? ? " -l #{limit_val}" : ''
+
+        extra_val = play_cfg['extra_args'].to_s.strip
+        play_extra = !extra_val.empty? ? " #{extra_val}" : ''
+
+        play_cmd  = "ansible-playbook -b#{play_inv}#{play_book}#{play_tags}#{play_limit}#{play_env}#{play_extra}"
       else
         raise "No playbook specified and no default playbook configured for 'ansible' node"
       end
@@ -1405,7 +1451,8 @@ module Automation
       # duplicated the command string and diverged in error handling.
       status = stream_docker_exec(controller_exec_name, play_cmd, log_file_path,
                                   pid_file: log_file_path ? Automation.playbook_run_state_path(@relative_path) : nil,
-                                  ansible_dir_ctl: ans_base_ctl)
+                                  ansible_dir_ctl: ans_base_ctl,
+                                  ansible_inv: resolved_inv)
 
       # Reaching this point does NOT mean the playbook succeeded: it may have
       # been stopped by the user (SIGTERM/143) or failed outright. Say which.
@@ -1429,8 +1476,8 @@ module Automation
       status
 
     ensure
-      # ALWAYS release lock (even on failure)
-      Automation.release_playbook_lock!(playbook_lock) if playbook_lock
+      # ALWAYS release lock (even on failure) when not managed by caller
+      Automation.release_playbook_lock!(playbook_lock) if playbook_lock && lock.nil?
     end
   end
 
@@ -1804,7 +1851,7 @@ module Automation
   #
   # Returns the child's status as a String: '0', '143', 'terminated by SIG15',
   # or 'unknown' if the status could not be determined.
-  def stream_docker_exec(container_name, play_cmd, log_file_path = nil, pid_file: nil, ansible_dir_ctl: nil, terraform_dir_ctl: nil)
+  def stream_docker_exec(container_name, play_cmd, log_file_path = nil, pid_file: nil, ansible_dir_ctl: nil, terraform_dir_ctl: nil, ansible_inv: nil)
     # Export the repo dirs the ctlabs-ansible group_vars expect
     # (inventories/group_vars/all/ctlabs.yml: ctg_ansible_repo_dir et al. resolve
     # from these env vars). They must be exported, not left to the group_vars
@@ -1818,9 +1865,12 @@ module Automation
     tf_ctl  = terraform_dir_ctl || TF_DIR_CTL
     user_for_agent = (container_name == (defined?(Controller::NAME) ? Controller::NAME : 'ctl-ctrl')) ? 'root' : 'ansible'
     agent_sock = (Automation.ensure_ssh_agent(container_name, user_for_agent) rescue Automation.ssh_agent_sock(user_for_agent))
-    repo_env = "CTLABS_ANSIBLE_REPO_DIR=#{ans_ctl} " \
+    inv_env = (ansible_inv && !ansible_inv.to_s.strip.empty?) ? "ANSIBLE_INVENTORY=#{ansible_inv} " : ""
+    repo_env = "PYTHONUNBUFFERED=1 " \
+               "CTLABS_ANSIBLE_REPO_DIR=#{ans_ctl} " \
                "CTLABS_TERRAFORM_REPO_DIR=#{tf_ctl} " \
                "CTLABS_TOOLS_REPO_DIR=/srv/ctlabs/ctlabs-tools " \
+               "#{inv_env}" \
                "SSH_AUTH_SOCK=#{agent_sock}"
     inner_command = "cd #{ans_ctl} && #{repo_env} ANSIBLE_FORCE_COLOR=1 #{play_cmd} 2>&1"
     cmd = ['docker', 'exec', container_name, 'sh', '-c', inner_command]
@@ -1855,7 +1905,7 @@ module Automation
         # Stream stdout → BOTH CLI ($stdout) AND log file
         # IOError here is the normal end-of-stream when the process is killed
         # (Stop button), not an error worth a backtrace in the server log.
-        Thread.new do
+        out_thr = Thread.new do
           begin
             while (line = stdout.gets)
               $stdout.print(line)
@@ -1869,7 +1919,7 @@ module Automation
         end
   
         # Stream stderr → BOTH CLI ($stderr) AND log file
-        Thread.new do
+        err_thr = Thread.new do
           begin
             while (err_line = stderr.gets)
               $stderr.print(err_line)
@@ -1884,6 +1934,8 @@ module Automation
   
         # Wait for command completion
         wait_thr.value
+        out_thr.join rescue nil
+        err_thr.join rescue nil
   
       rescue => e
         error_msg = "Error during playbook streaming: #{e.message}\n"

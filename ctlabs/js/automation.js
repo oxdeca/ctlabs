@@ -70,14 +70,19 @@ window.openAnsTab = function(tabId) {
   document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
       
   document.querySelectorAll(".ans-tablink").forEach(btn => {
-    btn.classList.remove("w3-text-blue");
+    btn.classList.remove("w3-text-blue", "w3-text-teal");
     btn.style.backgroundColor = "transparent";
     btn.style.borderBottom = "none";
           
     if (btn.getAttribute("data-target-tab") === tabId) {
-      btn.classList.add("w3-text-blue");
+      if (tabId === 'AnsCommands') {
+        btn.classList.add("w3-text-teal");
+        btn.style.borderBottom = "2px solid #14b8a6";
+      } else {
+        btn.classList.add("w3-text-blue");
+        btn.style.borderBottom = "2px solid #38bdf8";
+      }
       btn.style.backgroundColor = "#1e293b";
-      btn.style.borderBottom = "2px solid #38bdf8";
     }
   });
       
@@ -102,11 +107,16 @@ window.openAnsTab = function(tabId) {
   }
 
   const deleteBtn = document.getElementById('ans-delete-file-btn');
-  if (deleteBtn) deleteBtn.style.display = (tabId === 'AnsSettings' || tabId === 'AnsPlayProfiles' || tabId === 'AnsSetupProfiles' || tabId === 'AnsPlaySetup') ? 'none' : 'inline-block';
+  const isProtectedTab = ['AnsSettings', 'AnsCommands', 'AnsPlayProfiles', 'AnsSetupProfiles', 'AnsPlaySetup'].includes(tabId);
+  if (deleteBtn) deleteBtn.style.display = isProtectedTab ? 'none' : 'inline-block';
 
-  const taId = 'editor-' + tabId;
+  const taId = (tabId === 'AnsCommands') ? 'edit-ansible-commands' : 'editor-' + tabId;
   if (window.cmEditors[taId]) {
     setTimeout(() => window.cmEditors[taId].refresh(), 50);
+  }
+
+  if (tabId === 'AnsCommands' && window.initAnsibleAdhocResizer) {
+    setTimeout(() => window.initAnsibleAdhocResizer(), 20);
   }
 
   if (window.updateAnsibleVimStatus) {
@@ -271,17 +281,197 @@ window.loadAnsProfiles = async function() {
       }
   };
 
-  window.openAnsibleEditor = async function(labName, base) {
+  // --- ANSIBLE WORKSPACE PROFILES STATE & HELPERS ---
+  window.ansibleWorkspaces = {};
+  window.currentAnsibleWorkspace = 'default';
+
+  window.renderAnsibleWorkspaceSelect = function() {
+    const select = document.getElementById('edit-ansible-workspace');
+    if (!select) return;
+    select.innerHTML = '';
+    const names = Object.keys(window.ansibleWorkspaces || {});
+    if (!names.includes('default')) names.unshift('default');
+    names.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === window.currentAnsibleWorkspace) opt.selected = true;
+      select.appendChild(opt);
+    });
+    const badge = document.getElementById('ans-active-workspace-badge');
+    if (badge) badge.textContent = window.currentAnsibleWorkspace;
+  };
+
+  window.snapshotActiveAnsibleWorkspace = function() {
+    const ws = window.currentAnsibleWorkspace || 'default';
+    if (!window.ansibleWorkspaces) window.ansibleWorkspaces = {};
+    if (!window.ansibleWorkspaces[ws]) window.ansibleWorkspaces[ws] = {};
+
+    const setupVal = window.cmEditors['editor-AnsPlaySetup'] ? window.cmEditors['editor-AnsPlaySetup'].getValue() : '';
+    const cmdVal = window.cmEditors['edit-ansible-commands'] ? window.cmEditors['edit-ansible-commands'].getValue() : '';
+
+    const tagsRaw = (document.getElementById('edit-ansible-tags')?.value || '').trim();
+    const tagsArr = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    const envRaw = (document.getElementById('edit-ansible-env')?.value || '').trim();
+    const envArr = envRaw ? envRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+    const adhocInv = (document.getElementById('edit-ansible-adhoc-inv')?.value || '').trim();
+    let invVal = (document.getElementById('edit-ansible-inv')?.value || '').trim();
+    if (window.currentAnsibleTab === 'AnsCommands' && adhocInv) invVal = adhocInv;
+    else if (!invVal && adhocInv) invVal = adhocInv;
+
+    window.ansibleWorkspaces[ws] = {
+      ...window.ansibleWorkspaces[ws],
+      root_dir: (document.getElementById('edit-ansible-root-dir')?.value || '').trim(),
+      book: (document.getElementById('edit-ansible-book')?.value || '').trim(),
+      inv: invVal,
+      limit: (document.getElementById('edit-ansible-limit')?.value || '').trim(),
+      extra_args: (document.getElementById('edit-ansible-extra-args')?.value || '').trim(),
+      tags: tagsArr,
+      env: envArr,
+      commands: cmdVal,
+      setup_yaml: setupVal
+    };
+  };
+
+  window.applyAnsibleWorkspace = function(wsName) {
+    if (!window.ansibleWorkspaces || !window.ansibleWorkspaces[wsName]) return;
+    window.currentAnsibleWorkspace = wsName;
+    const cfg = window.ansibleWorkspaces[wsName];
+
+    const select = document.getElementById('edit-ansible-workspace');
+    if (select) select.value = wsName;
+    const badge = document.getElementById('ans-active-workspace-badge');
+    if (badge) badge.textContent = wsName;
+
+    if (document.getElementById('edit-ansible-root-dir')) {
+      document.getElementById('edit-ansible-root-dir').value = cfg.root_dir || '';
+    }
+    if (document.getElementById('edit-ansible-book')) {
+      document.getElementById('edit-ansible-book').value = cfg.book || 'main.yml';
+    }
+    if (document.getElementById('edit-ansible-inv')) {
+      let invVal = cfg.inv || '';
+      if (Array.isArray(invVal)) invVal = invVal.join(', ');
+      if (!invVal) {
+        invVal = (window.automationBase === '/controller')
+          ? 'controller.ini'
+          : (window.currentEditLab ? window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini') : 'default.ini');
+      }
+      document.getElementById('edit-ansible-inv').value = invVal;
+      if (document.getElementById('edit-ansible-adhoc-inv')) {
+        document.getElementById('edit-ansible-adhoc-inv').value = invVal;
+      }
+    }
+    if (document.getElementById('edit-ansible-limit')) {
+      document.getElementById('edit-ansible-limit').value = cfg.limit || cfg.hosts || '';
+    }
+    if (document.getElementById('edit-ansible-extra-args')) {
+      document.getElementById('edit-ansible-extra-args').value = cfg.extra_args || '';
+    }
+    if (document.getElementById('edit-ansible-tags')) {
+      let tagsVal = cfg.tags || '';
+      if (Array.isArray(tagsVal)) tagsVal = tagsVal.join(', ');
+      document.getElementById('edit-ansible-tags').value = tagsVal;
+    }
+    const envEl = document.getElementById('edit-ansible-env');
+    if (envEl) {
+      let envVal = cfg.env || '';
+      if (Array.isArray(envVal)) envVal = envVal.join('\n');
+      envEl.value = envVal;
+      setTimeout(() => {
+        envEl.style.height = 'auto';
+        envEl.style.height = Math.max(envEl.scrollHeight + 4, 90) + 'px';
+      }, 0);
+    }
+
+    // Update Execution Script CodeMirror
+    if (window.cmEditors['edit-ansible-commands']) {
+      window.cmEditors['edit-ansible-commands'].setValue(cfg.commands || '');
+    }
+
+    // Update Play Setup CodeMirror
+    if (window.cmEditors['editor-AnsPlaySetup']) {
+      let setupStr = cfg.setup_yaml;
+      if (typeof setupStr !== 'string') {
+        if (typeof cfg.setup === 'string') {
+          setupStr = cfg.setup;
+        } else if (cfg.setup && typeof cfg.setup === 'object') {
+          try {
+            setupStr = (window.jsyaml && window.jsyaml.dump) ? window.jsyaml.dump(cfg.setup) : JSON.stringify(cfg.setup, null, 2);
+          } catch(e) { setupStr = ''; }
+        } else {
+          setupStr = '';
+        }
+      }
+      window.cmEditors['editor-AnsPlaySetup'].setValue(setupStr || '');
+    }
+
+    // Delete button state (disable deletion of default)
+    const delBtn = document.getElementById('ans-delete-ws-btn');
+    if (delBtn) delBtn.disabled = (wsName === 'default');
+
+    // Trigger Git status check for the new root_dir
+    if (window.fetchAnsibleGitStatus) {
+      window.fetchAnsibleGitStatus();
+    }
+  };
+
+  window.onAnsibleWorkspaceChange = function(newWs) {
+    window.snapshotActiveAnsibleWorkspace();
+    window.applyAnsibleWorkspace(newWs);
+  };
+
+  window.promptNewAnsibleWorkspace = function() {
+    const name = prompt("Enter new workspace profile name (e.g. adhoc, setup, staging):");
+    if (!name) return;
+    const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9_\-]/g, '_');
+    if (!cleanName) { alert("Invalid profile name."); return; }
+    if (window.ansibleWorkspaces[cleanName]) { alert(`Workspace '${cleanName}' already exists.`); return; }
+
+    window.snapshotActiveAnsibleWorkspace();
+    const current = window.ansibleWorkspaces[window.currentAnsibleWorkspace] || {};
+    window.ansibleWorkspaces[cleanName] = JSON.parse(JSON.stringify(current));
+    window.renderAnsibleWorkspaceSelect();
+    window.applyAnsibleWorkspace(cleanName);
+  };
+
+  window.promptCloneAnsibleWorkspace = function() {
+    const name = prompt(`Clone '${window.currentAnsibleWorkspace}' as:`, `${window.currentAnsibleWorkspace}_copy`);
+    if (!name) return;
+    const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9_\-]/g, '_');
+    if (!cleanName) { alert("Invalid profile name."); return; }
+    if (window.ansibleWorkspaces[cleanName]) { alert(`Workspace '${cleanName}' already exists.`); return; }
+
+    window.snapshotActiveAnsibleWorkspace();
+    const current = window.ansibleWorkspaces[window.currentAnsibleWorkspace] || {};
+    window.ansibleWorkspaces[cleanName] = JSON.parse(JSON.stringify(current));
+    window.renderAnsibleWorkspaceSelect();
+    window.applyAnsibleWorkspace(cleanName);
+  };
+
+  window.promptDeleteAnsibleWorkspace = function() {
+    const ws = window.currentAnsibleWorkspace;
+    if (ws === 'default') {
+      alert("Cannot delete default workspace profile.");
+      return;
+    }
+    if (!confirm(`Are you sure you want to delete workspace profile '${ws}'?`)) return;
+
+    delete window.ansibleWorkspaces[ws];
+    window.currentAnsibleWorkspace = 'default';
+    window.renderAnsibleWorkspaceSelect();
+    window.applyAnsibleWorkspace('default');
+  };
+
+  window.openAnsibleEditor = async function(labName, base, initialTab) {
     window.automationBase = base || null;
     window.currentEditLab = labName;
     if (window.refreshAnsibleToolbar) window.refreshAnsibleToolbar();
-    // Update labels for controller vs lab context. The modal renders both the
-    // lab (automation/lab/) and controller (automation/ctl/) file paths into
-    // data-lab-label / data-ctl-label; pick the one matching this context.
     window.setProfileFileLabel('#AnsSetupProfiles', window.automationBase === '/controller');
     window.setProfileFileLabel('#AnsPlayProfiles',  window.automationBase === '/controller');
-    // --- READ MEMORY FIRST! ---
-    const savedActiveTab = localStorage.getItem('ans_active_tab_' + window.currentEditLab);
+    const savedActiveTab = initialTab || localStorage.getItem('ans_active_tab_' + window.currentEditLab);
 
     const resultDiv = document.getElementById('ansible-editor-result');
     if (resultDiv) resultDiv.style.display = 'none';
@@ -294,6 +484,18 @@ window.loadAnsProfiles = async function() {
         const data = await res.json();
         let play = data.json.play || {};
         if (typeof play === 'string') play = { book: play };
+
+        // Populate available topology hosts datalist for limit targeting
+        const hostsList = data.hosts || data.json?.hosts || [];
+        const hostsDatalist = document.getElementById('available-ansible-hosts');
+        if (hostsDatalist && Array.isArray(hostsList)) {
+          hostsDatalist.innerHTML = '';
+          hostsList.forEach(h => {
+            const opt = document.createElement('option');
+            opt.value = h;
+            hostsDatalist.appendChild(opt);
+          });
+        }
         
         const book = play.book || 'main.yml';
         let invVal = play.inv;
@@ -305,8 +507,6 @@ window.loadAnsProfiles = async function() {
             invVal = '';
         }
         if (!invVal) {
-            // Controller scope passes 'controller' (no .yml), labs pass e.g.
-            // 'labs/net01.yml'. Always normalize to a .ini inventory filename.
             invVal = (window.automationBase === '/controller')
                 ? 'controller.ini'
                 : window.currentEditLab.split('/').pop().replace(/\.ya?ml$/i, '.ini');
@@ -322,6 +522,34 @@ window.loadAnsProfiles = async function() {
         }
         const customInv = play.custom_inv || '';
 
+        // Workspace Profiles Setup
+        window.ansibleWorkspaces = {};
+        if (play.workspaces && typeof play.workspaces === 'object' && Object.keys(play.workspaces).length > 0) {
+          window.ansibleWorkspaces = JSON.parse(JSON.stringify(play.workspaces));
+        }
+
+        // Initialize default workspace if not present
+        if (!window.ansibleWorkspaces['default']) {
+          window.ansibleWorkspaces['default'] = {
+            root_dir: play.root_dir || '',
+            book: book,
+            inv: invVal,
+            custom_inv: customInv,
+            limit: play.limit || play.hosts || '',
+            extra_args: play.extra_args || '',
+            tags: play.tags || [],
+            env: play.env || [],
+            commands: play.commands || '',
+            setup_yaml: data.json.setup_yaml || ''
+          };
+        }
+
+        // Active workspace
+        window.currentAnsibleWorkspace = play.workspace || 'default';
+        if (!window.ansibleWorkspaces[window.currentAnsibleWorkspace]) {
+          window.currentAnsibleWorkspace = Object.keys(window.ansibleWorkspaces)[0] || 'default';
+        }
+
         document.getElementById('edit-ansible-book').value = book;
         if (document.getElementById('edit-ansible-root-dir')) {
             document.getElementById('edit-ansible-root-dir').value = play.root_dir || '';
@@ -330,10 +558,22 @@ window.loadAnsProfiles = async function() {
 
         const invInput = document.getElementById('edit-ansible-inv');
         if (invInput) invInput.value = invVal;
+        const adhocInvInput = document.getElementById('edit-ansible-adhoc-inv');
+        if (adhocInvInput) adhocInvInput.value = invVal;
         if (document.getElementById('edit-ansible-custom-inv')) {
             document.getElementById('edit-ansible-custom-inv').value = customInv;
         }
-        document.getElementById('edit-ansible-tags').value = (play.tags || []).join(', ');
+        if (document.getElementById('edit-ansible-limit')) {
+            document.getElementById('edit-ansible-limit').value = play.limit || play.hosts || '';
+        }
+        if (document.getElementById('edit-ansible-extra-args')) {
+            document.getElementById('edit-ansible-extra-args').value = play.extra_args || '';
+        }
+        const tagsStr = (play.tags || []).join(', ');
+        document.getElementById('edit-ansible-tags').value = tagsStr;
+        if (document.getElementById('edit-ansible-adhoc-tags')) {
+            document.getElementById('edit-ansible-adhoc-tags').value = tagsStr;
+        }
         
         const envEl = document.getElementById('edit-ansible-env');
         if (envEl) {
@@ -344,8 +584,19 @@ window.loadAnsProfiles = async function() {
             }, 0);
         }
         
+        // Initialize CodeMirror editor for custom commands / execution script
+        if (!window.cmEditors['edit-ansible-commands']) {
+          window.cmEditors['edit-ansible-commands'] = window.initCodeEditor('edit-ansible-commands', 'shell');
+        }
+        window.cmEditors['edit-ansible-commands'].setValue(play.commands || '');
+
+        // Initialize Play Setup editor
         const playSetupEd = window.initCodeEditor('editor-AnsPlaySetup', 'yaml');
         playSetupEd.setValue(data.json.setup_yaml || '');
+
+        // Render Workspaces dropdown and apply active profile
+        window.renderAnsibleWorkspaceSelect();
+        window.applyAnsibleWorkspace(window.currentAnsibleWorkspace);
         
         await window.loadAnsProfiles();
         
@@ -360,7 +611,6 @@ window.loadAnsProfiles = async function() {
         // 🔥 RESTORE TABS FROM MEMORY 🔥
         const savedTabsStr = localStorage.getItem('ansible_tabs_' + window.currentEditLab);
         let savedTabs = savedTabsStr ? JSON.parse(savedTabsStr) : null;
-          
 
         if (savedTabs && savedTabs.length > 0) {
           for (const filepath of savedTabs) {
@@ -384,11 +634,25 @@ window.loadAnsProfiles = async function() {
             fileTabs[fileTabs.length - 1].click();
           }
         }
+
+        // Initialize Ad-hoc Resizer
+        if (window.initAnsibleAdhocResizer) {
+          window.initAnsibleAdhocResizer();
+        }
+
+        // Fetch Git status for Ansible repository
+        if (window.fetchAnsibleGitStatus) {
+          window.fetchAnsibleGitStatus();
+        }
     } catch (err) { alert("Error: " + err.message); }
 };
 
   window.saveAnsibleConfig = async function() {
       const resultDiv = document.getElementById('ansible-editor-result');
+      if (window.snapshotActiveAnsibleWorkspace) {
+        window.snapshotActiveAnsibleWorkspace();
+      }
+
       const filesData = {};
       document.querySelectorAll('.ans-tab[data-filepath]').forEach(tab => {
           const filepath = tab.getAttribute('data-filepath');
@@ -399,15 +663,23 @@ window.loadAnsProfiles = async function() {
       const playProf  = window.cmEditors['editor-AnsPlayProfiles']  ? window.cmEditors['editor-AnsPlayProfiles'].getValue()  : '';
       const setupProf = window.cmEditors['editor-AnsSetupProfiles'] ? window.cmEditors['editor-AnsSetupProfiles'].getValue() : '';
       const playSetup = window.cmEditors['editor-AnsPlaySetup']     ? window.cmEditors['editor-AnsPlaySetup'].getValue()     : '';
+      const commands  = window.cmEditors['edit-ansible-commands']   ? window.cmEditors['edit-ansible-commands'].getValue()   : '';
 
       const invVal = (document.getElementById('edit-ansible-inv')?.value || '').trim();
       const customInvVal = (document.getElementById('edit-ansible-custom-inv')?.value || '').trim();
+      const limitVal = (document.getElementById('edit-ansible-limit')?.value || '').trim();
+      const extraArgsVal = (document.getElementById('edit-ansible-extra-args')?.value || '').trim();
 
       const formData = new URLSearchParams({
+          workspace: window.currentAnsibleWorkspace || 'default',
+          workspaces: JSON.stringify(window.ansibleWorkspaces || {}),
           root_dir: (document.getElementById('edit-ansible-root-dir')?.value || '').trim(),
           book: document.getElementById('edit-ansible-book').value,
           inv: invVal,
           custom_inv: customInvVal,
+          limit: limitVal,
+          extra_args: extraArgsVal,
+          commands: commands,
           tags: document.getElementById('edit-ansible-tags').value,
           env: document.getElementById('edit-ansible-env').value,
           setup: playSetup,
@@ -438,21 +710,668 @@ window.loadAnsProfiles = async function() {
           
           if (res.ok) {
               resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
-              resultDiv.textContent = '✅ All files saved successfully.';
+              resultDiv.textContent = '✅ All files and workspace profiles saved successfully.';
               setTimeout(() => location.reload(), 800);
+              return true;
           } else {
               // Safely handle HTML vs JSON error responses
               const errText = await res.text();
               let errMsg = errText;
-              try { errMsg = JSON.parse(errText).error; } catch(e) {} // Fallback to raw text if not JSON
+              try { errMsg = JSON.parse(errText).error; } catch(e) {}
               throw new Error(errMsg);
           }
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
-          resultDiv.innerHTML = '❌ ' + err.message; // Will render Sinatra's HTML error directly in the box!
+          resultDiv.innerHTML = '❌ ' + err.message;
           if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
+          return false;
       }
   };
+
+  window.clearAnsibleModalOutput = function() {
+    const out = document.getElementById('ans-modal-adhoc-output');
+    if (out) out.innerHTML = '';
+  };
+
+  window.runAnsibleAdhocModal = async function() {
+    const runBtn = document.getElementById('ans-modal-run-adhoc-btn');
+    const stopBtn = document.getElementById('ans-modal-stop-adhoc-btn');
+    const statusBadge = document.getElementById('ans-modal-adhoc-status');
+    const outPre = document.getElementById('ans-modal-adhoc-output');
+
+    if (runBtn) {
+      runBtn.disabled = true;
+      runBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+    }
+    if (outPre) {
+      outPre.innerHTML = '<i style="color: #64748b;">Starting ad-hoc execution...</i>\n';
+    }
+
+    try {
+      const activeWs = window.currentAnsibleWorkspace || 'default';
+      const wsCfg = (window.ansibleWorkspaces && window.ansibleWorkspaces[activeWs]) || {};
+      const invVal = (document.getElementById('edit-ansible-adhoc-inv')?.value || document.getElementById('edit-ansible-inv')?.value || wsCfg.inv || '').trim();
+      const limitVal = (document.getElementById('edit-ansible-limit')?.value || wsCfg.limit || '').trim();
+      const adhocTagsEl = document.getElementById('edit-ansible-adhoc-tags');
+      const tagsVal = adhocTagsEl ? adhocTagsEl.value.trim() : (document.getElementById('edit-ansible-tags')?.value || (Array.isArray(wsCfg.tags) ? wsCfg.tags.join(',') : '')).trim();
+      const extraArgsVal = (document.getElementById('edit-ansible-extra-args')?.value || wsCfg.extra_args || '').trim();
+      const commandsVal = window.cmEditors['edit-ansible-commands'] ? window.cmEditors['edit-ansible-commands'].getValue() : '';
+
+      const payload = new URLSearchParams({
+        workspace: activeWs,
+        inv: invVal,
+        limit: limitVal,
+        tags: tagsVal,
+        book: wsCfg.book || (document.getElementById('edit-ansible-book')?.value || '').trim(),
+        commands: commandsVal,
+        extra_args: extraArgsVal
+      });
+
+      const res = await fetch(`${window.ansScope()}/playbook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (outPre && typeof window.streamAnsibleOutput === 'function') {
+          window.streamAnsibleOutput({
+            logId: data.log_id,
+            initialOffset: typeof data.offset === 'number' ? data.offset : 0,
+            scope: window.ansScope(),
+            preEl: 'ans-modal-adhoc-output',
+            statusBadgeEl: 'ans-modal-adhoc-status',
+            scrollStatusEl: 'ans-modal-scroll-status',
+            stopBtnEl: 'ans-modal-stop-adhoc-btn',
+            runBtnEl: runBtn,
+            runBtnOriginalHtml: '<i class="fas fa-play"></i> Run Ad-Hoc',
+            fullLogLinkEl: 'ans-modal-full-log-link',
+            pollerKey: 'modal'
+          });
+        } else {
+          window.location.href = data.log_url || '/logs/current';
+        }
+      } else {
+        alert("Error starting ad-hoc execution: " + (data.error || 'Failed to start'));
+        if (runBtn) {
+          runBtn.disabled = false;
+          runBtn.innerHTML = '<i class="fas fa-play"></i> Run Ad-Hoc';
+        }
+      }
+    } catch(err) {
+      alert("Error starting ad-hoc execution: " + err.message);
+      if (runBtn) {
+        runBtn.disabled = false;
+        runBtn.innerHTML = '<i class="fas fa-play"></i> Run Ad-Hoc';
+      }
+    }
+  };
+
+  window.stopAnsiblePlaybookModal = async function() {
+    const stopBtn = document.getElementById('ans-modal-stop-adhoc-btn');
+    if (stopBtn) {
+      stopBtn.disabled = true;
+      stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+    }
+    try {
+      await fetch(`${window.ansScope()}/playbook/stop`, { method: 'POST' });
+    } catch(e) {
+      console.warn("Modal stop failed:", e);
+    }
+  };
+
+  window.saveAndRunAnsible = async function() {
+    const runBtn = document.getElementById('ans-run-btn');
+    const runBtnHtml = runBtn ? runBtn.innerHTML : null;
+    if (runBtn) {
+      runBtn.disabled = true;
+      runBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+    }
+
+    const saved = await window.saveAnsibleConfig();
+    if (!saved) {
+      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+      return;
+    }
+
+    // Switch to Ad-Hoc / Runner tab so the user sees live streaming output
+    if (typeof window.openAnsTab === 'function') {
+      window.openAnsTab('AnsCommands');
+    }
+
+    const outPre = document.getElementById('ans-modal-adhoc-output');
+    if (outPre) outPre.innerHTML = '<i style="color: #64748b;">Starting execution...</i>\n';
+
+    try {
+      const activeWs = window.currentAnsibleWorkspace || 'default';
+      const wsCfg = (window.ansibleWorkspaces && window.ansibleWorkspaces[activeWs]) || {};
+      const invVal = (document.getElementById('edit-ansible-adhoc-inv')?.value || document.getElementById('edit-ansible-inv')?.value || wsCfg.inv || '').trim();
+      const limitVal = (document.getElementById('edit-ansible-limit')?.value || wsCfg.limit || '').trim();
+      const adhocTagsEl = document.getElementById('edit-ansible-adhoc-tags');
+      const tagsVal = adhocTagsEl ? adhocTagsEl.value.trim() : (document.getElementById('edit-ansible-tags')?.value || (Array.isArray(wsCfg.tags) ? wsCfg.tags.join(',') : '')).trim();
+      const extraArgsVal = (document.getElementById('edit-ansible-extra-args')?.value || wsCfg.extra_args || '').trim();
+      const commandsVal = window.cmEditors['edit-ansible-commands'] ? window.cmEditors['edit-ansible-commands'].getValue() : '';
+
+      const payload = new URLSearchParams({
+        workspace: activeWs,
+        inv: invVal,
+        limit: limitVal,
+        tags: tagsVal,
+        book: wsCfg.book || (document.getElementById('edit-ansible-book')?.value || '').trim(),
+        commands: commandsVal,
+        extra_args: extraArgsVal
+      });
+
+      const res = await fetch(`${window.ansScope()}/playbook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (outPre && typeof window.streamAnsibleOutput === 'function') {
+          window.streamAnsibleOutput({
+            logId: data.log_id,
+            initialOffset: typeof data.offset === 'number' ? data.offset : 0,
+            scope: window.ansScope(),
+            preEl: 'ans-modal-adhoc-output',
+            statusBadgeEl: 'ans-modal-adhoc-status',
+            scrollStatusEl: 'ans-modal-scroll-status',
+            stopBtnEl: 'ans-modal-stop-adhoc-btn',
+            runBtnEl: runBtn,
+            runBtnOriginalHtml: '<i class="fas fa-play"></i> Run Now',
+            fullLogLinkEl: 'ans-modal-full-log-link',
+            pollerKey: 'modal'
+          });
+        } else {
+          window.location.href = data.log_url || '/logs/current';
+        }
+      } else {
+        alert("Error starting playbook: " + (data.error || 'Failed to start'));
+        if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+      }
+    } catch(err) {
+      alert("Error starting playbook: " + err.message);
+      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+    }
+  };
+
+  // --- GIT SUPPORT FOR ANSIBLE REPOSITORY ---
+  window.toggleAnsibleGitMenu = function(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('ans-git-menu');
+    if (!menu) return;
+    const isHidden = menu.style.display === 'none' || !menu.style.display;
+    menu.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      window.fetchAnsibleGitStatus();
+    }
+  };
+
+  window.getAnsibleRootDir = function() {
+    return (document.getElementById('edit-ansible-root-dir')?.value || '').trim();
+  };
+
+  window.fetchAnsibleGitStatus = async function(manual) {
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const query = rootDir ? `?root_dir=${encodeURIComponent(rootDir)}` : '';
+      const res = await fetch(`${window.ansScope()}/ansible/git/status${query}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.git_repo) {
+        const btn = document.getElementById('ans-git-btn');
+        if (btn) btn.style.display = 'none';
+        return;
+      }
+      const btn = document.getElementById('ans-git-btn');
+      if (btn) btn.style.display = 'inline-flex';
+
+      const branchLabel = document.getElementById('ans-git-branch-label');
+      if (branchLabel) branchLabel.textContent = data.branch || 'main';
+
+      const dirtyDot = document.getElementById('ans-git-dirty-badge');
+      const summarySpan = document.getElementById('ans-git-status-summary');
+      const countBadge = document.getElementById('ans-git-commit-count');
+
+      if (data.clean) {
+        if (dirtyDot) dirtyDot.style.display = 'none';
+        if (summarySpan) { summarySpan.textContent = 'clean'; summarySpan.style.color = '#38bdf8'; }
+        if (countBadge) countBadge.style.display = 'none';
+      } else {
+        const count = (data.modified?.length || 0) + (data.untracked?.length || 0);
+        if (dirtyDot) dirtyDot.style.display = 'inline-block';
+        if (summarySpan) { summarySpan.textContent = `modified (${count})`; summarySpan.style.color = '#f59e0b'; }
+        if (countBadge) { countBadge.textContent = count; countBadge.style.display = 'inline-block'; }
+      }
+      if (manual) {
+        alert(`Git repository is on branch '${data.branch}'. Status: ${data.clean ? 'clean' : 'modified (' + ((data.modified?.length || 0) + (data.untracked?.length || 0)) + ' files)'}`);
+      }
+      window.currentAnsibleGitStatus = data;
+    } catch (err) {
+      console.error("fetchAnsibleGitStatus error:", err);
+    }
+  };
+
+  window.openAnsibleGitCommitModal = async function() {
+    const menu = document.getElementById('ans-git-menu');
+    if (menu) menu.style.display = 'none';
+    const preview = document.getElementById('ans-git-commit-status-preview');
+    if (preview) preview.innerHTML = 'Checking status...';
+    document.getElementById('ans-git-commit-modal').style.display = 'block';
+
+    await window.fetchAnsibleGitStatus();
+    const status = window.currentAnsibleGitStatus || {};
+    if (preview) {
+      if (status.clean) {
+        preview.innerHTML = '<span style="color: #38bdf8;">Working tree clean, nothing to commit.</span>';
+      } else {
+        let html = '';
+        if (status.modified && status.modified.length > 0) {
+          html += '<div style="color: #f59e0b; margin-bottom: 4px;">Modified files:</div>';
+          status.modified.forEach(f => { html += `<div>&nbsp;&nbsp;M ${f}</div>`; });
+        }
+        if (status.untracked && status.untracked.length > 0) {
+          html += '<div style="color: #22c55e; margin-top: 4px; margin-bottom: 4px;">Untracked files:</div>';
+          status.untracked.forEach(f => { html += `<div>&nbsp;&nbsp;? ${f}</div>`; });
+        }
+        preview.innerHTML = html;
+      }
+    }
+  };
+
+  window.confirmAnsibleGitCommit = async function() {
+    const msgInput = document.getElementById('ans-git-commit-message');
+    const msg = (msgInput?.value || '').trim();
+    if (!msg) { alert("Please enter a commit message."); return; }
+
+    const submitBtn = document.getElementById('ans-git-commit-submit-btn');
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Committing...'; }
+
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const payload = new URLSearchParams({ message: msg, root_dir: rootDir });
+      const res = await fetch(`${window.ansScope()}/ansible/git/commit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        alert("Changes committed successfully!");
+        document.getElementById('ans-git-commit-modal').style.display = 'none';
+        if (msgInput) msgInput.value = '';
+        window.fetchAnsibleGitStatus();
+      } else {
+        alert("Commit failed: " + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert("Commit error: " + err.message);
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-check"></i> Commit'; }
+    }
+  };
+
+  window.ansibleGitPull = async function() {
+    const menu = document.getElementById('ans-git-menu');
+    if (menu) menu.style.display = 'none';
+    if (!confirm("Pull latest changes from remote (git pull --rebase)?")) return;
+
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const payload = new URLSearchParams({ root_dir: rootDir });
+      const res = await fetch(`${window.ansScope()}/ansible/git/pull`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        alert("Pull successful:\n" + (data.output || 'Up to date'));
+        window.fetchAnsibleGitStatus();
+      } else {
+        alert("Pull failed: " + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert("Pull error: " + err.message);
+    }
+  };
+
+  window.ansibleGitPush = async function() {
+    const menu = document.getElementById('ans-git-menu');
+    if (menu) menu.style.display = 'none';
+    if (!confirm("Push commits to remote (git push)?")) return;
+
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const payload = new URLSearchParams({ root_dir: rootDir });
+      const res = await fetch(`${window.ansScope()}/ansible/git/push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        alert("Push successful:\n" + (data.output || 'Pushed to remote'));
+        window.fetchAnsibleGitStatus();
+      } else {
+        alert("Push failed: " + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert("Push error: " + err.message);
+    }
+  };
+
+  window.ansibleGitCommits = [];
+  window.ansibleGitSelectedHash = null;
+
+  window.escapeAnsHtml = function(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  window.formatAnsibleGitDiff = function(diffText) {
+    if (!diffText) return '';
+    const lines = diffText.split('\n');
+    return lines.map(line => {
+      let bg = 'transparent';
+      let fg = '#cbd5e1';
+      let weight = '400';
+
+      if (line.startsWith('+++') || line.startsWith('---')) {
+        fg = '#94a3b8';
+        weight = '600';
+      } else if (line.startsWith('+')) {
+        bg = 'rgba(16, 185, 129, 0.2)';
+        fg = '#86efac';
+      } else if (line.startsWith('-')) {
+        bg = 'rgba(239, 68, 68, 0.2)';
+        fg = '#fca5a5';
+      } else if (line.startsWith('@@')) {
+        bg = 'rgba(56, 189, 248, 0.12)';
+        fg = '#38bdf8';
+        weight = '600';
+      } else if (line.startsWith('diff --git') || line.startsWith('index ')) {
+        fg = '#64748b';
+        weight = '600';
+      } else if (line.startsWith('commit ')) {
+        fg = '#38bdf8';
+        weight = '600';
+      } else if (line.startsWith('Author:') || line.startsWith('Date:')) {
+        fg = '#94a3b8';
+      }
+
+      const escaped = window.escapeAnsHtml(line);
+      const text = escaped.length > 0 ? escaped : '&nbsp;';
+      return `<div style="background: ${bg}; color: ${fg}; font-weight: ${weight}; padding: 0 4px; border-radius: 2px; min-height: 1.45em; margin: 0; box-sizing: border-box;">${text}</div>`;
+    }).join('');
+  };
+
+  window.openAnsibleGitHistoryModal = function() {
+    const menu = document.getElementById('ans-git-menu');
+    if (menu) menu.style.display = 'none';
+    document.getElementById('ans-git-history-modal').style.display = 'block';
+    window.loadAnsibleGitHistory();
+  };
+
+  window.loadAnsibleGitHistory = async function() {
+    const listEl = document.getElementById('ans-git-history-list');
+    const diffEl = document.getElementById('ans-git-diff-body');
+    const titleEl = document.getElementById('ans-git-diff-title');
+    const metaEl = document.getElementById('ans-git-diff-meta');
+    const branchBadge = document.getElementById('ans-git-history-branch-badge');
+    const workingBadge = document.getElementById('ans-git-history-working-badge');
+    const countBadge = document.getElementById('ans-git-commits-count');
+    const repoLabel = document.getElementById('ans-git-history-repo-label');
+
+    const rootDir = window.getAnsibleRootDir();
+    if (repoLabel) repoLabel.textContent = rootDir || '/root/ctlabs-ansible';
+
+    if (listEl) listEl.innerHTML = '<div style="color: #64748b; font-size: 0.85em; text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin"></i> Loading revisions...</div>';
+    if (diffEl) diffEl.innerHTML = '<span style="color: #64748b;">Select a commit from the list on the left to inspect file changes and unified diffs.</span>';
+    if (titleEl) titleEl.textContent = 'Select a revision to view diff';
+    if (metaEl) metaEl.textContent = '';
+    window.ansibleGitSelectedHash = null;
+
+    try {
+      // 1. Fetch Git status
+      const statusRes = await fetch(`${window.ansScope()}/ansible/git/status${rootDir ? '?root_dir=' + encodeURIComponent(rootDir) : ''}`);
+      let statusData = {};
+      if (statusRes.ok) {
+        statusData = await statusRes.json();
+      }
+
+      if (branchBadge) {
+        branchBadge.textContent = `branch: ${statusData.branch || 'main'}`;
+      }
+      const hasWorkingChanges = !statusData.clean;
+      if (workingBadge) {
+        workingBadge.style.display = hasWorkingChanges ? 'inline-flex' : 'none';
+      }
+
+      // 2. Fetch commits log
+      const query = rootDir ? `?root_dir=${encodeURIComponent(rootDir)}&limit=50` : '?limit=50';
+      const res = await fetch(`${window.ansScope()}/ansible/git/history${query}`);
+      if (!res.ok) throw new Error("Failed to fetch history");
+      const data = await res.json();
+      window.ansibleGitCommits = data.commits || [];
+
+      if (countBadge) {
+        countBadge.textContent = `${window.ansibleGitCommits.length} commits`;
+      }
+
+      // Render cards
+      window.renderAnsibleGitHistoryList(hasWorkingChanges, statusData);
+
+      // Auto-select working tree if modified, else top commit
+      if (hasWorkingChanges) {
+        window.showAnsibleGitDiff('working');
+      } else if (window.ansibleGitCommits.length > 0) {
+        window.showAnsibleGitDiff(window.ansibleGitCommits[0].hash);
+      } else {
+        if (listEl) listEl.innerHTML = '<div style="color: #94a3b8; font-size: 0.85em; text-align: center; padding: 20px;">No revisions found yet.</div>';
+      }
+    } catch (err) {
+      if (listEl) listEl.innerHTML = `<div style="color: #ef4444; padding: 15px;">Error: ${err.message}</div>`;
+    }
+  };
+
+  window.renderAnsibleGitHistoryList = function(hasWorkingChanges, statusData) {
+    const listEl = document.getElementById('ans-git-history-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    // Render Working Tree card if there are uncommitted changes
+    if (hasWorkingChanges) {
+      const isSelected = (window.ansibleGitSelectedHash === 'working');
+      const item = document.createElement('div');
+      item.className = 'ans-git-commit-card';
+      item.dataset.hash = 'working';
+      item.style.cssText = `padding: 10px 12px; border-radius: 6px; background: ${isSelected ? '#1e293b' : '#131d31'}; border: 1px solid ${isSelected ? '#f59e0b' : '#78350f'}; cursor: pointer; transition: all 0.15s ease;`;
+
+      const modCount = (statusData.modified?.length || 0) + (statusData.untracked?.length || 0);
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 0.78em; color: #f59e0b; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+            <i class="fas fa-pencil-alt"></i> Working Tree
+          </span>
+          <span style="font-size: 0.72em; color: #fde68a; background: #78350f; padding: 1px 6px; border-radius: 3px;">Uncommitted</span>
+        </div>
+        <div style="font-size: 0.84em; color: #f8fafc; font-weight: 500; margin-bottom: 4px;">
+          Uncommitted changes (${modCount} file${modCount === 1 ? '' : 's'})
+        </div>
+        <div style="font-size: 0.72em; color: #94a3b8;">
+          Click to inspect diff and pending changes
+        </div>
+      `;
+      item.addEventListener('click', () => window.showAnsibleGitDiff('working'));
+      listEl.appendChild(item);
+    }
+
+    // Render commit cards
+    window.ansibleGitCommits.forEach(c => {
+      const isSelected = (c.hash === window.ansibleGitSelectedHash);
+      const item = document.createElement('div');
+      item.className = 'ans-git-commit-card';
+      item.dataset.hash = c.hash;
+      item.style.cssText = `padding: 10px 12px; border-radius: 6px; background: ${isSelected ? '#1e293b' : '#131d31'}; border: 1px solid ${isSelected ? '#0284c7' : '#334155'}; cursor: pointer; transition: all 0.15s ease;`;
+
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-family: ui-monospace, monospace; font-size: 0.78em; color: #38bdf8; font-weight: 700;">${c.hash}</span>
+          <span style="font-size: 0.72em; color: #94a3b8;">${c.date}</span>
+        </div>
+        <div style="font-size: 0.84em; color: #f8fafc; font-weight: 500; margin-bottom: 4px; word-break: break-word; line-height: 1.35;">${window.escapeAnsHtml(c.message)}</div>
+        <div style="font-size: 0.72em; color: #64748b;"><i class="fas fa-user" style="font-size: 0.85em;"></i> ${window.escapeAnsHtml(c.author)}</div>
+      `;
+      item.addEventListener('click', () => window.showAnsibleGitDiff(c.hash));
+      listEl.appendChild(item);
+    });
+  };
+
+  window.showAnsibleGitDiff = async function(hash) {
+    window.ansibleGitSelectedHash = hash;
+    const listEl = document.getElementById('ans-git-history-list');
+    const diffEl = document.getElementById('ans-git-diff-body');
+    const titleEl = document.getElementById('ans-git-diff-title');
+    const metaEl = document.getElementById('ans-git-diff-meta');
+
+    // Highlight selected item in list
+    if (listEl) {
+      listEl.querySelectorAll('.ans-git-commit-card').forEach(card => {
+        const isSel = (card.dataset.hash === hash);
+        if (card.dataset.hash === 'working') {
+          card.style.background = isSel ? '#1e293b' : '#131d31';
+          card.style.borderColor = isSel ? '#f59e0b' : '#78350f';
+        } else {
+          card.style.background = isSel ? '#1e293b' : '#131d31';
+          card.style.borderColor = isSel ? '#0284c7' : '#334155';
+        }
+      });
+    }
+
+    if (diffEl) diffEl.innerHTML = '<span style="color: #64748b;"><i class="fas fa-spinner fa-spin"></i> Loading diff...</span>';
+
+    const rootDir = window.getAnsibleRootDir();
+    const query = rootDir ? `?root_dir=${encodeURIComponent(rootDir)}` : '';
+
+    if (hash === 'working') {
+      if (titleEl) titleEl.textContent = 'Uncommitted Changes (Working Tree vs HEAD)';
+      if (metaEl) metaEl.textContent = 'Active working tree modifications';
+
+      try {
+        const res = await fetch(`${window.ansScope()}/ansible/git/diff/working${query}`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to inspect working tree diff');
+
+        const diffText = (data.diff && data.diff.trim()) ? data.diff : (data.stat && data.stat.trim() ? data.stat : '');
+        if (!diffText) {
+          if (diffEl) diffEl.innerHTML = '<span style="color: #10b981;"><i class="fas fa-check-circle"></i> Working tree is clean. No uncommitted modifications.</span>';
+        } else {
+          if (diffEl) diffEl.innerHTML = window.formatAnsibleGitDiff(diffText);
+        }
+      } catch (err) {
+        if (diffEl) diffEl.innerHTML = `<span style="color: #ef4444;">Error loading working tree diff: ${window.escapeAnsHtml(err.message)}</span>`;
+      }
+      return;
+    }
+
+    const commit = (window.ansibleGitCommits || []).find(c => c.hash === hash);
+    if (titleEl) titleEl.textContent = commit ? commit.message : `Commit ${hash}`;
+    if (metaEl) {
+      metaEl.textContent = commit ? `Commit ${commit.hash} by ${commit.author} (${commit.date})` : '';
+    }
+
+    try {
+      const res = await fetch(`${window.ansScope()}/ansible/git/diff/${encodeURIComponent(hash)}${query}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to load diff');
+
+      const diffText = (data.diff && data.diff.trim()) ? data.diff : (data.stat && data.stat.trim() ? data.stat : '');
+      if (!diffText) {
+        if (diffEl) diffEl.innerHTML = '<span style="color: #64748b;">(No text changes in this commit)</span>';
+      } else {
+        if (diffEl) diffEl.innerHTML = window.formatAnsibleGitDiff(diffText);
+      }
+    } catch (err) {
+      if (diffEl) diffEl.innerHTML = `<span style="color: #ef4444;">Error loading diff: ${window.escapeAnsHtml(err.message)}</span>`;
+    }
+  };
+
+  window.openAnsibleGitBranchModal = async function() {
+    const menu = document.getElementById('ans-git-menu');
+    if (menu) menu.style.display = 'none';
+    const select = document.getElementById('ans-git-branch-select');
+    select.innerHTML = '<option>Loading branches...</option>';
+    document.getElementById('ans-git-branch-modal').style.display = 'block';
+
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const query = rootDir ? `?root_dir=${encodeURIComponent(rootDir)}` : '';
+      const res = await fetch(`${window.ansScope()}/ansible/git/branches${query}`);
+      if (!res.ok) throw new Error("Failed to fetch branches");
+      const data = await res.json();
+      select.innerHTML = '';
+      const branches = data.branches || [];
+      branches.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.name;
+        opt.textContent = b.name + (b.current ? ' (current)' : '');
+        if (b.current) opt.selected = true;
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      select.innerHTML = `<option>Error: ${err.message}</option>`;
+    }
+  };
+
+  window.confirmAnsibleGitBranch = async function() {
+    const select = document.getElementById('ans-git-branch-select');
+    const newNameInput = document.getElementById('ans-git-new-branch-name');
+    const newBranch = (newNameInput?.value || '').trim();
+    const targetBranch = newBranch || select.value;
+
+    if (!targetBranch) { alert("Please select or enter a branch."); return; }
+
+    try {
+      const rootDir = window.getAnsibleRootDir();
+      const payload = new URLSearchParams({
+        branch: targetBranch,
+        create: !!newBranch,
+        root_dir: rootDir
+      });
+      const res = await fetch(`${window.ansScope()}/ansible/git/branch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: payload.toString()
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        alert(`Switched to branch '${targetBranch}'`);
+        document.getElementById('ans-git-branch-modal').style.display = 'none';
+        if (newNameInput) newNameInput.value = '';
+        window.fetchAnsibleGitStatus();
+      } else {
+        alert("Branch checkout failed: " + (data.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert("Branch checkout error: " + err.message);
+    }
+  };
+
+  // Close Git menu when clicking outside
+  document.addEventListener('click', function(e) {
+    const menu = document.getElementById('ans-git-menu');
+    const btn = document.getElementById('ans-git-btn');
+    if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && (!btn || !btn.contains(e.target))) {
+      menu.style.display = 'none';
+    }
+  });
   
   window.updateAnsibleOpenTabs = function() {
       if (!window.currentEditLab) return;
@@ -510,52 +1429,338 @@ window.loadAnsProfiles = async function() {
       } catch (err) { alert("Failed to delete file: " + err.message); }
   };
 
-  window.runAnsiblePlaybook = async function(event, labName) {
-      const btn = event.currentTarget;
-      btn.disabled = true;
-      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
-      btn.classList.replace('w3-green', 'w3-grey');
+// --- ANSIBLE IN-VIEW LIVE OUTPUT STREAMING & AD-HOC SPLITTER ---
+window.initAnsibleAdhocResizer = function() {
+  const resizer = document.getElementById('ans-adhoc-drag-resizer');
+  const scriptContainer = document.getElementById('ans-adhoc-script-container');
+  const consoleContainer = document.getElementById('ans-adhoc-console-container');
+  if (!resizer || !scriptContainer || !consoleContainer) return;
+  if (resizer.__resizerInitialized) return;
+  resizer.__resizerInitialized = true;
 
-      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-      try {
-          const res = await fetch(`${window.ansScope(labName)}/playbook`, { method: 'POST' });
-          if (res.ok) {
-              const data = await res.json().catch(() => ({}));
-              window.location.href = data.log_url || '/logs/current';
-          }
-          else {
-              const data = await res.json();
-              alert("Error: " + (data.error || 'Failed to start playbook'));
-              btn.disabled = false;
-              btn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
-              btn.classList.replace('w3-grey', 'w3-green');
-          }
-      } catch (err) {
-          alert("Error: " + err.message);
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
-          btn.classList.replace('w3-grey', 'w3-green');
+  // Restore saved console height from localStorage
+  try {
+    const savedH = localStorage.getItem('ctlabs_ans_adhoc_console_h');
+    if (savedH && parseInt(savedH, 10) >= 80) {
+      consoleContainer.style.height = parseInt(savedH, 10) + 'px';
+    }
+  } catch(e) {}
+
+  let isDragging = false;
+  let startY = 0;
+  let startConsoleH = 0;
+
+  resizer.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    isDragging = true;
+    startY = e.clientY;
+    startConsoleH = consoleContainer.offsetHeight;
+
+    resizer.style.backgroundColor = '#14b8a6';
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = function(moveEvent) {
+      if (!isDragging) return;
+      const deltaY = moveEvent.clientY - startY;
+      // Dragging UP grows console; dragging DOWN shrinks console
+      const newConsoleH = Math.max(70, Math.min(650, startConsoleH - deltaY));
+      consoleContainer.style.height = newConsoleH + 'px';
+
+      if (window.cmEditors['edit-ansible-commands']) {
+        window.cmEditors['edit-ansible-commands'].refresh();
       }
+    };
+
+    const onMouseUp = function() {
+      if (!isDragging) return;
+      isDragging = false;
+      resizer.style.backgroundColor = '#1e293b';
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+
+      try {
+        localStorage.setItem('ctlabs_ans_adhoc_console_h', consoleContainer.offsetHeight);
+      } catch(e) {}
+
+      if (window.cmEditors['edit-ansible-commands']) {
+        window.cmEditors['edit-ansible-commands'].refresh();
+      }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
+};
+
+window.clearAnsibleCardOutput = function() {
+  const out = document.getElementById('card-ans-output');
+  if (out) out.innerHTML = '';
+};
+
+window.toggleAnsibleCardOutputSize = function() {
+  const out = document.getElementById('card-ans-output');
+  const btn = document.getElementById('card-ans-expand-btn');
+  if (!out) return;
+  const isExpanded = out.style.height === '480px';
+  out.style.height = isExpanded ? '220px' : '480px';
+  out.style.maxHeight = isExpanded ? '400px' : '650px';
+  if (btn) {
+    btn.innerHTML = isExpanded ? '<i class="fas fa-expand-alt"></i>' : '<i class="fas fa-compress-alt"></i>';
+  }
+};
+
+window.activeAnsibleStreamPollers = window.activeAnsibleStreamPollers || {};
+
+window.streamAnsibleOutput = function(options) {
+  const pollerKey = options.pollerKey || 'default';
+  if (window.activeAnsibleStreamPollers[pollerKey]) {
+    clearTimeout(window.activeAnsibleStreamPollers[pollerKey]);
+    delete window.activeAnsibleStreamPollers[pollerKey];
+  }
+
+  const preEl = typeof options.preEl === 'string' ? document.getElementById(options.preEl) : options.preEl;
+  if (!preEl) return;
+
+  const statusBadgeEl = typeof options.statusBadgeEl === 'string' ? document.getElementById(options.statusBadgeEl) : options.statusBadgeEl;
+  const scrollStatusEl = typeof options.scrollStatusEl === 'string' ? document.getElementById(options.scrollStatusEl) : options.scrollStatusEl;
+  const stopBtnEl = typeof options.stopBtnEl === 'string' ? document.getElementById(options.stopBtnEl) : options.stopBtnEl;
+  const runBtnEl = typeof options.runBtnEl === 'string' ? document.getElementById(options.runBtnEl) : options.runBtnEl;
+  const fullLogLinkEl = typeof options.fullLogLinkEl === 'string' ? document.getElementById(options.fullLogLinkEl) : options.fullLogLinkEl;
+
+  if (statusBadgeEl) {
+    statusBadgeEl.className = 'w3-badge w3-tiny w3-round w3-teal';
+    statusBadgeEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+  }
+  if (stopBtnEl) stopBtnEl.style.display = 'inline-block';
+  if (fullLogLinkEl && options.logId) {
+    fullLogLinkEl.href = `/logs?id=${encodeURIComponent(options.logId)}`;
+  }
+
+  let isAutoScroll = true;
+  preEl.onscroll = () => {
+    const atBottom = preEl.scrollHeight - preEl.scrollTop <= preEl.clientHeight + 30;
+    isAutoScroll = atBottom;
+    if (scrollStatusEl) {
+      scrollStatusEl.textContent = isAutoScroll ? '' : '⏸ Paused';
+    }
   };
 
+  let currentOffset = typeof options.initialOffset === 'number' ? options.initialOffset : 0;
+  let isFetching = false;
+  let nonRunningChecks = 0;
+  let pollAttempts = 0;
+  let hasSeenRunning = false;
+
+  async function poll() {
+    if (isFetching) return;
+    isFetching = true;
+    pollAttempts++;
+
+    try {
+      // 1. Fetch streaming log content
+      if (options.logId) {
+        const url = `/logs/content?id=${encodeURIComponent(options.logId)}&offset=${currentOffset}&format=json&t=${Date.now()}`;
+        const res = await fetch(url, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          currentOffset = data.offset;
+          if (data.content && data.content.trim() !== '') {
+            if (preEl.innerHTML.includes('Starting ad-hoc execution') ||
+                preEl.innerHTML.includes('Starting execution') ||
+                preEl.innerHTML.includes('Starting playbook execution') ||
+                preEl.innerHTML.includes('Waiting for log output...')) {
+              preEl.innerHTML = '';
+            }
+            preEl.insertAdjacentHTML('beforeend', data.content);
+            if (isAutoScroll) preEl.scrollTop = preEl.scrollHeight;
+          }
+        }
+      }
+
+      // 2. Query status endpoint
+      const scopeUrl = options.scope || (typeof window.ansScope === 'function' ? window.ansScope() : '');
+      const statusRes = await fetch(`${scopeUrl}/playbook/status?t=${Date.now()}`);
+      let isRunning = false;
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        isRunning = Boolean(statusData.running);
+        if (!options.logId && statusData.log_id) {
+          options.logId = statusData.log_id;
+          if (fullLogLinkEl) fullLogLinkEl.href = `/logs?id=${encodeURIComponent(options.logId)}`;
+        }
+      }
+
+      if (isRunning) {
+        hasSeenRunning = true;
+        nonRunningChecks = 0;
+      } else {
+        if (hasSeenRunning || pollAttempts >= 5) {
+          nonRunningChecks++;
+        }
+      }
+
+      const logText = preEl.textContent || '';
+      const hasCompletedMarker = logText.includes('--- Playbook execution completed ---') ||
+                                 logText.includes('Playbook execution completed') ||
+                                 logText.includes('PLAY RECAP') ||
+                                 logText.includes('Playbook failed:') ||
+                                 logText.includes('stopped by user');
+
+      const isFinished = (hasSeenRunning && nonRunningChecks >= 2) ||
+                         (hasCompletedMarker && !isRunning) ||
+                         (nonRunningChecks >= 3 && pollAttempts >= 8);
+
+      // After confirmation that run is completed, do final flush and finish
+      if (isFinished && pollAttempts > 1) {
+        if (options.logId) {
+          try {
+            const finalRes = await fetch(`/logs/content?id=${encodeURIComponent(options.logId)}&offset=${currentOffset}&format=json&t=${Date.now()}`, { cache: 'no-store' });
+            if (finalRes.ok) {
+              const finalData = await finalRes.json();
+              if (finalData.content && finalData.content.trim() !== '') {
+                preEl.insertAdjacentHTML('beforeend', finalData.content);
+                if (isAutoScroll) preEl.scrollTop = preEl.scrollHeight;
+              }
+            }
+          } catch(e) {}
+        }
+
+        const finalLogText = preEl.textContent || '';
+        const hasStopped = finalLogText.includes('stopped by user');
+        const hasFailed = finalLogText.includes('Playbook execution failed') || finalLogText.includes('Playbook failed') || (finalLogText.includes('failed=') && !finalLogText.includes('failed=0'));
+
+        if (statusBadgeEl) {
+          if (hasStopped) {
+            statusBadgeEl.className = 'w3-badge w3-tiny w3-round w3-orange';
+            statusBadgeEl.innerHTML = '<i class="fas fa-stop"></i> Stopped';
+          } else if (hasFailed) {
+            statusBadgeEl.className = 'w3-badge w3-tiny w3-round w3-red';
+            statusBadgeEl.innerHTML = '<i class="fas fa-times"></i> Failed';
+          } else {
+            statusBadgeEl.className = 'w3-badge w3-tiny w3-round w3-green';
+            statusBadgeEl.innerHTML = '<i class="fas fa-check"></i> Completed';
+          }
+        }
+
+        if (stopBtnEl) stopBtnEl.style.display = 'none';
+        if (runBtnEl) {
+          runBtnEl.disabled = false;
+          if (options.runBtnOriginalHtml) runBtnEl.innerHTML = options.runBtnOriginalHtml;
+        }
+
+        const pbRunBtn = document.getElementById('card-ans-run-playbook-btn');
+        if (pbRunBtn) {
+          pbRunBtn.disabled = false;
+          pbRunBtn.innerHTML = '<i class="fas fa-play"></i> Run Playbook';
+          pbRunBtn.classList.replace('w3-grey', 'w3-green');
+        }
+        const pbStopBtn = document.getElementById('card-ans-stop-playbook-btn');
+        if (pbStopBtn) pbStopBtn.style.display = 'none';
+
+        delete window.activeAnsibleStreamPollers[pollerKey];
+        return;
+      }
+    } catch(err) {
+      console.warn("streamAnsibleOutput error:", err);
+    } finally {
+      isFetching = false;
+      window.activeAnsibleStreamPollers[pollerKey] = setTimeout(poll, 1000);
+    }
+  }
+
+  poll();
+};
+
+window.runAnsiblePlaybook = async function(event, labName) {
+  const btn = event.currentTarget;
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting...';
+  btn.classList.replace('w3-green', 'w3-grey');
+
+  const outContainer = document.getElementById('card-ans-output-container');
+  const outPre = document.getElementById('card-ans-output');
+  const outTitle = document.getElementById('card-ans-output-title');
+  if (outContainer) outContainer.style.display = 'block';
+  if (outTitle) outTitle.textContent = 'Ansible Output';
+  if (outPre) outPre.innerHTML = '<i style="color: #64748b;">Starting playbook execution...</i>\n';
+
+  try {
+    const res = await fetch(`${window.ansScope(labName)}/playbook`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (outPre) {
+        window.streamAnsibleOutput({
+          logId: data.log_id,
+          initialOffset: typeof data.offset === 'number' ? data.offset : 0,
+          scope: window.ansScope(labName),
+          preEl: 'card-ans-output',
+          statusBadgeEl: 'card-ans-status-badge',
+          scrollStatusEl: 'card-ans-scroll-status',
+          stopBtnEl: 'card-ans-stop-playbook-btn',
+          runBtnEl: btn,
+          runBtnOriginalHtml: '<i class="fas fa-play"></i> Run Playbook',
+          fullLogLinkEl: 'card-ans-full-log-link',
+          pollerKey: 'card'
+        });
+      } else {
+        window.location.href = data.log_url || '/logs/current';
+      }
+    } else {
+      alert("Error: " + (data.error || 'Failed to start playbook'));
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      btn.classList.replace('w3-grey', 'w3-green');
+    }
+  } catch (err) {
+    alert("Error: " + err.message);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+    btn.classList.replace('w3-grey', 'w3-green');
+  }
+};
+
+window.runAnsibleAdhocCard = function(event, labName) {
+  return window.runAnsiblePlaybook(event, labName);
+};
 
 window.stopAnsiblePlaybook = async function(event, labName) {
-      const btn = event.currentTarget;
+  const btn = event.currentTarget;
+  try {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
+    const res = await fetch(`${window.ansScope(labName)}/playbook/stop`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || data.error || 'Stop failed');
+    if (!document.getElementById('card-ans-output')) {
+      window.location.reload();
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Stop failed';
+    btn.title = err.message;
+  }
+};
 
-      const safeLab = (labName || '').replace(/\.ya?ml$/i, '').split('/').map(encodeURIComponent).join('/');
-      try {
-          btn.disabled = true;
-          btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Stopping...';
-          const res = await fetch(`${window.ansScope(labName)}/playbook/stop`, { method: 'POST' });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.message || data.error || 'Stop failed');
-          window.location.reload();
-      } catch (err) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Stop failed';
-          btn.title = err.message;
-      }
-  };
+document.addEventListener('DOMContentLoaded', () => {
+  const cardOut = document.getElementById('card-ans-output');
+  const cardContainer = document.getElementById('card-ans-output-container');
+  const badge = document.getElementById('card-ans-status-badge');
+  if (cardOut && cardContainer && badge && badge.textContent.includes('Running')) {
+    window.streamAnsibleOutput({
+      preEl: 'card-ans-output',
+      statusBadgeEl: 'card-ans-status-badge',
+      scrollStatusEl: 'card-ans-scroll-status',
+      stopBtnEl: 'card-ans-stop-playbook-btn',
+      runBtnEl: 'card-ans-run-playbook-btn',
+      fullLogLinkEl: 'card-ans-full-log-link',
+      pollerKey: 'card'
+    });
+  }
+});
 
 
 // ----------------------------------------------------------------------------

@@ -12,24 +12,29 @@
   select.w3-select  { font-family: monospace !important; }
 </style>
 
-<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
+<%
+  lab_is_running = defined?(get_running_lab) && get_running_lab == info_hash[:lab_path]
+  pb_running = (lab_is_running && defined?(Automation) && Automation.playbook_running?(info_hash[:lab_path])) rescue false
+%>
+
+<div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;" id="card-ansible-main">
+  <!-- Card Header -->
   <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
     <span><i class="fas fa-code-branch w3-text-blue"></i> Ansible</span>
     <div>
       <button type="button" onclick="window.openAnsibleEditor('<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-blue" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-right: 4px;"><i class="fas fa-edit"></i> Edit</button>
-      <% if defined?(get_running_lab) && get_running_lab == info_hash[:lab_path] && info_hash[:ansible][:playbook] != 'N/A' %>
-        <% pb_running = Automation.playbook_running?(info_hash[:lab_path]) rescue false %>
-        <button type="button" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 3px 10px; font-size: 13px; font-weight: 600;" <%= pb_running ? 'disabled' : '' %>>
+      <% if lab_is_running && info_hash[:ansible][:playbook] != 'N/A' %>
+        <button type="button" id="card-ans-run-playbook-btn" onclick="window.runAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-round <%= pb_running ? 'w3-grey' : 'w3-green' %>" style="padding: 3px 10px; font-size: 13px; font-weight: 600;" <%= pb_running ? 'disabled' : '' %>>
           <i class="fas <%= pb_running ? 'fa-spinner fa-spin' : 'fa-play' %>"></i> <%= pb_running ? 'Running...' : 'Run Playbook' %>
         </button>
-        <% if pb_running %>
-          <button type="button" onclick="window.stopAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-red" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-left: 4px;" title="Send SIGTERM to the running playbook">
-            <i class="fas fa-stop"></i> Stop
-          </button>
-        <% end %>
+        <button type="button" id="card-ans-stop-playbook-btn" onclick="window.stopAnsiblePlaybook(event, '<%= info_hash[:lab_path] %>')" class="w3-button w3-round w3-red" style="padding: 3px 10px; font-size: 13px; font-weight: 600; margin-left: 4px; <%= pb_running ? '' : 'display:none;' %>" title="Send SIGTERM to running playbook">
+          <i class="fas fa-stop"></i> Stop
+        </button>
       <% end %>
     </div>
   </div>
+
+  <!-- Playbook Details -->
   <div class="w3-padding w3-small">
     <table class="w3-table">
       <tr><td style="color: #94a3b8; width: 120px;">Playbook:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= info_hash[:ansible][:playbook] %></code></td></tr>
@@ -37,6 +42,33 @@
       <tr><td style="color: #94a3b8;">Environment:</td><td><% (info_hash[:ansible][:environment] || []).each do |e| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= e %></code></div><% end %></td></tr>
       <tr><td style="color: #94a3b8;">Tags:</td><td><% (info_hash[:ansible][:tags] || []).each do |t| %><span style="display: inline-block; background-color: #1e293b; color: #34d399; border: 1px solid #10b981; padding: 1px 8px; border-radius: 10px; font-weight: 600; margin: 0 4px 2px 0;"><%= t %></span><% end %></td></tr>
     </table>
+  </div>
+
+  <!-- Live Output Console (Streams in-view for Playbook) -->
+  <div id="card-ans-output-container" style="display: <%= pb_running ? 'block' : 'none' %>; border-top: 1px solid #334155; background-color: #0b1120;">
+    <div style="padding: 5px 12px; background-color: #0f172a; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8;">
+          <i class="fas fa-terminal w3-text-blue"></i> <span id="card-ans-output-title">Ansible Output</span>
+        </span>
+        <span id="card-ans-status-badge" class="w3-badge w3-tiny w3-round <%= pb_running ? 'w3-teal' : 'w3-dark-grey' %>" style="font-family: monospace;">
+          <%= pb_running ? 'Running...' : 'Idle' %>
+        </span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span id="card-ans-scroll-status" style="font-size: 11px; color: #64748b;"></span>
+        <button type="button" onclick="window.clearAnsibleCardOutput()" class="w3-button w3-tiny w3-round" style="background-color: #334155; color: #cbd5e1; padding: 2px 8px;" title="Clear console">
+          <i class="fas fa-eraser"></i> Clear
+        </button>
+        <button type="button" onclick="window.toggleAnsibleCardOutputSize()" id="card-ans-expand-btn" class="w3-button w3-tiny w3-round" style="background-color: #334155; color: #cbd5e1; padding: 2px 8px;" title="Toggle expanded console view">
+          <i class="fas fa-expand-alt"></i>
+        </button>
+        <a id="card-ans-full-log-link" href="/logs/current" target="_blank" class="w3-button w3-tiny w3-round" style="background-color: #334155; color: #38bdf8; padding: 2px 8px;" title="Open in dedicated log page">
+          <i class="fas fa-external-link-alt"></i>
+        </a>
+      </div>
+    </div>
+    <pre id="card-ans-output" class="log-terminal slim-scroll" style="margin: 0; padding: 10px 14px; font-family: monospace; font-size: 12px; line-height: 1.45; color: #f8fafc; height: 220px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; background-color: #0b1120;"></pre>
   </div>
 </div>
 

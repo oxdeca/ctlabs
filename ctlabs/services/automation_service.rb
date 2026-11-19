@@ -450,4 +450,214 @@ PY
     repos[:terraform].uniq!
     repos
   end
+
+  # =========================================================================
+  # GIT OPERATIONS (Ansible & Automation Repositories)
+  # =========================================================================
+
+  def self.git_available?
+    @git_available ||= system('git --version > /dev/null 2>&1')
+  end
+
+  def self.run_git_in_dir(dir, *args, container: nil)
+    base = resolve_ansible_dir(dir)
+    if Dir.exist?(base)
+      cmd = ['git', '-C', base] + args
+      out, err, status = Open3.capture3(*cmd)
+      return { ok: status.success?, stdout: out.to_s, stderr: err.to_s, exitstatus: status.exitstatus }
+    elsif container && container_running?(container)
+      esc_cmd = (['git', '-C', base] + args).map { |a| Shellwords.escape(a) }.join(' ')
+      out, err, status = Open3.capture3("docker exec #{container} #{esc_cmd} 2>&1")
+      return { ok: status.success?, stdout: out.to_s, stderr: err.to_s, exitstatus: status.exitstatus }
+    else
+      return { ok: false, stdout: '', stderr: "Directory #{base} not found", exitstatus: 1 }
+    end
+  end
+
+  def self.git_status(dir = nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    res = run_git_in_dir(base, 'status', '--porcelain=v1', '-b', container: container)
+    return { ok: false, success: false, git_repo: false, error: res[:stderr].empty? ? 'Git command failed' : res[:stderr] } unless res[:ok]
+
+    lines = res[:stdout].lines.map(&:chomp)
+    branch_header = lines.first || '## unknown'
+    branch_match = branch_header.match(/\A##\s+([^\s\.]+)/)
+    branch = branch_match ? branch_match[1] : 'unknown'
+    ahead = branch_header[/ahead (\d+)/, 1]&.to_i || 0
+    behind = branch_header[/behind (\d+)/, 1]&.to_i || 0
+
+    entries = lines[1..-1] || []
+    modified = []
+    untracked = []
+    staged = []
+
+    entries.each do |line|
+      next if line.strip.empty?
+      code = line[0..1]
+      path = line[3..-1].to_s.strip
+      if code[0] != ' ' && code[0] != '?'
+        staged << path
+      end
+      if code[1] == 'M' || code[1] == 'D'
+        modified << path
+      elsif code == '??'
+        untracked << path
+      end
+    end
+
+    head_res = run_git_in_dir(base, 'rev-parse', '--short', 'HEAD', container: container)
+    head_hash = head_res[:ok] ? head_res[:stdout].strip : ''
+
+    {
+      ok: true,
+      success: true,
+      git_repo: true,
+      branch: branch,
+      hash: head_hash,
+      clean: entries.empty?,
+      ahead: ahead,
+      behind: behind,
+      staged: staged,
+      modified: modified,
+      untracked: untracked,
+      total_changes: entries.size,
+      raw: res[:stdout]
+    }
+  end
+
+  def self.git_commit(message, dir = nil, author: nil, files: nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    msg = message.to_s.strip
+    return { ok: false, success: false, error: 'Commit message is required' } if msg.empty?
+
+    # Ensure git user config exists if not set
+    name_check = run_git_in_dir(base, 'config', 'user.name', container: container)
+    if !name_check[:ok] || name_check[:stdout].strip.empty?
+      run_git_in_dir(base, 'config', 'user.name', 'ctlabs', container: container)
+    end
+    email_check = run_git_in_dir(base, 'config', 'user.email', container: container)
+    if !email_check[:ok] || email_check[:stdout].strip.empty?
+      run_git_in_dir(base, 'config', 'user.email', 'ctlabs@ctlabs.internal', container: container)
+    end
+
+    if files && !files.empty?
+      Array(files).each do |f|
+        run_git_in_dir(base, 'add', '--', f, container: container)
+      end
+    else
+      run_git_in_dir(base, 'add', '-A', container: container)
+    end
+
+    args = ['commit', '-m', msg]
+    args += ['--author', author] if author && !author.strip.empty?
+    res = run_git_in_dir(base, *args, container: container)
+
+    if res[:ok]
+      head_res = run_git_in_dir(base, 'rev-parse', '--short', 'HEAD', container: container)
+      { ok: true, success: true, message: msg, hash: head_res[:stdout].strip }
+    else
+      { ok: false, success: false, error: res[:stderr].empty? ? res[:stdout] : res[:stderr] }
+    end
+  end
+
+  def self.git_pull(dir = nil, remote: 'origin', branch: nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    args = ['pull']
+    args << remote if remote && !remote.strip.empty?
+    args << branch if branch && !branch.strip.empty?
+    res = run_git_in_dir(base, *args, container: container)
+    { ok: res[:ok], success: res[:ok], output: res[:stdout], error: res[:stderr] }
+  end
+
+  def self.git_push(dir = nil, remote: 'origin', branch: nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    args = ['push']
+    args << remote if remote && !remote.strip.empty?
+    args << branch if branch && !branch.strip.empty?
+    res = run_git_in_dir(base, *args, container: container)
+    { ok: res[:ok], success: res[:ok], output: res[:stdout], error: res[:stderr] }
+  end
+
+  def self.git_history(dir = nil, limit: 30, container: nil)
+    base = resolve_ansible_dir(dir)
+    res = run_git_in_dir(base, 'log', "-n", limit.to_s, '--pretty=format:%h|%an|%ar|%s', container: container)
+    return { ok: false, success: false, error: res[:stderr] } unless res[:ok]
+
+    commits = res[:stdout].lines.map do |l|
+      parts = l.strip.split('|', 4)
+      next unless parts && parts.length >= 4
+      { hash: parts[0], author: parts[1], date: parts[2], message: parts[3] }
+    end.compact
+
+    { ok: true, success: true, commits: commits }
+  end
+
+  def self.git_branches(dir = nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    res = run_git_in_dir(base, 'branch', '--no-color', container: container)
+    return { ok: false, success: false, error: res[:stderr] } unless res[:ok]
+
+    current = 'main'
+    branches_list = []
+    res[:stdout].lines.each do |l|
+      line = l.strip
+      if line.start_with?('* ')
+        bname = line.sub('* ', '').strip
+        current = bname
+        branches_list << { name: bname, current: true }
+      elsif !line.empty?
+        branches_list << { name: line, current: false }
+      end
+    end
+
+    { ok: true, success: true, current: current, branches: branches_list }
+  end
+
+  def self.git_checkout(branch, dir = nil, create: false, container: nil)
+    base = resolve_ansible_dir(dir)
+    args = ['checkout']
+    args << '-b' if create
+    args << branch.to_s.strip
+    res = run_git_in_dir(base, *args, container: container)
+    { ok: res[:ok], success: res[:ok], output: res[:stdout], error: res[:stderr] }
+  end
+
+  def self.git_diff(hash, dir = nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    clean_hash = hash.to_s.strip
+    return { ok: false, success: false, error: 'Invalid commit hash' } unless clean_hash =~ /\A[a-f0-9]{4,40}\z/i
+
+    stat_res = run_git_in_dir(base, 'show', '--stat', '--oneline', clean_hash, container: container)
+    patch_res = run_git_in_dir(base, 'show', '-p', clean_hash, container: container)
+
+    if patch_res[:ok]
+      { ok: true, success: true, hash: clean_hash, stat: stat_res[:stdout], diff: patch_res[:stdout] }
+    else
+      { ok: false, success: false, error: patch_res[:stderr].empty? ? patch_res[:stdout] : patch_res[:stderr] }
+    end
+  end
+
+  def self.git_diff_working(dir = nil, container: nil)
+    base = resolve_ansible_dir(dir)
+    stat_res = run_git_in_dir(base, 'diff', '--stat', 'HEAD', container: container)
+    patch_res = run_git_in_dir(base, 'diff', 'HEAD', container: container)
+
+    patch_text = patch_res[:stdout].to_s
+    stat_text = stat_res[:stdout].to_s
+
+    # Include untracked files in working tree diff
+    p_res = run_git_in_dir(base, 'status', '--porcelain', container: container)
+    if p_res[:ok]
+      p_res[:stdout].lines.each do |line|
+        code = line[0..1]
+        file = line[3..-1].to_s.strip
+        if code == '??' && !file.empty?
+          u_res = run_git_in_dir(base, 'diff', '--no-index', '--', '/dev/null', file, container: container)
+          patch_text = [patch_text, u_res[:stdout].to_s].reject(&:empty?).join("\n") unless u_res[:stdout].to_s.empty?
+        end
+      end
+    end
+
+    { ok: true, success: true, hash: 'working', stat: stat_text, diff: patch_text }
+  end
 end
