@@ -202,7 +202,7 @@ if (window.CodeMirror && CodeMirror.Vim && !window.__ansVimExDefined) {
     const closeAns = function() { const m = document.getElementById('ansible-editor-modal'); if (m) m.style.display = 'none'; };
     const prevW = null;
     CodeMirror.Vim.defineEx('write', 'w', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig(); });
-    CodeMirror.Vim.defineEx('wq', 'wq', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) { window.saveAnsibleConfig(); closeAns(); } });
+    CodeMirror.Vim.defineEx('wq', 'wq', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig({ closeAfter: true }); });
     CodeMirror.Vim.defineEx('quit', 'q', function(cm) { if (inAns(cm)) closeAns(); });
 }
 
@@ -274,3 +274,15 @@ window.autoResizeLayout = function() {
     }
 };
 window.addEventListener('resize', window.autoResizeLayout);
+
+// Modal-level save shortcut (Ctrl+S / Cmd+S)
+window.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('ansible-editor-modal');
+    if (!modal || modal.style.display === 'none') return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (typeof window.saveAnsibleConfig === 'function') {
+            window.saveAnsibleConfig();
+        }
+    }
+});

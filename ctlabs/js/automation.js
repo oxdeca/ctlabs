@@ -653,7 +653,7 @@ window.loadAnsProfiles = async function() {
     } catch (err) { alert("Error: " + err.message); }
 };
 
-  window.saveAnsibleConfig = async function() {
+  window.saveAnsibleConfig = async function(options = {}) {
       const resultDiv = document.getElementById('ansible-editor-result');
       if (window.snapshotActiveAnsibleWorkspace) {
         window.snapshotActiveAnsibleWorkspace();
@@ -694,11 +694,12 @@ window.loadAnsProfiles = async function() {
           setup_profiles: setupProf
       });
 
-      resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
-      resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration and files...';
+      if (resultDiv) {
+        resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
+        resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving configuration and files...';
+      }
 
-      // Disable while the request is in flight so a second click can't fire a
-      // duplicate save (the two POSTs would race the reload below).
+      // Disable while the request is in flight so a second click can't fire a duplicate save
       const saveBtn = document.getElementById('ans-save-btn');
       const saveBtnHtml = saveBtn ? saveBtn.innerHTML : null;
       if (saveBtn) {
@@ -715,9 +716,48 @@ window.loadAnsProfiles = async function() {
           });
           
           if (res.ok) {
-              resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
-              resultDiv.textContent = '✅ All files and workspace profiles saved successfully.';
-              setTimeout(() => location.reload(), 800);
+              if (resultDiv) {
+                resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
+                resultDiv.textContent = '✅ All files and workspace profiles saved successfully.';
+                setTimeout(() => {
+                  if (resultDiv && resultDiv.textContent.includes('saved successfully')) {
+                    resultDiv.style.display = 'none';
+                  }
+                }, 2500);
+              }
+
+              if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved';
+                setTimeout(() => { if (saveBtn) saveBtn.innerHTML = saveBtnHtml; }, 2000);
+              }
+
+              // Update Vim status key indicator if visible
+              const keyEl = document.getElementById('ans-vim-status-key');
+              if (keyEl) {
+                const origText = keyEl.textContent;
+                keyEl.textContent = '[Saved]';
+                keyEl.style.color = '#10b981';
+                setTimeout(() => {
+                  if (keyEl.textContent === '[Saved]') {
+                    keyEl.textContent = origText;
+                    keyEl.style.color = '';
+                  }
+                }, 2000);
+              }
+
+              // Refresh Git status indicator if active
+              if (typeof window.fetchAnsibleGitStatus === 'function') {
+                window.fetchAnsibleGitStatus(false);
+              }
+
+              if (options && options.closeAfter) {
+                const modal = document.getElementById('ansible-editor-modal');
+                if (modal) modal.style.display = 'none';
+              } else if (options && options.reload) {
+                setTimeout(() => location.reload(), 800);
+              }
+
               return true;
           } else {
               // Safely handle HTML vs JSON error responses
@@ -727,8 +767,10 @@ window.loadAnsProfiles = async function() {
               throw new Error(errMsg);
           }
       } catch (err) {
-          resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
-          resultDiv.innerHTML = '❌ ' + err.message;
+          if (resultDiv) {
+            resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
+            resultDiv.innerHTML = '❌ ' + err.message;
+          }
           if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
           return false;
       }
