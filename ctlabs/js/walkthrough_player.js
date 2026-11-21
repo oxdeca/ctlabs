@@ -807,6 +807,15 @@
       stepContextEdit.style.display = (dataType === 'markdown') ? 'flex' : 'none';
     }
 
+    const currentStatus = (btn.getAttribute('data-status') || 'none').toLowerCase();
+    stepContextMenu.querySelectorAll('.step-status-option').forEach(opt => {
+      const optStatus = opt.getAttribute('data-status');
+      const check = opt.querySelector('.step-status-active-check');
+      if (check) {
+        check.style.display = (optStatus === currentStatus) ? 'inline-block' : 'none';
+      }
+    });
+
     stepContextMenu.style.display = 'block';
     const rect = stepContextMenu.getBoundingClientRect();
     let x = e.clientX;
@@ -953,6 +962,74 @@
         stepContextCopyLink.innerHTML = original;
         hideStepContextMenu();
       }, 800);
+    });
+  }
+
+  function renderStatusBadge(status) {
+    if (status === 'done') {
+      return '<i class="fas fa-check-circle" style="color: #10b981;" title="Status: Done"></i>';
+    } else if (status === 'in_progress') {
+      return '<i class="fas fa-spinner fa-spin" style="color: #f59e0b;" title="Status: In Progress"></i>';
+    } else if (status === 'open') {
+      return '<i class="far fa-circle" style="color: #38bdf8;" title="Status: Open"></i>';
+    }
+    return '';
+  }
+
+  function updateStepStatusBadge(btn, status) {
+    if (!btn) return;
+    const badge = btn.querySelector('.step-status-badge');
+    const norm = (status || 'none').toLowerCase();
+    if (badge) {
+      badge.innerHTML = renderStatusBadge(norm);
+      badge.style.marginRight = badge.innerHTML ? '5px' : '0px';
+    }
+    btn.setAttribute('data-status', norm);
+  }
+
+  function saveStepStatus(id, newStatus, btn) {
+    const activeWalkthrough = (window.activeWalkthrough || (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : ''));
+    const body = new URLSearchParams({
+      status: newStatus,
+      walkthrough: activeWalkthrough
+    });
+
+    // Optimistic update
+    updateStepStatusBadge(btn, newStatus);
+
+    fetch(`/recordings/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'Accept': 'application/json'
+      },
+      body: body,
+      credentials: 'same-origin'
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.ok) {
+        updateStepStatusBadge(btn, data.status || 'none');
+      }
+    })
+    .catch(err => {
+      console.error('Failed to update step status:', err);
+    });
+  }
+
+  if (stepContextMenu) {
+    stepContextMenu.querySelectorAll('.step-status-option').forEach(btnOpt => {
+      btnOpt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!stepContextBtn) return;
+        const targetBtn = stepContextBtn;
+        const newStatus = btnOpt.getAttribute('data-status');
+        const id = targetBtn.getAttribute('data-id');
+        hideStepContextMenu();
+        if (id && newStatus) {
+          saveStepStatus(id, newStatus, targetBtn);
+        }
+      });
     });
   }
 

@@ -1283,6 +1283,38 @@ class RecordingsController < BaseController
     redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
   end
 
+  post '/recordings/:id/status' do
+    halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
+
+    raw_status = params[:status]
+    if raw_status.nil? && (request.media_type == 'application/json' || request.content_type =~ /application\/json/)
+      begin
+        body_json = JSON.parse(request.body.read)
+        raw_status = body_json['status'] if body_json.is_a?(Hash)
+      rescue StandardError
+      end
+    end
+
+    status_val = raw_status.to_s.strip.downcase.tr(' ', '_')
+    allowed = %w[done open in_progress none]
+    halt 400, 'Invalid status' unless allowed.include?(status_val)
+
+    updated = RecordingService.update_status(params[:id], status_val)
+    halt 404, 'Recording not found' unless updated
+
+    status_resp = (status_val == 'none' ? nil : status_val)
+
+    if request.xhr? || request.accept?('application/json') || request.media_type == 'application/json'
+      content_type :json
+      return { ok: true, id: params[:id], status: status_resp }.to_json
+    end
+
+    wks  = RecordingService.load_walkthroughs
+    slug = params[:walkthrough].to_s
+    slug = wks.keys.first.to_s unless wks.key?(slug)
+    redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
+  end
+
   post '/recordings/:id/delete' do
     halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
 

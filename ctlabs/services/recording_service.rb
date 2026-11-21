@@ -973,6 +973,8 @@ class RecordingService
       end
 
       created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
+      status = meta_data['status'].to_s.strip
+      status = nil if status.empty? || status == 'none'
 
       return {
         id:         id,
@@ -982,7 +984,8 @@ class RecordingService
         type:       :markdown,
         created_at: created_at,
         duration:   0.0,
-        size:       size
+        size:       size,
+        status:     status
       }
     end
 
@@ -1005,6 +1008,8 @@ class RecordingService
       title = 'Browser Recording' if title.empty?
       duration = meta_data['duration'].to_f
       created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
+      status = meta_data['status'].to_s.strip
+      status = nil if status.empty? || status == 'none'
 
       return {
         id:         id,
@@ -1014,7 +1019,8 @@ class RecordingService
         type:       :video,
         created_at: created_at,
         duration:   duration,
-        size:       size
+        size:       size,
+        status:     status
       }
     end
 
@@ -1035,6 +1041,19 @@ class RecordingService
       File.mtime(path)
     end
 
+    status = header['status'].to_s.strip
+    if status.empty?
+      meta_file = File.join(File.dirname(path), "#{id}.json")
+      if File.file?(meta_file)
+        begin
+          m = JSON.parse(File.read(meta_file))
+          status = m['status'].to_s.strip if m.is_a?(Hash)
+        rescue StandardError
+        end
+      end
+    end
+    status = nil if status.empty? || status == 'none'
+
     {
       id:         id,
       path:       path,
@@ -1045,7 +1064,8 @@ class RecordingService
       rows:       header['height'],
       created_at: created_at,
       duration:   last_event_time(path, size),
-      size:       size
+      size:       size,
+      status:     status
     }
   end
 
@@ -1228,6 +1248,92 @@ class RecordingService
 
     File.write(path, lines.join)
     RecordingGitService.commit("Update recording '#{id}' title to '#{title}'", files: [path]) rescue nil
+    true
+  rescue StandardError
+    false
+  end
+
+  def self.update_status(id, status)
+    path = path_for(id)
+    return false unless path
+
+    clean_status = status.to_s.strip.downcase.tr(' ', '_')
+    clean_status = 'none' unless %w[done open in_progress none].include?(clean_status)
+
+    if path.end_with?(MD_EXT)
+      id_clean = File.basename(path, MD_EXT)
+      dir = File.dirname(path)
+      meta_file = File.join(dir, "#{id_clean}.json")
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
+      end
+      meta_data = {} unless meta_data.is_a?(Hash)
+      if clean_status == 'none'
+        meta_data.delete('status')
+      else
+        meta_data['status'] = clean_status
+      end
+      meta_data['type'] ||= 'markdown'
+      meta_data['created_at'] ||= File.mtime(path).to_i
+      File.write(meta_file, JSON.pretty_generate(meta_data))
+      RecordingGitService.commit("Update note '#{id}' status to '#{clean_status}'", files: [meta_file]) rescue nil
+      return true
+    end
+
+    if VIDEO_EXTS.any? { |e| path.end_with?(e) }
+      ext = File.extname(path)
+      id_clean = File.basename(path, ext)
+      dir = File.dirname(path)
+      meta_file = File.join(dir, "#{id_clean}.json")
+      meta_data = {}
+      if File.file?(meta_file)
+        begin
+          meta_data = JSON.parse(File.read(meta_file))
+        rescue StandardError
+          meta_data = {}
+        end
+      end
+      meta_data = {} unless meta_data.is_a?(Hash)
+      if clean_status == 'none'
+        meta_data.delete('status')
+      else
+        meta_data['status'] = clean_status
+      end
+      meta_data['type'] ||= 'video'
+      meta_data['created_at'] ||= File.mtime(path).to_i
+      File.write(meta_file, JSON.pretty_generate(meta_data))
+      RecordingGitService.commit("Update video '#{id}' status to '#{clean_status}'", files: [meta_file]) rescue nil
+      return true
+    end
+
+    lines = File.readlines(path)
+    return false if lines.empty?
+
+    header = begin
+      JSON.parse(lines[0])
+    rescue StandardError
+      nil
+    end
+    return false unless header.is_a?(Hash)
+
+    if clean_status == 'none'
+      header.delete('status')
+      header['ctlabs'].delete('status') if header['ctlabs'].is_a?(Hash)
+    else
+      header['status'] = clean_status
+      if header['ctlabs'].is_a?(Hash)
+        header['ctlabs']['status'] = clean_status
+      end
+    end
+    lines[0] = JSON.generate(header) + "\n"
+
+    File.write(path, lines.join)
+    RecordingGitService.commit("Update recording '#{id}' status to '#{clean_status}'", files: [path]) rescue nil
     true
   rescue StandardError
     false

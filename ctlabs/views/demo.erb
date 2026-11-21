@@ -236,6 +236,7 @@
                         data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step="<%= r[:step] || (idx + 1) %>"
+                        data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -252,8 +253,17 @@
                       <div style="color: #94a3b8; font-size: 0.8em; white-space: nowrap;"><%= is_md ? 'Text' : RecordingService.duration_label(r[:duration]) %></div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.8em;">
-                      <div>
+                      <div style="display: flex; align-items: center;">
                         <i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i>
+                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 5px;' : '' %>">
+                          <% if r[:status].to_s == 'done' %>
+                            <i class="fas fa-check-circle" style="color: #10b981;" title="Status: Done"></i>
+                          <% elsif r[:status].to_s == 'in_progress' %>
+                            <i class="fas fa-spinner fa-spin" style="color: #f59e0b;" title="Status: In Progress"></i>
+                          <% elsif r[:status].to_s == 'open' %>
+                            <i class="far fa-circle" style="color: #38bdf8;" title="Status: Open"></i>
+                          <% end %>
+                        </span>
                         <% if is_md %>
                           <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
                         <% elsif is_vid %>
@@ -336,6 +346,7 @@
                         data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step=""
+                        data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -352,7 +363,16 @@
                       <div style="color: #94a3b8; font-size: 0.78em; white-space: nowrap;"><%= is_md ? 'Text' : RecordingService.duration_label(r[:duration]) %></div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.76em;">
-                      <div>
+                      <div style="display: flex; align-items: center;">
+                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 5px;' : '' %>">
+                          <% if r[:status].to_s == 'done' %>
+                            <i class="fas fa-check-circle" style="color: #10b981;" title="Status: Done"></i>
+                          <% elsif r[:status].to_s == 'in_progress' %>
+                            <i class="fas fa-spinner fa-spin" style="color: #f59e0b;" title="Status: In Progress"></i>
+                          <% elsif r[:status].to_s == 'open' %>
+                            <i class="far fa-circle" style="color: #38bdf8;" title="Status: Open"></i>
+                          <% end %>
+                        </span>
                         <% if is_md %>
                           <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
                         <% elsif is_vid %>
@@ -1242,6 +1262,24 @@
       </button>
       <button type="button" id="step-context-copy-link" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-link" style="color: #38bdf8; width: 14px; text-align: center;"></i> Copy step link
+      </button>
+      <div style="height: 1px; background: #334155; margin: 4px 0;"></div>
+      <div style="padding: 4px 12px 2px; font-size: 0.70em; text-transform: uppercase; letter-spacing: 0.5px; color: #64748b; font-weight: 700;">Status</div>
+      <button type="button" class="step-status-option" data-status="done" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-check-circle" style="color: #10b981; width: 14px; text-align: center;"></i> <span style="flex: 1;">Done</span>
+        <i class="fas fa-check step-status-active-check" style="color: #10b981; font-size: 0.8em; display: none;"></i>
+      </button>
+      <button type="button" class="step-status-option" data-status="in_progress" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-spinner fa-spin" style="color: #f59e0b; width: 14px; text-align: center;"></i> <span style="flex: 1;">In Progress</span>
+        <i class="fas fa-check step-status-active-check" style="color: #f59e0b; font-size: 0.8em; display: none;"></i>
+      </button>
+      <button type="button" class="step-status-option" data-status="open" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="far fa-circle" style="color: #38bdf8; width: 14px; text-align: center;"></i> <span style="flex: 1;">Open</span>
+        <i class="fas fa-check step-status-active-check" style="color: #38bdf8; font-size: 0.8em; display: none;"></i>
+      </button>
+      <button type="button" class="step-status-option" data-status="none" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: transparent; border: none; color: #94a3b8; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-ban" style="color: #64748b; width: 14px; text-align: center;"></i> <span style="flex: 1;">None</span>
+        <i class="fas fa-check step-status-active-check" style="color: #94a3b8; font-size: 0.8em; display: none;"></i>
       </button>
     </div>
 
