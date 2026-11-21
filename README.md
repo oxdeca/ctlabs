@@ -359,7 +359,7 @@ We can then find the recording in the Walkthrough added as new Step (we might ne
 ![screenshot](docs/pics/screenshot-20261101-133551.png)
 
 
-## Mardown Editor
+## Markdown Editor
 
 - create/edit markdown documents
 - copy/paste from clipboard

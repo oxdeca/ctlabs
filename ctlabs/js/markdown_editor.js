@@ -356,6 +356,7 @@
     if (mdCodeEditor) {
       const currentKeyMap = mdCodeEditor.getOption('keyMap') || 'default';
       if (mdVimMode) {
+        ensureCodeMirrorVimClipboard();
         if (!currentKeyMap.startsWith('vim')) {
           mdCodeEditor.setOption('keyMap', 'vim');
           updateVimModeIndicator({ mode: 'normal' });
@@ -627,6 +628,39 @@
     }
   }
 
+  function ensureCodeMirrorVimClipboard() {
+    if (typeof CodeMirror === 'undefined' || !CodeMirror.Vim) return;
+    if (typeof window.ensureCodeMirrorVimConfigured === 'function') {
+      window.ensureCodeMirrorVimConfigured();
+      return;
+    }
+    if (CodeMirror.Vim._clipboardConfigured) return;
+    CodeMirror.Vim._clipboardConfigured = true;
+
+    try {
+      CodeMirror.Vim.unmap('<C-c>', 'insert');
+    } catch (e) {}
+
+    try {
+      CodeMirror.Vim.defineAction('clipboardCopy', (cm) => {
+        if (cm.somethingSelected()) {
+          const text = cm.getSelection();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(() => {
+              try { document.execCommand('copy'); } catch (err) {}
+            });
+          } else {
+            try { document.execCommand('copy'); } catch (err) {}
+          }
+          if (typeof CodeMirror.Vim.exitVisualMode === 'function') {
+            CodeMirror.Vim.exitVisualMode(cm);
+          }
+        }
+      });
+      CodeMirror.Vim.mapCommand('<C-c>', 'action', 'clipboardCopy', {}, { context: 'visual' });
+    } catch (e) {}
+  }
+
   function getMdEditor() {
     if (mdCodeEditor) return mdCodeEditor;
     if (typeof CodeMirror === 'undefined') return null;
@@ -687,6 +721,7 @@
 
       if (typeof CodeMirror !== 'undefined' && CodeMirror.Vim) {
         ensureCodeMirrorVimFoldBindings();
+        ensureCodeMirrorVimClipboard();
         CodeMirror.Vim.defineEx('write', 'w', (cm) => {
           if (cm && typeof window.mdGraphvizCodeEditor !== 'undefined' && cm === window.mdGraphvizCodeEditor) {
             if (typeof saveAndInsertGraphviz === 'function') saveAndInsertGraphviz({ saveAsNew: false, closeAfter: false });
@@ -2292,6 +2327,7 @@
     if (mdGraphvizCodeEditor) {
       const currentKeyMap = mdGraphvizCodeEditor.getOption('keyMap') || 'default';
       if (mdGraphvizVimMode) {
+        ensureCodeMirrorVimClipboard();
         if (!currentKeyMap.startsWith('vim')) {
           mdGraphvizCodeEditor.setOption('keyMap', 'vim');
           updateGraphvizVimIndicator({ mode: 'normal' });

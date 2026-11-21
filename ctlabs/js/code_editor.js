@@ -183,7 +183,10 @@ window.setAnsibleEditorPref = function(key, val) {
         const ed = window.cmEditors[id];
         if (!ed || !ed.setOption) return;
         if (key === 'wrap') ed.setOption('lineWrapping', !!val);
-        if (key === 'vim') ed.setOption('keyMap', (val && CodeMirror.Vim) ? 'vim' : 'default');
+        if (key === 'vim') {
+            if (val) window.ensureCodeMirrorVimConfigured();
+            ed.setOption('keyMap', (val && CodeMirror.Vim) ? 'vim' : 'default');
+        }
         setTimeout(function() { ed.refresh(); }, 20);
     });
     window.refreshAnsibleToolbar();
@@ -195,16 +198,48 @@ window.toggleAnsibleVim = function() {
     window.setAnsibleEditorPref('vim', !window.AnsEditorPrefs.get().vim);
 };
 
-// :w / :wq / :q ex-commands for the ansible editor
-if (window.CodeMirror && CodeMirror.Vim && !window.__ansVimExDefined) {
-    window.__ansVimExDefined = true;
-    const inAns = function(cm) { const ta = cm.getTextArea && cm.getTextArea(); return ta && window.isAnsibleEditorId(ta.id); };
-    const closeAns = function() { const m = document.getElementById('ansible-editor-modal'); if (m) m.style.display = 'none'; };
-    const prevW = null;
-    CodeMirror.Vim.defineEx('write', 'w', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig(); });
-    CodeMirror.Vim.defineEx('wq', 'wq', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig({ closeAfter: true }); });
-    CodeMirror.Vim.defineEx('quit', 'q', function(cm) { if (inAns(cm)) closeAns(); });
-}
+// Universal Vim configuration for CodeMirror: Ex commands (:w, :wq, :q) and OS clipboard (Ctrl-C, Ctrl-V)
+window.ensureCodeMirrorVimConfigured = function() {
+    if (typeof CodeMirror === 'undefined' || !CodeMirror.Vim) return;
+
+    if (!window.__ansVimExDefined) {
+        window.__ansVimExDefined = true;
+        const inAns = function(cm) { const ta = cm.getTextArea && cm.getTextArea(); return ta && window.isAnsibleEditorId(ta.id); };
+        const closeAns = function() { const m = document.getElementById('ansible-editor-modal'); if (m) m.style.display = 'none'; };
+        CodeMirror.Vim.defineEx('write', 'w', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig(); });
+        CodeMirror.Vim.defineEx('wq', 'wq', function(cm) { if (inAns(cm) && window.saveAnsibleConfig) window.saveAnsibleConfig({ closeAfter: true }); });
+        CodeMirror.Vim.defineEx('quit', 'q', function(cm) { if (inAns(cm)) closeAns(); });
+    }
+
+    if (!CodeMirror.Vim._clipboardConfigured) {
+        CodeMirror.Vim._clipboardConfigured = true;
+        try {
+            // Unmap <C-c> in insert mode so native browser copy works without exiting insert mode
+            CodeMirror.Vim.unmap('<C-c>', 'insert');
+        } catch (e) {}
+
+        try {
+            // In visual mode, allow Ctrl-C to copy selection to system clipboard and exit visual mode
+            CodeMirror.Vim.defineAction('clipboardCopy', function(cm) {
+                if (cm.somethingSelected()) {
+                    const text = cm.getSelection();
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).catch(function() {
+                            try { document.execCommand('copy'); } catch (err) {}
+                        });
+                    } else {
+                        try { document.execCommand('copy'); } catch (err) {}
+                    }
+                    if (typeof CodeMirror.Vim.exitVisualMode === 'function') {
+                        CodeMirror.Vim.exitVisualMode(cm);
+                    }
+                }
+            });
+            CodeMirror.Vim.mapCommand('<C-c>', 'action', 'clipboardCopy', {}, { context: 'visual' });
+        } catch (e) {}
+    }
+};
+window.ensureCodeMirrorVimConfigured();
 
 // --- UNIVERSAL EDITOR FACTORY ---
 window.initCodeEditor = function(textAreaId, langMode) {
@@ -238,7 +273,10 @@ window.initCodeEditor = function(textAreaId, langMode) {
     if (isAns) {
         const prefs = window.AnsEditorPrefs.get();
         opts.lineWrapping = prefs.wrap;
-        if (prefs.vim && CodeMirror.Vim) opts.keyMap = 'vim';
+        if (prefs.vim && CodeMirror.Vim) {
+            window.ensureCodeMirrorVimConfigured();
+            opts.keyMap = 'vim';
+        }
     }
     const editor = CodeMirror.fromTextArea(ta, opts);
 
