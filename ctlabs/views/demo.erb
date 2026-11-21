@@ -485,8 +485,8 @@
                     <span style="font-weight: 500;">Emoji</span>
                   </button>
 
-                  <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; width: 360px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: hidden;">
-                    <div style="padding: 8px 10px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
+                  <div id="md-emoji-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; width: 360px; background: #1e293b; border: 1px solid #475569; border-radius: 8px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; flex-direction: column; overflow: visible;">
+                    <div style="padding: 8px 10px; background: #0f172a; border-radius: 7px 7px 0 0; border-bottom: 1px solid #334155; display: flex; flex-direction: column; gap: 6px;">
                       <div style="display: flex; align-items: center; gap: 6px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; padding: 3px 8px;">
                         <i class="fas fa-search" style="color: #94a3b8; font-size: 0.8em;"></i>
                         <input type="text" id="md-emoji-search" placeholder="Search emojis &amp; symbols (e.g. rocket, check, sum, arrow, alpha)..." style="background: transparent; border: none; outline: none; color: #f8fafc; font-size: 0.82em; width: 100%;" autocomplete="off" />
@@ -499,6 +499,7 @@
                         </button>
                         <div id="md-emoji-cat-viewport" style="flex: 1; min-width: 0; overflow-x: hidden; scroll-behavior: smooth;">
                           <div id="md-emoji-cat-tabs" style="display: flex; align-items: center; gap: 4px; width: max-content;">
+                            <button type="button" class="md-emoji-cat-btn" data-cat="recent" title="Recently Used" style="flex: 0 0 68px; width: 68px; height: 26px; padding: 0 2px; border-radius: 4px; font-size: 0.75em; background: transparent; color: #94a3b8; border: none; cursor: pointer; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center; gap: 4px;"><i class="fas fa-history" style="font-size: 0.85em;"></i> Recent</button>
                             <button type="button" class="md-emoji-cat-btn active" data-cat="all" title="All Emojis &amp; Symbols" style="flex: 0 0 62px; width: 62px; height: 26px; padding: 0 2px; border-radius: 4px; font-size: 0.75em; background: #0284c7; color: #fff; border: none; cursor: pointer; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center;">⚡ All</button>
                             <button type="button" class="md-emoji-cat-btn" data-cat="smileys" title="Smileys &amp; Emotion" style="flex: 0 0 62px; width: 62px; height: 26px; padding: 0 2px; border-radius: 4px; font-size: 0.75em; background: transparent; color: #94a3b8; border: none; cursor: pointer; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center;">😊 Smileys</button>
                             <button type="button" class="md-emoji-cat-btn" data-cat="people" title="People &amp; Hands" style="flex: 0 0 62px; width: 62px; height: 26px; padding: 0 2px; border-radius: 4px; font-size: 0.75em; background: transparent; color: #94a3b8; border: none; cursor: pointer; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; justify-content: center;">🧑 People</button>
@@ -522,7 +523,10 @@
                         <button type="button" id="md-emoji-cat-menu-btn" title="All categories menu" style="flex: 0 0 24px; width: 24px; height: 26px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #94a3b8; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; font-size: 0.75em; transition: background 0.1s, color 0.1s;" onmouseover="this.style.background='#334155'; this.style.color='#f8fafc';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';">
                           <i class="fas fa-bars"></i>
                         </button>
-                        <div id="md-emoji-cat-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; width: 215px; max-height: 280px; overflow-y: auto; background: #0f172a; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.7); z-index: 1050; padding: 4px; flex-direction: column; gap: 2px;">
+                        <div id="md-emoji-cat-dropdown" style="display: none; position: absolute; top: calc(100% + 4px); right: 0; width: 220px; max-height: 260px; overflow-y: auto; background: #0f172a; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 14px 35px rgba(0,0,0,0.85); z-index: 1050; padding: 5px 4px 8px 4px; flex-direction: column; gap: 2px; overscroll-behavior: contain;">
+                          <button type="button" class="md-emoji-menu-item" data-cat="recent" style="width: 100%; text-align: left; background: transparent; color: #cbd5e1; border: none; border-radius: 4px; padding: 5px 8px; font-size: 0.78em; cursor: pointer; display: flex; align-items: center; justify-content: space-between;" onmouseover="if(!this.classList.contains('active')) this.style.background='#1e293b';" onmouseout="if(!this.classList.contains('active')) this.style.background='transparent';">
+                            <span><i class="fas fa-history" style="color: #38bdf8; margin-right: 6px;"></i> Recently Used</span><span id="md-emoji-recent-count" style="opacity: 0.7; font-size: 0.9em;">0</span>
+                          </button>
                           <button type="button" class="md-emoji-menu-item active" data-cat="all" style="width: 100%; text-align: left; background: #0284c7; color: #fff; border: none; border-radius: 4px; padding: 5px 8px; font-size: 0.78em; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
                             <span>⚡ All Emojis &amp; Symbols</span><span style="opacity: 0.7; font-size: 0.9em;">783</span>
                           </button>
@@ -572,10 +576,10 @@
                       </div>
                     </div>
 
-                    <div id="md-emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 8px; max-height: 230px; overflow-y: auto; background: #131d31;">
+                    <div id="md-emoji-grid" style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 8px 8px 12px 8px; min-height: 200px; max-height: 230px; overflow-y: auto; background: #131d31;">
                     </div>
 
-                    <div style="padding: 6px 10px; background: #0f172a; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.74em; color: #94a3b8;">
+                    <div style="padding: 6px 10px; background: #0f172a; border-radius: 0 0 7px 7px; border-top: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; font-size: 0.74em; color: #94a3b8;">
                       <div id="md-emoji-footer-preview" style="color: #cbd5e1; font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 195px;">
                         Hover emoji for code
                       </div>

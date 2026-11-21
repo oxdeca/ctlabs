@@ -1354,6 +1354,89 @@
   }
 
   // --- Unified Curated Emoji Dictionary (loaded from /recordings/emojis) ---
+  const RECENT_EMOJIS_KEY = 'ctlabs_recent_emojis';
+  const LAST_EMOJI_CAT_KEY = 'ctlabs_emoji_last_cat';
+  const LAST_GV_EMOJI_CAT_KEY = 'ctlabs_graphviz_emoji_last_cat';
+  const MAX_RECENT_EMOJIS = 32;
+
+  function getRecentEmojis() {
+    try {
+      const raw = localStorage.getItem(RECENT_EMOJIS_KEY);
+      if (!raw) return [];
+      const list = JSON.parse(raw);
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function addRecentEmoji(item) {
+    if (!item || (!item.code && !item.char)) return;
+    try {
+      let list = getRecentEmojis();
+      const code = item.code ? item.code.toLowerCase() : '';
+      const ch = item.char || '';
+      list = list.filter(i => {
+        if (code && i.code && i.code.toLowerCase() === code) return false;
+        if (ch && i.char && i.char === ch) return false;
+        return true;
+      });
+      list.unshift({
+        code: item.code || '',
+        char: item.char || '',
+        name: item.name || item.code || '',
+        entity: item.entity || '',
+        keywords: item.keywords || '',
+        cat: item.cat || 'recent'
+      });
+      if (list.length > MAX_RECENT_EMOJIS) {
+        list = list.slice(0, MAX_RECENT_EMOJIS);
+      }
+      localStorage.setItem(RECENT_EMOJIS_KEY, JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  function clearRecentEmojis() {
+    try {
+      localStorage.removeItem(RECENT_EMOJIS_KEY);
+    } catch (e) {}
+  }
+
+  function scrollEmojiCatBtnIntoView(viewport, btn) {
+    if (!viewport || !btn) return;
+    try {
+      const vRect = viewport.getBoundingClientRect();
+      const bRect = btn.getBoundingClientRect();
+      if (bRect.left < vRect.left) {
+        viewport.scrollLeft -= (vRect.left - bRect.left + 8);
+      } else if (bRect.right > vRect.right) {
+        viewport.scrollLeft += (bRect.right - vRect.right + 8);
+      }
+    } catch (e) {}
+  }
+
+  function buildEmojiCellHtml(item, cssClass = 'md-emoji-cell') {
+    const code = item.code || '';
+    const ch = item.char || '';
+    const name = item.name || code || '';
+    const entity = item.entity || '';
+    const titleText = code ? `:${code}: (${name})` : name;
+    return `<button type="button" class="${cssClass}" data-code="${code}" data-char="${ch}" data-entity="${entity}" data-name="${name}" title="${titleText}" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; color: #f8fafc; font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Segoe UI Symbol', 'DejaVu Sans', sans-serif; border: 1px solid rgba(255, 255, 255, 0.05); background: rgba(255, 255, 255, 0.04); border-radius: 4px; cursor: pointer; transition: background 0.1s, border-color 0.1s, transform 0.1s;" onmouseover="this.style.background='#334155'; this.style.borderColor='#64748b'; this.style.color='#ffffff'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='rgba(255, 255, 255, 0.04)'; this.style.borderColor='rgba(255, 255, 255, 0.05)'; this.style.color='#f8fafc'; this.style.transform='none';">${ch}</button>`;
+  }
+
+  window.clearCtlabsRecentEmojis = function() {
+    clearRecentEmojis();
+    const mdActiveBtn = document.querySelector('.md-emoji-cat-btn.active');
+    let mdCat = mdActiveBtn ? mdActiveBtn.getAttribute('data-cat') : 'all';
+    if (mdCat === 'recent') mdCat = 'all';
+    selectEmojiCategory(mdCat);
+
+    const gvActiveBtn = document.querySelector('.md-gv-emoji-cat-btn.active');
+    let gvCat = gvActiveBtn ? gvActiveBtn.getAttribute('data-cat') : 'all';
+    if (gvCat === 'recent') gvCat = 'all';
+    selectGraphvizEmojiCategory(gvCat);
+  };
+
   let ctlabsEmojiList = [];
   let ctlabsEmojiMap = {};
   let ctlabsEmojisLoadingPromise = null;
@@ -1437,14 +1520,16 @@
   }
 
   // --- Emoji Picker ---
-  function selectEmojiCategory(cat = 'all') {
+  function selectEmojiCategory(cat = 'recent') {
+    try { localStorage.setItem(LAST_EMOJI_CAT_KEY, cat); } catch (e) {}
+
     mdEmojiCatBtns.forEach(b => {
       const isMatch = b.getAttribute('data-cat') === cat;
       b.classList.toggle('active', isMatch);
       b.style.background = isMatch ? '#0284c7' : 'transparent';
       b.style.color = isMatch ? '#fff' : '#94a3b8';
       if (isMatch && mdEmojiCatViewport) {
-        b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        scrollEmojiCatBtnIntoView(mdEmojiCatViewport, b);
       }
     });
 
@@ -1456,6 +1541,11 @@
     });
 
     if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
+
+    const recentCountEl = document.getElementById('md-emoji-recent-count');
+    if (recentCountEl) {
+      recentCountEl.textContent = getRecentEmojis().length;
+    }
 
     const query = mdEmojiSearch ? mdEmojiSearch.value : '';
     renderEmojiGrid(cat, query);
@@ -1471,13 +1561,19 @@
         await loadCtlabsEmojis();
       }
       if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
-      if (mdEmojiCatViewport) mdEmojiCatViewport.scrollLeft = 0;
       if (mdEmojiSearch) {
         mdEmojiSearch.value = '';
         if (mdEmojiSearchClear) mdEmojiSearchClear.style.display = 'none';
-        mdEmojiSearch.focus();
+        setTimeout(() => mdEmojiSearch.focus(), 30);
       }
-      selectEmojiCategory('all');
+      let savedCat = 'recent';
+      try {
+        savedCat = localStorage.getItem(LAST_EMOJI_CAT_KEY) || (getRecentEmojis().length > 0 ? 'recent' : 'all');
+      } catch (e) {}
+      if (savedCat === 'recent' && getRecentEmojis().length === 0) {
+        savedCat = 'all';
+      }
+      selectEmojiCategory(savedCat);
     } else {
       if (mdEmojiCatDropdown) mdEmojiCatDropdown.style.display = 'none';
     }
@@ -1488,8 +1584,77 @@
     if (!mdEmojiGrid || !list) return;
     const rawQuery = query.trim().toLowerCase();
     const cleanQuery = rawQuery.replace(/^[:&]+|[:;]+$/g, '');
+
+    // Case 1: Category is 'recent'
+    if (cat === 'recent') {
+      const recents = getRecentEmojis();
+      const filtered = cleanQuery ? recents.filter(item => {
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
+      }) : recents;
+
+      if (filtered.length === 0) {
+        if (cleanQuery) {
+          mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching recent emojis</div>';
+        } else {
+          mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 0.8em;"><i class="fas fa-history" style="font-size: 1.8em; margin-bottom: 8px; display: block; opacity: 0.4; color: #38bdf8;"></i>No recently used emojis yet.<br><span style="color: #64748b; font-size: 0.9em;">Click any emoji to add it here.</span></div>';
+        }
+        return;
+      }
+
+      const headerHtml = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 2px 4px 4px 4px; display: flex; align-items: center; justify-content: space-between;"><span><i class="fas fa-history" style="color: #38bdf8; margin-right: 5px;"></i> Recently Used (${filtered.length})</span><button type="button" onclick="window.clearCtlabsRecentEmojis()" style="background: transparent; border: none; color: #64748b; font-size: 0.85em; cursor: pointer; text-decoration: underline;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">clear all</button></div>`;
+      mdEmojiGrid.innerHTML = headerHtml + filtered.map(item => buildEmojiCellHtml(item, 'md-emoji-cell')).join('');
+      attachMdEmojiCellListeners();
+      return;
+    }
+
+    // Case 2: Category is 'all'
+    if (cat === 'all') {
+      const recents = getRecentEmojis();
+      const filtered = list.filter(item => {
+        if (!cleanQuery) return true;
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
+      });
+
+      if (filtered.length === 0) {
+        mdEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis or symbols</div>';
+        return;
+      }
+
+      let gridHtml = '';
+      if (!cleanQuery && recents.length > 0) {
+        const recentDisplay = recents.slice(0, 16);
+        const recentHeader = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 2px 4px 2px 4px; display: flex; align-items: center; justify-content: space-between;"><span><i class="fas fa-history" style="color: #38bdf8; margin-right: 5px;"></i> Recently Used</span><button type="button" onclick="window.clearCtlabsRecentEmojis()" style="background: transparent; border: none; color: #64748b; font-size: 0.85em; cursor: pointer; text-decoration: underline;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">clear</button></div>`;
+        const recentCells = recentDisplay.map(item => buildEmojiCellHtml(item, 'md-emoji-cell')).join('');
+
+        const allHeader = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 8px 4px 2px 4px; border-top: 1px solid #334155; margin-top: 4px;"><span>⚡ All Emojis &amp; Symbols</span></div>`;
+        const allCells = filtered.slice(0, 480).map(item => buildEmojiCellHtml(item, 'md-emoji-cell')).join('');
+
+        gridHtml = recentHeader + recentCells + allHeader + allCells;
+      } else {
+        const displayItems = cleanQuery ? filtered : filtered.slice(0, 480);
+        gridHtml = displayItems.map(item => buildEmojiCellHtml(item, 'md-emoji-cell')).join('');
+      }
+
+      mdEmojiGrid.innerHTML = gridHtml;
+      attachMdEmojiCellListeners();
+      return;
+    }
+
+    // Case 3: Other specific categories (smileys, tech, etc.)
     const filtered = list.filter(item => {
-      if (cat !== 'all' && item.cat !== cat) return false;
+      if (item.cat !== cat) return false;
       if (cleanQuery) {
         return (
           (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
@@ -1507,13 +1672,12 @@
       return;
     }
 
-    // Full items for filtered categories/queries; generous slice for 'all' overview
-    const displayItems = (cleanQuery || cat !== 'all') ? filtered : filtered.slice(0, 480);
+    mdEmojiGrid.innerHTML = filtered.map(item => buildEmojiCellHtml(item, 'md-emoji-cell')).join('');
+    attachMdEmojiCellListeners();
+  }
 
-    mdEmojiGrid.innerHTML = displayItems.map(item => {
-      return `<button type="button" class="md-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;
-    }).join('');
-
+  function attachMdEmojiCellListeners() {
+    if (!mdEmojiGrid) return;
     mdEmojiGrid.querySelectorAll('.md-emoji-cell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
         if (mdEmojiFooterPreview) {
@@ -1530,7 +1694,10 @@
         const code = cell.getAttribute('data-code');
         const ch = cell.getAttribute('data-char');
         const entity = cell.getAttribute('data-entity');
-        // Left-click inserts character. Right-click inserts :code: (or &entity; if available).
+        const name = cell.getAttribute('data-name');
+
+        addRecentEmoji({ code, char: ch, entity, name });
+
         let snippet = ch;
         if (forceCode) {
           snippet = code ? `:${code}:` : (entity || ch);
@@ -1636,6 +1803,10 @@
         e.stopPropagation();
         const isClosed = !mdEmojiCatDropdown.style.display || mdEmojiCatDropdown.style.display === 'none';
         mdEmojiCatDropdown.style.display = isClosed ? 'flex' : 'none';
+        if (isClosed) {
+          const activeItem = mdEmojiCatDropdown.querySelector('.md-emoji-menu-item.active');
+          if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+        }
       });
     }
 
@@ -2520,14 +2691,16 @@
     scheduleGraphvizPreview();
   }
 
-  function selectGraphvizEmojiCategory(cat = 'all') {
+  function selectGraphvizEmojiCategory(cat = 'recent') {
+    try { localStorage.setItem(LAST_GV_EMOJI_CAT_KEY, cat); } catch (e) {}
+
     mdGraphvizEmojiCatBtns.forEach(b => {
       const isMatch = b.getAttribute('data-cat') === cat;
       b.classList.toggle('active', isMatch);
       b.style.background = isMatch ? '#0284c7' : 'transparent';
       b.style.color = isMatch ? '#fff' : '#94a3b8';
       if (isMatch && mdGraphvizEmojiCatViewport) {
-        b.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        scrollEmojiCatBtnIntoView(mdGraphvizEmojiCatViewport, b);
       }
     });
 
@@ -2539,6 +2712,11 @@
     });
 
     if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
+
+    const recentCountEl = document.getElementById('md-graphviz-emoji-recent-count');
+    if (recentCountEl) {
+      recentCountEl.textContent = getRecentEmojis().length;
+    }
 
     const query = mdGraphvizEmojiSearch ? mdGraphvizEmojiSearch.value : '';
     renderGraphvizEmojiGrid(cat, query);
@@ -2555,13 +2733,19 @@
       }
       if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
       if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
-      if (mdGraphvizEmojiCatViewport) mdGraphvizEmojiCatViewport.scrollLeft = 0;
       if (mdGraphvizEmojiSearch) {
         mdGraphvizEmojiSearch.value = '';
         if (mdGraphvizEmojiSearchClear) mdGraphvizEmojiSearchClear.style.display = 'none';
         setTimeout(() => mdGraphvizEmojiSearch.focus(), 30);
       }
-      selectGraphvizEmojiCategory('all');
+      let savedCat = 'recent';
+      try {
+        savedCat = localStorage.getItem(LAST_GV_EMOJI_CAT_KEY) || localStorage.getItem(LAST_EMOJI_CAT_KEY) || (getRecentEmojis().length > 0 ? 'recent' : 'all');
+      } catch (e) {}
+      if (savedCat === 'recent' && getRecentEmojis().length === 0) {
+        savedCat = 'all';
+      }
+      selectGraphvizEmojiCategory(savedCat);
     } else {
       if (mdGraphvizEmojiCatDropdown) mdGraphvizEmojiCatDropdown.style.display = 'none';
     }
@@ -2572,8 +2756,74 @@
     if (!mdGraphvizEmojiGrid || !list) return;
     const rawQuery = query.trim().toLowerCase();
     const cleanQuery = rawQuery.replace(/^[:&]+|[:;]+$/g, '');
+
+    if (cat === 'recent') {
+      const recents = getRecentEmojis();
+      const filtered = cleanQuery ? recents.filter(item => {
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
+      }) : recents;
+
+      if (filtered.length === 0) {
+        if (cleanQuery) {
+          mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching recent emojis</div>';
+        } else {
+          mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 24px 16px; text-align: center; color: #94a3b8; font-size: 0.8em;"><i class="fas fa-history" style="font-size: 1.8em; margin-bottom: 8px; display: block; opacity: 0.4; color: #38bdf8;"></i>No recently used emojis yet.<br><span style="color: #64748b; font-size: 0.9em;">Click any emoji to add it here.</span></div>';
+        }
+        return;
+      }
+
+      const headerHtml = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 2px 4px 4px 4px; display: flex; align-items: center; justify-content: space-between;"><span><i class="fas fa-history" style="color: #38bdf8; margin-right: 5px;"></i> Recently Used (${filtered.length})</span><button type="button" onclick="window.clearCtlabsRecentEmojis()" style="background: transparent; border: none; color: #64748b; font-size: 0.85em; cursor: pointer; text-decoration: underline;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">clear all</button></div>`;
+      mdGraphvizEmojiGrid.innerHTML = headerHtml + filtered.map(item => buildEmojiCellHtml(item, 'md-gv-emoji-cell')).join('');
+      attachGraphvizEmojiCellListeners();
+      return;
+    }
+
+    if (cat === 'all') {
+      const recents = getRecentEmojis();
+      const filtered = list.filter(item => {
+        if (!cleanQuery) return true;
+        return (
+          (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
+          (item.name && item.name.toLowerCase().includes(cleanQuery)) ||
+          (item.char && item.char.includes(rawQuery)) ||
+          (item.keywords && item.keywords.toLowerCase().includes(cleanQuery)) ||
+          (item.entity && item.entity.toLowerCase().includes(rawQuery))
+        );
+      });
+
+      if (filtered.length === 0) {
+        mdGraphvizEmojiGrid.innerHTML = '<div style="grid-column: 1 / -1; padding: 16px; text-align: center; color: #94a3b8; font-size: 0.8em;">No matching emojis or symbols</div>';
+        return;
+      }
+
+      let gridHtml = '';
+      if (!cleanQuery && recents.length > 0) {
+        const recentDisplay = recents.slice(0, 16);
+        const recentHeader = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 2px 4px 2px 4px; display: flex; align-items: center; justify-content: space-between;"><span><i class="fas fa-history" style="color: #38bdf8; margin-right: 5px;"></i> Recently Used</span><button type="button" onclick="window.clearCtlabsRecentEmojis()" style="background: transparent; border: none; color: #64748b; font-size: 0.85em; cursor: pointer; text-decoration: underline;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#64748b'">clear</button></div>`;
+        const recentCells = recentDisplay.map(item => buildEmojiCellHtml(item, 'md-gv-emoji-cell')).join('');
+
+        const allHeader = `<div style="grid-column: 1 / -1; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; padding: 8px 4px 2px 4px; border-top: 1px solid #334155; margin-top: 4px;"><span>⚡ All Emojis &amp; Symbols</span></div>`;
+        const allCells = filtered.slice(0, 480).map(item => buildEmojiCellHtml(item, 'md-gv-emoji-cell')).join('');
+
+        gridHtml = recentHeader + recentCells + allHeader + allCells;
+      } else {
+        const displayItems = cleanQuery ? filtered : filtered.slice(0, 480);
+        gridHtml = displayItems.map(item => buildEmojiCellHtml(item, 'md-gv-emoji-cell')).join('');
+      }
+
+      mdGraphvizEmojiGrid.innerHTML = gridHtml;
+      attachGraphvizEmojiCellListeners();
+      return;
+    }
+
     const filtered = list.filter(item => {
-      if (cat !== 'all' && item.cat !== cat) return false;
+      if (item.cat !== cat) return false;
       if (cleanQuery) {
         return (
           (item.code && item.code.toLowerCase().includes(cleanQuery)) ||
@@ -2591,12 +2841,12 @@
       return;
     }
 
-    const displayItems = (cleanQuery || cat !== 'all') ? filtered : filtered.slice(0, 480);
+    mdGraphvizEmojiGrid.innerHTML = filtered.map(item => buildEmojiCellHtml(item, 'md-gv-emoji-cell')).join('');
+    attachGraphvizEmojiCellListeners();
+  }
 
-    mdGraphvizEmojiGrid.innerHTML = displayItems.map(item => {
-      return `<button type="button" class="md-gv-emoji-cell" data-code="${item.code}" data-char="${item.char || ''}" data-entity="${item.entity || ''}" data-name="${item.name}" title=":${item.code}: (${item.name})" style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; font-size: 1.25em; border: none; background: transparent; border-radius: 4px; cursor: pointer; transition: background 0.1s, transform 0.1s;" onmouseover="this.style.background='#1e293b'; this.style.transform='scale(1.15)';" onmouseout="this.style.background='transparent'; this.style.transform='none';">${item.char || ''}</button>`;
-    }).join('');
-
+  function attachGraphvizEmojiCellListeners() {
+    if (!mdGraphvizEmojiGrid) return;
     mdGraphvizEmojiGrid.querySelectorAll('.md-gv-emoji-cell').forEach(cell => {
       cell.addEventListener('mouseenter', () => {
         if (mdGraphvizEmojiFooterPreview) {
@@ -2613,8 +2863,12 @@
         e.stopPropagation();
         const code = cell.getAttribute('data-code');
         const ch = cell.getAttribute('data-char');
-        const snippet = (asCode || !ch) ? `:${code}:` : ch;
+        const entity = cell.getAttribute('data-entity');
+        const name = cell.getAttribute('data-name');
 
+        addRecentEmoji({ code, char: ch, entity, name });
+
+        const snippet = (asCode || !ch) ? `:${code}:` : ch;
         insertGraphvizEmoji(snippet);
         toggleGraphvizEmojiMenu(false);
       };
@@ -3901,6 +4155,10 @@
           e.stopPropagation();
           const isClosed = !mdGraphvizEmojiCatDropdown.style.display || mdGraphvizEmojiCatDropdown.style.display === 'none';
           mdGraphvizEmojiCatDropdown.style.display = isClosed ? 'flex' : 'none';
+          if (isClosed) {
+            const activeItem = mdGraphvizEmojiCatDropdown.querySelector('.md-gv-emoji-menu-item.active');
+            if (activeItem) activeItem.scrollIntoView({ block: 'nearest' });
+          }
         });
       }
 
