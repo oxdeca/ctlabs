@@ -56,6 +56,7 @@ PKGS=(
   'git'
   'graphviz'
   'pandoc'
+  'weasyprint'
   'epel-release'
   'htop'
   'ruby'

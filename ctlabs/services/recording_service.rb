@@ -1854,7 +1854,7 @@ class RecordingService
   end
 
   DOCX_REFERENCE_PATH = File.expand_path('../config/reference.docx', __dir__)
-  PDF_CSS_PATH = File.expand_path('../config/export_pdf.css', __dir__)
+  PDF_CSS_PATH = File.expand_path('../css/export_pdf.css', __dir__)
 
   def self.pdf_css_path
     File.file?(PDF_CSS_PATH) && File.size(PDF_CSS_PATH) > 0 ? PDF_CSS_PATH : nil
