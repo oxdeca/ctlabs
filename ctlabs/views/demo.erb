@@ -1127,20 +1127,89 @@
 
     <!-- Record Screen Modal -->
     <div id="record-screen-modal" class="w3-modal" style="z-index: 9999;">
-      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 520px;">
-        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
-          <h3 style="margin: 0; font-size: 1.15em; font-weight: 600; color: #f43f5e; display: flex; align-items: center; gap: 8px;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 530px; overflow: hidden;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #f43f5e; display: flex; align-items: center; gap: 8px;">
             <i class="fas fa-video"></i> Record Browser Screen
           </h3>
           <span id="close-record-screen-modal" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
         </header>
-        <div style="padding: 20px 18px;">
-          <p style="color: #cbd5e1; font-size: 0.9em; margin-top: 0; margin-bottom: 14px; line-height: 1.5;">
-            Capture your browser tab, window, or entire screen directly into this walkthrough set as a video step.
-          </p>
 
-          <!-- Dedicated Clean Recording Window Launcher -->
-          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
+        <!-- Navigation Tabs -->
+        <div style="display: flex; background: #0f172a; border-bottom: 1px solid #334155; padding: 0 12px;">
+          <button type="button" class="rec-screen-tab-btn" data-tab="rec-tab-general" style="background: transparent; border: none; border-bottom: 2px solid #f43f5e; color: #f8fafc; font-weight: 600; font-size: 0.85em; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-sliders-h" style="color: #f43f5e;"></i> General
+          </button>
+          <button type="button" class="rec-screen-tab-btn" data-tab="rec-tab-target" style="background: transparent; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 500; font-size: 0.85em; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-external-link-alt" style="color: #38bdf8;"></i> Target Window
+          </button>
+          <button type="button" class="rec-screen-tab-btn" data-tab="rec-tab-settings" style="background: transparent; border: none; border-bottom: 2px solid transparent; color: #94a3b8; font-weight: 500; font-size: 0.85em; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            <i class="fas fa-cog" style="color: #10b981;"></i> Limits &amp; Codec
+          </button>
+        </div>
+
+        <div style="padding: 16px 18px;">
+          <!-- TAB 1: General (Capture Area & Audio) -->
+          <div id="rec-tab-general" class="rec-screen-tab-pane">
+            <p style="color: #cbd5e1; font-size: 0.86em; margin-top: 0; margin-bottom: 12px; line-height: 1.4;">
+              Select the capture area and whether to record microphone audio.
+            </p>
+
+            <!-- Recording Area Selection: Entire Surface vs Custom Section -->
+            <div style="margin-bottom: 14px;">
+              <div style="font-weight: 600; font-size: 0.84em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                <i class="fas fa-crop-alt" style="color: #f59e0b;"></i> Recording Area
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <label style="display: flex; align-items: flex-start; gap: 10px; background: #0f172a; border: 1px solid #475569; padding: 10px 12px; border-radius: 6px; cursor: pointer;">
+                  <input type="radio" name="rec-screen-area" value="full" checked style="margin-top: 3px; accent-color: #38bdf8;" />
+                  <div>
+                    <div style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-expand" style="color: #38bdf8;"></i> Entire Surface
+                    </div>
+                    <div style="font-size: 0.77em; color: #94a3b8; margin-top: 2px;">
+                      Full window, tab, or screen
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: flex-start; gap: 10px; background: #0f172a; border: 1px solid #475569; padding: 10px 12px; border-radius: 6px; cursor: pointer;">
+                  <input type="radio" name="rec-screen-area" value="crop" style="margin-top: 3px; accent-color: #f59e0b;" />
+                  <div>
+                    <div style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-vector-square" style="color: #f59e0b;"></i> Custom Section
+                    </div>
+                    <div style="font-size: 0.77em; color: #94a3b8; margin-top: 2px;">
+                      Crop to interactive box
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Audio Input -->
+            <div style="background: #0f172a; padding: 12px 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
+              <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: #f8fafc; font-size: 0.88em; user-select: none;">
+                <input type="checkbox" id="rec-screen-mic" style="margin-top: 3px; accent-color: #f43f5e; width: 16px; height: 16px;" />
+                <div>
+                  <strong>Include Microphone Audio</strong>
+                  <span style="display: block; color: #94a3b8; font-size: 0.8em; margin-top: 2px;">
+                    Mix voiceover narration together with system or tab audio.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.22); border-radius: 6px; padding: 9px 12px; display: flex; gap: 8px; align-items: center;">
+              <i class="fas fa-info-circle" style="color: #38bdf8; font-size: 0.9em;"></i>
+              <div style="color: #cbd5e1; font-size: 0.8em; line-height: 1.4;">
+                Clicking <strong>Start Recording</strong> prompts your browser to pick a screen, window, or tab.
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: Target Window (Clean Popup / New Tab Launcher) -->
+          <div id="rec-tab-target" class="rec-screen-tab-pane" style="display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
               <span style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px;">
                 <i class="fas fa-external-link-alt" style="color: #38bdf8;"></i> Dedicated Recording Window
@@ -1149,115 +1218,100 @@
                 Not open
               </span>
             </div>
-            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
-              Launch a target to record. <strong>New Tab</strong> keeps the tab bar, navigation, and split-screen mode (drag the tab header to detach into a separate window). <strong>Clean Popup</strong> opens a fixed 16:9 canvas without browser toolbars.
+            <p style="color: #94a3b8; font-size: 0.8em; margin-top: 0; margin-bottom: 12px; line-height: 1.4;">
+              Open a clean popup without toolbars, or a separate browser tab to record lab activities cleanly.
             </p>
-            <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
-              <input type="text" id="rec-win-url" value="/labs" placeholder="/labs, https://..., or custom URL" class="w3-input" style="flex: 1; min-width: 180px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 10px; font-size: 0.83em;" />
-              <select id="rec-win-res" class="w3-select" style="width: 230px; background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
-                <option value="tab" selected>New Tab (Tabs &amp; Full Nav)</option>
-                <option value="1280x720">Clean Popup: 1280 &times; 720 (16:9)</option>
-                <option value="1920x1080">Clean Popup: 1920 &times; 1080 (HD)</option>
-                <option value="1024x768">Clean Popup: 1024 &times; 768 (4:3)</option>
-              </select>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px;">
+              <div>
+                <label for="rec-win-url" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Target URL</label>
+                <input type="text" id="rec-win-url" value="/labs" placeholder="/labs, https://..., or custom URL" class="w3-input" style="width: 100%; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 10px; font-size: 0.83em;" />
+              </div>
+              <div>
+                <label for="rec-win-res" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">Window Type &amp; Resolution</label>
+                <select id="rec-win-res" class="w3-select" style="width: 100%; box-sizing: border-box; background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em;">
+                  <option value="tab" selected>New Tab (Tabs &amp; Full Nav)</option>
+                  <option value="1280x720">Clean Popup: 1280 &times; 720 (16:9)</option>
+                  <option value="1920x1080">Clean Popup: 1920 &times; 1080 (HD)</option>
+                  <option value="1024x768">Clean Popup: 1024 &times; 768 (4:3)</option>
+                </select>
+              </div>
             </div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <button type="button" id="launch-rec-win-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.8em; padding: 5px 12px; display: flex; align-items: center; gap: 5px;">
+              <button type="button" id="launch-rec-win-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.8em; padding: 6px 12px; display: flex; align-items: center; gap: 5px;">
                 <i class="fas fa-external-link-alt"></i> Launch Window
               </button>
-              <button type="button" id="focus-rec-win-btn" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.8em; padding: 5px 12px; display: none; align-items: center; gap: 5px;">
+              <button type="button" id="focus-rec-win-btn" class="w3-button w3-round" style="background: #334155; color: #cbd5e1; font-size: 0.8em; padding: 6px 12px; display: none; align-items: center; gap: 5px;">
                 <i class="fas fa-bullseye"></i> Focus Window
               </button>
-              <button type="button" id="close-rec-win-btn" class="w3-button w3-round" style="background: #1e293b; color: #94a3b8; border: 1px solid #475569; font-size: 0.8em; padding: 5px 10px; display: none; align-items: center; gap: 5px;" title="Close window and reset state">
+              <button type="button" id="close-rec-win-btn" class="w3-button w3-round" style="background: #1e293b; color: #94a3b8; border: 1px solid #475569; font-size: 0.8em; padding: 6px 10px; display: none; align-items: center; gap: 5px;" title="Close window and reset state">
                 <i class="fas fa-times"></i> Close / Reset
               </button>
             </div>
           </div>
 
-          <!-- Video Quality & Compression Selector -->
-          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <label for="rec-screen-quality" style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin: 0;">
-                <i class="fas fa-compress-arrows-alt" style="color: #10b981;"></i> Video Quality &amp; Compression
-              </label>
-              <span id="rec-codec-badge" style="font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-family: ui-monospace, monospace;">
-                VP9
-              </span>
-            </div>
-            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 8px; line-height: 1.4;">
-              Select compression level. High compression keeps file sizes compact (~7&ndash;9 MB/min) with razor-sharp text.
-            </p>
-            <select id="rec-screen-quality" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em;">
-              <option value="compact" selected>High Compression (~1.0 Mbps) - Recommended</option>
-              <option value="balanced">Balanced (~1.8 Mbps)</option>
-              <option value="hq">High Bitrate (~3.5 Mbps)</option>
-            </select>
-          </div>
-
-          <!-- Recording Limits (Max Length & Max Size) -->
-          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 14px;">
-            <div style="font-weight: 600; font-size: 0.88em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
-              <i class="fas fa-stopwatch" style="color: #f59e0b;"></i> Recording Limits
-            </div>
-            <p style="color: #94a3b8; font-size: 0.82em; margin-top: 0; margin-bottom: 10px; line-height: 1.4;">
-              Automatically stops recording when the chosen duration or file size limit is reached.
-            </p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <!-- Max Duration -->
-              <div>
-                <label for="rec-screen-max-len" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
-                  <i class="fas fa-clock" style="color: #38bdf8; margin-right: 3px;"></i> Max Length
+          <!-- TAB 3: Limits & Codec -->
+          <div id="rec-tab-settings" class="rec-screen-tab-pane" style="display: none;">
+            <!-- Video Quality & Compression Selector -->
+            <div style="margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="rec-screen-quality" style="font-weight: 600; font-size: 0.84em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin: 0;">
+                  <i class="fas fa-compress-arrows-alt" style="color: #10b981;"></i> Compression &amp; Bitrate
                 </label>
-                <select id="rec-screen-max-len" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em; width: 100%;">
-                  <option value="0">No limit (Manual stop)</option>
-                  <option value="60">1 minute</option>
-                  <option value="120">2 minutes</option>
-                  <option value="180">3 minutes</option>
-                  <option value="300" selected>5 minutes (Default)</option>
-                  <option value="600">10 minutes</option>
-                  <option value="900">15 minutes</option>
-                  <option value="1800">30 minutes</option>
-                  <option value="3600">60 minutes</option>
-                </select>
-              </div>
-              <!-- Max Size -->
-              <div>
-                <label for="rec-screen-max-size" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
-                  <i class="fas fa-hdd" style="color: #10b981; margin-right: 3px;"></i> Max File Size
-                </label>
-                <select id="rec-screen-max-size" class="w3-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 5px 8px; font-size: 0.83em; width: 100%;">
-                  <option value="0">No limit</option>
-                  <option value="10">10 MB</option>
-                  <option value="25">25 MB</option>
-                  <option value="50" selected>50 MB (Default)</option>
-                  <option value="100">100 MB</option>
-                  <option value="250">250 MB</option>
-                  <option value="500">500 MB</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div style="background: #0f172a; padding: 14px; border-radius: 6px; border: 1px solid #334155; margin-bottom: 16px;">
-            <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: #f8fafc; font-size: 0.9em; user-select: none;">
-              <input type="checkbox" id="rec-screen-mic" style="margin-top: 3px; accent-color: #f43f5e; width: 16px; height: 16px;" />
-              <div>
-                <strong>Include Microphone Audio</strong>
-                <span style="display: block; color: #94a3b8; font-size: 0.85em; margin-top: 3px;">
-                  Mix voiceover commentary together with tab audio into the recording.
+                <span id="rec-codec-badge" style="font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; font-family: ui-monospace, monospace;">
+                  VP9
                 </span>
               </div>
-            </label>
-          </div>
+              <select id="rec-screen-quality" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
+                <option value="compact" selected>High Compression (~1.0 Mbps) - Recommended</option>
+                <option value="balanced">Balanced (~1.8 Mbps)</option>
+                <option value="hq">High Bitrate (~3.5 Mbps)</option>
+              </select>
+            </div>
 
-          <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 10px 14px; margin-bottom: 20px; display: flex; gap: 10px; align-items: flex-start;">
-            <i class="fas fa-info-circle" style="color: #38bdf8; margin-top: 3px;"></i>
-            <div style="color: #cbd5e1; font-size: 0.83em; line-height: 1.45;">
-              When you click <strong>Start Recording</strong>, your browser prompts you to select a surface. The browser will automatically focus to the chosen window or tab.
+            <!-- Recording Limits -->
+            <div style="margin-bottom: 8px;">
+              <div style="font-weight: 600; font-size: 0.84em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                <i class="fas fa-stopwatch" style="color: #f59e0b;"></i> Auto-Stop Limits
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <!-- Max Duration -->
+                <div>
+                  <label for="rec-screen-max-len" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
+                    <i class="fas fa-clock" style="color: #38bdf8; margin-right: 3px;"></i> Max Length
+                  </label>
+                  <select id="rec-screen-max-len" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
+                    <option value="0">No limit (Manual stop)</option>
+                    <option value="60">1 minute</option>
+                    <option value="120">2 minutes</option>
+                    <option value="180">3 minutes</option>
+                    <option value="300" selected>5 minutes (Default)</option>
+                    <option value="600">10 minutes</option>
+                    <option value="900">15 minutes</option>
+                    <option value="1800">30 minutes</option>
+                    <option value="3600">60 minutes</option>
+                  </select>
+                </div>
+                <!-- Max Size -->
+                <div>
+                  <label for="rec-screen-max-size" style="display: block; font-size: 0.78em; color: #cbd5e1; font-weight: 600; margin-bottom: 4px;">
+                    <i class="fas fa-hdd" style="color: #10b981; margin-right: 3px;"></i> Max File Size
+                  </label>
+                  <select id="rec-screen-max-size" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
+                    <option value="0">No limit</option>
+                    <option value="10">10 MB</option>
+                    <option value="25">25 MB</option>
+                    <option value="50" selected>50 MB (Default)</option>
+                    <option value="100">100 MB</option>
+                    <option value="250">250 MB</option>
+                    <option value="500">500 MB</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <!-- Modal Footer Actions -->
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #334155;">
             <button type="button" id="cancel-record-screen-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Cancel</button>
             <button type="button" id="confirm-record-screen-btn" class="w3-button w3-round" style="background: #e11d48; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
               <i class="fas fa-circle" style="font-size: 0.75em;"></i> Start Recording
@@ -1267,11 +1321,69 @@
       </div>
     </div>
 
+    <!-- Screen Recording Crop Area Selector Modal -->
+    <div id="screen-crop-modal" class="w3-modal" style="z-index: 10001; display: none;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #0f172a; color: #f8fafc; max-width: 900px; width: 92vw; border: 1px solid #334155; display: flex; flex-direction: column; max-height: 92vh; overflow: hidden;">
+        <header class="w3-container" style="background-color: #1e293b; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-crop-alt" style="color: #f59e0b; font-size: 1.1em;"></i>
+            <span style="font-weight: 600; font-size: 1em; color: #f8fafc;">Select Recording Area</span>
+            <span id="screen-crop-dims-badge" style="background: #0f172a; border: 1px solid #475569; color: #38bdf8; font-size: 0.78em; padding: 2px 8px; border-radius: 10px; font-family: ui-monospace, monospace;">
+              0 &times; 0
+            </span>
+          </div>
+          <button type="button" id="close-screen-crop-modal" class="w3-button w3-hover-red" style="background: transparent; color: #94a3b8; font-size: 1.2em; padding: 6px 12px; border-radius: 4px;">&times;</button>
+        </header>
+
+        <div style="flex: 1; min-height: 0; background: #020617; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 16px;">
+          <div id="screen-crop-stage" style="position: relative; display: inline-block; max-width: 100%; max-height: 100%; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid #334155; user-select: none; line-height: 0;">
+            <video id="screen-crop-preview-video" autoplay muted playsinline style="display: block; max-width: 100%; max-height: 65vh; object-fit: contain; pointer-events: none;"></video>
+
+            <!-- Dimmed Crop Selection Box -->
+            <div id="screen-crop-box" style="position: absolute; left: 10%; top: 10%; width: 80%; height: 80%; border: 2px dashed #f59e0b; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.65); cursor: move; box-sizing: border-box; line-height: normal;">
+              <!-- Dimension pill inside box -->
+              <div id="screen-crop-box-label" style="position: absolute; top: 6px; left: 6px; background: rgba(15, 23, 42, 0.85); border: 1px solid #f59e0b; color: #fef08a; font-size: 0.72em; padding: 1px 6px; border-radius: 3px; font-family: ui-monospace, monospace; pointer-events: none;">
+                ...
+              </div>
+
+              <!-- 8 Resize handles -->
+              <div class="crop-handle crop-handle-nw" data-handle="nw" style="position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: nwse-resize;"></div>
+              <div class="crop-handle crop-handle-ne" data-handle="ne" style="position: absolute; right: -6px; top: -6px; width: 12px; height: 12px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: nesw-resize;"></div>
+              <div class="crop-handle crop-handle-se" data-handle="se" style="position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: nwse-resize;"></div>
+              <div class="crop-handle crop-handle-sw" data-handle="sw" style="position: absolute; left: -6px; bottom: -6px; width: 12px; height: 12px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: nesw-resize;"></div>
+              <div class="crop-handle crop-handle-n" data-handle="n" style="position: absolute; left: 50%; margin-left: -5px; top: -5px; width: 10px; height: 10px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: ns-resize;"></div>
+              <div class="crop-handle crop-handle-s" data-handle="s" style="position: absolute; left: 50%; margin-left: -5px; bottom: -5px; width: 10px; height: 10px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: ns-resize;"></div>
+              <div class="crop-handle crop-handle-e" data-handle="e" style="position: absolute; top: 50%; margin-top: -5px; right: -5px; width: 10px; height: 10px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: ew-resize;"></div>
+              <div class="crop-handle crop-handle-w" data-handle="w" style="position: absolute; top: 50%; margin-top: -5px; left: -5px; width: 10px; height: 10px; background: #f59e0b; border: 1px solid #fff; border-radius: 2px; cursor: ew-resize;"></div>
+            </div>
+          </div>
+        </div>
+
+        <footer style="background: #1e293b; padding: 12px 18px; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none; gap: 12px;">
+          <!-- Presets -->
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="font-size: 0.8em; color: #94a3b8; margin-right: 4px;">Presets:</span>
+            <button type="button" class="w3-button w3-round crop-preset-btn" data-aspect="16:9" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.78em; padding: 4px 8px;">16:9</button>
+            <button type="button" class="w3-button w3-round crop-preset-btn" data-aspect="4:3" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.78em; padding: 4px 8px;">4:3</button>
+            <button type="button" class="w3-button w3-round crop-preset-btn" data-aspect="full" style="background: #0f172a; border: 1px solid #475569; color: #f8fafc; font-size: 0.78em; padding: 4px 8px;">Full Area</button>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button type="button" id="cancel-screen-crop-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 7px 16px;">Cancel</button>
+            <button type="button" id="confirm-screen-crop-btn" class="w3-button w3-round" style="background: #f43f5e; color: #ffffff; font-size: 0.85em; padding: 7px 18px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <i class="fas fa-record-vinyl"></i> Start Recording Section
+            </button>
+          </div>
+        </footer>
+      </div>
+    </div>
+
     <!-- Floating Screen Recording Bar -->
     <div id="screen-rec-bar" style="display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10005; background: #0f172a; border: 2px solid #e11d48; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(225, 29, 72, 0.35); padding: 8px 18px; align-items: center; gap: 14px;">
       <div style="display: flex; align-items: center; gap: 8px;">
         <span style="display: inline-block; width: 12px; height: 12px; background: #e11d48; border-radius: 50%; animation: pulse 1.2s infinite;"></span>
         <span style="font-size: 0.82em; font-weight: 700; color: #f43f5e; letter-spacing: 0.06em;">REC</span>
+        <span id="screen-rec-crop-badge" style="display: none; font-size: 0.72em; padding: 1px 6px; border-radius: 10px; background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fef08a; font-family: ui-monospace, monospace;">CROP</span>
       </div>
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 80px;">
         <div id="screen-rec-timer" style="font-family: ui-monospace, monospace; font-size: 1.0em; font-weight: 700; color: #f8fafc; text-align: center; white-space: nowrap;">

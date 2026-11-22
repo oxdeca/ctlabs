@@ -1538,10 +1538,25 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     return false;
   }
 
+  function markTargetWindowRecTitle(win) {
+    if (!win || win.closed) return;
+    try {
+      if (win.document) {
+        let t = win.document.title || '';
+        if (!t.startsWith('🔴 [REC TARGET]')) {
+          win.document.title = '🔴 [REC TARGET] ' + (t.replace(/^🔴\s*\[REC TARGET\]\s*/, '') || 'CTLABS');
+        }
+      }
+    } catch (e) {
+      // Cross-origin restriction
+    }
+  }
+
   function focusTargetWindow() {
     if (activeRecWindow && !activeRecWindow.closed) {
       try {
         activeRecWindow.focus();
+        markTargetWindowRecTitle(activeRecWindow);
         flashRecWindowHighlight(activeRecWindow, 1500);
         return;
       } catch (e) {}
@@ -1685,6 +1700,45 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     return 'WebM';
   }
 
+  async function acquireDisplayStream(controller = null) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      throw new Error('Screen capture API (getDisplayMedia) is not supported in this browser.');
+    }
+
+    const supported = (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints()) || {};
+    const videoConstraints = supported.cursor ? { cursor: 'always' } : true;
+
+    const gdmOptions = {
+      video: videoConstraints,
+      audio: true,
+      preferCurrentTab: false,
+      selfBrowserSurface: 'exclude',
+      surfaceSwitching: 'include',
+      systemAudio: 'include'
+    };
+    if (controller) {
+      gdmOptions.controller = controller;
+    }
+
+    try {
+      return await navigator.mediaDevices.getDisplayMedia(gdmOptions);
+    } catch (err) {
+      if (err.name === 'NotAllowedError') throw err;
+      // Fallback to basic getDisplayMedia if advanced options or controller rejected (e.g. Firefox)
+      try {
+        return await navigator.mediaDevices.getDisplayMedia({
+          video: videoConstraints,
+          audio: true
+        });
+      } catch (err2) {
+        if (err2.name === 'NotAllowedError') throw err2;
+        return await navigator.mediaDevices.getDisplayMedia({
+          video: true
+        });
+      }
+    }
+  }
+
   // --- Browser Screen Recorder ---
   class ScreenRecorder {
     constructor() {
@@ -1695,6 +1749,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       this.micStream = null;
       this.audioCtx = null;
       this.captureController = null;
+      this.cropCancelLoop = null;
       this.timerInterval = null;
       this.startTime = 0;
       this.durationSec = 0;
@@ -1731,92 +1786,8 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       }
     }
 
-    async start(enableMic = false) {
-      this.cleanup();
-      this.recordedChunks = [];
-      this.durationSec = 0;
-      this.currentSizeBytes = 0;
-      this.isRecording = false;
-      this.isStopping = false;
-      this.stopReason = null;
-
-      const maxLenSelect = document.getElementById('rec-screen-max-len');
-      const maxSizeSelect = document.getElementById('rec-screen-max-size');
-      this.maxDurationSec = maxLenSelect ? parseInt(maxLenSelect.value, 10) || 0 : 0;
-      const maxSizeMB = maxSizeSelect ? parseInt(maxSizeSelect.value, 10) || 0 : 0;
-      this.maxSizeBytes = maxSizeMB > 0 ? maxSizeMB * 1024 * 1024 : 0;
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        throw new Error('Screen capture API (getDisplayMedia) is not supported in this browser.');
-      }
-
-      const supported = (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints()) || {};
-      const videoConstraints = supported.cursor ? { cursor: 'always' } : true;
-
-      let controller = null;
-      if (typeof CaptureController !== 'undefined') {
-        try {
-          controller = new CaptureController();
-        } catch (e) {
-          controller = null;
-        }
-      }
-      this.captureController = controller;
-
-      const gdmOptions = {
-        video: videoConstraints,
-        audio: true,
-        preferCurrentTab: false,
-        selfBrowserSurface: 'exclude',
-        surfaceSwitching: 'include',
-        systemAudio: 'include'
-      };
-      if (controller) {
-        gdmOptions.controller = controller;
-      }
-
-      let displayStream;
-      try {
-        displayStream = await navigator.mediaDevices.getDisplayMedia(gdmOptions);
-      } catch (err) {
-        if (err.name === 'NotAllowedError') throw err;
-        // Fallback to basic getDisplayMedia if options or controller rejected (e.g. Firefox)
-        try {
-          displayStream = await navigator.mediaDevices.getDisplayMedia({
-            video: videoConstraints,
-            audio: true
-          });
-        } catch (err2) {
-          if (err2.name === 'NotAllowedError') throw err2;
-          displayStream = await navigator.mediaDevices.getDisplayMedia({
-            video: true
-          });
-        }
-      }
-
-      // In Chromium, automatically focus the captured surface
-      if (controller && typeof controller.setFocusBehavior === 'function') {
-        try {
-          const videoTrack = displayStream.getVideoTracks()[0];
-          const settings = videoTrack && videoTrack.getSettings ? videoTrack.getSettings() : {};
-          if (settings.displaySurface !== 'monitor') {
-            controller.setFocusBehavior('focus-captured-surface');
-          }
-        } catch (focusErr) {
-          console.warn('CaptureController setFocusBehavior notice:', focusErr);
-        }
-      }
-
-      // If dedicated window is open, bring it to focus and make sure NO border is visible in the recording
-      if (activeRecWindow && !activeRecWindow.closed) {
-        try { activeRecWindow.focus(); } catch (e) {}
-        removeRecWindowHighlight(activeRecWindow);
-      }
-
-      this.displayStream = displayStream;
-      let combinedStream = displayStream;
-
-      // Mix microphone audio if requested
+    async mixMicrophone(videoStream, displayAudioSource, enableMic = false) {
+      let combinedAudio = [...displayAudioSource.getAudioTracks()];
       if (enableMic && navigator.mediaDevices.getUserMedia) {
         try {
           const micStream = await navigator.mediaDevices.getUserMedia({
@@ -1827,7 +1798,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
           });
           this.micStream = micStream;
 
-          const hasDisplayAudio = displayStream.getAudioTracks().length > 0;
+          const hasDisplayAudio = displayAudioSource.getAudioTracks().length > 0;
           const hasMicAudio = micStream.getAudioTracks().length > 0;
 
           if (hasDisplayAudio || hasMicAudio) {
@@ -1838,7 +1809,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
               const dest = ctx.createMediaStreamDestination();
 
               if (hasDisplayAudio) {
-                const displaySource = ctx.createMediaStreamSource(new MediaStream(displayStream.getAudioTracks()));
+                const displaySource = ctx.createMediaStreamSource(new MediaStream(displayAudioSource.getAudioTracks()));
                 displaySource.connect(dest);
               }
               if (hasMicAudio) {
@@ -1846,16 +1817,12 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
                 micSource.connect(dest);
               }
 
-              combinedStream = new MediaStream([
-                ...displayStream.getVideoTracks(),
-                ...dest.stream.getAudioTracks()
-              ]);
+              combinedAudio = dest.stream.getAudioTracks();
             } else {
-              combinedStream = new MediaStream([
-                ...displayStream.getVideoTracks(),
-                ...displayStream.getAudioTracks(),
+              combinedAudio = [
+                ...displayAudioSource.getAudioTracks(),
                 ...micStream.getAudioTracks()
-              ]);
+              ];
             }
           }
         } catch (micErr) {
@@ -1863,8 +1830,13 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         }
       }
 
-      this.stream = combinedStream;
+      return new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...combinedAudio
+      ]);
+    }
 
+    initRecorder(combinedStream, displayStream) {
       // Pick preferred mimeType based on available codecs: AV1 -> VP9 -> VP8 -> H.264
       const hasAudio = combinedStream.getAudioTracks().length > 0;
       const candidates = hasAudio ? [
@@ -1978,6 +1950,132 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       }, 500);
     }
 
+    async start(enableMic = false) {
+      this.cleanup();
+      this.recordedChunks = [];
+      this.durationSec = 0;
+      this.currentSizeBytes = 0;
+      this.isRecording = false;
+      this.isStopping = false;
+      this.stopReason = null;
+
+      const maxLenSelect = document.getElementById('rec-screen-max-len');
+      const maxSizeSelect = document.getElementById('rec-screen-max-size');
+      this.maxDurationSec = maxLenSelect ? parseInt(maxLenSelect.value, 10) || 0 : 0;
+      const maxSizeMB = maxSizeSelect ? parseInt(maxSizeSelect.value, 10) || 0 : 0;
+      this.maxSizeBytes = maxSizeMB > 0 ? maxSizeMB * 1024 * 1024 : 0;
+
+      let controller = null;
+      if (typeof CaptureController !== 'undefined') {
+        try {
+          controller = new CaptureController();
+        } catch (e) {
+          controller = null;
+        }
+      }
+      this.captureController = controller;
+
+      const displayStream = await acquireDisplayStream(controller);
+
+      // In Chromium, automatically focus the captured surface
+      if (controller && typeof controller.setFocusBehavior === 'function') {
+        try {
+          const videoTrack = displayStream.getVideoTracks()[0];
+          const settings = videoTrack && videoTrack.getSettings ? videoTrack.getSettings() : {};
+          if (settings.displaySurface !== 'monitor') {
+            controller.setFocusBehavior('focus-captured-surface');
+          }
+        } catch (focusErr) {
+          console.warn('CaptureController setFocusBehavior notice:', focusErr);
+        }
+      }
+
+      // If dedicated window is open, bring it to focus and make sure NO border is visible in the recording
+      if (activeRecWindow && !activeRecWindow.closed) {
+        try { activeRecWindow.focus(); } catch (e) {}
+        removeRecWindowHighlight(activeRecWindow);
+      }
+
+      this.displayStream = displayStream;
+      const combinedStream = await this.mixMicrophone(displayStream, displayStream, enableMic);
+      this.stream = combinedStream;
+
+      const cropBadge = document.getElementById('screen-rec-crop-badge');
+      if (cropBadge) cropBadge.style.display = 'none';
+
+      this.initRecorder(combinedStream, displayStream);
+    }
+
+    async startWithCrop(displayStream, cropArea, enableMic = false) {
+      this.cleanup();
+      this.recordedChunks = [];
+      this.durationSec = 0;
+      this.currentSizeBytes = 0;
+      this.isRecording = false;
+      this.isStopping = false;
+      this.stopReason = null;
+
+      const maxLenSelect = document.getElementById('rec-screen-max-len');
+      const maxSizeSelect = document.getElementById('rec-screen-max-size');
+      this.maxDurationSec = maxLenSelect ? parseInt(maxLenSelect.value, 10) || 0 : 0;
+      const maxSizeMB = maxSizeSelect ? parseInt(maxSizeSelect.value, 10) || 0 : 0;
+      this.maxSizeBytes = maxSizeMB > 0 ? maxSizeMB * 1024 * 1024 : 0;
+
+      this.displayStream = displayStream;
+
+      // 1. Offscreen video element playing the source stream
+      const offscreenVid = document.createElement('video');
+      offscreenVid.srcObject = displayStream;
+      offscreenVid.muted = true;
+      offscreenVid.playsInline = true;
+      await offscreenVid.play().catch(() => {});
+
+      // 2. Offscreen canvas of the exact cropped section resolution
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = cropArea.width;
+      cropCanvas.height = cropArea.height;
+      const cropCtx = cropCanvas.getContext('2d', { alpha: false, desynchronized: true });
+
+      // 3. Render loop using requestAnimationFrame
+      let isLooping = true;
+      this.cropCancelLoop = () => {
+        isLooping = false;
+        try {
+          offscreenVid.pause();
+          offscreenVid.srcObject = null;
+        } catch (e) {}
+      };
+
+      const renderLoop = () => {
+        if (!isLooping) return;
+        if (offscreenVid.readyState >= 2) {
+          cropCtx.drawImage(
+            offscreenVid,
+            cropArea.x, cropArea.y, cropArea.width, cropArea.height,
+            0, 0, cropArea.width, cropArea.height
+          );
+        }
+        requestAnimationFrame(renderLoop);
+      };
+      requestAnimationFrame(renderLoop);
+
+      // 4. Capture cropped stream from canvas at 30 fps
+      const croppedStream = cropCanvas.captureStream(30);
+
+      // 5. Mix microphone and system audio
+      const combinedStream = await this.mixMicrophone(croppedStream, displayStream, enableMic);
+      this.stream = combinedStream;
+
+      // Show CROP badge in floating recording bar
+      const cropBadge = document.getElementById('screen-rec-crop-badge');
+      if (cropBadge) {
+        cropBadge.textContent = `${cropArea.width}×${cropArea.height}`;
+        cropBadge.style.display = 'inline-block';
+      }
+
+      this.initRecorder(combinedStream, displayStream);
+    }
+
     stop() {
       if (activeRecWindow && !activeRecWindow.closed) {
         removeRecWindowHighlight(activeRecWindow);
@@ -2018,6 +2116,10 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     }
 
     cleanupTracks() {
+      if (this.cropCancelLoop) {
+        try { this.cropCancelLoop(); } catch (e) {}
+        this.cropCancelLoop = null;
+      }
       if (this.stream) {
         this.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
         this.stream = null;
@@ -2041,6 +2143,8 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         removeRecWindowHighlight(activeRecWindow);
       }
       if (screenRecFocusBtn) screenRecFocusBtn.style.display = 'none';
+      const cropBadge = document.getElementById('screen-rec-crop-badge');
+      if (cropBadge) cropBadge.style.display = 'none';
       if (this.timerInterval) {
         clearInterval(this.timerInterval);
         this.timerInterval = null;
@@ -2219,11 +2323,38 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     });
   }
 
+  function switchRecScreenTab(targetTabId) {
+    document.querySelectorAll('.rec-screen-tab-btn').forEach(btn => {
+      const isTarget = btn.getAttribute('data-tab') === targetTabId;
+      btn.style.borderBottom = isTarget ? '2px solid #f43f5e' : '2px solid transparent';
+      btn.style.color = isTarget ? '#f8fafc' : '#94a3b8';
+      btn.style.fontWeight = isTarget ? '600' : '500';
+    });
+    document.querySelectorAll('.rec-screen-tab-pane').forEach(pane => {
+      pane.style.display = pane.id === targetTabId ? 'block' : 'none';
+    });
+  }
+
+  document.querySelectorAll('.rec-screen-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tabId = btn.getAttribute('data-tab');
+      if (tabId) switchRecScreenTab(tabId);
+    });
+  });
+
   if (recordScreenBtn) {
     recordScreenBtn.addEventListener('click', () => {
       if (recordDropdownMenu) recordDropdownMenu.style.display = 'none';
+      switchRecScreenTab('rec-tab-general');
       const badge = document.getElementById('rec-codec-badge');
       if (badge) badge.textContent = detectSupportedVideoCodec();
+      try {
+        const savedArea = localStorage.getItem('ctlabs_screen_rec_area');
+        if (savedArea) {
+          const rad = document.querySelector(`input[name="rec-screen-area"][value="${savedArea}"]`);
+          if (rad) rad.checked = true;
+        }
+      } catch (e) {}
       if (recordScreenModal) recordScreenModal.style.display = 'block';
     });
   }
@@ -2237,6 +2368,268 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (recordScreenModal) recordScreenModal.style.display = 'none';
     });
   }
+
+  // --- Screen Recording Crop Area Selector ---
+  const screenCropModal = document.getElementById('screen-crop-modal');
+  const screenCropStage = document.getElementById('screen-crop-stage');
+  const screenCropPreviewVideo = document.getElementById('screen-crop-preview-video');
+  const screenCropBoxEl = document.getElementById('screen-crop-box');
+  const screenCropBoxLabel = document.getElementById('screen-crop-box-label');
+  const screenCropDimsBadge = document.getElementById('screen-crop-dims-badge');
+  const closeScreenCropModal = document.getElementById('close-screen-crop-modal');
+  const cancelScreenCropBtn = document.getElementById('cancel-screen-crop-btn');
+  const confirmScreenCropBtn = document.getElementById('confirm-screen-crop-btn');
+
+  let activeCropStream = null;
+  let activeCropEnableMic = false;
+  let cropBox = { x: 0, y: 0, w: 0, h: 0 };
+  let cropDragState = null;
+
+  function updateCropBoxDOM() {
+    if (!screenCropBoxEl || !screenCropStage || !screenCropPreviewVideo) return;
+    const stageW = screenCropStage.clientWidth;
+    const stageH = screenCropStage.clientHeight;
+    if (stageW <= 0 || stageH <= 0) return;
+
+    cropBox.w = Math.max(30, Math.min(cropBox.w, stageW));
+    cropBox.h = Math.max(30, Math.min(cropBox.h, stageH));
+    cropBox.x = Math.max(0, Math.min(cropBox.x, stageW - cropBox.w));
+    cropBox.y = Math.max(0, Math.min(cropBox.y, stageH - cropBox.h));
+
+    screenCropBoxEl.style.left = cropBox.x + 'px';
+    screenCropBoxEl.style.top = cropBox.y + 'px';
+    screenCropBoxEl.style.width = cropBox.w + 'px';
+    screenCropBoxEl.style.height = cropBox.h + 'px';
+
+    const vidW = screenCropPreviewVideo.videoWidth || 1920;
+    const vidH = screenCropPreviewVideo.videoHeight || 1080;
+    const scaleX = vidW / stageW;
+    const scaleY = vidH / stageH;
+
+    const realW = Math.max(32, Math.floor((cropBox.w * scaleX) / 2) * 2);
+    const realH = Math.max(32, Math.floor((cropBox.h * scaleY) / 2) * 2);
+
+    const dimsStr = `${realW} &times; ${realH}`;
+    if (screenCropDimsBadge) screenCropDimsBadge.innerHTML = dimsStr;
+    if (screenCropBoxLabel) screenCropBoxLabel.innerHTML = dimsStr;
+  }
+
+  function initCropBox(aspect = 16 / 9) {
+    if (!screenCropStage) return;
+    const sw = screenCropStage.clientWidth;
+    const sh = screenCropStage.clientHeight;
+    if (sw <= 0 || sh <= 0) return;
+
+    if (aspect === 'full' || !aspect) {
+      cropBox = { x: 0, y: 0, w: sw, h: sh };
+    } else {
+      let bw = Math.round(sw * 0.75);
+      let bh = Math.round(bw / aspect);
+      if (bh > sh * 0.85) {
+        bh = Math.round(sh * 0.85);
+        bw = Math.round(bh * aspect);
+      }
+      cropBox = {
+        x: Math.round((sw - bw) / 2),
+        y: Math.round((sh - bh) / 2),
+        w: bw,
+        h: bh
+      };
+    }
+    updateCropBoxDOM();
+  }
+
+  function openScreenCropModal(stream, enableMic) {
+    activeCropStream = stream;
+    activeCropEnableMic = enableMic;
+
+    if (!screenCropModal || !screenCropPreviewVideo) return;
+
+    screenCropModal.style.display = 'block';
+    screenCropPreviewVideo.srcObject = stream;
+    screenCropPreviewVideo.play().catch(() => {});
+
+    const setupBox = () => {
+      setTimeout(() => {
+        initCropBox(16 / 9);
+      }, 60);
+    };
+
+    if (screenCropPreviewVideo.readyState >= 1) {
+      setupBox();
+    } else {
+      screenCropPreviewVideo.onloadedmetadata = setupBox;
+    }
+
+    stream.getVideoTracks().forEach(track => {
+      track.onended = () => {
+        if (screenCropModal && screenCropModal.style.display === 'block') {
+          cancelCropSelection();
+        }
+      };
+    });
+  }
+
+  function cancelCropSelection() {
+    if (activeCropStream) {
+      activeCropStream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+      activeCropStream = null;
+    }
+    if (screenCropPreviewVideo) {
+      try {
+        screenCropPreviewVideo.pause();
+        screenCropPreviewVideo.srcObject = null;
+      } catch (e) {}
+    }
+    if (screenCropModal) screenCropModal.style.display = 'none';
+  }
+
+  if (screenCropStage) {
+    screenCropStage.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      const rect = screenCropStage.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+
+      const handle = e.target.getAttribute('data-handle');
+      if (handle) {
+        cropDragState = {
+          type: 'resize',
+          handle: handle,
+          startX: e.clientX,
+          startY: e.clientY,
+          initBox: { ...cropBox }
+        };
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (e.target === screenCropBoxEl || screenCropBoxEl.contains(e.target)) {
+        cropDragState = {
+          type: 'move',
+          startX: e.clientX,
+          startY: e.clientY,
+          initBox: { ...cropBox }
+        };
+        e.preventDefault();
+        e.stopPropagation();
+      } else {
+        cropDragState = {
+          type: 'draw',
+          startX: clickX,
+          startY: clickY
+        };
+        cropBox = { x: clickX, y: clickY, w: 4, h: 4 };
+        updateCropBoxDOM();
+        e.preventDefault();
+      }
+    });
+  }
+
+  window.addEventListener('mousemove', (e) => {
+    if (!cropDragState || !screenCropStage) return;
+    const rect = screenCropStage.getBoundingClientRect();
+
+    if (cropDragState.type === 'move') {
+      const dx = e.clientX - cropDragState.startX;
+      const dy = e.clientY - cropDragState.startY;
+      cropBox.x = cropDragState.initBox.x + dx;
+      cropBox.y = cropDragState.initBox.y + dy;
+      updateCropBoxDOM();
+    } else if (cropDragState.type === 'resize') {
+      const dx = e.clientX - cropDragState.startX;
+      const dy = e.clientY - cropDragState.startY;
+      const h = cropDragState.handle;
+      const ib = cropDragState.initBox;
+
+      if (h.includes('e')) cropBox.w = ib.w + dx;
+      if (h.includes('s')) cropBox.h = ib.h + dy;
+      if (h.includes('w')) {
+        const nw = ib.w - dx;
+        if (nw >= 30) {
+          cropBox.x = ib.x + dx;
+          cropBox.w = nw;
+        }
+      }
+      if (h.includes('n')) {
+        const nh = ib.h - dy;
+        if (nh >= 30) {
+          cropBox.y = ib.y + dy;
+          cropBox.h = nh;
+        }
+      }
+      updateCropBoxDOM();
+    } else if (cropDragState.type === 'draw') {
+      const curX = Math.max(0, Math.min(e.clientX - rect.left, screenCropStage.clientWidth));
+      const curY = Math.max(0, Math.min(e.clientY - rect.top, screenCropStage.clientHeight));
+      cropBox.x = Math.min(cropDragState.startX, curX);
+      cropBox.y = Math.min(cropDragState.startY, curY);
+      cropBox.w = Math.abs(curX - cropDragState.startX);
+      cropBox.h = Math.abs(curY - cropDragState.startY);
+      updateCropBoxDOM();
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (cropDragState) {
+      cropDragState = null;
+      if (cropBox.w < 20 || cropBox.h < 20) {
+        initCropBox(16 / 9);
+      }
+    }
+  });
+
+  document.querySelectorAll('.crop-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const asp = btn.getAttribute('data-aspect');
+      if (asp === '16:9') initCropBox(16 / 9);
+      else if (asp === '4:3') initCropBox(4 / 3);
+      else if (asp === 'full') initCropBox('full');
+    });
+  });
+
+  if (confirmScreenCropBtn) {
+    confirmScreenCropBtn.addEventListener('click', async () => {
+      if (!activeCropStream || !screenCropStage || !screenCropPreviewVideo) return;
+      const stageW = screenCropStage.clientWidth;
+      const stageH = screenCropStage.clientHeight;
+      const vidW = screenCropPreviewVideo.videoWidth || 1920;
+      const vidH = screenCropPreviewVideo.videoHeight || 1080;
+      const scaleX = vidW / stageW;
+      const scaleY = vidH / stageH;
+
+      let rx = Math.round(cropBox.x * scaleX);
+      let ry = Math.round(cropBox.y * scaleY);
+      let rw = Math.max(32, Math.floor((cropBox.w * scaleX) / 2) * 2);
+      let rh = Math.max(32, Math.floor((cropBox.h * scaleY) / 2) * 2);
+
+      rx = Math.max(0, Math.min(rx, vidW - rw));
+      ry = Math.max(0, Math.min(ry, vidH - rh));
+
+      const cropArea = { x: rx, y: ry, width: rw, height: rh };
+      const stream = activeCropStream;
+      const mic = activeCropEnableMic;
+
+      activeCropStream = null;
+      if (screenCropPreviewVideo) {
+        try {
+          screenCropPreviewVideo.pause();
+          screenCropPreviewVideo.srcObject = null;
+        } catch (e) {}
+      }
+      if (screenCropModal) screenCropModal.style.display = 'none';
+
+      try {
+        await screenRecorder.startWithCrop(stream, cropArea, mic);
+      } catch (err) {
+        console.error('Failed to start cropped screen recording:', err);
+        alert('Could not start cropped recording: ' + err.message);
+        screenRecorder.cleanup();
+      }
+    });
+  }
+
+  if (closeScreenCropModal) closeScreenCropModal.addEventListener('click', cancelCropSelection);
+  if (cancelScreenCropBtn) cancelScreenCropBtn.addEventListener('click', cancelCropSelection);
+
   if (confirmRecordScreenBtn) {
     confirmRecordScreenBtn.addEventListener('click', async () => {
       if (recordScreenModal) recordScreenModal.style.display = 'none';
@@ -2246,14 +2639,30 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         if (recScreenMaxSizeSelect) localStorage.setItem('ctlabs_screen_rec_max_size', recScreenMaxSizeSelect.value);
       } catch (e) {}
       const enableMic = recScreenMic ? recScreenMic.checked : false;
-      try {
-        await screenRecorder.start(enableMic);
-      } catch (err) {
-        console.error('Failed to start screen recording:', err);
-        if (err.name !== 'NotAllowedError') {
-          alert('Could not start screen recording: ' + err.message);
+      const areaRadio = document.querySelector('input[name="rec-screen-area"]:checked');
+      const area = areaRadio ? areaRadio.value : 'full';
+      try { localStorage.setItem('ctlabs_screen_rec_area', area); } catch (e) {}
+
+      if (area === 'crop') {
+        try {
+          const displayStream = await acquireDisplayStream();
+          openScreenCropModal(displayStream, enableMic);
+        } catch (err) {
+          console.error('Failed to acquire screen stream for crop:', err);
+          if (err.name !== 'NotAllowedError') {
+            alert('Could not start screen capture: ' + err.message);
+          }
         }
-        screenRecorder.cleanup();
+      } else {
+        try {
+          await screenRecorder.start(enableMic);
+        } catch (err) {
+          console.error('Failed to start screen recording:', err);
+          if (err.name !== 'NotAllowedError') {
+            alert('Could not start screen recording: ' + err.message);
+          }
+          screenRecorder.cleanup();
+        }
       }
     });
   }
@@ -2310,8 +2719,9 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
             updateRecWindowUI();
             return;
           }
+          markTargetWindowRecTitle(activeRecWindow);
           updateRecWindowUI();
-        }, 1500);
+        }, 1000);
       }
     });
   }
