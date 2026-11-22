@@ -826,9 +826,10 @@ class RecordingsController < BaseController
                       orig_base.tr('_-', ' ').strip
                     end
         base_name = 'Browser Recording' if base_name.empty?
+        probed_dur = RecordingService.probe_video_duration(dest_path)
         meta = {
           'title'      => base_name,
-          'duration'   => 0.0,
+          'duration'   => (probed_dur && probed_dur > 0) ? probed_dur.to_f : 0.0,
           'created_at' => Time.now.to_i,
           'type'       => 'video'
         }
@@ -1369,6 +1370,28 @@ class RecordingsController < BaseController
     slug = params[:walkthrough].to_s
     slug = wks.keys.first.to_s unless wks.key?(slug)
     redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
+  end
+
+  post '/recordings/:id/duration' do
+    halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
+
+    raw_dur = params[:duration]
+    if raw_dur.nil? && (request.media_type == 'application/json' || request.content_type =~ /application\/json/)
+      begin
+        body_json = JSON.parse(request.body.read)
+        raw_dur = body_json['duration'] if body_json.is_a?(Hash)
+      rescue StandardError
+      end
+    end
+
+    dur = raw_dur.to_f
+    if dur <= 0
+      halt 400, { ok: false, error: 'Invalid duration' }.to_json
+    end
+
+    updated = RecordingService.update_duration(params[:id], dur)
+    content_type :json
+    { ok: updated, id: params[:id], duration: dur, label: RecordingService.duration_label(dur) }.to_json
   end
 
   post '/recordings/:id/delete' do

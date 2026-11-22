@@ -2497,6 +2497,25 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       }
       if (videoPlayer) {
         videoPlayer.src = src;
+        videoPlayer.onloadedmetadata = () => {
+          const dur = videoPlayer.duration;
+          if (dur && !isNaN(dur) && dur > 0 && activeId && activeDataType === 'video') {
+            const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+            if (activeBtn) {
+              const row1 = activeBtn.children[0];
+              const durEl = row1 ? row1.children[1] : null;
+              if (durEl && (durEl.textContent.trim() === '0s' || durEl.textContent.trim() === '0.0s')) {
+                const formatted = (dur < 60) ? `${dur.toFixed(1)}s` : `${Math.floor(dur / 60)}m ${Math.floor(dur % 60).toString().padStart(2, '0')}s`;
+                durEl.textContent = formatted;
+                fetch(`/recordings/${encodeURIComponent(activeId)}/duration`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: `duration=${encodeURIComponent(dur)}`
+                }).catch(() => {});
+              }
+            }
+          }
+        };
         if (autoPlay) {
           videoPlayer.play().catch(() => {});
         }

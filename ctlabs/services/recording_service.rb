@@ -1007,6 +1007,18 @@ class RecordingService
       title = meta_data['title'].to_s.strip
       title = 'Browser Recording' if title.empty?
       duration = meta_data['duration'].to_f
+      if duration <= 0.0
+        probed = probe_video_duration(path)
+        if probed && probed > 0.0
+          duration = probed
+          begin
+            meta_data['duration'] = duration
+            target_meta = File.join(File.dirname(path), "#{id}.json")
+            File.write(target_meta, JSON.pretty_generate(meta_data))
+          rescue StandardError
+          end
+        end
+      end
       created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
       status = meta_data['status'].to_s.strip
       status = nil if status.empty? || status == 'none'
@@ -1150,6 +1162,113 @@ class RecordingService
     RecordingGitService.commit("Delete step '#{id}'") rescue nil
     true
   rescue SystemCallError
+    false
+  end
+
+  # --- Video Duration Probing & Updates --------------------------------------
+
+  # Probes video files (.webm, .mp4, .mkv, .mov) to extract true duration in seconds without external binaries
+  def self.probe_video_duration(path)
+    return 0.0 unless path && File.file?(path)
+    ext = File.extname(path).downcase
+    dur = if ext == '.webm' || ext == '.mkv'
+            probe_webm_duration(path)
+          elsif ext == '.mp4' || ext == '.mov' || ext == '.m4v'
+            probe_mp4_duration(path)
+          end
+    dur.to_f
+  rescue StandardError
+    0.0
+  end
+
+  def self.probe_webm_duration(path)
+    return nil unless File.file?(path)
+    # Read first 512KB where Segment Info element typically resides
+    chunk = File.binread(path, 524288)
+    return nil unless chunk && chunk.bytesize >= 16
+
+    timecode_scale = 1_000_000 # default 1ms
+
+    ts_idx = chunk.index("\x2A\xD7\xB1".b)
+    if ts_idx
+      len_byte = chunk.getbyte(ts_idx + 3)
+      if len_byte
+        len = len_byte & 0x7F
+        ts_bytes = chunk[ts_idx + 4, len]
+        if ts_bytes && ts_bytes.bytesize == len
+          scale = ts_bytes.unpack('C*').reduce(0) { |acc, b| (acc << 8) | b }
+          timecode_scale = scale if scale && scale > 0
+        end
+      end
+    end
+
+    d_idx = chunk.index("\x44\x89".b)
+    if d_idx
+      len_byte = chunk.getbyte(d_idx + 2)
+      if len_byte
+        len = len_byte & 0x7F
+        dur_bytes = chunk[d_idx + 3, len]
+        if dur_bytes && dur_bytes.bytesize == len
+          val = (len == 4) ? dur_bytes.unpack1('g') : dur_bytes.unpack1('G')
+          if val && val > 0
+            return (val * timecode_scale) / 1_000_000_000.0
+          end
+        end
+      end
+    end
+
+    nil
+  end
+
+  def self.probe_mp4_duration(path)
+    return nil unless File.file?(path)
+    # Read first 1MB where moov/mvhd box typically resides
+    chunk = File.binread(path, 1048576)
+    return nil unless chunk && chunk.bytesize >= 32
+
+    idx = chunk.index('mvhd'.b)
+    if idx && idx >= 4
+      payload_idx = idx + 4
+      version = chunk.getbyte(payload_idx)
+      if version == 0 && chunk.bytesize >= payload_idx + 20
+        timescale = chunk[payload_idx + 12, 4].unpack1('N')
+        duration  = chunk[payload_idx + 16, 4].unpack1('N')
+        return duration.to_f / timescale if timescale && timescale > 0
+      elsif version == 1 && chunk.bytesize >= payload_idx + 32
+        timescale = chunk[payload_idx + 20, 4].unpack1('N')
+        duration  = chunk[payload_idx + 24, 8].unpack1('Q>')
+        return duration.to_f / timescale if timescale && timescale > 0
+      end
+    end
+
+    nil
+  end
+
+  def self.update_duration(id, duration)
+    path = path_for(id)
+    return false unless path && File.file?(path)
+    dur = duration.to_f
+    return false if dur <= 0
+
+    if path.end_with?(MD_EXT)
+      return false
+    elsif VIDEO_EXTS.any? { |e| path.end_with?(e) }
+      meta_file = File.join(File.dirname(path), "#{id}.json")
+      meta_file = File.join(dir, "#{id}.json") unless File.file?(meta_file)
+      meta = {}
+      if File.file?(meta_file)
+        meta = JSON.parse(File.read(meta_file)) rescue {}
+      end
+      meta = {} unless meta.is_a?(Hash)
+      meta['duration'] = dur
+      meta['title'] ||= 'Browser Recording'
+      meta['type'] ||= 'video'
+      meta['created_at'] ||= File.mtime(path).to_i
+      File.write(meta_file, JSON.pretty_generate(meta))
+      return true
+    end
+    false
+  rescue StandardError
     false
   end
 
