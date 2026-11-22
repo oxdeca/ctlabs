@@ -254,8 +254,8 @@
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.8em;">
                       <div style="display: flex; align-items: center;">
-                        <i class="fas fa-grip-vertical" style="margin-right: 4px; color: #64748b;"></i>
-                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 5px;' : '' %>">
+                        <i class="fas fa-grip-vertical" style="margin-right: 6px; color: #64748b;"></i>
+                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 6px;' : '' %>">
                           <% if r[:status].to_s == 'done' %>
                             <i class="fas fa-check-circle" style="color: #10b981;" title="Status: Done"></i>
                           <% elsif r[:status].to_s == 'in_progress' %>
@@ -265,11 +265,11 @@
                           <% end %>
                         </span>
                         <% if is_md %>
-                          <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown</span>
                         <% elsif is_vid %>
-                          <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-video" style="color: #f43f5e;"></i> Screen</span>
                         <% else %>
-                          <i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %>
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %></span>
                         <% end %>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
@@ -364,7 +364,7 @@
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: 0.76em;">
                       <div style="display: flex; align-items: center;">
-                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 5px;' : '' %>">
+                        <span class="step-status-badge" style="display: inline-flex; align-items: center; <%= (r[:status] && r[:status] != 'none') ? 'margin-right: 6px;' : '' %>">
                           <% if r[:status].to_s == 'done' %>
                             <i class="fas fa-check-circle" style="color: #10b981;" title="Status: Done"></i>
                           <% elsif r[:status].to_s == 'in_progress' %>
@@ -374,11 +374,11 @@
                           <% end %>
                         </span>
                         <% if is_md %>
-                          <i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-file-alt" style="color: #38bdf8;"></i> Markdown</span>
                         <% elsif is_vid %>
-                          <i class="fas fa-video" style="color: #f43f5e;"></i> Screen
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-video" style="color: #f43f5e;"></i> Screen</span>
                         <% else %>
-                          <i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %>
+                          <span style="display: inline-flex; align-items: center; gap: 5px;"><i class="fas fa-terminal" style="color: #10b981;"></i> <%= ERB::Util.html_escape(node_str) %></span>
                         <% end %>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
@@ -605,6 +605,110 @@
                       </div>
                       <span style="color: #64748b; font-size: 0.88em; white-space: nowrap;">Click: Char · Right-click: :code:</span>
                     </div>
+                  </div>
+                </div>
+
+                <!-- Snippets Helper Dropdown -->
+                <div id="md-snippets-wrapper" style="position: relative; display: none; align-items: center; gap: 6px;">
+                  <button type="button" id="md-snippets-btn" title="Insert markdown snippet (Ctrl+Shift+S)" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                    <i class="fas fa-puzzle-piece" style="color: #38bdf8; font-size: 0.9em;"></i>
+                    <span style="font-weight: 500;">Snippet</span>
+                    <i class="fas fa-caret-down" style="font-size: 0.75em; opacity: 0.7; margin-left: 1px;"></i>
+                  </button>
+
+                  <div id="md-snippets-menu" style="display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 260px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.65); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                    <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                      <span>Insert Snippet</span>
+                      <span style="font-size: 0.85em; color: #64748b; font-weight: normal; font-family: ui-monospace, monospace;">^⇧S</span>
+                    </div>
+
+                    <div style="padding: 3px 12px 1px; font-size: 0.68em; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Collapsible Details</div>
+                    <button type="button" class="md-snippet-item" data-snippet="details_named" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-chevron-circle-down" style="color: #38bdf8; width: 14px; text-align: center;"></i>
+                        <span>Details Accordion</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&lt;details name&gt;</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="details_simple" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-caret-square-down" style="color: #38bdf8; width: 14px; text-align: center;"></i>
+                        <span>Details (Simple)</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&lt;details&gt;</code>
+                    </button>
+
+                    <div style="height: 1px; background: #334155; margin: 4px 0;"></div>
+                    <div style="padding: 3px 12px 1px; font-size: 0.68em; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Tables</div>
+                    <button type="button" class="md-snippet-item" data-snippet="table_2x2" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-table" style="color: #10b981; width: 14px; text-align: center;"></i>
+                        <span>Pipe Table (2 cols)</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">| col | col |</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="table_3x3" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-th" style="color: #10b981; width: 14px; text-align: center;"></i>
+                        <span>Pipe Table (3 cols)</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">3x3 table</code>
+                    </button>
+
+                    <div style="height: 1px; background: #334155; margin: 4px 0;"></div>
+                    <div style="padding: 3px 12px 1px; font-size: 0.68em; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Callouts &amp; Alerts</div>
+                    <button type="button" class="md-snippet-item" data-snippet="callout_note" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-info-circle" style="color: #38bdf8; width: 14px; text-align: center;"></i>
+                        <span>Note / Info</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&gt; [!NOTE]</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="callout_tip" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-lightbulb" style="color: #10b981; width: 14px; text-align: center;"></i>
+                        <span>Tip</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&gt; [!TIP]</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="callout_important" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-circle" style="color: #a855f7; width: 14px; text-align: center;"></i>
+                        <span>Important</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&gt; [!IMPORTANT]</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="callout_warning" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-exclamation-triangle" style="color: #f59e0b; width: 14px; text-align: center;"></i>
+                        <span>Warning</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&gt; [!WARNING]</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="callout_caution" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-fire" style="color: #ef4444; width: 14px; text-align: center;"></i>
+                        <span>Caution</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">&gt; [!CAUTION]</code>
+                    </button>
+
+                    <div style="height: 1px; background: #334155; margin: 4px 0;"></div>
+                    <div style="padding: 3px 12px 1px; font-size: 0.68em; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Blocks &amp; Formatting</div>
+                    <button type="button" class="md-snippet-item" data-snippet="code_block" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-terminal" style="color: #f59e0b; width: 14px; text-align: center;"></i>
+                        <span>Code Block</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">```bash</code>
+                    </button>
+                    <button type="button" class="md-snippet-item" data-snippet="task_list" style="width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.83em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-check-square" style="color: #a855f7; width: 14px; text-align: center;"></i>
+                        <span>Task Checklist</span>
+                      </span>
+                      <code style="font-size: 0.76em; color: #94a3b8; background: rgba(255,255,255,0.06); padding: 1px 4px; border-radius: 3px;">- [ ] task</code>
+                    </button>
                   </div>
                 </div>
               </div>

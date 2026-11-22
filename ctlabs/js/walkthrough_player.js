@@ -982,7 +982,7 @@
     const norm = (status || 'none').toLowerCase();
     if (badge) {
       badge.innerHTML = renderStatusBadge(norm);
-      badge.style.marginRight = badge.innerHTML ? '5px' : '0px';
+      badge.style.marginRight = badge.innerHTML ? '6px' : '0px';
     }
     btn.setAttribute('data-status', norm);
   }

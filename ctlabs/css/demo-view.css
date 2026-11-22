@@ -236,6 +236,94 @@
   background: rgba(56, 189, 248, 0.08);
   color: #94a3b8;
 }
+
+/* GitHub / GitLab / Obsidian Style Markdown Alert Callouts */
+.markdown-body .markdown-alert {
+  margin: 1.2em 0;
+  padding: 12px 16px;
+  border-left: 4px solid #38bdf8;
+  border-radius: 0 8px 8px 0;
+  background: rgba(56, 189, 248, 0.08);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+.markdown-body .markdown-alert .markdown-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.95em;
+  margin-bottom: 8px;
+  line-height: 1.2;
+}
+.markdown-body .markdown-alert .markdown-alert-content {
+  color: #cbd5e1;
+  font-size: 0.94em;
+  line-height: 1.55;
+}
+.markdown-body .markdown-alert .markdown-alert-content > p:first-child {
+  margin-top: 0;
+}
+.markdown-body .markdown-alert .markdown-alert-content > p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body .markdown-alert .markdown-alert-content ul,
+.markdown-body .markdown-alert .markdown-alert-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+
+/* Callout Variant Colors */
+.markdown-body .markdown-alert-note,
+.markdown-body .markdown-alert-info {
+  border-left-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+}
+.markdown-body .markdown-alert-note .markdown-alert-title,
+.markdown-body .markdown-alert-info .markdown-alert-title {
+  color: #38bdf8;
+}
+
+.markdown-body .markdown-alert-tip {
+  border-left-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+.markdown-body .markdown-alert-tip .markdown-alert-title {
+  color: #10b981;
+}
+
+.markdown-body .markdown-alert-important {
+  border-left-color: #a855f7;
+  background: rgba(168, 85, 247, 0.08);
+}
+.markdown-body .markdown-alert-important .markdown-alert-title {
+  color: #a855f7;
+}
+
+.markdown-body .markdown-alert-warning {
+  border-left-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.markdown-body .markdown-alert-warning .markdown-alert-title {
+  color: #f59e0b;
+}
+
+.markdown-body .markdown-alert-caution {
+  border-left-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.markdown-body .markdown-alert-caution .markdown-alert-title {
+  color: #ef4444;
+}
+
+/* Shell prompt and CLI syntax highlighting in rendered blocks */
+.markdown-body pre code.hljs {
+  padding: 0;
+  background: transparent !important;
+}
+.markdown-body .hljs-meta.prompt_ {
+  color: #38bdf8 !important;
+  font-weight: 600;
+}
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;
@@ -249,6 +337,31 @@
 .markdown-body th {
   background: #1e293b;
   color: #f8fafc;
+}
+.markdown-body details {
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 1em 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+.markdown-body details[open] {
+  border-color: #475569;
+  background: rgba(30, 41, 59, 0.7);
+}
+.markdown-body summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #38bdf8;
+  outline: none;
+  user-select: none;
+}
+.markdown-body summary:hover {
+  color: #7dd3fc;
+}
+.markdown-body details > *:not(summary) {
+  margin-top: 10px;
 }
 .markdown-body ul, .markdown-body ol {
   padding-left: 1.5em;

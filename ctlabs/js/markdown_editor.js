@@ -160,6 +160,10 @@
   const mdEmojiCatDropdown = document.getElementById('md-emoji-cat-dropdown');
   const mdEmojiMenuItems = document.querySelectorAll('.md-emoji-menu-item');
 
+  const mdSnippetsWrapper = document.getElementById('md-snippets-wrapper');
+  const mdSnippetsBtn = document.getElementById('md-snippets-btn');
+  const mdSnippetsMenu = document.getElementById('md-snippets-menu');
+
   // --- State Variables ---
   let mdCodeEditor = null;
   let currentMdMode = 'preview';
@@ -709,6 +713,8 @@
           'Cmd-Shift-G': () => openGraphvizModal(),
           'Ctrl-Shift-C': () => promptAndCommitNote(),
           'Cmd-Shift-C': () => promptAndCommitNote(),
+          'Ctrl-Shift-S': () => toggleMdSnippetsMenu(),
+          'Cmd-Shift-S': () => toggleMdSnippetsMenu(),
           'Tab': (cm) => {
             if (cm.somethingSelected()) {
               cm.indentSelection('add');
@@ -845,6 +851,35 @@
 
     marked.use({
       renderer: {
+        blockquote(quote) {
+          const quoteHtml = (typeof quote === 'object' && quote !== null) ? (quote.text || '') : (quote || '');
+          const match = quoteHtml.match(/^\s*<p>\s*\[!(NOTE|INFO|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s*<br\s*\/?>|\n|\s+)?([\s\S]*?)<\/p>([\s\S]*)$/i);
+          if (!match) {
+            return `<blockquote>${quoteHtml}</blockquote>`;
+          }
+          const type = match[1].toLowerCase();
+          const ALERT_CONFIGS = {
+            note:      { title: 'Note',      icon: 'fas fa-info-circle' },
+            info:      { title: 'Info',      icon: 'fas fa-info-circle' },
+            tip:       { title: 'Tip',       icon: 'fas fa-lightbulb' },
+            important: { title: 'Important', icon: 'fas fa-exclamation-circle' },
+            warning:   { title: 'Warning',   icon: 'fas fa-exclamation-triangle' },
+            caution:   { title: 'Caution',   icon: 'fas fa-fire' }
+          };
+          const cfg = ALERT_CONFIGS[type] || ALERT_CONFIGS.note;
+          const firstP = match[2].trim();
+          const rest = match[3] || '';
+          let body = '';
+          if (firstP) {
+            body += `<p>${firstP}</p>`;
+          }
+          body += rest;
+
+          return `<div class="markdown-alert markdown-alert-${type}">` +
+                 `<div class="markdown-alert-title"><i class="${cfg.icon}"></i> ${cfg.title}</div>` +
+                 `<div class="markdown-alert-content">${body}</div>` +
+                 `</div>`;
+        },
         image(arg0, arg1, arg2) {
           let href = '', title = '', text = '';
           if (typeof arg0 === 'object' && arg0 !== null) {
@@ -1029,6 +1064,10 @@
       mdEmojiWrapper.style.display = (mode === 'preview') ? 'none' : 'flex';
       if (mode === 'preview') toggleMdEmojiMenu(false);
     }
+    if (mdSnippetsWrapper) {
+      mdSnippetsWrapper.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
+      if (mode === 'preview') toggleMdSnippetsMenu(false);
+    }
     if (mdGraphvizBtn) {
       mdGraphvizBtn.style.display = (mode === 'preview') ? 'none' : 'inline-flex';
     }
@@ -1115,14 +1154,56 @@
 
   const diagramCacheBusters = {};
 
+  function ensureHljsConfigured() {
+    if (typeof hljs === 'undefined' || hljs.__ctlabsEnhanced) return;
+    hljs.__ctlabsEnhanced = true;
+
+    const COMMON_CLI_COMMANDS = [
+      'ping', 'curl', 'wget', 'cat', 'grep', 'sed', 'awk', 'find', 'git', 'ssh', 'scp',
+      'sudo', 'systemctl', 'journalctl', 'docker', 'podman', 'kubectl', 'ansible',
+      'ansible-playbook', 'python', 'python3', 'ruby', 'node', 'npm', 'yarn', 'tar',
+      'zip', 'unzip', 'ls', 'cp', 'mv', 'rm', 'mkdir', 'chmod', 'chown', 'ip', 'ss',
+      'netstat', 'traceroute', 'dig', 'nslookup', 'host', 'iptables', 'nft', 'ps',
+      'top', 'htop', 'kill', 'killall', 'tail', 'head', 'tee', 'touch', 'which',
+      'whereis', 'whoami', 'df', 'du', 'free', 'uname', 'uptime', 'env', 'sh', 'bash'
+    ];
+
+    try {
+      const origBash = hljs.getLanguage('bash');
+      if (origBash && typeof origBash.rawDefinition === 'function') {
+        hljs.registerLanguage('bash', function(hljsInstance) {
+          const lang = origBash.rawDefinition(hljsInstance);
+          if (lang.keywords && Array.isArray(lang.keywords.built_in)) {
+            lang.keywords.built_in = [...new Set([...lang.keywords.built_in, ...COMMON_CLI_COMMANDS])];
+          }
+          lang.contains = lang.contains || [];
+          lang.contains.unshift({
+            className: 'meta prompt_',
+            begin: /^\s{0,3}[a-zA-Z0-9_~/@:.\\-]*[$#>]\s+/
+          });
+          return lang;
+        });
+        hljs.registerAliases(['sh', 'zsh', 'bash'], { languageName: 'bash' });
+      }
+    } catch (e) {
+      console.warn('Failed to enhance hljs bash language:', e);
+    }
+  }
+
   function renderMarkdownPreview() {
     if (!mdPreviewPane) return;
     const raw = (mdCodeEditor ? mdCodeEditor.getValue() : (mdTextarea ? mdTextarea.value : '')) || '';
     if (typeof marked !== 'undefined') {
+      ensureHljsConfigured();
       const preprocessed = preprocessExtendedMarkdown(raw);
       mdPreviewPane.innerHTML = marked.parse(preprocessed);
       if (typeof hljs !== 'undefined') {
         mdPreviewPane.querySelectorAll('pre code').forEach(block => {
+          if (!block.className || !block.className.includes('language-')) {
+            if (/^\s{0,3}[a-zA-Z0-9_~/@:.\\-]*[$#>]\s+/.test(block.textContent)) {
+              block.classList.add('language-sh');
+            }
+          }
           try { hljs.highlightElement(block); } catch (e) {}
         });
       }
@@ -1340,6 +1421,133 @@
 
     onMarkdownContentChanged();
     saveMarkdownContent(false);
+  }
+
+  // --- Snippet Helpers ---
+  const MD_SNIPPETS = {
+    details_named: {
+      template: (selected) => {
+        const body = selected ? selected : 'Content goes here...';
+        return `<details markdown="1" name="details">\n<summary>Details title</summary>\n\n${body}\n</details>`;
+      },
+      caretOffset: 49
+    },
+    details_simple: {
+      template: (selected) => {
+        const body = selected ? selected : 'Content goes here...';
+        return `<details markdown="1">\n<summary>Details title</summary>\n\n${body}\n</details>`;
+      },
+      caretOffset: 34
+    },
+    table_2x2: {
+      template: () => `| Column 1 | Column 2 |\n| -------- | -------- |\n| Item 1   | Item 2   |\n| Item 3   | Item 4   |`,
+      caretOffset: 2
+    },
+    table_3x3: {
+      template: () => `| Header 1 | Header 2 | Header 3 |\n| -------- | -------- | -------- |\n| Row 1    | Data     | Data     |\n| Row 2    | Data     | Data     |`,
+      caretOffset: 2
+    },
+    callout_note: {
+      template: (selected) => {
+        const text = selected ? selected : 'Note details here...';
+        return `> [!NOTE]\n> ${text}`;
+      },
+      caretOffset: 12
+    },
+    callout_info: {
+      template: (selected) => {
+        const text = selected ? selected : 'Info details here...';
+        return `> [!INFO]\n> ${text}`;
+      },
+      caretOffset: 12
+    },
+    callout_tip: {
+      template: (selected) => {
+        const text = selected ? selected : 'Tip advice here...';
+        return `> [!TIP]\n> ${text}`;
+      },
+      caretOffset: 11
+    },
+    callout_warning: {
+      template: (selected) => {
+        const text = selected ? selected : 'Warning details here...';
+        return `> [!WARNING]\n> ${text}`;
+      },
+      caretOffset: 15
+    },
+    callout_important: {
+      template: (selected) => {
+        const text = selected ? selected : 'Important details here...';
+        return `> [!IMPORTANT]\n> ${text}`;
+      },
+      caretOffset: 17
+    },
+    callout_caution: {
+      template: (selected) => {
+        const text = selected ? selected : 'Caution details here...';
+        return `> [!CAUTION]\n> ${text}`;
+      },
+      caretOffset: 15
+    },
+    code_block: {
+      template: (selected) => {
+        const text = selected ? selected : '# commands here';
+        return `\`\`\`bash\n${text}\n\`\`\``;
+      },
+      caretOffset: 8
+    },
+    task_list: {
+      template: () => `- [ ] Todo item\n- [ ] In progress item\n- [x] Completed item`,
+      caretOffset: 6
+    }
+  };
+
+  function toggleMdSnippetsMenu(force) {
+    if (!mdSnippetsMenu) return;
+    const isClosed = !mdSnippetsMenu.style.display || mdSnippetsMenu.style.display === 'none';
+    const show = (typeof force === 'boolean') ? force : isClosed;
+    mdSnippetsMenu.style.display = show ? 'block' : 'none';
+    if (mdSnippetsBtn) {
+      mdSnippetsBtn.style.background = show ? '#334155' : '#1e293b';
+      mdSnippetsBtn.style.borderColor = show ? '#38bdf8' : '#475569';
+    }
+    if (show && mdEmojiMenu && mdEmojiMenu.style.display !== 'none') {
+      toggleMdEmojiMenu(false);
+    }
+    if (show && mdGitMenu && mdGitMenu.style.display !== 'none') {
+      mdGitMenu.style.display = 'none';
+    }
+    if (show && mdSettingsMenu && mdSettingsMenu.style.display !== 'none') {
+      mdSettingsMenu.style.display = 'none';
+    }
+  }
+
+  function insertMarkdownSnippet(snippetKey) {
+    const config = MD_SNIPPETS[snippetKey];
+    if (!config) return;
+
+    if (currentMdMode === 'preview') {
+      setMdMode(mdSplitMode ? 'split' : 'edit');
+    }
+
+    const cm = getMdEditor();
+    let selectedText = '';
+    let targetPos = null;
+
+    if (cm) {
+      selectedText = cm.getSelection() || '';
+      targetPos = cm.getCursor('from');
+    } else if (mdTextarea) {
+      const start = mdTextarea.selectionStart;
+      const end = mdTextarea.selectionEnd;
+      if (typeof start === 'number' && typeof end === 'number' && start !== end) {
+        selectedText = mdTextarea.value.substring(start, end);
+      }
+    }
+
+    const snippetText = config.template(selectedText.trim());
+    insertMarkdownBlock(snippetText, targetPos, config.caretOffset);
+    toggleMdSnippetsMenu(false);
   }
 
   function uploadAndInsertImage(file, targetPos = null) {
@@ -5239,6 +5447,33 @@
     updateMdSettingsUI();
   }
 
+  function setupSnippetsMenu() {
+    if (mdSnippetsBtn) {
+      mdSnippetsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMdSnippetsMenu();
+      });
+    }
+
+    if (mdSnippetsMenu) {
+      mdSnippetsMenu.querySelectorAll('.md-snippet-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const snippetKey = item.getAttribute('data-snippet');
+          insertMarkdownSnippet(snippetKey);
+        });
+      });
+    }
+
+    document.addEventListener('click', (e) => {
+      if (mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+        if (!mdSnippetsMenu.contains(e.target) && e.target !== mdSnippetsBtn && !mdSnippetsBtn.contains(e.target)) {
+          toggleMdSnippetsMenu(false);
+        }
+      }
+    });
+  }
+
   // --- Initial Setup on DOMContentLoaded ---
   let mdInitialized = false;
   function initMarkdownEditor() {
@@ -5247,6 +5482,7 @@
     setupSettingsMenu();
     setupGitMenu();
     setupEmojiPicker();
+    setupSnippetsMenu();
     setupGraphvizEditor();
     setupGitHistory();
 
@@ -5378,7 +5614,13 @@
     }
     // Global Ctrl+S shortcut handler when editing markdown
     window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        const activeDataType = getActiveDataType();
+        if (activeDataType === 'markdown' && (currentMdMode === 'edit' || currentMdMode === 'split')) {
+          e.preventDefault();
+          toggleMdSnippetsMenu();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         const activeDataType = getActiveDataType();
         if (activeDataType === 'markdown' && (currentMdMode === 'edit' || currentMdMode === 'split')) {
           e.preventDefault();
@@ -5436,6 +5678,9 @@
       updateMdAutosaveUI();
     },
     toggleEmoji: toggleMdEmojiMenu,
+    toggleSnippets: toggleMdSnippetsMenu,
+    insertSnippet: insertMarkdownSnippet,
+    snippets: MD_SNIPPETS,
     get emojis() { return getEmojiList(); },
     replaceEmojiShortcodes: replaceEmojiShortcodes
   };
@@ -5470,6 +5715,9 @@
   window.promptAndCommitNote = promptAndCommitNote;
   window.onMarkdownContentChanged = onMarkdownContentChanged;
   window.toggleMdEmojiMenu = toggleMdEmojiMenu;
+  window.toggleMdSnippetsMenu = toggleMdSnippetsMenu;
+  window.insertMarkdownSnippet = insertMarkdownSnippet;
+  window.MD_SNIPPETS = MD_SNIPPETS;
   window.getEmojiList = getEmojiList;
   window.getEmojiMap = getEmojiMap;
   window.MARKDOWN_EMOJI_LIST = ctlabsEmojiList;
