@@ -2280,4 +2280,212 @@ class RecordingService
   rescue StandardError => e
     { ok: false, error: "PDF generation error: #{e.message}" }
   end
+
+  # Extracts readable terminal text from asciicast v2 file by stripping ANSI control codes
+  def self.extract_cast_terminal_text(path, max_lines: 80)
+    return '' unless File.file?(path)
+    raw_output = +""
+    File.foreach(path).with_index do |line, idx|
+      next if idx == 0 # line 0 is JSON header
+      begin
+        event = JSON.parse(line)
+        raw_output << event[2].to_s if event.is_a?(Array) && event[1] == 'o'
+      rescue StandardError
+      end
+    end
+    # Strip ANSI escape codes
+    plain = raw_output.gsub(/\e\[[0-9;?]*[a-zA-Z]/, '')
+                       .gsub(/\e\([a-zA-Z]/, '')
+                       .gsub(/\r\n/, "\n")
+                       .gsub(/\r/, "\n")
+    lines = plain.lines.map(&:rstrip).reject(&:empty?)
+    lines.first(max_lines).join("\n")
+  end
+
+  # Converts an entire walkthrough set (all steps in sequence) into a single, unified styled PDF document
+  def self.convert_walkthrough_to_pdf(slug, filename: nil)
+    require 'open3'
+    require 'tmpdir'
+
+    pandoc_bin = `which pandoc 2>/dev/null`.strip
+    if pandoc_bin.empty? || !File.executable?(pandoc_bin)
+      return { ok: false, error: 'pandoc is not installed on the system. Please ensure pandoc is installed.' }
+    end
+
+    weasyprint_bin = `which weasyprint 2>/dev/null`.strip
+    if weasyprint_bin.empty? || !File.executable?(weasyprint_bin)
+      return { ok: false, error: 'weasyprint is not installed on the system. Please ensure weasyprint is installed.' }
+    end
+
+    bundle = export_bundle(slug)
+    steps  = bundle[:recordings] || []
+    unint  = bundle[:unintegrated] || []
+
+    if steps.empty? && unint.empty?
+      return { ok: false, error: 'No steps or notes found in this walkthrough set.' }
+    end
+
+    # Clean up older export walkthrough pdf files (>1 hour old)
+    Dir.glob(File.join(dir, 'export_walkthrough_*_*.pdf')).each do |old_pdf|
+      File.delete(old_pdf) rescue nil if File.mtime(old_pdf) < (Time.now - 3600)
+    end
+
+    label = node_slug(bundle[:name])
+    label = bundle[:slug] if label.empty?
+    label = 'walkthrough' if label.empty?
+
+    clean_name = if filename && !filename.to_s.strip.empty?
+                   File.basename(filename.to_s.strip).gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+                 else
+                   "ctlabs_walkthrough_#{label}_#{Time.now.strftime('%Y%m%d_%H%M%S')}.pdf"
+                 end
+    clean_name = "#{clean_name}.pdf" unless clean_name.downcase.end_with?('.pdf')
+
+    target_pdf = File.join(dir, "export_walkthrough_#{SecureRandom.hex(4)}_#{clean_name}")
+
+    # Build the combined markdown source document
+    doc = []
+    set_title = bundle[:name].to_s.strip
+    set_title = bundle[:slug] if set_title.empty?
+
+    doc << "# Walkthrough: #{set_title}\n"
+    doc << "**Set:** `#{bundle[:slug]}` &nbsp;|&nbsp; **Total Steps:** #{steps.size} &nbsp;|&nbsp; **Exported:** #{Time.now.strftime('%Y-%m-%d %H:%M')}\n"
+    doc << "---\n"
+    doc << "## Table of Contents\n"
+
+    steps.each_with_index do |step, idx|
+      num = idx + 1
+      t_label = case step[:type]
+                when :markdown then 'Markdown Note'
+                when :cast     then "Terminal (#{step[:node] || 'Console'})"
+                when :video    then 'Screen Recording'
+                else step[:type].to_s.capitalize
+                end
+      status_part = step[:status] && step[:status] != 'none' ? " &nbsp;[Status: #{step[:status].capitalize}]" : ""
+      doc << "#{num}. [Step #{num}: #{step[:title]}](#step-#{num}) *(#{t_label}#{status_part})*"
+    end
+
+    if unint.any?
+      doc << "\n### Additional Notes & Recordings (Unintegrated)\n"
+      unint.each_with_index do |u, idx|
+        u_label = case u[:type]
+                  when :markdown then 'Markdown Note'
+                  when :cast     then "Terminal (#{u[:node] || 'Console'})"
+                  when :video    then 'Screen Recording'
+                  else u[:type].to_s.capitalize
+                  end
+        doc << "- [Appendix #{idx + 1}: #{u[:title]}](#appendix-#{idx + 1}) *(#{u_label})*"
+      end
+    end
+
+    doc << "\n<div style=\"page-break-before: always;\"></div>\n"
+
+    # Render each active step in order
+    steps.each_with_index do |step, idx|
+      num = idx + 1
+      doc << "# Step #{num}: #{step[:title]} {#step-#{num}}\n"
+
+      type_badge_label = case step[:type]
+                         when :markdown then 'Markdown Note'
+                         when :cast     then "Terminal (#{step[:node] || 'Console'})"
+                         when :video    then 'Screen Recording'
+                         else step[:type].to_s.capitalize
+                         end
+      status_badge = if step[:status] && step[:status] != 'none'
+                       "&nbsp;|&nbsp; <strong>Status:</strong> <span class=\"status-badge-#{step[:status]}\">#{step[:status].capitalize}</span>"
+                     else
+                       ""
+                     end
+      duration_badge = if step[:duration] && step[:duration].to_f > 0
+                         dur_s = step[:duration].to_f
+                         dur_str = dur_s >= 60 ? "#{dur_s.to_i / 60}m #{dur_s.to_i % 60}s" : "#{dur_s.round(1)}s"
+                         "&nbsp;|&nbsp; <strong>Duration:</strong> #{dur_str}"
+                       else
+                         ""
+                       end
+
+      doc << "<div class=\"step-meta-badge\">"
+      doc << "  <span class=\"step-badge step-badge-#{step[:type]}\">#{type_badge_label}</span>"
+      doc << "  #{status_badge}"
+      doc << "  #{duration_badge}"
+      doc << "</div>\n"
+
+      if step[:type] == :markdown
+        body = File.read(step[:path], encoding: 'UTF-8') rescue ''
+        # Strip redundant first-line H1 if it duplicates the step title
+        first_line = body.lines.find { |l| !l.strip.empty? }
+        if first_line && first_line.strip =~ /\A#\s+(.+)\z/
+          h1_text = $1.strip
+          if h1_text.downcase == step[:title].to_s.strip.downcase || h1_text.downcase == step[:id].to_s.strip.downcase
+            body = body.sub(first_line, '')
+          end
+        end
+        doc << body
+      elsif step[:type] == :cast
+        term_text = extract_cast_terminal_text(step[:path])
+        if term_text && !term_text.strip.empty?
+          doc << "```sh\n#{term_text}\n```"
+        else
+          doc << "> [!NOTE]\n> Terminal recording session on node `#{step[:node] || 'Console'}` (Duration: #{step[:duration].to_f.round(1)}s).\n"
+        end
+      elsif step[:type] == :video
+        doc << "> [!INFO]\n> **Screen Video Recording**\n>\n> *Recorded screen session: #{step[:title]} (Duration: #{step[:duration].to_f >= 60 ? "#{step[:duration].to_i / 60}m #{step[:duration].to_i % 60}s" : "#{step[:duration].to_f.round(1)}s"})*.\n"
+      end
+
+      doc << "\n<div style=\"page-break-before: always;\"></div>\n"
+    end
+
+    # Render unintegrated notes as an appendix if any
+    if unint.any?
+      doc << "# Appendix: Additional Notes & Recordings {#appendix}\n"
+      unint.each_with_index do |u, idx|
+        unum = idx + 1
+        doc << "## Appendix #{unum}: #{u[:title]} {#appendix-#{unum}}\n"
+        if u[:type] == :markdown
+          ubody = File.read(u[:path], encoding: 'UTF-8') rescue ''
+          doc << ubody
+        elsif u[:type] == :cast
+          utext = extract_cast_terminal_text(u[:path])
+          doc << (utext.strip.empty? ? "> Terminal session on `#{u[:node]}`\n" : "```sh\n#{utext}\n```")
+        elsif u[:type] == :video
+          doc << "> Screen recording: #{u[:title]}\n"
+        end
+        doc << "\n<div style=\"page-break-before: always;\"></div>\n" unless idx == unint.size - 1
+      end
+    end
+
+    combined_markdown = doc.join("\n")
+
+    # Preprocess all markdown (resolve image paths, dimensions, callouts)
+    rewritten = preprocess_markdown_for_docx(combined_markdown, walkthrough: bundle[:slug])
+
+    Dir.mktmpdir('ctlabs-pdf') do |tmpdir|
+      tmp_md = File.join(tmpdir, 'input.md')
+      File.write(tmp_md, rewritten, encoding: 'UTF-8')
+
+      css_path = pdf_css_path
+      title = File.basename(clean_name, '.pdf').tr('_', ' ')
+
+      pandoc_args = [
+        pandoc_bin,
+        '-f', 'markdown',
+        '-t', 'html5',
+        '-s',
+        '--pdf-engine=weasyprint',
+        "--metadata=title:#{title}"
+      ]
+      pandoc_args.concat(['-c', css_path]) if css_path && File.file?(css_path)
+      pandoc_args.concat(['-o', target_pdf, tmp_md])
+
+      stdout, stderr, status = Open3.capture3(*pandoc_args)
+      unless status.success? && File.file?(target_pdf)
+        err_msg = stderr.strip.empty? ? 'Unknown error during pandoc walkthrough PDF conversion' : stderr.strip
+        return { ok: false, error: "Failed to convert Walkthrough to PDF: #{err_msg}" }
+      end
+    end
+
+    { ok: true, path: target_pdf }
+  rescue StandardError => e
+    { ok: false, error: "Walkthrough PDF generation error: #{e.message}" }
+  end
 end

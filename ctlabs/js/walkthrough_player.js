@@ -3275,10 +3275,40 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
   }
 
   // --- Export Modal Handler ---
+  window.updateExportWalkthroughFormat = function(targetFmt) {
+    const exportInput = document.getElementById('export-filename');
+    const exportHint = document.getElementById('export-filename-hint');
+    const submitBtn = document.getElementById('export-submit-btn');
+    const ext = (targetFmt === 'pdf') ? 'pdf' : 'zip';
+
+    if (exportInput) {
+      let val = exportInput.value.trim();
+      if (val) {
+        val = val.replace(/\.(zip|pdf)$/i, '');
+        exportInput.value = `${val}.${ext}`;
+      }
+    }
+    if (exportHint) {
+      exportHint.innerHTML = `The <code>.${ext}</code> extension will be added automatically if omitted.`;
+    }
+    if (submitBtn) {
+      if (targetFmt === 'pdf') {
+        submitBtn.innerHTML = '<i class="fas fa-file-pdf"></i> Download PDF';
+      } else {
+        submitBtn.innerHTML = '<i class="fas fa-download"></i> Download ZIP';
+      }
+    }
+  };
+
   window.openExportModal = function() {
     const exportModal = document.getElementById('export-modal');
     const exportInput = document.getElementById('export-filename');
     if (exportModal && exportInput) {
+      const defaultRadio = document.querySelector('input[name="format"][value="zip"]');
+      if (defaultRadio) defaultRadio.checked = true;
+      if (typeof window.updateExportWalkthroughFormat === 'function') {
+        window.updateExportWalkthroughFormat('zip');
+      }
       const rawName = (window.WalkthroughConfig && window.WalkthroughConfig.walkthroughName) || window.activeWalkthrough || 'walkthrough';
       const clean = rawName.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'walkthrough';
       const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');

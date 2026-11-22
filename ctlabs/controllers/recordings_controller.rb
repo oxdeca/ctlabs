@@ -121,6 +121,20 @@ class RecordingsController < BaseController
     custom_name = File.basename(custom_name)
     custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
 
+    # PDF format export for walkthrough set
+    if params[:format].to_s.downcase == 'pdf'
+      res = RecordingService.convert_walkthrough_to_pdf(bundle[:slug], filename: custom_name)
+      if res[:ok] && res[:path] && File.file?(res[:path])
+        pdf_filename = File.basename(res[:path]).sub(/\Aexport_walkthrough_[a-f0-9]+_/, '')
+        return send_file res[:path],
+                         type: 'application/pdf',
+                         disposition: 'attachment',
+                         filename: pdf_filename
+      else
+        halt 500, "Walkthrough PDF export failed: #{res[:error]}"
+      end
+    end
+
     zip_filename = if !custom_name.empty? && custom_name != '.zip'
                      custom_name.downcase.end_with?('.zip') ? custom_name : "#{custom_name}.zip"
                    else
@@ -221,6 +235,10 @@ class RecordingsController < BaseController
               type: 'application/zip',
               disposition: 'attachment',
               filename: zip_filename
+  end
+
+  get '/recordings/export-pdf' do
+    redirect "/recordings/download-all?walkthrough=#{ERB::Util.url_encode(params[:walkthrough].to_s)}&format=pdf"
   end
 
   post '/recordings/import' do
