@@ -1108,6 +1108,11 @@ class RecordingsController < BaseController
     redirect "/recordings/#{Rack::Utils.escape_path(params[:id])}?download=1&format=docx#{fn_param}"
   end
 
+  get '/recordings/:id/pdf' do
+    fn_param = params[:filename] ? "&filename=#{Rack::Utils.escape_path(params[:filename])}" : ""
+    redirect "/recordings/#{Rack::Utils.escape_path(params[:id])}?download=1&format=pdf#{fn_param}"
+  end
+
   get '/recordings/:id' do
     headers 'Access-Control-Allow-Origin' => '*'
     path = RecordingService.path_for(params[:id])
@@ -1169,6 +1174,39 @@ class RecordingsController < BaseController
                          disposition: 'attachment'
       else
         halt 500, (res[:error] || 'Failed to export DOCX')
+      end
+    end
+
+    if is_md && (params[:format] == 'pdf' || params[:pdf] == '1')
+      custom_name = params[:filename].to_s.strip
+      custom_name = File.basename(custom_name)
+      custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+
+      base_name = if !custom_name.empty? && custom_name != '.pdf'
+                    File.basename(custom_name, '.*')
+                  else
+                    File.basename(path, RecordingService::MD_EXT)
+                  end
+
+      pdf_filename = if !custom_name.empty? && custom_name != '.pdf'
+                       custom_name.downcase.end_with?('.pdf') ? custom_name : "#{custom_name}.pdf"
+                     else
+                       "#{base_name}.pdf"
+                     end
+
+      walkthrough = params[:walkthrough].to_s.strip
+      walkthrough = RecordingService.walkthrough_for(path) if walkthrough.empty?
+
+      content = File.read(path, encoding: 'UTF-8') rescue ''
+      res = RecordingService.convert_markdown_to_pdf(content, filename: pdf_filename, walkthrough: walkthrough)
+
+      if res[:ok]
+        return send_file res[:path],
+                         filename:    pdf_filename,
+                         type:        'application/pdf',
+                         disposition: 'attachment'
+      else
+        halt 500, (res[:error] || 'Failed to export PDF')
       end
     end
 

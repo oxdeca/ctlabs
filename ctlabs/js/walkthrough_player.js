@@ -1130,7 +1130,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
     if (!exportNoteFilenameInput) return;
     let val = exportNoteFilenameInput.value.trim();
     if (val) {
-      val = val.replace(/\.(zip|md|docx)$/i, '');
+      val = val.replace(/\.(zip|md|docx|pdf)$/i, '');
       exportNoteFilenameInput.value = `${val}.${targetExt}`;
     }
     if (exportNoteFilenameHint) {
@@ -1174,6 +1174,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       let ext = 'zip';
       if (radio.value === 'raw') ext = 'md';
       else if (radio.value === 'docx') ext = 'docx';
+      else if (radio.value === 'pdf') ext = 'pdf';
       updateExportNoteFilenameExtension(ext);
     });
   });
@@ -1196,15 +1197,17 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       const selectedFormat = document.querySelector('input[name="export-note-format"]:checked');
       const format = selectedFormat ? selectedFormat.value : 'bundle';
       let filename = exportNoteFilenameInput ? exportNoteFilenameInput.value.trim() : '';
-      const expectedExt = (format === 'docx') ? '.docx' : (format === 'raw' ? '.md' : '.zip');
+      const expectedExt = (format === 'docx') ? '.docx' : (format === 'pdf' ? '.pdf' : (format === 'raw' ? '.md' : '.zip'));
       if (filename) {
-        filename = filename.replace(/\.(zip|md|docx)$/i, '') + expectedExt;
+        filename = filename.replace(/\.(zip|md|docx|pdf)$/i, '') + expectedExt;
       }
       let url = '/recordings/' + encodeURIComponent(activeId) + '?download=1';
       if (format === 'bundle') {
         url += '&bundle=1';
       } else if (format === 'docx') {
         url += '&format=docx';
+      } else if (format === 'pdf') {
+        url += '&format=pdf';
       }
       if (filename) {
         url += '&filename=' + encodeURIComponent(filename);

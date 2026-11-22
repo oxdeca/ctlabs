@@ -20,7 +20,7 @@ class WalkthroughGitService
   SLUG_RE          = /\A[a-zA-Z0-9_-]{1,120}\z/
   MANIFEST         = '_walkthrough.json'
   VIDEO_PATTERNS   = %w[*.webm *.mp4 *.mkv *.mov *.avi *.flv *.wmv].freeze
-  EXCLUDE_PATTERNS = (VIDEO_PATTERNS + %w[*.tmp temp_* export_*.zip export_note_*.zip export_*.docx export_note_*.docx .DS_Store _repos.json]).freeze
+  EXCLUDE_PATTERNS = (VIDEO_PATTERNS + %w[*.tmp temp_* export_*.zip export_note_*.zip export_*.docx export_note_*.docx export_*.pdf export_note_*.pdf .DS_Store _repos.json]).freeze
   SSH_COMMAND      = 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20'
   ASKPASS_SCRIPT   = File.expand_path('../scripts/git_askpass.sh', __dir__)
   DEFAULT_TIMEOUT  = 90

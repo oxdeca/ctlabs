@@ -1854,6 +1854,11 @@ class RecordingService
   end
 
   DOCX_REFERENCE_PATH = File.expand_path('../config/reference.docx', __dir__)
+  PDF_CSS_PATH = File.expand_path('../config/export_pdf.css', __dir__)
+
+  def self.pdf_css_path
+    File.file?(PDF_CSS_PATH) && File.size(PDF_CSS_PATH) > 0 ? PDF_CSS_PATH : nil
+  end
 
   def self.docx_reference_path
     if File.file?(DOCX_REFERENCE_PATH) && File.size(DOCX_REFERENCE_PATH) > 1000
@@ -2030,12 +2035,13 @@ class RecordingService
     end
 
     # 1. Format GitHub-style alert callouts (> [!NOTE], > [!TIP], > [!WARNING], etc.) inside blockquotes
-    processed = processed.gsub(/^([ \t]*>[ \t]*)\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(.*)$/i) do
+    processed = processed.gsub(/^([ \t]*>[ \t]*)\[!(NOTE|INFO|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*(.*)$/i) do
       prefix = $1
       tag = $2.upcase
       rest = $3.to_s.strip
       label = case tag
               when 'NOTE' then 'Note:'
+              when 'INFO' then 'Info:'
               when 'TIP' then 'Tip:'
               when 'IMPORTANT' then 'Important:'
               when 'WARNING' then 'Warning:'
@@ -2211,5 +2217,67 @@ class RecordingService
     { ok: true, path: target_docx }
   rescue StandardError => e
     { ok: false, error: "DOCX generation error: #{e.message}" }
+  end
+
+  # Converts Markdown content into a styled PDF document via pandoc + weasyprint,
+  # embedding all referenced images and applying clean print stylesheet.
+  def self.convert_markdown_to_pdf(content, filename: nil, walkthrough: nil)
+    require 'open3'
+    require 'tmpdir'
+
+    pandoc_bin = `which pandoc 2>/dev/null`.strip
+    if pandoc_bin.empty? || !File.executable?(pandoc_bin)
+      return { ok: false, error: 'pandoc is not installed on the system. Please ensure pandoc is installed.' }
+    end
+
+    weasyprint_bin = `which weasyprint 2>/dev/null`.strip
+    if weasyprint_bin.empty? || !File.executable?(weasyprint_bin)
+      return { ok: false, error: 'weasyprint is not installed on the system. Please ensure weasyprint is installed.' }
+    end
+
+    # Clean up older export note pdf files (>1 hour old)
+    Dir.glob(File.join(dir, 'export_note_*_*.pdf')).each do |old_pdf|
+      File.delete(old_pdf) rescue nil if File.mtime(old_pdf) < (Time.now - 3600)
+    end
+
+    clean_name = if filename && !filename.to_s.strip.empty?
+                   File.basename(filename.to_s.strip).gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+                 else
+                   "note_#{Time.now.strftime('%Y%m%d_%H%M%S')}.pdf"
+                 end
+    clean_name = "#{clean_name}.pdf" unless clean_name.downcase.end_with?('.pdf')
+
+    target_pdf = File.join(dir, "export_note_#{SecureRandom.hex(4)}_#{clean_name}")
+
+    rewritten = preprocess_markdown_for_docx(content, walkthrough: walkthrough)
+
+    Dir.mktmpdir('ctlabs-pdf') do |tmpdir|
+      tmp_md = File.join(tmpdir, 'input.md')
+      File.write(tmp_md, rewritten, encoding: 'UTF-8')
+
+      css_path = pdf_css_path
+      title = File.basename(clean_name, '.pdf').tr('_', ' ')
+
+      pandoc_args = [
+        pandoc_bin,
+        '-f', 'markdown',
+        '-t', 'html5',
+        '-s',
+        '--pdf-engine=weasyprint',
+        "--metadata=title:#{title}"
+      ]
+      pandoc_args.concat(['-c', css_path]) if css_path && File.file?(css_path)
+      pandoc_args.concat(['-o', target_pdf, tmp_md])
+
+      stdout, stderr, status = Open3.capture3(*pandoc_args)
+      unless status.success? && File.file?(target_pdf)
+        err_msg = stderr.strip.empty? ? 'Unknown error during pandoc PDF conversion' : stderr.strip
+        return { ok: false, error: "Failed to convert Markdown to PDF: #{err_msg}" }
+      end
+    end
+
+    { ok: true, path: target_pdf }
+  rescue StandardError => e
+    { ok: false, error: "PDF generation error: #{e.message}" }
   end
 end
