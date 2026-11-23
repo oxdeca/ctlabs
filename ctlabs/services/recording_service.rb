@@ -1186,15 +1186,16 @@ class RecordingService
     nil
   end
 
-  # Ensures terminal data is valid asciicast v2 format.
-  # If data is a raw terminal log or typescript (e.g. from `script` command),
+  # Ensures terminal data is valid asciicast format (v1, v2, v3, etc.).
+  # If data is already an asciicast file (JSON header with version), returns it unchanged.
+  # If data is a raw terminal transcript/typescript (e.g. from `script` command),
   # wraps it into asciicast v2 JSON lines so asciinema-player can play it.
   def self.ensure_asciicast_v2(data, title: nil)
     raw = data.to_s
-    first_line = raw.lines.first.to_s.strip
+    first_non_empty = raw.lines.map(&:strip).reject(&:empty?).first.to_s
     begin
-      parsed = JSON.parse(first_line)
-      if parsed.is_a?(Hash) && (parsed['version'] == 2 || parsed['version'] == 1)
+      parsed = JSON.parse(first_non_empty)
+      if parsed.is_a?(Hash) && (parsed.key?('version') || parsed.key?('term') || parsed.key?('width') || parsed.key?('events'))
         return raw
       end
     rescue JSON::ParserError, StandardError
@@ -1543,6 +1544,10 @@ class RecordingService
     format('%.1f %s', value, units[unit])
   end
 
+
+  def self.set_title(id, title)
+    update_meta(id, title: title)
+  end
 
   # Updates the title in the JSON header of the .cast file or heading of .md file
   def self.update_meta(id, title:)
