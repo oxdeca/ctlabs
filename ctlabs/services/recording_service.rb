@@ -850,16 +850,69 @@ class RecordingService
     node.to_s.gsub(/[^a-zA-Z0-9_.-]+/, '_').gsub(/\A_+|_+\z/, '')[0, NODE_MAX].to_s
   end
 
-  def self.new_id(node)
-    "#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(node)}_#{SecureRandom.hex(3)}"
+  def self.title_slug(title, fallback = 'step')
+    slug = title.to_s
+                .strip
+                .downcase
+                .gsub(/[^a-z0-9_.-]+/, '_')
+                .gsub(/_+/, '_')
+                .sub(/\A_+/, '')
+                .sub(/_+\z/, '')
+    slug = fallback if slug.empty?
+    slug[0, 60].sub(/_+\z/, '')
   end
 
-  def self.new_markdown_id(label = 'note')
-    "md_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
+  def self.step_id_exists?(candidate, walkthrough: nil)
+    return true if path_for(candidate)
+    if walkthrough && !walkthrough.to_s.empty?
+      dir = walkthrough_dir(walkthrough)
+      return true if Dir.glob(File.join(dir, "#{candidate}.*")).any?
+    end
+    false
   end
 
-  def self.new_video_id(label = 'screen')
-    "vid_#{Time.now.strftime('%Y%m%d-%H%M%S')}_#{node_slug(label)}_#{SecureRandom.hex(3)}"
+  def self.unique_step_id(base_id, walkthrough: nil)
+    clean = base_id.to_s.strip
+    clean = 'step' if clean.empty?
+    return clean unless step_id_exists?(clean, walkthrough: walkthrough)
+
+    idx = 1
+    loop do
+      candidate = "#{clean}_#{idx}"
+      return candidate unless step_id_exists?(candidate, walkthrough: walkthrough)
+      idx += 1
+    end
+  end
+
+  def self.new_id(node = 'terminal', title = nil, walkthrough: nil)
+    n_slug = node_slug(node)
+    n_slug = 'terminal' if n_slug.empty?
+
+    base = if title && !title.to_s.strip.empty?
+             t_slug = title_slug(title)
+             if t_slug.start_with?('cast_')
+               t_slug
+             elsif t_slug.include?(n_slug)
+               "cast_#{t_slug}"
+             else
+               "cast_#{n_slug}_#{t_slug}"
+             end
+           else
+             "cast_#{n_slug}"
+           end
+    unique_step_id(base, walkthrough: walkthrough)
+  end
+
+  def self.new_markdown_id(label_or_title = 'note', walkthrough: nil)
+    slug = title_slug(label_or_title, 'note')
+    base = slug.start_with?('md_') ? slug : "md_#{slug}"
+    unique_step_id(base, walkthrough: walkthrough)
+  end
+
+  def self.new_video_id(label_or_title = 'screen', walkthrough: nil)
+    slug = title_slug(label_or_title, 'screen')
+    base = slug.start_with?('vid_') ? slug : "vid_#{slug}"
+    unique_step_id(base, walkthrough: walkthrough)
   end
 
   def self.all_disk_files(slug = nil)
@@ -1007,16 +1060,17 @@ class RecordingService
       title = meta_data['title'].to_s.strip
       title = 'Browser Recording' if title.empty?
       duration = meta_data['duration'].to_f
-      if duration <= 0.0
-        probed = probe_video_duration(path)
-        if probed && probed > 0.0
-          duration = probed
-          begin
-            meta_data['duration'] = duration
-            target_meta = File.join(File.dirname(path), "#{id}.json")
-            File.write(target_meta, JSON.pretty_generate(meta_data))
-          rescue StandardError
-          end
+
+      # Auto-heal video duration if missing or if probed container duration is significantly longer
+      # (e.g. user imported a video or recording finished without full duration written)
+      probed = probe_video_duration(path)
+      if probed && probed > 0.0 && (duration <= 0.0 || probed > duration + 1.0)
+        duration = probed
+        begin
+          meta_data['duration'] = duration
+          target_meta = File.join(File.dirname(path), "#{id}.json")
+          File.write(target_meta, JSON.pretty_generate(meta_data))
+        rescue StandardError
         end
       end
       created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
@@ -1183,36 +1237,82 @@ class RecordingService
 
   def self.probe_webm_duration(path)
     return nil unless File.file?(path)
-    # Read first 512KB where Segment Info element typically resides
-    chunk = File.binread(path, 524288)
-    return nil unless chunk && chunk.bytesize >= 16
+    file_size = File.size(path)
+    return nil if file_size < 16
 
     timecode_scale = 1_000_000 # default 1ms
 
-    ts_idx = chunk.index("\x2A\xD7\xB1".b)
-    if ts_idx
-      len_byte = chunk.getbyte(ts_idx + 3)
-      if len_byte
-        len = len_byte & 0x7F
-        ts_bytes = chunk[ts_idx + 4, len]
-        if ts_bytes && ts_bytes.bytesize == len
-          scale = ts_bytes.unpack('C*').reduce(0) { |acc, b| (acc << 8) | b }
-          timecode_scale = scale if scale && scale > 0
+    # 1. Inspect Segment Info element (ID 0x1549A966) in the head
+    head_chunk = File.binread(path, [file_size, 65536].min)
+    if head_chunk
+      info_idx = head_chunk.index("\x15\x49\xA9\x66".b)
+      if info_idx
+        # Find TimecodeScale (0x2AD7B1) inside or near Info
+        ts_idx = head_chunk.index("\x2A\xD7\xB1".b, info_idx)
+        if ts_idx && ts_idx - info_idx < 1024
+          len_byte = head_chunk.getbyte(ts_idx + 3)
+          if len_byte
+            len = len_byte & 0x7F
+            ts_bytes = head_chunk[ts_idx + 4, len]
+            if ts_bytes && ts_bytes.bytesize == len
+              scale = ts_bytes.unpack('C*').reduce(0) { |acc, b| (acc << 8) | b }
+              timecode_scale = scale if scale && scale > 0
+            end
+          end
+        end
+
+        # Find Duration (0x4489) strictly inside Info element
+        d_idx = head_chunk.index("\x44\x89".b, info_idx)
+        if d_idx && d_idx - info_idx < 1024
+          len_byte = head_chunk.getbyte(d_idx + 2)
+          if len_byte
+            len = len_byte & 0x7F
+            dur_bytes = head_chunk[d_idx + 3, len]
+            if dur_bytes && dur_bytes.bytesize == len
+              val = (len == 4) ? dur_bytes.unpack1('g') : dur_bytes.unpack1('G')
+              if val && val > 0.05
+                sec = (val * timecode_scale) / 1_000_000_000.0
+                return sec if sec > 0.05
+              end
+            end
+          end
         end
       end
     end
 
-    d_idx = chunk.index("\x44\x89".b)
-    if d_idx
-      len_byte = chunk.getbyte(d_idx + 2)
-      if len_byte
+    # 2. Fallback for live/streamed WebM recordings without header duration:
+    # Scan backwards from tail for the last Cluster (0x1F43B675)
+    tail_size = [file_size, 524288].min
+    tail_chunk = File.open(path, 'rb') do |f|
+      f.seek(file_size - tail_size)
+      f.read(tail_size)
+    end
+    return nil unless tail_chunk
+
+    last_cluster_idx = tail_chunk.rindex("\x1F\x43\xB6\x75".b)
+    if last_cluster_idx
+      cluster_data = tail_chunk[last_cluster_idx..-1]
+      # Cluster Timecode element ID is 0xE7
+      tc_idx = cluster_data.index("\xE7".b)
+      if tc_idx && tc_idx + 2 < cluster_data.bytesize
+        len_byte = cluster_data.getbyte(tc_idx + 1)
         len = len_byte & 0x7F
-        dur_bytes = chunk[d_idx + 3, len]
-        if dur_bytes && dur_bytes.bytesize == len
-          val = (len == 4) ? dur_bytes.unpack1('g') : dur_bytes.unpack1('G')
-          if val && val > 0
-            return (val * timecode_scale) / 1_000_000_000.0
+        tc_bytes = cluster_data[tc_idx + 2, len]
+        if tc_bytes && tc_bytes.bytesize == len
+          base_tc = tc_bytes.unpack('C*').reduce(0) { |acc, b| (acc << 8) | b }
+          max_rel = 0
+          offset = tc_idx + 2 + len
+          while (b_idx = cluster_data.index("\xA3".b, offset))
+            if b_idx + 5 <= cluster_data.bytesize
+              rel_tc = cluster_data[b_idx + 3, 2].unpack1('s>')
+              if rel_tc && rel_tc >= 0 && rel_tc < 30000
+                max_rel = rel_tc if rel_tc > max_rel
+              end
+            end
+            offset = b_idx + 1
           end
+          total_tc = base_tc + max_rel
+          return (total_tc * timecode_scale) / 1_000_000_000.0 if total_tc > 0
         end
       end
     end
@@ -1372,6 +1472,105 @@ class RecordingService
     false
   end
 
+  def self.rename_recording(old_id, new_title, walkthrough: nil)
+    return { ok: false, error: 'Invalid ID' } unless valid_id?(old_id)
+
+    clean_title = new_title.to_s.strip
+    return { ok: false, error: 'Title cannot be empty' } if clean_title.empty?
+
+    old_path = path_for(old_id)
+    return { ok: false, error: 'Recording not found' } unless old_path && File.file?(old_path)
+
+    # Resolve target walkthrough slug
+    slug = walkthrough.to_s.strip
+    if slug.empty?
+      wks = load_walkthroughs rescue {}
+      wks.each do |w_slug, entry|
+        r_ids = Array(entry['recording_ids']).map(&:to_s)
+        u_ids = Array(entry['unintegrated_ids']).map(&:to_s)
+        if r_ids.include?(old_id) || u_ids.include?(old_id)
+          slug = w_slug
+          break
+        end
+      end
+    end
+
+    ext = File.extname(old_path).downcase
+    t_slug = title_slug(clean_title)
+
+    new_base_prefix = if ext == MD_EXT
+                        t_slug.start_with?('md_') ? t_slug : "md_#{t_slug}"
+                      elsif VIDEO_EXTS.include?(ext)
+                        t_slug.start_with?('vid_') ? t_slug : "vid_#{t_slug}"
+                      elsif ext == EXT
+                        t_slug.start_with?('cast_') ? t_slug : "cast_#{t_slug}"
+                      else
+                        t_slug
+                      end
+
+    dir = File.dirname(old_path)
+    new_id = if new_base_prefix == old_id
+               old_id
+             else
+               unique_step_id(new_base_prefix, walkthrough: slug)
+             end
+
+    # 1. Update title in metadata sidecar or cast header
+    update_meta(old_id, title: clean_title)
+
+    new_path = nil
+    if new_id != old_id
+      new_path = File.join(dir, "#{new_id}#{ext}")
+      old_meta = File.join(dir, "#{old_id}.json")
+      new_meta = File.join(dir, "#{new_id}.json")
+
+      # Rename media file
+      File.rename(old_path, new_path) if File.exist?(old_path)
+
+      # Rename sidecar JSON if present
+      File.rename(old_meta, new_meta) if File.exist?(old_meta)
+
+      # 2. Update walkthrough manifests (_walkthrough.json)
+      modified_manifests = []
+      wks = load_walkthroughs rescue {}
+      wks.each do |w_slug, entry|
+        changed = false
+        if entry['recording_ids'].is_a?(Array) && entry['recording_ids'].include?(old_id)
+          entry['recording_ids'] = entry['recording_ids'].map { |x| x == old_id ? new_id : x }
+          changed = true
+        end
+        if entry['unintegrated_ids'].is_a?(Array) && entry['unintegrated_ids'].include?(old_id)
+          entry['unintegrated_ids'] = entry['unintegrated_ids'].map { |x| x == old_id ? new_id : x }
+          changed = true
+        end
+        if changed
+          save_walkthrough(w_slug, entry)
+          modified_manifests << File.join(walkthrough_dir(w_slug), MANIFEST)
+        end
+      end
+
+      # 3. Update references in Markdown files within the walkthrough directory: #step-old_id -> #step-new_id
+      Dir.glob(File.join(dir, "*#{MD_EXT}")).each do |md_file|
+        next unless File.file?(md_file)
+        content = File.read(md_file, encoding: 'UTF-8') rescue nil
+        next unless content && content.include?("#step-#{old_id}")
+        updated = content.gsub("#step-#{old_id}", "#step-#{new_id}")
+        File.write(md_file, updated, encoding: 'UTF-8')
+      end
+
+      # 4. Git commit
+      files_to_commit = [old_path, new_path]
+      files_to_commit << old_meta if File.exist?(old_meta)
+      files_to_commit << new_meta if File.exist?(new_meta)
+      files_to_commit += modified_manifests
+      RecordingGitService.commit("Rename recording '#{old_id}' to '#{new_id}' (#{clean_title})", files: files_to_commit.uniq, slug: slug) rescue nil
+    end
+
+    { ok: true, old_id: old_id, id: new_id, title: clean_title, path: (new_path || old_path) }
+  rescue StandardError => e
+    { ok: false, error: e.message }
+  end
+
   def self.update_status(id, status)
     path = path_for(id)
     return false unless path
@@ -1459,12 +1658,12 @@ class RecordingService
   end
 
   def self.create_markdown_step(slug, title: 'Step Note', content: nil)
-    id = new_markdown_id('note')
+    clean_title = title.to_s.strip
+    clean_title = 'Step Note' if clean_title.empty?
+    id = new_markdown_id(clean_title, walkthrough: slug)
     target_dir = walkthrough_dir(slug)
     FileUtils.mkdir_p(target_dir)
     path = File.join(target_dir, "#{id}#{MD_EXT}")
-    clean_title = title.to_s.strip
-    clean_title = 'Step Note' if clean_title.empty?
     initial_content = content || "# #{clean_title}\n\nAdd your step notes or instructions here.\n"
     File.write(path, initial_content, encoding: 'UTF-8')
 

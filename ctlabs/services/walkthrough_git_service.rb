@@ -19,8 +19,8 @@ require 'securerandom'
 class WalkthroughGitService
   SLUG_RE          = /\A[a-zA-Z0-9_-]{1,120}\z/
   MANIFEST         = '_walkthrough.json'
-  VIDEO_PATTERNS   = %w[*.webm *.mp4 *.mkv *.mov *.avi *.flv *.wmv].freeze
-  EXCLUDE_PATTERNS = (VIDEO_PATTERNS + %w[*.tmp temp_* export_*.zip export_note_*.zip export_*.docx export_note_*.docx export_*.pdf export_note_*.pdf .DS_Store _repos.json]).freeze
+  LFS_PATTERNS     = %w[*.webm *.mp4 *.mkv *.mov *.avi *.flv *.wmv].freeze
+  EXCLUDE_PATTERNS = %w[*.tmp temp_* export_*.zip export_note_*.zip export_*.docx export_note_*.docx export_*.pdf export_note_*.pdf .DS_Store _repos.json].freeze
   SSH_COMMAND      = 'ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20'
   ASKPASS_SCRIPT   = File.expand_path('../scripts/git_askpass.sh', __dir__)
   DEFAULT_TIMEOUT  = 90
@@ -883,6 +883,30 @@ class WalkthroughGitService
   def self.configure_repo_dir(work_path)
     run_in_dir(work_path, 'config', 'user.name', 'ctlabs')
     run_in_dir(work_path, 'config', 'user.email', 'ctlabs@localhost')
+    ensure_lfs_installed!(work_path)
+  end
+
+  def self.ensure_lfs_installed!(work_path)
+    return unless git_available?
+
+    # Install git-lfs hooks into local repo if git-lfs binary is installed
+    run_in_dir(work_path, 'lfs', 'install', '--local') rescue nil
+
+    # Ensure .gitattributes exists and tracks LFS_PATTERNS
+    attr_path = File.join(work_path, '.gitattributes')
+    existing_attr = File.file?(attr_path) ? File.read(attr_path) : ''
+    present_lines = existing_attr.lines.map(&:strip)
+
+    needed_lines = LFS_PATTERNS.map { |pat| "#{pat} filter=lfs diff=lfs merge=lfs -text" }
+    missing_lines = needed_lines.reject { |line| present_lines.include?(line) }
+
+    if missing_lines.any?
+      sep = existing_attr.empty? || existing_attr.end_with?("\n") ? '' : "\n"
+      header = existing_attr.include?('filter=lfs') ? '' : "# Git LFS tracking for video recordings & media\n"
+      File.write(attr_path, existing_attr + sep + header + missing_lines.join("\n") + "\n")
+    end
+  rescue StandardError => e
+    warn "WalkthroughGitService.ensure_lfs_installed! error: #{e.message}"
   end
 
   def self.write_excludes(git_path)
@@ -890,12 +914,15 @@ class WalkthroughGitService
     FileUtils.mkdir_p(info_dir)
     exclude_path = File.join(info_dir, 'exclude')
     existing = File.file?(exclude_path) ? File.read(exclude_path) : ''
-    present = existing.lines.map(&:strip)
-    missing = EXCLUDE_PATTERNS.reject { |pattern| present.include?(pattern) }
-    return if missing.empty?
-
-    separator = existing.empty? || existing.end_with?("\n") ? '' : "\n"
-    File.write(exclude_path, existing + separator + missing.join("\n") + "\n")
+    
+    # Clean out any legacy video patterns from info/exclude
+    lines = existing.lines.map(&:strip).reject do |line|
+      LFS_PATTERNS.include?(line)
+    end
+    
+    missing = EXCLUDE_PATTERNS.reject { |pattern| lines.include?(pattern) }
+    final_lines = (lines + missing).uniq
+    File.write(exclude_path, final_lines.empty? ? '' : "#{final_lines.join("\n")}\n")
   end
 
   def self.valid_slug?(slug)

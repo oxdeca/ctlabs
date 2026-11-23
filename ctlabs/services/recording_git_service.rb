@@ -18,15 +18,6 @@ class RecordingGitService
   ROOT = File.expand_path('/srv/ctlabs-server/recordings')
 
   GITIGNORE_CONTENT = <<~GITIGNORE
-    # Video files (casts / screen captures) - not stored in git
-    *.webm
-    *.mp4
-    *.mkv
-    *.mov
-    *.avi
-    *.flv
-    *.wmv
-
     # Temporary files & export archives
     *.tmp
     temp_*
@@ -38,6 +29,17 @@ class RecordingGitService
     export_note_*.pdf
     .DS_Store
   GITIGNORE
+
+  GITATTRIBUTES_CONTENT = <<~GITATTRIBUTES
+    # Git LFS tracking for video recordings & media
+    *.webm filter=lfs diff=lfs merge=lfs -text
+    *.mp4 filter=lfs diff=lfs merge=lfs -text
+    *.mkv filter=lfs diff=lfs merge=lfs -text
+    *.mov filter=lfs diff=lfs merge=lfs -text
+    *.avi filter=lfs diff=lfs merge=lfs -text
+    *.flv filter=lfs diff=lfs merge=lfs -text
+    *.wmv filter=lfs diff=lfs merge=lfs -text
+  GITATTRIBUTES
 
   def self.root_dir
     defined?(RecordingService) ? File.expand_path(RecordingService.dir) : ROOT
@@ -64,11 +66,15 @@ class RecordingGitService
     end
 
     gitignore_path = File.join(rdir, '.gitignore')
-    unless File.exist?(gitignore_path)
-      File.write(gitignore_path, GITIGNORE_CONTENT)
+    File.write(gitignore_path, GITIGNORE_CONTENT)
+
+    gitattributes_path = File.join(rdir, '.gitattributes')
+    unless File.exist?(gitattributes_path)
+      File.write(gitattributes_path, GITATTRIBUTES_CONTENT)
     end
 
     if defined?(WalkthroughGitService)
+      WalkthroughGitService.ensure_lfs_installed!(rdir) rescue nil
       WalkthroughGitService.write_excludes(File.join(rdir, '.git')) rescue nil
     end
 

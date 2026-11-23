@@ -845,8 +845,10 @@
     .then(res => res.json())
     .then(data => {
       if (data && data.ok) {
+        const nextId = data.id || id;
         if (btn) {
           btn.setAttribute('data-title', newTitle);
+          btn.setAttribute('data-id', nextId);
           const titleSpan = btn.querySelector('.item-title');
           if (titleSpan) titleSpan.textContent = newTitle;
           const currentActive = document.querySelector('.rec-item.active');
@@ -857,6 +859,11 @@
               const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
               if (span) span.textContent = fullTitleText;
               titleEl.title = fullTitleText;
+            }
+            if (nextId !== id) {
+              const url = new URL(window.location);
+              url.searchParams.set('recording', nextId);
+              window.history.replaceState({}, '', url.toString());
             }
           }
         }

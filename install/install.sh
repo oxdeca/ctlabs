@@ -54,6 +54,7 @@ PKGS=(
   'tmux'
   'vim'
   'git'
+  'git-lfs'
   'graphviz'
   'pandoc'
   'weasyprint'

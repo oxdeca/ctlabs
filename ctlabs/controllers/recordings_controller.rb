@@ -42,7 +42,8 @@ class RecordingsController < BaseController
       wks = RecordingService.load_walkthroughs
     end
 
-    id = RecordingService.new_id(node.empty? ? 'terminal' : node)
+    title = params[:title].to_s.strip
+    id = RecordingService.new_id(node.empty? ? 'terminal' : node, title, walkthrough: target_slug)
     target_dir = RecordingService.walkthrough_dir(target_slug)
     FileUtils.mkdir_p(target_dir)
     path = File.join(target_dir, "#{id}#{RecordingService::EXT}")
@@ -78,15 +79,15 @@ class RecordingsController < BaseController
     ext = File.extname(orig_name).downcase
     ext = RecordingService::VIDEO_EXT unless RecordingService::VIDEO_EXTS.include?(ext)
 
-    id = RecordingService.new_video_id('screen')
+    clean_title = params[:title].to_s.strip
+    clean_title = 'Browser Recording' if clean_title.empty?
+    duration = params[:duration].to_f
+
+    id = RecordingService.new_video_id(clean_title, walkthrough: target_slug)
     target_dir = RecordingService.walkthrough_dir(target_slug)
     FileUtils.mkdir_p(target_dir)
     path = File.join(target_dir, "#{id}#{ext}")
     FileUtils.cp(f[:tempfile].path, path)
-
-    clean_title = params[:title].to_s.strip
-    clean_title = 'Browser Recording' if clean_title.empty?
-    duration = params[:duration].to_f
 
     meta = {
       'title'      => clean_title,
@@ -671,31 +672,17 @@ class RecordingsController < BaseController
         node = RecordingService.node_from_cast(data) ||
                RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
         orig_base = File.basename(f[:filename].to_s, '.*').strip
-        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-        clean_base = 'recording' if clean_base.empty?
+        clean_base = RecordingService.title_slug(orig_base, 'recording')
+        clean_base = clean_base.start_with?('cast_') ? clean_base : "cast_#{clean_base}"
 
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
              elsif conflict_action == 'rename' && !custom_name.empty?
-               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-               cand = 'recording' if cand.empty?
-               c_id = cand
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{cand}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
-             elsif !RecordingService.path_for(clean_base)
-               clean_base
+               cand = RecordingService.title_slug(custom_name, 'recording')
+               cand = cand.start_with?('cast_') ? cand : "cast_#{cand}"
+               RecordingService.unique_step_id(cand, walkthrough: wk_target)
              else
-               c_id = clean_base
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{clean_base}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
+               RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
 
         wk_target = params[:walkthrough].to_s.strip
@@ -731,8 +718,8 @@ class RecordingsController < BaseController
         data = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
 
         orig_base = File.basename(f[:filename].to_s, '.*').strip
-        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-        clean_base = 'note' if clean_base.empty?
+        clean_base = RecordingService.title_slug(orig_base, 'note')
+        clean_base = clean_base.start_with?('md_') ? clean_base : "md_#{clean_base}"
 
         if conflict_action == 'rename' && !custom_name.empty?
           if data =~ /\A(\s*#+\s*)([^\n]+)/
@@ -747,25 +734,11 @@ class RecordingsController < BaseController
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
              elsif conflict_action == 'rename' && !custom_name.empty?
-               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-               cand = 'note' if cand.empty?
-               c_id = cand
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{cand}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
-             elsif !RecordingService.path_for(clean_base)
-               clean_base
+               cand = RecordingService.title_slug(custom_name, 'note')
+               cand = cand.start_with?('md_') ? cand : "md_#{cand}"
+               RecordingService.unique_step_id(cand, walkthrough: wk_target)
              else
-               c_id = clean_base
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{clean_base}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
+               RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
 
         wk_target = params[:walkthrough].to_s.strip
@@ -783,31 +756,17 @@ class RecordingsController < BaseController
       elsif RecordingService::VIDEO_EXTS.include?(File.extname(filename))
         vext = File.extname(filename).downcase
         orig_base = File.basename(f[:filename].to_s, '.*').strip
-        clean_base = orig_base.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-        clean_base = 'video' if clean_base.empty?
+        clean_base = RecordingService.title_slug(orig_base, 'video')
+        clean_base = clean_base.start_with?('vid_') ? clean_base : "vid_#{clean_base}"
 
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
              elsif conflict_action == 'rename' && !custom_name.empty?
-               cand = custom_name.to_s.strip.downcase.gsub(/[^a-z0-9_.-]+/, '_').gsub(/_+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')[0, 80]
-               cand = 'video' if cand.empty?
-               c_id = cand
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{cand}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
-             elsif !RecordingService.path_for(clean_base)
-               clean_base
+               cand = RecordingService.title_slug(custom_name, 'video')
+               cand = cand.start_with?('vid_') ? cand : "vid_#{cand}"
+               RecordingService.unique_step_id(cand, walkthrough: wk_target)
              else
-               c_id = clean_base
-               cnt = 1
-               while RecordingService.path_for(c_id)
-                 c_id = "#{clean_base}_#{cnt}"
-                 cnt += 1
-               end
-               c_id
+               RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
 
         wk_target = params[:walkthrough].to_s.strip
@@ -1156,8 +1115,26 @@ class RecordingsController < BaseController
     if RecordingService::VIDEO_EXTS.include?(ext)
       mime = (ext == '.mp4') ? 'video/mp4' : 'video/webm'
       disposition = params[:download] ? 'attachment' : 'inline'
+
+      download_filename = File.basename(path)
+      if params[:download]
+        if !params[:filename].to_s.strip.empty?
+          custom_name = params[:filename].to_s.strip
+          custom_name = File.basename(custom_name)
+          custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+          download_filename = custom_name.downcase.end_with?(ext) ? custom_name : "#{custom_name}#{ext}" unless custom_name.empty?
+        else
+          rec_meta = RecordingService.meta(path)
+          title = rec_meta && rec_meta[:title].to_s.strip
+          if title && !title.empty? && title != 'Browser Recording'
+            slug = title.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+            download_filename = "#{slug}#{ext}" unless slug.empty?
+          end
+        end
+      end
+
       return send_file path,
-                       filename:    File.basename(path),
+                       filename:    download_filename,
                        type:        mime,
                        disposition: disposition
     end
@@ -1294,13 +1271,25 @@ class RecordingsController < BaseController
     disposition = params[:download] ? 'attachment' : 'inline'
 
     download_filename = File.basename(path)
-    if params[:download] && !params[:filename].to_s.strip.empty?
-      custom_name = params[:filename].to_s.strip
-      custom_name = File.basename(custom_name)
-      custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
-      if !custom_name.empty?
-        ext = is_md ? RecordingService::MD_EXT : RecordingService::EXT
-        download_filename = custom_name.downcase.end_with?(ext) ? custom_name : "#{custom_name}#{ext}"
+    if params[:download]
+      if !params[:filename].to_s.strip.empty?
+        custom_name = params[:filename].to_s.strip
+        custom_name = File.basename(custom_name)
+        custom_name = custom_name.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+        if !custom_name.empty?
+          ext = is_md ? RecordingService::MD_EXT : RecordingService::EXT
+          download_filename = custom_name.downcase.end_with?(ext) ? custom_name : "#{custom_name}#{ext}"
+        end
+      else
+        rec_meta = RecordingService.meta(path)
+        title = rec_meta && rec_meta[:title].to_s.strip
+        if title && !title.empty?
+          slug = title.gsub(/[^a-zA-Z0-9_.-]+/, '_').sub(/\A_+/, '').sub(/_+\z/, '')
+          if !slug.empty?
+            ext = is_md ? RecordingService::MD_EXT : RecordingService::EXT
+            download_filename = "#{slug}#{ext}"
+          end
+        end
       end
     end
 
@@ -1323,21 +1312,24 @@ class RecordingsController < BaseController
     halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
 
     title = params[:title].to_s.strip
-    
-    # Ensure update_meta only updates the title field and never touches the node identifier
-    if RecordingService.respond_to?(:update_meta)
-      RecordingService.update_meta(params[:id], title: title)
-    end
+    wks   = RecordingService.load_walkthroughs
+    slug  = params[:walkthrough].to_s
+    slug  = wks.keys.first.to_s unless wks.key?(slug)
+
+    res = if RecordingService.respond_to?(:rename_recording)
+            RecordingService.rename_recording(params[:id], title, walkthrough: slug)
+          else
+            RecordingService.update_meta(params[:id], title: title)
+            { ok: true, id: params[:id], title: title }
+          end
+    new_id = (res.is_a?(Hash) && res[:ok] && res[:id]) ? res[:id] : params[:id]
 
     if request.xhr? || request.accept?('application/json') || request.media_type == 'application/json'
       content_type :json
-      return { ok: true, id: params[:id], title: title }.to_json
+      return { ok: (res.is_a?(Hash) ? res[:ok] != false : true), id: new_id, old_id: params[:id], title: title }.to_json
     end
 
-    wks  = RecordingService.load_walkthroughs
-    slug = params[:walkthrough].to_s
-    slug = wks.keys.first.to_s unless wks.key?(slug)
-    redirect "/demo?walkthrough=#{slug}&recording=#{params[:id]}"
+    redirect "/demo?walkthrough=#{slug}&recording=#{new_id}"
   end
 
   post '/recordings/:id/status' do
