@@ -856,18 +856,40 @@
 
     <!-- Picture Inspector Modal -->
     <div id="pic-inspector-modal" class="w3-modal" style="z-index: 9999;">
-      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 820px;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 880px;">
         <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
           <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;"><i class="fas fa-images"></i> Picture Inspector</h3>
           <span onclick="document.getElementById('pic-inspector-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
         </header>
         <div style="padding: 14px 16px;">
-          <p id="pic-inspector-summary" style="color: #cbd5e1; font-size: 0.88em; margin: 0 0 10px 0;">Loading pictures…</p>
-          <div id="pic-inspector-list" style="max-height: 60vh; overflow-y: auto; border: 1px solid #334155; border-radius: 6px; background: #0f172a;"></div>
-          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 14px;">
-            <button type="button" id="pic-inspector-delete-unused" class="w3-button w3-round" style="background: #ef4444; color: #ffffff; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
-              <i class="fas fa-broom"></i> Delete all unused
-            </button>
+          <!-- Controls bar: Section Filter Tabs & Multi-select actions -->
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+            <!-- Tabs: Unused, Used, All -->
+            <div id="pic-inspector-tabs" style="display: inline-flex; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 2px;">
+              <button type="button" class="pic-inspector-tab-btn" data-tab="all" style="background: #0284c7; color: #ffffff; border: none; border-radius: 4px; padding: 5px 12px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;">
+                <i class="fas fa-layer-group"></i> All <span id="pic-tab-count-all" style="background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 10px; font-size: 0.9em;">0</span>
+              </button>
+              <button type="button" class="pic-inspector-tab-btn" data-tab="unused" style="background: transparent; color: #94a3b8; border: none; border-radius: 4px; padding: 5px 12px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;">
+                <i class="fas fa-trash-alt" style="color: #f59e0b;"></i> Unused <span id="pic-tab-count-unused" style="background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 10px; font-size: 0.9em;">0</span>
+              </button>
+              <button type="button" class="pic-inspector-tab-btn" data-tab="used" style="background: transparent; color: #94a3b8; border: none; border-radius: 4px; padding: 5px 12px; font-size: 0.82em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.15s;">
+                <i class="fas fa-check-circle" style="color: #10b981;"></i> Used <span id="pic-tab-count-used" style="background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 10px; font-size: 0.9em;">0</span>
+              </button>
+            </div>
+            <!-- Multi-select actions -->
+            <div id="pic-inspector-batch-actions" style="display: flex; align-items: center; gap: 10px;">
+              <label id="pic-inspector-select-all-wrap" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.82em; color: #cbd5e1; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="pic-inspector-select-all" style="cursor: pointer; width: 15px; height: 15px; accent-color: #ef4444;" />
+                <span>Select all</span>
+              </label>
+              <button type="button" id="pic-inspector-delete-selected" class="w3-button w3-round" disabled style="background: #7f1d1d; color: #ffffff; font-size: 0.82em; padding: 5px 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; opacity: 0.5; cursor: not-allowed; transition: all 0.15s;">
+                <i class="fas fa-trash-alt"></i> Delete Selected (<span id="pic-selected-count">0</span>)
+              </button>
+            </div>
+          </div>
+          <p id="pic-inspector-summary" style="color: #94a3b8; font-size: 0.82em; margin: 0 0 10px 0;">Loading pictures…</p>
+          <div id="pic-inspector-list" style="max-height: 58vh; overflow-y: auto; border: 1px solid #334155; border-radius: 6px; background: #0f172a;"></div>
+          <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px;">
             <button type="button" onclick="document.getElementById('pic-inspector-modal').style.display='none'" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px;">Close</button>
           </div>
         </div>

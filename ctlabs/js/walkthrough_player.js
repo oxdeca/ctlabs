@@ -499,8 +499,14 @@
   const picInspectorModal = document.getElementById('pic-inspector-modal');
   const picInspectorSummary = document.getElementById('pic-inspector-summary');
   const picInspectorList = document.getElementById('pic-inspector-list');
-  const picInspectorDeleteUnused = document.getElementById('pic-inspector-delete-unused');
   const picInspectorBtn = document.getElementById('pic-inspector-btn');
+  const picInspectorSelectAll = document.getElementById('pic-inspector-select-all');
+  const picInspectorDeleteSelected = document.getElementById('pic-inspector-delete-selected');
+  const picSelectedCount = document.getElementById('pic-selected-count');
+
+  let picInspectorItems = [];
+  let picInspectorActiveTab = 'all';
+  let picInspectorSelectedFiles = new Set();
 
   function escapeHtml(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => ({
@@ -517,88 +523,215 @@
     return `![${alt}](images/${filename})`;
   }
 
-  function renderPicInspector(items) {
-    if (!picInspectorList) return;
-    items.forEach(i => {
-      if (i.diagram && i.diagram_base) cachedDiagramBases.add(i.diagram_base);
-    });
-    const used = items.filter(i => i.used && !i.missing).length;
-    const unused = items.filter(i => !i.used && !i.missing).length;
-    const missing = items.filter(i => i.missing).length;
-    if (picInspectorSummary) {
-      picInspectorSummary.textContent = `${items.length} picture${items.length === 1 ? '' : 's'} · ${used} used · ${unused} unused · ${missing} missing`;
+  function updatePicInspectorSelectionUI() {
+    if (picSelectedCount) {
+      picSelectedCount.textContent = picInspectorSelectedFiles.size;
     }
-    if (picInspectorDeleteUnused) {
-      picInspectorDeleteUnused.disabled = unused === 0;
-      picInspectorDeleteUnused.style.opacity = unused === 0 ? '0.5' : '1';
-      picInspectorDeleteUnused.style.cursor = unused === 0 ? 'not-allowed' : 'pointer';
+    if (picInspectorDeleteSelected) {
+      const hasSel = picInspectorSelectedFiles.size > 0;
+      picInspectorDeleteSelected.disabled = !hasSel;
+      picInspectorDeleteSelected.style.opacity = hasSel ? '1' : '0.5';
+      picInspectorDeleteSelected.style.cursor = hasSel ? 'pointer' : 'not-allowed';
     }
-    if (items.length === 0) {
-      picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;">No pictures in this walkthrough set.</div>';
-      return;
+    if (picInspectorSelectAll) {
+      const visibleCheckboxes = picInspectorList ? picInspectorList.querySelectorAll('.pic-inspector-check') : [];
+      if (visibleCheckboxes.length > 0) {
+        const allChecked = Array.from(visibleCheckboxes).every(cb => cb.checked);
+        picInspectorSelectAll.checked = allChecked;
+        picInspectorSelectAll.indeterminate = !allChecked && Array.from(visibleCheckboxes).some(cb => cb.checked);
+      } else {
+        picInspectorSelectAll.checked = false;
+        picInspectorSelectAll.indeterminate = false;
+      }
     }
-    picInspectorList.innerHTML = items.map(item => {
-      const usedBy = (item.used_by || []).map(u => (u.step ? '#' + u.step + ' ' : '') + escapeHtml(u.title)).join(', ');
-      const status = item.missing
-        ? '<span style="background:#7f1d1d; color:#fecaca; padding:1px 6px; border-radius:3px; font-size:0.75em;">Missing</span>'
-        : item.used
-          ? '<span style="background:#14532d; color:#bbf7d0; padding:1px 6px; border-radius:3px; font-size:0.75em;">Used</span>'
-          : '<span style="background:#78350f; color:#fde68a; padding:1px 6px; border-radius:3px; font-size:0.75em;">Unused</span>';
-      const diagramBadge = item.diagram
-        ? '<span style="background:#0369a1; color:#bae6fd; padding:1px 6px; border-radius:3px; font-size:0.75em;"><i class="fas fa-project-diagram" style="margin-right:3px;"></i>Diagram</span>'
-        : '';
-      const thumb = item.missing
-        ? '<div style="width:56px; height:42px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#ef4444;"><i class="fas fa-image-slash"></i></div>'
-        : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" class="pic-inspector-thumb" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Click to preview full size (hover for quick preview)" style="width:56px; height:42px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b; cursor:pointer;" />`;
-      const detail = item.missing
-        ? 'Referenced but file is missing'
-        : (item.used ? 'Used in: ' + usedBy : 'Not referenced by any note');
-      const globalTag = item.global_only ? ' <span style="color:#94a3b8; font-size:0.75em;">(global fallback)</span>' : '';
-      const previewBtn = item.missing
-        ? ''
-        : `<button type="button" class="pic-inspector-preview w3-button w3-round" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Preview full size in lightbox" style="background:#1e293b; border:1px solid #475569; color:#38bdf8; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-eye" style="margin-right:4px;"></i>Preview</button>`;
-      const copyBtn = item.missing
-        ? ''
-        : `<button type="button" class="pic-inspector-copy w3-button w3-round" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown image link" style="background:#1e293b; border:1px solid #475569; color:#cbd5e1; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-link" style="color:#38bdf8; margin-right:4px;"></i>Copy link</button>`;
-      const annotateBtn = item.missing
-        ? ''
-        : `<button type="button" class="pic-inspector-annotate w3-button w3-round" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Annotate picture in screenshot editor" style="background:#1e293b; border:1px solid #475569; color:#10b981; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-paint-brush" style="margin-right:4px;"></i>Annotate</button>`;
-      const editBtn = (item.diagram && item.diagram_base)
-        ? `<button type="button" class="pic-inspector-edit w3-button w3-round" data-base="${escapeHtml(item.diagram_base)}" title="Edit diagram source" style="background:#0284c7; color:#ffffff; font-size:0.78em; padding:4px 10px; white-space:nowrap;"><i class="fas fa-edit" style="margin-right:4px;"></i>Edit</button>`
-        : '';
-      const deleteBtn = (!item.used && !item.missing && item.scoped)
-        ? `<button type="button" class="pic-inspector-delete w3-button w3-round" data-filename="${escapeHtml(item.filename)}" style="background:#7f1d1d; color:#fecaca; font-size:0.78em; padding:4px 10px; white-space:nowrap;">Delete</button>`
-        : '';
-      return `<div style="display:flex; align-items:center; gap:12px; padding:10px 12px; border-bottom:1px solid #334155;">
-        ${thumb}
-        <div style="flex:1; min-width:0;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-family:ui-monospace, monospace; font-size:0.82em; color:#f8fafc; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(item.filename)}</span>
-            ${status}${diagramBadge}${globalTag}
-          </div>
-          <div style="color:#94a3b8; font-size:0.78em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detail}</div>
+  }
+
+  function renderPicInspectorRow(item) {
+    const usedBy = (item.used_by || []).map(u => (u.step ? '#' + u.step + ' ' : '') + escapeHtml(u.title)).join(', ');
+    const status = item.missing
+      ? '<span style="background:#7f1d1d; color:#fecaca; padding:1px 6px; border-radius:3px; font-size:0.75em;">Missing</span>'
+      : item.used
+        ? '<span style="background:#14532d; color:#bbf7d0; padding:1px 6px; border-radius:3px; font-size:0.75em;">Used</span>'
+        : '<span style="background:#78350f; color:#fde68a; padding:1px 6px; border-radius:3px; font-size:0.75em;">Unused</span>';
+    const diagramBadge = item.diagram
+      ? '<span style="background:#0369a1; color:#bae6fd; padding:1px 6px; border-radius:3px; font-size:0.75em;"><i class="fas fa-project-diagram" style="margin-right:3px;"></i>Diagram</span>'
+      : '';
+    const thumb = item.missing
+      ? '<div style="width:48px; height:36px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #475569; border-radius:4px; color:#ef4444;"><i class="fas fa-image-slash"></i></div>'
+      : `<img src="${picInspectorImageUrl(item.filename)}" alt="" loading="lazy" class="pic-inspector-thumb" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Click to preview full size (hover for quick preview)" style="width:48px; height:36px; object-fit:cover; border-radius:4px; border:1px solid #475569; background:#1e293b; cursor:pointer;" />`;
+    const detail = item.missing
+      ? 'Referenced but file is missing'
+      : (item.used ? 'Used in: ' + usedBy : 'Not referenced by any note');
+    const globalTag = item.global_only ? ' <span style="color:#94a3b8; font-size:0.75em;">(global fallback)</span>' : '';
+
+    const canDelete = (!item.used && !item.missing && item.scoped);
+    const isChecked = picInspectorSelectedFiles.has(item.filename);
+
+    const checkboxHtml = canDelete
+      ? `<input type="checkbox" class="pic-inspector-check" data-filename="${escapeHtml(item.filename)}" ${isChecked ? 'checked' : ''} title="Select to delete" style="width:16px; height:16px; cursor:pointer; accent-color:#ef4444; flex-shrink:0;" />`
+      : `<div style="width:16px; height:16px; flex-shrink:0;"></div>`;
+
+    const btnStyle = 'width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; padding:0; background:#1e293b; border:1px solid #334155; border-radius:4px; cursor:pointer; transition:all 0.15s; font-size:0.85em;';
+
+    const previewBtn = item.missing ? '' :
+      `<button type="button" class="pic-inspector-preview" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Preview full size in lightbox" style="${btnStyle} color:#38bdf8;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'"><i class="fas fa-eye"></i></button>`;
+
+    const annotateBtn = item.missing ? '' :
+      `<button type="button" class="pic-inspector-annotate" data-filename="${escapeHtml(item.filename)}" data-url="${escapeHtml(picInspectorImageUrl(item.filename))}" title="Annotate picture in screenshot editor" style="${btnStyle} color:#10b981;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'"><i class="fas fa-paint-brush"></i></button>`;
+
+    const copyBtn = item.missing ? '' :
+      `<button type="button" class="pic-inspector-copy" data-filename="${escapeHtml(item.filename)}" title="Copy Markdown link" style="${btnStyle} color:#cbd5e1;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'"><i class="fas fa-link" style="color:#38bdf8;"></i></button>`;
+
+    const editBtn = (item.diagram && item.diagram_base) ?
+      `<button type="button" class="pic-inspector-edit" data-base="${escapeHtml(item.diagram_base)}" title="Edit diagram source" style="${btnStyle} background:#0284c7; border-color:#0284c7; color:#ffffff;" onmouseover="this.style.background='#0369a1'" onmouseout="this.style.background='#0284c7'"><i class="fas fa-edit"></i></button>` : '';
+
+    const deleteBtn = canDelete ?
+      `<button type="button" class="pic-inspector-delete" data-filename="${escapeHtml(item.filename)}" title="Delete picture" style="${btnStyle} background:#450a0a; border-color:#991b1b; color:#fca5a5;" onmouseover="this.style.background='#7f1d1d'" onmouseout="this.style.background='#450a0a'"><i class="fas fa-trash-alt"></i></button>` : '';
+
+    return `<div class="pic-inspector-row" data-filename="${escapeHtml(item.filename)}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #1e293b; transition:background 0.15s;">
+      ${checkboxHtml}
+      ${thumb}
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span style="font-family:ui-monospace, monospace; font-size:0.82em; color:#f8fafc; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</span>
+          ${status}${diagramBadge}${globalTag}
         </div>
-        <div style="color:#94a3b8; font-size:0.78em; white-space:nowrap;">${formatFileSize(item.size)}</div>
+        <div style="color:#94a3b8; font-size:0.76em; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(detail)}">${detail}</div>
+      </div>
+      <div style="color:#64748b; font-size:0.76em; white-space:nowrap; margin-right:4px;">${formatFileSize(item.size)}</div>
+      <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
         ${previewBtn}
         ${annotateBtn}
         ${copyBtn}
         ${editBtn}
         ${deleteBtn}
-      </div>`;
-    }).join('');
+      </div>
+    </div>`;
+  }
+
+  function renderPicInspector(items) {
+    if (!picInspectorList) return;
+    picInspectorItems = items || [];
+    picInspectorItems.forEach(i => {
+      if (i.diagram && i.diagram_base) cachedDiagramBases.add(i.diagram_base);
+    });
+
+    const used = picInspectorItems.filter(i => i.used && !i.missing);
+    const unused = picInspectorItems.filter(i => !i.used && !i.missing);
+    const missing = picInspectorItems.filter(i => i.missing);
+
+    // Update tab counts
+    const tabCountUnused = document.getElementById('pic-tab-count-unused');
+    const tabCountUsed = document.getElementById('pic-tab-count-used');
+    const tabCountAll = document.getElementById('pic-tab-count-all');
+    if (tabCountUnused) tabCountUnused.textContent = unused.length;
+    if (tabCountUsed) tabCountUsed.textContent = used.length;
+    if (tabCountAll) tabCountAll.textContent = picInspectorItems.length;
+
+    if (picInspectorSummary) {
+      picInspectorSummary.textContent = `${picInspectorItems.length} picture${picInspectorItems.length === 1 ? '' : 's'} · ${used.length} used · ${unused.length} unused${missing.length > 0 ? ' · ' + missing.length + ' missing' : ''}`;
+    }
+
+    // Clean up selected files that no longer exist
+    const currentUnusedNames = new Set(unused.map(i => i.filename));
+    picInspectorSelectedFiles.forEach(fn => {
+      if (!currentUnusedNames.has(fn)) picInspectorSelectedFiles.delete(fn);
+    });
+
+    // Update tab button styles
+    const tabBtns = document.querySelectorAll('.pic-inspector-tab-btn');
+    tabBtns.forEach(btn => {
+      const t = btn.getAttribute('data-tab');
+      if (t === picInspectorActiveTab) {
+        btn.style.background = '#0284c7';
+        btn.style.color = '#ffffff';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = '#94a3b8';
+      }
+    });
+
+    if (picInspectorItems.length === 0) {
+      picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;">No pictures in this walkthrough set.</div>';
+      updatePicInspectorSelectionUI();
+      return;
+    }
+
+    let html = '';
+    if (picInspectorActiveTab === 'unused') {
+      if (unused.length === 0) {
+        html = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;"><i class="fas fa-check-circle" style="color:#10b981; margin-right:6px;"></i>No unused pictures. All pictures are referenced by walkthrough notes.</div>';
+      } else {
+        html = unused.map(item => renderPicInspectorRow(item)).join('');
+      }
+    } else if (picInspectorActiveTab === 'used') {
+      if (used.length === 0) {
+        html = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;">No used pictures in this walkthrough set.</div>';
+      } else {
+        html = used.map(item => renderPicInspectorRow(item)).join('');
+      }
+    } else {
+      // 'all' tab: render 2 clear sections with sticky headers!
+      if (unused.length > 0) {
+        html += `<div style="background:#1e293b; padding:6px 12px; font-size:0.78em; font-weight:600; color:#fde68a; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; position:sticky; top:0; z-index:2;">
+          <span style="display:flex; align-items:center; gap:6px;"><i class="fas fa-trash-alt" style="color:#f59e0b;"></i> Unused Pictures (${unused.length})</span>
+          <span style="font-size:0.88em; font-weight:normal; color:#94a3b8;">Not referenced in any note</span>
+        </div>`;
+        html += unused.map(item => renderPicInspectorRow(item)).join('');
+      }
+      if (used.length > 0) {
+        html += `<div style="background:#1e293b; padding:6px 12px; font-size:0.78em; font-weight:600; color:#86efac; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; position:sticky; top:0; z-index:2;">
+          <span style="display:flex; align-items:center; gap:6px;"><i class="fas fa-check-circle" style="color:#10b981;"></i> Used Pictures (${used.length})</span>
+          <span style="font-size:0.88em; font-weight:normal; color:#94a3b8;">Referenced in steps</span>
+        </div>`;
+        html += used.map(item => renderPicInspectorRow(item)).join('');
+      }
+      if (missing.length > 0) {
+        html += `<div style="background:#1e293b; padding:6px 12px; font-size:0.78em; font-weight:600; color:#fca5a5; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #334155; position:sticky; top:0; z-index:2;">
+          <span style="display:flex; align-items:center; gap:6px;"><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> Missing Picture References (${missing.length})</span>
+          <span style="font-size:0.88em; font-weight:normal; color:#94a3b8;">Referenced in notes but file is missing</span>
+        </div>`;
+        html += missing.map(item => renderPicInspectorRow(item)).join('');
+      }
+    }
+
+    picInspectorList.innerHTML = html;
+    updatePicInspectorSelectionUI();
+    attachPicInspectorListeners();
+  }
+
+  function attachPicInspectorListeners() {
+    if (!picInspectorList) return;
+
+    // Checkboxes
+    picInspectorList.querySelectorAll('.pic-inspector-check').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const fn = cb.getAttribute('data-filename');
+        if (!fn) return;
+        if (cb.checked) {
+          picInspectorSelectedFiles.add(fn);
+        } else {
+          picInspectorSelectedFiles.delete(fn);
+        }
+        updatePicInspectorSelectionUI();
+      });
+    });
+
+    // Thumb & preview clicks
     picInspectorList.querySelectorAll('.pic-inspector-thumb, .pic-inspector-preview').forEach(el => {
       el.addEventListener('click', (e) => {
         e.stopPropagation();
         const filename = el.getAttribute('data-filename');
         const url = el.getAttribute('data-url');
         if (!url) return;
-        const hoverBox = document.getElementById('pic-inspector-hover-preview');
-        if (hoverBox) hoverBox.style.display = 'none';
+        hidePicInspectorHover();
         if (typeof openImageModal === 'function') {
           openImageModal(url, filename, filename);
         }
       });
     });
+
+    // Thumb hovers
     const hoverBox = document.getElementById('pic-inspector-hover-preview');
     const hoverImg = document.getElementById('pic-inspector-hover-img');
     if (hoverBox && hoverImg) {
@@ -619,6 +752,8 @@
         });
       });
     }
+
+    // Annotate button
     picInspectorList.querySelectorAll('.pic-inspector-annotate').forEach(btn => {
       btn.addEventListener('click', () => {
         const filename = btn.getAttribute('data-filename');
@@ -630,16 +765,24 @@
         }
       });
     });
+
+    // Copy link button
     picInspectorList.querySelectorAll('.pic-inspector-copy').forEach(btn => {
       btn.addEventListener('click', () => {
         const filename = btn.getAttribute('data-filename');
         if (!filename) return;
         copyTextToClipboard(picInspectorMarkdownFor(filename));
         const original = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check" style="color:#10b981; margin-right:4px;"></i>Copied!';
-        setTimeout(() => { btn.innerHTML = original; }, 1200);
+        btn.innerHTML = '<i class="fas fa-check" style="color:#10b981;"></i>';
+        btn.title = 'Copied!';
+        setTimeout(() => {
+          btn.innerHTML = original;
+          btn.title = 'Copy Markdown link';
+        }, 1200);
       });
     });
+
+    // Edit diagram button
     picInspectorList.querySelectorAll('.pic-inspector-edit').forEach(btn => {
       btn.addEventListener('click', () => {
         const base = btn.getAttribute('data-base');
@@ -648,54 +791,125 @@
         openGraphvizModal(base);
       });
     });
+
+    // Single delete button
     picInspectorList.querySelectorAll('.pic-inspector-delete').forEach(btn => {
-      btn.addEventListener('click', () => deletePicInspectorImage(btn.getAttribute('data-filename')));
+      btn.addEventListener('click', () => deletePicInspectorImage(btn.getAttribute('data-filename'), btn));
     });
   }
 
-  async function loadPicInspector() {
+  async function loadPicInspector(options = {}) {
     if (!picInspectorList) return;
-    picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;"><i class="fas fa-spinner fa-spin"></i> Loading pictures...</div>';
+    const preserveScroll = options.preserveScroll === true;
+    const savedScrollTop = picInspectorList.scrollTop;
+
+    if (!preserveScroll || !picInspectorItems || picInspectorItems.length === 0) {
+      picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.9em;"><i class="fas fa-spinner fa-spin"></i> Loading pictures...</div>';
+    } else {
+      picInspectorList.style.opacity = '0.7';
+    }
+
     try {
       const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/inventory', { credentials: 'same-origin' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const items = await res.json();
       renderPicInspector(Array.isArray(items) ? items : []);
+      if (preserveScroll && picInspectorList) {
+        picInspectorList.scrollTop = savedScrollTop;
+      }
     } catch (err) {
       console.error('Picture inspector load failed:', err);
       if (picInspectorSummary) picInspectorSummary.textContent = '';
       picInspectorList.innerHTML = '<div style="padding: 24px; text-align: center; color: #ef4444; font-size: 0.9em;"><i class="fas fa-exclamation-triangle"></i> Failed to load pictures.</div>';
+    } finally {
+      if (picInspectorList) picInspectorList.style.opacity = '1';
     }
   }
 
-  async function deletePicInspectorImage(filename) {
+  async function deletePicInspectorImage(filename, btn) {
     if (!filename) return;
     if (!confirm('Delete unused picture "' + filename + '"?')) return;
+    const row = btn ? btn.closest('.pic-inspector-row') : null;
+    if (row) {
+      row.style.opacity = '0.3';
+      row.style.pointerEvents = 'none';
+    }
     const fd = new FormData();
     fd.append('filename', filename);
     try {
       const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/delete', { method: 'POST', credentials: 'same-origin', body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
-      loadPicInspector();
+      picInspectorSelectedFiles.delete(filename);
+      if (row) row.remove();
+      loadPicInspector({ preserveScroll: true });
     } catch (err) {
+      if (row) {
+        row.style.opacity = '1';
+        row.style.pointerEvents = 'auto';
+      }
       alert('Failed to delete picture: ' + err.message);
     }
   }
 
-  if (picInspectorDeleteUnused) {
-    picInspectorDeleteUnused.addEventListener('click', async () => {
-      if (!confirm('Delete all pictures that are not referenced by any note in this set?')) return;
+  if (picInspectorDeleteSelected) {
+    picInspectorDeleteSelected.addEventListener('click', async () => {
+      const files = Array.from(picInspectorSelectedFiles);
+      if (files.length === 0) return;
+      if (!confirm(`Delete ${files.length} selected picture${files.length === 1 ? '' : 's'}?`)) return;
+
+      picInspectorDeleteSelected.disabled = true;
+      picInspectorDeleteSelected.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+      const fd = new FormData();
+      fd.append('filenames', JSON.stringify(files));
+
       try {
-        const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/delete-unused', { method: 'POST', credentials: 'same-origin' });
+        const res = await fetch('/walkthroughs/' + encodeURIComponent(activeWalkthrough) + '/images/delete', {
+          method: 'POST',
+          credentials: 'same-origin',
+          body: fd
+        });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-        loadPicInspector();
+        if (!res.ok || !data.ok) throw new Error(data.error || ('HTTP ' + res.status));
+        picInspectorSelectedFiles.clear();
+        loadPicInspector({ preserveScroll: true });
       } catch (err) {
-        alert('Failed to delete unused pictures: ' + err.message);
+        alert('Failed to delete selected pictures: ' + err.message);
+        loadPicInspector({ preserveScroll: true });
+      } finally {
+        if (picInspectorDeleteSelected) {
+          picInspectorDeleteSelected.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Selected (<span id="pic-selected-count">0</span>)';
+        }
       }
     });
   }
+
+  if (picInspectorSelectAll) {
+    picInspectorSelectAll.addEventListener('change', () => {
+      const isChecked = picInspectorSelectAll.checked;
+      const visibleCheckboxes = picInspectorList ? picInspectorList.querySelectorAll('.pic-inspector-check') : [];
+      visibleCheckboxes.forEach(cb => {
+        cb.checked = isChecked;
+        const fn = cb.getAttribute('data-filename');
+        if (fn) {
+          if (isChecked) picInspectorSelectedFiles.add(fn);
+          else picInspectorSelectedFiles.delete(fn);
+        }
+      });
+      updatePicInspectorSelectionUI();
+    });
+  }
+
+  document.querySelectorAll('.pic-inspector-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      if (tab) {
+        picInspectorActiveTab = tab;
+        renderPicInspector(picInspectorItems);
+      }
+    });
+  });
 
   function positionPicInspectorHover(e) {
     const hoverBox = document.getElementById('pic-inspector-hover-preview');

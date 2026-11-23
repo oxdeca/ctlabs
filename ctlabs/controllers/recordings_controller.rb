@@ -1479,10 +1479,37 @@ class RecordingsController < BaseController
 
   post '/walkthroughs/:slug/images/delete' do
     content_type :json
-    filename = params[:filename].to_s
-    ok = RecordingService.delete_image(params[:slug].to_s, filename)
-    status ok ? 200 : 422
-    { ok: ok, filename: filename }.to_json
+    raw_files = params[:filenames] || params[:filename]
+    filenames = if raw_files.is_a?(Array)
+                  raw_files
+                elsif raw_files.to_s.start_with?('[')
+                  begin
+                    JSON.parse(raw_files.to_s)
+                  rescue StandardError
+                    [raw_files.to_s]
+                  end
+                elsif raw_files
+                  [raw_files.to_s]
+                else
+                  []
+                end
+
+    slug = params[:slug].to_s
+    deleted = []
+    failed = []
+
+    filenames.each do |fn|
+      clean_fn = fn.to_s.strip
+      next if clean_fn.empty?
+      if RecordingService.delete_image(slug, clean_fn)
+        deleted << clean_fn
+      else
+        failed << clean_fn
+      end
+    end
+
+    status (failed.empty? || !deleted.empty?) ? 200 : 422
+    { ok: !deleted.empty?, deleted: deleted, failed: failed, count: deleted.size, filename: filenames.first }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
