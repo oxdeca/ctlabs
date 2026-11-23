@@ -452,8 +452,8 @@ class RecordingsController < BaseController
               old_id = clean_base
               data   = entry.get_input_stream.read
               data   = data.force_encoding('UTF-8') rescue data
-              # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
-              data   = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+              # Normalize image paths to relative images/
+              data   = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
 
               if manifest.nil? && conflict_action == 'rename' && !custom_name.empty?
                 if data =~ /\A(\s*#+\s*)([^\n]+)/
@@ -716,8 +716,8 @@ class RecordingsController < BaseController
       elsif filename.end_with?(RecordingService::MD_EXT)
         data = File.binread(f[:tempfile].path)
         data = data.force_encoding('UTF-8') rescue data
-        # Update image paths from relative images/ to /recordings/images/ (and normalize any duplicate prefixes)
-        data = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, '/recordings/images/\1')
+        # Normalize image paths to relative images/
+        data = data.gsub(%r{(?:(?:\.?/)?(?:recordings?/+)+|(?:\./)?|/)images/([a-zA-Z0-9_.-]+)}, 'images/\1')
 
         orig_base = File.basename(f[:filename].to_s, '.*').strip
         clean_base = RecordingService.title_slug(orig_base, 'note')
@@ -809,7 +809,7 @@ class RecordingsController < BaseController
     end
 
     if upload_files.size == 1 && image_count == 1 && imported.empty?
-      return { ok: true, count: 1, image: "/recordings/images/#{last_saved_image}" }.to_json
+      return { ok: true, count: 1, image: "images/#{last_saved_image}", web_url: "/recordings/images/#{last_saved_image}" }.to_json
     end
 
     if !imported.empty? && walkthrough.nil?
@@ -850,7 +850,7 @@ class RecordingsController < BaseController
     wk_slug = params[:walkthrough].to_s.strip
     wk_slug = session[:walkthrough].to_s.strip if wk_slug.empty?
     filename = RecordingService.save_image(file[:tempfile], orig_name, walkthrough: wk_slug)
-    { ok: true, filename: filename, url: "/recordings/images/#{filename}" }.to_json
+    { ok: true, filename: filename, url: "images/#{filename}", web_url: "/recordings/images/#{filename}" }.to_json
   rescue StandardError => e
     status 500
     { ok: false, error: e.message }.to_json
@@ -884,8 +884,9 @@ class RecordingsController < BaseController
       ok: true,
       filename: result[:filename],
       mode: result[:mode],
-      url: "/recordings/images/#{result[:filename]}?t=#{cache_bust}",
-      clean_url: "/recordings/images/#{result[:filename]}"
+      url: "images/#{result[:filename]}",
+      clean_url: "images/#{result[:filename]}",
+      web_url: "/recordings/images/#{result[:filename]}?t=#{cache_bust}"
     }.to_json
   rescue StandardError => e
     status 500
@@ -1005,7 +1006,8 @@ class RecordingsController < BaseController
       ok:       true,
       filename: saved['filename'],
       base:     saved['base'],
-      url:      "/recordings/images/#{saved['filename']}",
+      url:      "images/#{saved['filename']}",
+      web_url:  "/recordings/images/#{saved['filename']}",
       dot:      result[:dot]
     }.to_json
   rescue StandardError => e
@@ -1082,6 +1084,11 @@ class RecordingsController < BaseController
 
   get %r{/recordings(?:/recordings)+/images/(.+)} do |filename|
     redirect "/recordings/images/#{filename}"
+  end
+
+  get '/images/:filename' do
+    qs = request.query_string.to_s.empty? ? '' : "?#{request.query_string}"
+    redirect "/recordings/images/#{params[:filename]}#{qs}"
   end
 
   get '/recordings/:id/docx' do

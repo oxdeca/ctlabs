@@ -143,12 +143,12 @@ class MainController < BaseController
     if note_id == '__new__'
       note_title = params[:new_note_title].to_s.strip
       note_title = clean_name if note_title.empty?
-      snippet = "![#{clean_name}](/recordings/images/#{img_filename})"
+      snippet = "![#{clean_name}](images/#{img_filename})"
       note_content = "# #{note_title}\n\n#{snippet}\n"
       target_note_id = RecordingService.create_markdown_step(wk, title: note_title, content: note_content)
     elsif !note_id.empty? && RecordingService.valid_id?(note_id)
       current_content = RecordingService.read_content(note_id) || ''
-      snippet = "![#{clean_name}](/recordings/images/#{img_filename})"
+      snippet = "![#{clean_name}](images/#{img_filename})"
       unless current_content.include?(img_filename) || current_content.include?("#{clean_name}.svg")
         updated_content = current_content.rstrip
         updated_content = updated_content.empty? ? snippet : "#{updated_content}\n\n#{snippet}\n"

@@ -184,7 +184,7 @@
       if (!img) return;
       const filename = getFilenameFromUrl(img.src);
       const alt = (img.alt || filename).replace(/[[\]]/g, '\\$&');
-      const snippet = `![${alt}](/recordings/images/${filename})`;
+      const snippet = `![${alt}](images/${filename})`;
       copyTextToClipboard(snippet);
       ctlabsToast(`Copied Markdown link: <code>${snippet}</code>`, 'fas fa-link', '#a855f7');
     });

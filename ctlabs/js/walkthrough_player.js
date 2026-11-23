@@ -514,7 +514,7 @@
 
   function picInspectorMarkdownFor(filename) {
     const alt = String(filename || '').replace(/\.[^.]+$/, '');
-    return `![${alt}](/recordings/images/${filename})`;
+    return `![${alt}](images/${filename})`;
   }
 
   function renderPicInspector(items) {
@@ -3812,12 +3812,12 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         ? window.MarkdownEditor.getEditor()
         : ((typeof getMdEditor === 'function') ? getMdEditor() : null);
       const ta = document.getElementById('md-textarea');
-      const newSnippet = `![${newFilename.replace(/\.[^.]+$/, '')}](/recordings/images/${newFilename})`;
+      const newSnippet = `![${newFilename.replace(/\.[^.]+$/, '')}](images/${newFilename})`;
       if (cm) {
         const val = cm.getValue();
         const regex = new RegExp(`!\\[([^\\]]*)\\]\\([^)]*${oldFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^)]*\\)`, 'g');
         if (regex.test(val)) {
-          cm.setValue(val.replace(regex, `![$1](/recordings/images/${newFilename})`));
+          cm.setValue(val.replace(regex, `![$1](images/${newFilename})`));
         } else {
           if (window.MarkdownEditor && typeof window.MarkdownEditor.insertBlock === 'function') {
             window.MarkdownEditor.insertBlock(newSnippet, cm.getCursor());
@@ -3830,7 +3830,7 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
         const val = ta.value;
         const regex = new RegExp(`!\\[([^\\]]*)\\]\\([^)]*${oldFilename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^)]*\\)`, 'g');
         if (regex.test(val)) {
-          ta.value = val.replace(regex, `![$1](/recordings/images/${newFilename})`);
+          ta.value = val.replace(regex, `![$1](images/${newFilename})`);
         } else {
           if (window.MarkdownEditor && typeof window.MarkdownEditor.insertBlock === 'function') {
             window.MarkdownEditor.insertBlock(newSnippet);

@@ -391,8 +391,8 @@
   // --- Extended Markdown Preprocessing ---
   function preprocessExtendedMarkdown(text) {
     if (!text) return '';
-    // Normalize relative images/ paths to /recordings/images/
-    text = text.replace(/!\[([^\]]*)\]\((?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)(?:images\/)([^)\s]+)(.*?)\)/g, '![$1](/recordings/images/$2$3)');
+    // Normalize any legacy /recordings/images/ paths to relative images/
+    text = text.replace(/!\[([^\]]*)\]\((?:(?:\.?\/)?(?:recordings?\/+)+)(?:images\/)([^)\s]+)(.*?)\)/g, '![$1](images/$2$3)');
 
     // Equal syntax: ![alt](url =300x200), ![alt](url =300), ![alt](url =50%)
     text = text.replace(/!\[([^\]]*)\]\(([^)\s]+)\s+=(\d+(?:%|px)?)(?:x(\d+(?:%|px)?))?\)/g, (match, alt, url, w, h) => {
@@ -893,7 +893,12 @@
           }
 
           if (href) {
-            href = href.replace(/^(?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)images\//, '/recordings/images/');
+            const wk = (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : '') ||
+                       (window.CtlabsWalkthrough && typeof window.CtlabsWalkthrough.getActiveWalkthrough === 'function' ? window.CtlabsWalkthrough.getActiveWalkthrough() : '');
+            if (href.match(/^(?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)images\//)) {
+              const cleanFile = href.replace(/^(?:(?:\.?\/)?(?:recordings?\/+)+|(?:\.?\/)?)images\//, '');
+              href = wk ? `/recordings/${encodeURIComponent(wk)}/images/${cleanFile}` : `/recordings/images/${cleanFile}`;
+            }
           }
 
           let width = '';
@@ -1211,12 +1216,12 @@
       const activeWk = getActiveWalkthrough();
       mdPreviewPane.querySelectorAll('img').forEach(img => {
         const rawSrc = img.getAttribute('src');
-        if (rawSrc && (rawSrc.startsWith('/recordings/images/') || rawSrc.includes('/images/'))) {
+        if (rawSrc && (rawSrc.startsWith('/recordings/images/') || rawSrc.includes('/images/') || rawSrc.startsWith('images/'))) {
           const cleanSrc = rawSrc.split('?')[0];
           const queryParams = [];
           if (activeWk) queryParams.push(`walkthrough=${encodeURIComponent(activeWk)}`);
           const fname = cleanSrc.substring(cleanSrc.lastIndexOf('/') + 1);
-          const ts = diagramCacheBusters[cleanSrc] || diagramCacheBusters[fname];
+          const ts = diagramCacheBusters[cleanSrc] || diagramCacheBusters[fname] || diagramCacheBusters[`/recordings/images/${fname}`] || diagramCacheBusters[`images/${fname}`];
           if (ts) queryParams.push(`t=${ts}`);
           if (queryParams.length > 0) {
             img.src = `${cleanSrc}?${queryParams.join('&')}`;
@@ -1583,7 +1588,8 @@
         const rawName = (file.name || 'Picture').replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, ' ').trim();
         const altText = rawName || 'Picture';
         const cm = getMdEditor();
-        insertMarkdownBlock(`![${altText}](${data.url})`, cm ? cm.getCursor() : targetPos);
+        const imgTarget = data.filename ? `images/${data.filename}` : (data.url || 'images/image.png');
+        insertMarkdownBlock(`![${altText}](${imgTarget})`, cm ? cm.getCursor() : targetPos);
       } else {
         alert('Failed to upload picture: ' + (data.error || 'Unknown error'));
         if (mdSaveStatus) mdSaveStatus.style.display = 'none';
@@ -3959,12 +3965,15 @@
       const nowTs = Date.now();
       if (data.filename) {
         diagramCacheBusters[data.filename] = nowTs;
+        diagramCacheBusters[`images/${data.filename}`] = nowTs;
         diagramCacheBusters[`/recordings/images/${data.filename}`] = nowTs;
       }
       if (data.base) {
         diagramCacheBusters[data.base] = nowTs;
         diagramCacheBusters[`${data.base}.svg`] = nowTs;
         diagramCacheBusters[`${data.base}.png`] = nowTs;
+        diagramCacheBusters[`images/${data.base}.svg`] = nowTs;
+        diagramCacheBusters[`images/${data.base}.png`] = nowTs;
         diagramCacheBusters[`/recordings/images/${data.base}.svg`] = nowTs;
         diagramCacheBusters[`/recordings/images/${data.base}.png`] = nowTs;
       }
@@ -3972,6 +3981,8 @@
         diagramCacheBusters[base] = nowTs;
         diagramCacheBusters[`${base}.svg`] = nowTs;
         diagramCacheBusters[`${base}.png`] = nowTs;
+        diagramCacheBusters[`images/${base}.svg`] = nowTs;
+        diagramCacheBusters[`images/${base}.png`] = nowTs;
         diagramCacheBusters[`/recordings/images/${base}.svg`] = nowTs;
         diagramCacheBusters[`/recordings/images/${base}.png`] = nowTs;
       }
@@ -3991,7 +4002,8 @@
           });
         }
       } else {
-        insertMarkdownBlock(`![${name}](${data.url})`, cm ? cm.getCursor() : null);
+        const imgTarget = data.filename ? `images/${data.filename}` : (data.url || `images/${name}.svg`);
+        insertMarkdownBlock(`![${name}](${imgTarget})`, cm ? cm.getCursor() : null);
       }
 
       if (data.base) {
