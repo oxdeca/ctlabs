@@ -390,6 +390,7 @@ class RecordingsController < BaseController
     last_saved_image = nil
     selected_id = nil
     extracted_images = []
+    wk_target = params[:walkthrough].to_s.strip
 
     upload_files.each do |f|
       filename = f[:filename].to_s.downcase
@@ -671,11 +672,15 @@ class RecordingsController < BaseController
         end
       elsif filename.end_with?(RecordingService::EXT)
         data = File.binread(f[:tempfile].path)
-        node = RecordingService.node_from_cast(data) ||
-               RecordingService.node_from_id(File.basename(f[:filename].to_s, '.*'))
         orig_base = File.basename(f[:filename].to_s, '.*').strip
+        data = RecordingService.ensure_asciicast_v2(data, title: orig_base.tr('_-', ' ').strip)
+        node = RecordingService.node_from_cast(data) ||
+               RecordingService.node_from_id(orig_base)
         clean_base = RecordingService.title_slug(orig_base, 'recording')
         clean_base = clean_base.start_with?('cast_') ? clean_base : "cast_#{clean_base}"
+
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
+        FileUtils.mkdir_p(target_dir)
 
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
@@ -687,10 +692,6 @@ class RecordingsController < BaseController
                RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
 
-        wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
-        FileUtils.mkdir_p(target_dir)
-
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
                       existing_p
                     else
@@ -701,14 +702,18 @@ class RecordingsController < BaseController
         if conflict_action == 'rename' && !custom_name.empty?
           RecordingService.set_title(id, custom_name)
         else
+          title_set = false
           begin
             header_json = JSON.parse(data.to_s.lines.first)
-            if header_json.is_a?(Hash) && header_json['title'].to_s.strip.empty?
-              base_name = orig_base.tr('_-', ' ').strip
-              RecordingService.set_title(id, base_name) unless base_name.empty?
+            if header_json.is_a?(Hash) && !header_json['title'].to_s.strip.empty?
+              title_set = true
             end
           rescue StandardError
             # ignore
+          end
+          unless title_set
+            base_name = orig_base.tr('_-', ' ').strip
+            RecordingService.set_title(id, base_name) unless base_name.empty?
           end
         end
 
@@ -733,6 +738,9 @@ class RecordingsController < BaseController
           data = "# #{orig_base.tr('_-', ' ')}\n\n" + data
         end
 
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
+        FileUtils.mkdir_p(target_dir)
+
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
              elsif conflict_action == 'rename' && !custom_name.empty?
@@ -742,10 +750,6 @@ class RecordingsController < BaseController
              else
                RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
-
-        wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
-        FileUtils.mkdir_p(target_dir)
 
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
                       existing_p
@@ -761,6 +765,9 @@ class RecordingsController < BaseController
         clean_base = RecordingService.title_slug(orig_base, 'video')
         clean_base = clean_base.start_with?('vid_') ? clean_base : "vid_#{clean_base}"
 
+        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
+        FileUtils.mkdir_p(target_dir)
+
         id = if conflict_action == 'overwrite' && !target_id.empty?
                target_id
              elsif conflict_action == 'rename' && !custom_name.empty?
@@ -770,10 +777,6 @@ class RecordingsController < BaseController
              else
                RecordingService.unique_step_id(clean_base, walkthrough: wk_target)
              end
-
-        wk_target = params[:walkthrough].to_s.strip
-        target_dir = !wk_target.empty? ? RecordingService.walkthrough_dir(wk_target) : RecordingService.dir
-        FileUtils.mkdir_p(target_dir)
 
         dest_path = if conflict_action == 'overwrite' && !target_id.empty? && (existing_p = RecordingService.path_for(target_id))
                       existing_p

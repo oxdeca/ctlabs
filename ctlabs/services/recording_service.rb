@@ -1186,6 +1186,53 @@ class RecordingService
     nil
   end
 
+  # Ensures terminal data is valid asciicast v2 format.
+  # If data is a raw terminal log or typescript (e.g. from `script` command),
+  # wraps it into asciicast v2 JSON lines so asciinema-player can play it.
+  def self.ensure_asciicast_v2(data, title: nil)
+    raw = data.to_s
+    first_line = raw.lines.first.to_s.strip
+    begin
+      parsed = JSON.parse(first_line)
+      if parsed.is_a?(Hash) && (parsed['version'] == 2 || parsed['version'] == 1)
+        return raw
+      end
+    rescue JSON::ParserError, StandardError
+      # Not JSON — raw terminal transcript / typescript
+    end
+
+    lines = raw.lines
+    start_ts = Time.now.to_i
+    if lines.first && lines.first =~ /\AScript started on (.+)\z/
+      begin
+        start_ts = Time.parse($1.strip).to_i
+      rescue StandardError
+      end
+      lines.shift
+    end
+    if lines.last && lines.last =~ /\AScript done on /
+      lines.pop
+    end
+
+    header = {
+      version: 2,
+      width: 120,
+      height: 36,
+      timestamp: start_ts,
+      title: title.to_s.strip.empty? ? 'Terminal Recording' : title.to_s.strip,
+      env: { 'TERM' => 'xterm-256color' }
+    }
+
+    out = [JSON.generate(header)]
+    elapsed = 0.0
+    lines.each do |line|
+      text = line.chomp("\r\n").chomp("\n") + "\r\n"
+      out << JSON.generate([elapsed.round(3), 'o', text])
+      elapsed += 0.05
+    end
+    out.join("\n") + "\n"
+  end
+
   def self.delete(id)
     path = path_for(id)
     return false unless path
