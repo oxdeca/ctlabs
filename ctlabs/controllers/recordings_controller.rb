@@ -97,6 +97,8 @@ class RecordingsController < BaseController
     }
     File.write(File.join(target_dir, "#{id}.json"), JSON.pretty_generate(meta))
 
+    RecordingService.inject_webm_duration!(path, duration) if ext == '.webm'
+
     RecordingService.add_to_walkthrough(target_slug, [id])
 
     { ok: true, success: true, id: id, walkthrough: target_slug }.to_json
@@ -786,6 +788,7 @@ class RecordingsController < BaseController
                     end
         base_name = 'Browser Recording' if base_name.empty?
         probed_dur = RecordingService.probe_video_duration(dest_path)
+        RecordingService.inject_webm_duration!(dest_path, probed_dur) if vext == '.webm' && probed_dur && probed_dur > 0
         meta = {
           'title'      => base_name,
           'duration'   => (probed_dur && probed_dur > 0) ? probed_dur.to_f : 0.0,
@@ -1133,6 +1136,7 @@ class RecordingsController < BaseController
         end
       end
 
+      headers['Accept-Ranges'] = 'bytes'
       return send_file path,
                        filename:    download_filename,
                        type:        mime,

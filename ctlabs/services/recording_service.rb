@@ -1070,8 +1070,11 @@ class RecordingService
           meta_data['duration'] = duration
           target_meta = File.join(File.dirname(path), "#{id}.json")
           File.write(target_meta, JSON.pretty_generate(meta_data))
+          inject_webm_duration!(path, duration)
         rescue StandardError
         end
+      elsif duration > 0.0 && (ext == '.webm' || ext == '.mkv')
+        inject_webm_duration!(path, duration)
       end
       created_at = meta_data['created_at'] ? Time.at(meta_data['created_at'].to_i) : File.mtime(path)
       status = meta_data['status'].to_s.strip
@@ -1344,6 +1347,97 @@ class RecordingService
     nil
   end
 
+  def self.decode_ebml_vint(data, offset)
+    first = data.getbyte(offset)
+    return [nil, 0] unless first
+
+    mask = 0x80
+    vint_len = 1
+    while vint_len <= 8
+      break if (first & mask) != 0
+      mask >>= 1
+      vint_len += 1
+    end
+    return [nil, 0] if vint_len > 8 || offset + vint_len > data.bytesize
+
+    val = first & (mask - 1)
+    (1...vint_len).each do |i|
+      val = (val << 8) | data.getbyte(offset + i)
+    end
+    [val, vint_len]
+  end
+
+  def self.encode_ebml_vint(val)
+    if val < 0x7F
+      (0x80 | val).chr
+    elsif val < 0x3FFF
+      [0x4000 | val].pack('n')
+    elsif val < 0x1FFFFF
+      c = (0x20 | (val >> 16)).chr
+      c + [(val & 0xFFFF)].pack('n')
+    else
+      [0x10000000 | val].pack('N')
+    end
+  end
+
+  # Injects EBML Duration element (0x4489) directly into WebM/MKV Segment Info
+  # to fix Chrome's duration: Infinity and broken playbar scrubbing.
+  def self.inject_webm_duration!(path, dur_seconds = nil)
+    return false unless path && File.file?(path)
+    ext = File.extname(path).downcase
+    return false unless ext == '.webm' || ext == '.mkv'
+
+    data = File.binread(path)
+    return false if data.bytesize < 100
+
+    idx_info = data.index("\x15\x49\xA9\x66".b)
+    return false unless idx_info
+
+    old_info_len, vint_len = decode_ebml_vint(data, idx_info + 4)
+    return false unless old_info_len && vint_len > 0
+
+    info_payload = data[idx_info + 4 + vint_len, old_info_len]
+    return true if info_payload && info_payload.include?("\x44\x89".b)
+
+    dur_val = dur_seconds ? dur_seconds.to_f : probe_video_duration(path)
+    return false unless dur_val && dur_val > 0.05
+
+    timecode_scale = 1_000_000 # default 1ms
+    if info_payload
+      idx_tc = info_payload.index("\x2A\xD7\xB1".b)
+      if idx_tc
+        tc_len, tc_vint_len = decode_ebml_vint(info_payload, idx_tc + 3)
+        if tc_len && tc_len > 0 && tc_len <= 8
+          tc_bytes = info_payload[idx_tc + 3 + tc_vint_len, tc_len]
+          val = 0
+          tc_bytes.each_byte { |b| val = (val << 8) | b }
+          timecode_scale = val if val > 0
+        end
+      end
+    end
+
+    dur_scaled = (dur_val * 1e9) / timecode_scale.to_f
+    dur_elem = "\x44\x89\x88".b + [dur_scaled].pack('G')
+
+    new_info_len = old_info_len + dur_elem.bytesize
+    enc_new_vint = encode_ebml_vint(new_info_len)
+
+    insert_pos = idx_info + 4 + vint_len + old_info_len
+    updated_data = data[0...(idx_info + 4)] +
+                   enc_new_vint +
+                   data[(idx_info + 4 + vint_len)...insert_pos] +
+                   dur_elem +
+                   data[insert_pos..-1]
+
+    temp_path = "#{path}.tmp_dur_#{Process.pid}"
+    File.binwrite(temp_path, updated_data)
+    File.rename(temp_path, path)
+    true
+  rescue StandardError
+    File.delete(temp_path) if temp_path && File.file?(temp_path)
+    false
+  end
+
   def self.update_duration(id, duration)
     path = path_for(id)
     return false unless path && File.file?(path)
@@ -1365,6 +1459,7 @@ class RecordingService
       meta['type'] ||= 'video'
       meta['created_at'] ||= File.mtime(path).to_i
       File.write(meta_file, JSON.pretty_generate(meta))
+      inject_webm_duration!(path, dur)
       return true
     end
     false

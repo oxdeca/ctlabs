@@ -236,6 +236,7 @@
                         data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step="<%= r[:step] || (idx + 1) %>"
+                        data-duration="<%= (r[:duration] || 0).to_f %>"
                         data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
@@ -346,6 +347,7 @@
                         data-type="<%= data_type_str %>"
                         data-title="<%= ERB::Util.html_escape(r[:title] || '') %>"
                         data-step=""
+                        data-duration="<%= (r[:duration] || 0).to_f %>"
                         data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">

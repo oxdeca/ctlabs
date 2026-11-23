@@ -2915,23 +2915,44 @@ if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       if (videoPlayer) {
         videoPlayer.src = src;
         videoPlayer.onloadedmetadata = () => {
-          const dur = videoPlayer.duration;
-          if (dur && !isNaN(dur) && dur > 0 && activeId && activeDataType === 'video') {
-            const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
-            if (activeBtn) {
-              const row1 = activeBtn.children[0];
-              const durEl = row1 ? row1.children[1] : null;
-              if (durEl && (durEl.textContent.trim() === '0s' || durEl.textContent.trim() === '0.0s')) {
-                const formatted = (dur < 60) ? `${dur.toFixed(1)}s` : `${Math.floor(dur / 60)}m ${Math.floor(dur % 60).toString().padStart(2, '0')}s`;
-                durEl.textContent = formatted;
-                fetch(`/recordings/${encodeURIComponent(activeId)}/duration`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  body: `duration=${encodeURIComponent(dur)}`
-                }).catch(() => {});
+          let dur = videoPlayer.duration;
+          const syncDurationUI = (discoveredDur) => {
+            if (discoveredDur && !isNaN(discoveredDur) && isFinite(discoveredDur) && discoveredDur > 0 && activeId && activeDataType === 'video') {
+              const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+              if (activeBtn) {
+                activeBtn.setAttribute('data-duration', String(discoveredDur));
+                const row1 = activeBtn.children[0];
+                const durEl = row1 ? row1.children[1] : null;
+                if (durEl && (durEl.textContent.trim() === '0s' || durEl.textContent.trim() === '0.0s')) {
+                  const formatted = (discoveredDur < 60) ? `${discoveredDur.toFixed(1)}s` : `${Math.floor(discoveredDur / 60)}m ${Math.floor(discoveredDur % 60).toString().padStart(2, '0')}s`;
+                  durEl.textContent = formatted;
+                  fetch(`/recordings/${encodeURIComponent(activeId)}/duration`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `duration=${encodeURIComponent(discoveredDur)}`
+                  }).catch(() => {});
+                }
               }
             }
+          };
+
+          if (!isFinite(dur) || dur === Infinity) {
+            // Chrome WebM Infinity duration workaround: seek to 1e101 to force demuxer to resolve EOF cluster timestamp
+            const onSeekDiscovered = () => {
+              videoPlayer.removeEventListener('timeupdate', onSeekDiscovered);
+              videoPlayer.currentTime = 0;
+              const fixedDur = videoPlayer.duration;
+              syncDurationUI(fixedDur);
+              if (autoPlay) {
+                videoPlayer.play().catch(() => {});
+              }
+            };
+            videoPlayer.addEventListener('timeupdate', onSeekDiscovered, { once: true });
+            videoPlayer.currentTime = 1e101;
+            return;
           }
+
+          syncDurationUI(dur);
         };
         if (autoPlay) {
           videoPlayer.play().catch(() => {});
