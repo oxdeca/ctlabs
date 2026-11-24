@@ -133,10 +133,10 @@ The installer configures dependencies (Podman, QEMU/KVM, Ruby, systemd services)
 
 Open your browser and navigate to:
 ```
-https://<YOUR_VM_IP>:5678
+https://<YOUR_VM_IP>:4567
 ```
 
-> **Note:** If your VM is behind a cloud NAT/firewall, ensure TCP port `5678` is permitted in your cloud security group and access the URL using your public IP.
+> **Note:** If your VM is behind a cloud NAT/firewall, ensure TCP port `4567` is permitted in your cloud security group and access the URL using your public IP.
 
 ![Login Screen](docs/pics/screenshot-20260419-142655.png)
 
