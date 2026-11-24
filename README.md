@@ -1,133 +1,143 @@
-CTLABS
-======
+<div align="center">
 
-`ctlabs` is a tool designed to create temporary lab environments using KVM that can be used as a playground for experimentations, testing, development, study ...
-It automates the setup and configuration of lab components, which are primarily run as containers. When full virtualization is required, QEMU instances can be created within containers. The QEMU instances are then connected via TAP interfaces to the container network. The environment is extensiable, e.g. more KVM instances can be added. Those can be located anywhere as long as they have network connectivity. This approach allows for a consistent, straightforward and flexible lab setup, regardless of the virtualization needs.
+# CTLABS 🧪
 
+### The Hybrid Container & KVM Network Lab Workbench with Interactive Walkthroughs
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform: Linux](https://img.shields.io/badge/Platform-Linux%20%2F%20KVM-orange.svg)](https://github.com/oxdeca/ctlabs)
+[![Container: Podman](https://img.shields.io/badge/Container-Podman-purple.svg)](https://podman.io)
+[![Virtualization: QEMU/KVM](https://img.shields.io/badge/Virtualization-QEMU%20%2F%20KVM-lightgrey.svg)](https://www.qemu.org)
+[![Automation: Ansible](https://img.shields.io/badge/Automation-Ansible-red.svg)](https://www.ansible.com)
+[![Documentation: Asciinema](https://img.shields.io/badge/Player-Asciicast%20v1%2Fv2%2Fv3-green.svg)](https://asciinema.org)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/oxdeca/ctlabs/pulls)
 
-![CtLabs](docs/pics/lab_setup.gif) 
+**CTLABS** is a lightweight, web-first laboratory workbench designed for platform engineers, network architects, and DevOps practitioners. It enables rapid provisioning of complex, isolated network topologies combining **Podman containers** and **QEMU/KVM virtual machines** on a single machine or cloud instance.
 
-
-Key Features
-------------
-
-* **Automated Lab Setup:** Uses YAML configuration files to define complex environments. (Ansible, Terraform Support)
-* **Hybrid Virtualization:** Support for virtual machines (using QEMU/KVM) and containers (using Podman).
-* **Infrastructure as Code:** Integrated editors for Ansible playbooks, Terraform configurations, and Dockerfiles.
-* **Segregated Networking:** Automatic creation of isolated Data and Management Networks for enhanced lab security and realism.
-* **Real-time Visibility:** Unified logging architecture with real-time streaming in both CLI and web interfaces.
-* **Interactive Web Terminal:** Integrated xterm.js-based console access for every node in the lab.
-* **Dynamic Topology Mapping:** Automated SVG generation for both Data and Management network planes.
-* **Ad-hoc DNAT Management:** Runtime port forwarding with a full audit trail visible in operational logs.
-* **Concurrency Protection:** Playbook execution lock prevents dangerous concurrent runs between CLI and web interfaces.
-* **Interactive Walkthroughs & Documentation:** Built-in step-by-step player and rich Markdown editor for terminal sessions (`.cast`), screen videos (`.webm`/`.mp4`), and Markdown notes with custom image sizing, emoji picker, Vi mode, and bundle export/import.
-* **CLI and WebUI** Can be used via cli and WebUI
-
-Installation
-------------
-
-1. Create a new or use an existing VM that runs centos9/10. 
-2. Make sure `nested virtualization` is enabled.
-
-_VM with enabled `nested virtualiztion`_
-```
-root@vm1:~# grep -cw vmx /proc/cpuinfo  # if "result > 0" nested virtualzation is supported.
-4
-```
-
-The VM should have at least following resources:
-
-| vCPUs | Memory | Storage |
-|------|---------|---------|
-|   2  |   4GB   |   20GB  |
-
-e.g. we can create a vm in `GCP` using machine-type `n1-standard-1` (2 vCPU, 4GB RAM):
-
-```bash
-gcloud compute instances create vm1    \
-    --zone=us-central1-a               \
-    --machine-type=n1-standard-1       \
-    --image-family=centos-stream-9     \
-    --image-project=centos-cloud       \
-    --boot-disk-size=20GB              \
-    --enable-nested-virtualization     \
-    --provisioning-model=SPOT          \
-    --instance-termination-action=STOP \
-    --max-run-duration=8h
-```
-
-3. Login into the vm and run the `install.sh` script
-
-```sh
-curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/install.sh | bash
-```
-
-
-![screenshot](docs/pics/screenshot-20260419-155347.png)
-
-4. Login into the `WebUI` with the information given in the summary:
-
-![screenshot](docs/pics/screenshot-20260419-142655.png)
-
-> If the VM is only accessible via `NAT` we need to replace the private ip with the public one.
-
-
-![screenshot](docs/pics/screenshot-20260419-142456.png)
-
-
+With integrated in-browser IDEs (Ansible, Terraform, Dockerfile), real-time SVG topology visualization, zero-latency web terminals, and an interactive multimedia Walkthrough & Documentation engine, CTLABS makes infrastructure experimentation and knowledge sharing completely reproducible.
 
 ---
 
+![CtLabs Demo](docs/pics/lab_setup.gif)
 
-Web Interface
--------------
+</div>
 
-The web interface provides a management console for our labs.
+## 📑 Table of Contents
 
-### Lab Details View
-![Lab Details Overview](docs/pics/screenshot-20260418-125613.png)
+- [Why CTLABS?](#-why-ctlabs)
+- [Key Features](#-key-features)
+- [Quick Start](#-quick-start)
+- [Network Architecture](#-network-architecture)
+- [Interactive Network Topology](#-interactive-network-topology)
+- [Integrated Web Terminal](#-integrated-web-terminal)
+- [In-Browser Automation (Ansible & Terraform)](#-in-browser-automation-ansible--terraform)
+- [Interactive Walkthroughs & Documentation Engine](#-interactive-walkthroughs--documentation-engine)
+- [Managing Labs](#-managing-labs)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-The Lab Details view is the central hub for managing a specific lab environment. It is organized into several functional tabs:
+---
 
-* **Overview:**
-  * Displays lab metadata (name, description) and a real-time table of **Exposed Ports (DNAT)**. It includes a form to add **Ad-hoc DNAT Rules** during runtime.
+## 💡 Why CTLABS?
 
-* **Automation:**
-  * Integrated editors for managing **Ansible playbooks**, **Terraform scripts**, and **Dockerfiles** associated with the lab.
+Most lab environments force you to choose between heavy, resource-intensive hypervisors (GNS3, Eve-NG, Proxmox) or lightweight tools that only do containers (Containerlab, Kind, Minikube). **CTLABS bridges the gap**:
 
-* **Nodes:**
-  * A complete list of all nodes (VMs and Containers). Shows hardware specs (CPU, RAM), images, and provides quick actions for terminal access or editing.
+| Feature | CTLABS | Eve-NG / GNS3 | Vagrant / VirtualBox | Containerlab |
+| :--- | :---: | :---: | :---: | :---: |
+| **Hybrid (Containers + QEMU VMs)** | ✅ **Native** | ⚠️ VM-heavy | ❌ VMs only | ⚠️ Mostly containers |
+| **Footprint & Speed** | ⚡ **Ultra-lightweight** | 🐢 Heavy footprint | 🐢 Slow boot times | ⚡ Lightweight |
+| **Web UI & Management Console** | ✅ **Built-in** | ⚠️ Clunky legacy UI | ❌ CLI only | ❌ CLI only |
+| **Live SVG Topology Maps** | ✅ **Dynamic (Data & Mgmt)** | ⚠️ Manual layout | ❌ None | ⚠️ Graphviz / D3 |
+| **Built-in Web Terminals** | ✅ **xterm.js + File Transfer** | ⚠️ Requires native telnet | ❌ SSH CLI only | ❌ SSH CLI only |
+| **In-Browser Ansible / Terraform IDE** | ✅ **With live streaming** | ❌ None | ❌ None | ❌ None |
+| **Interactive Walkthrough Player** | ✅ **Casts, Videos & Notes** | ❌ None | ❌ None | ❌ None |
+| **1-Click DOCX & PDF Export** | ✅ **Built-in** | ❌ None | ❌ None | ❌ None |
+| **Single-Command Setup** | ✅ `curl ... \| bash` | ❌ Multi-GB ISO install | ⚠️ Multi-tool setup | ⚠️ Package install |
 
-* **Links:**
-  * Visual and form-based management of network connections between nodes and virtual switches.
+---
 
-* **Node Profiles:**
-  * Management of reusable templates for node configurations, allowing for consistent deployment of common node types.
+## ✨ Key Features
 
-* **Container Images:**
-  * View and manage the local container images available for use within the lab.
+* **Hybrid Virtualization:** Combine high-density Podman containers and full QEMU/KVM virtual machines inside the same isolated network fabric via TAP interfaces.
+* **Declarative Lab-as-Code:** Define multi-node environments, NICs, and link interconnections with clean, readable YAML definitions.
+* **Segregated Network Planes:** Automatic segregation of Management (`mgmt`), Data (`data`), Transit (`transit`), and Edge (`edge`) networks with Linux VRF isolation.
+* **Interactive SVG Topology Visualizer:** Auto-generates real-time, interactive maps with pan/zoom, link inspections, and right-click terminal launching.
+* **Low-Latency Web Terminals:** Full xterm.js terminals with direct container exec, QEMU serial console access, drag-and-drop file upload, directory downloads, and tmux persistence.
+* **In-Browser Automation IDE:** Multi-file editors for Ansible, Terraform, and Dockerfiles with workspace profiles, ad-hoc execution runners, Vim mode, and live streaming output.
+* **Ad-Hoc Runtime DNAT:** Expose lab ports to the host or public internet on the fly with a complete audit trail in operational logs.
+* **Interactive Walkthroughs & Documentation:**
+  * Record terminal sessions (`.cast` with native Asciicast v1/v2/v3 support).
+  * Record browser screen videos (`.webm`/`.mp4`) with rectangular crop selection and mic mixing.
+  * Rich Markdown notes with relative image links, interactive lightbox, emoji picker, and Vi mode.
+  * One-click export to standalone Word (`.docx`) and styled, print-ready PDF reports with embedded diagrams.
+  * Export/import complete lab sets as portable zip bundles.
 
-### Walkthroughs & Documentation View
+---
 
-The **Walkthroughs** view provides an integrated authoring and playback environment for lab guides:
+## 🚀 Quick Start
 
-* **Interactive Steps**: Combine terminal session casts (`.cast`), screen videos (`.webm`/`.mp4`), and rich Markdown notes into ordered sequences.
-* **Markdown Note Editor**: CodeMirror editor with live preview, custom image resizing (`=300x200`, `=50%`, `{width=300}`), clipboard paste, drag & drop attachments, and code block line wrapping.
-* **Emoji Support**: Built-in GitHub emoji shortcodes (`:rocket:`, `:warning:`) with an interactive emoji picker (`Ctrl+E`).
-* **Vi / Vim Modal Editing**: Optional Vi mode with modal navigation, status bar indicator, and `:w` saving.
-* **Bundle Export / Import**: Export complete walkthrough sets or standalone notes as packaged zip archives with customizable file names and automatic asset path resolution.
+### 1. Prerequisites
 
-For detailed documentation, see [Walkthroughs & Markdown Guide](docs/ctlabs.docs.walkthroughs.md).
+A clean Linux host or VM running **CentOS Stream 9 / RHEL 9** (or compatible enterprise Linux) with **nested virtualization enabled**:
 
+```bash
+# Verify nested virtualization is supported (result should be > 0)
+grep -cw vmx /proc/cpuinfo || grep -cw svm /proc/cpuinfo
+```
 
+**Recommended Specifications:**
+* **vCPUs:** 2 or more
+* **Memory:** 4 GB RAM minimum (8 GB+ recommended for labs with multiple QEMU VMs)
+* **Storage:** 20 GB+ free disk space
 
-Network Architecture
---------------------
+#### Example: Spinning up a Google Cloud (GCP) Spot VM
 
-ctlabs automatically creates separate network planes to enhance lab isolation and simulate complex environments.
+```bash
+gcloud compute instances create ctlabs-vm \
+    --zone=us-central1-a \
+    --machine-type=n1-standard-2 \
+    --image-family=centos-stream-9 \
+    --image-project=centos-cloud \
+    --boot-disk-size=30GB \
+    --enable-nested-virtualization \
+    --provisioning-model=SPOT \
+    --instance-termination-action=STOP
+```
 
-```yml
+---
+
+### 2. Single-Line Installation
+
+SSH into your VM and run the automated installer:
+
+```bash
+curl -fSs https://raw.githubusercontent.com/oxdeca/ctlabs/refs/heads/main/install/install.sh | bash
+```
+
+The installer configures dependencies (Podman, QEMU/KVM, Ruby, systemd services) and prints your access credentials upon completion:
+
+![Installer Summary](docs/pics/screenshot-20260419-155347.png)
+
+---
+
+### 3. Accessing the Web Console
+
+Open your browser and navigate to:
+```
+https://<YOUR_VM_IP>:5678
+```
+
+> **Note:** If your VM is behind a cloud NAT/firewall, ensure TCP port `5678` is permitted in your cloud security group and access the URL using your public IP.
+
+![Login Screen](docs/pics/screenshot-20260419-142655.png)
+
+---
+
+## 🌐 Network Architecture
+
+CTLABS automatically segments network traffic into distinct planes to accurately simulate real-world data centers and enterprise topologies:
+
+```yaml
 topology:
   - hv: lab-vm1
     planes:
@@ -135,37 +145,28 @@ topology:
         nodes:
           ansible:
             type: controller
-            ...
           sw0:
             type: switch
-            ...
           ro0:
             type: router
-            ...
       edge:
         nodes:
           natgw:
             type: gateway
-            ...
       transit:
         nodes:
           ro1:
             type: router
-            ...
       data:
         nodes:
           sw1:
             type: switch
-            ...
           sw2:
             type: switch
-            ...
           h1:
             type: host
-            ...
           h2:
             type: host
-            ...
 
     links:
       - [ "ro0:eth1", "natgw:eth1" ]
@@ -174,216 +175,113 @@ topology:
       - [ "ro1:eth3", "sw2:eth1"   ]
       - [ "sw1:eth2", "h1:eth1"    ]
       - [ "sw2:eth2", "h2:eth1"    ]
-      ...
 ```
 
-  * **Management Plane (mgmt):**
-      * Used for out-of-band management tasks, such as initial provisioning via the Ansible controller.
-      * Nodes with `type: controller` or explicitly assigned to the `mgmt` plane are placed here.
-      * ctlabs automatically generates management links for all local nodes, isolated from other networks via a VRF.
+* **Management Plane (`mgmt`):** Isolated out-of-band management network connected via Linux VRF. Houses the Ansible controller and node management interfaces without polluting data routing tables.
+* **Data Plane (`data`):** Simulates the primary application communication paths. Links, bridges, and IP schemes are completely user-defined.
+* **Transit Plane (`transit`):** Dedicated segment for site-to-site VPNs, BGP peering, and overlay network tunnels (WireGuard, VXLAN, Cilium).
+* **Edge Plane (`edge`):** Represents perimeter gateways, NAT boundaries, and external internet connectivity.
 
-  * **Data Plane (data):**
-      * Simulates the primary communication network within the lab.
-      * Links and interface mappings are defined within the lab's YAML configuration.
-      * Most simulated services and user traffic run over this plane.
+![Network Architecture Planes](docs/pics/screenshot-20260419-150333.png)
 
-  * **Transit Plane (transit):**
-      * Dedicated to carrying traffic between different network segments or remote sites.
-      * Frequently used for VPN gateways (OpenVPN, WireGuard) and overlay network tunnels.
-      * Isolated from management traffic to ensure realistic routing scenarios.
+---
 
-  * **Edge Plane (edge):**
-      * Represents the boundary between the internal lab infrastructure and external networks (e.g., the public Internet).
-      * Used for nodes requiring NAT, public IPs, or providing external access points.
-      * Often serves as the termination point for cloud-integrated nodes (GCP, AWS).
+## 🗺️ Interactive Network Topology
 
-![screenshot](docs/pics/screenshot-20260419-150333.png)
+CTLABS automatically renders real-time interactive SVG diagrams directly from your running environment:
 
+* **Dual Plane Views:** Switch seamlessly between **Data Network Topology** and **Management Network Topology**.
+* **Direct Node Interaction:** Right-click any node on the topology canvas to immediately open an interactive Web Terminal or inspect interfaces.
+* **Exportable Diagrams:** Export live lab topologies directly into Graphviz `.dot` or `.svg` assets inside your documentation walkthroughs.
 
-Network Topology
-----------------
+![Network Topology](docs/pics/screenshot-topology_data_01.png)
 
-ctlabs provides automated, real-time visualization of your lab's network structure:
+---
 
-*   **Data Network Topology**: Visualizes the primary communication paths defined in your lab configuration.
-*   **Management Network Topology**: Shows the isolated management plane, including the controller and management interfaces of all nodes.
-*   **Interactive Viewer**: SVG-based maps with pan and zoom capabilities for exploring complex topologies.
+## 💻 Integrated Web Terminal
 
+Every container and virtual machine in your lab is directly accessible right from your browser:
 
-![Network Topology](./docs/pics/screenshot-topology_data_01.png)
+* **xterm.js Powered:** Full ANSI color support, customizable fonts, and native copy-paste shortcuts.
+* **Instant Terminal Access:** Launch terminals from the Topology diagram, Connections table, or Nodes inventory:
+  1. *Topology View:* Right-click any node and select **Open Web Terminal**.
+  2. *Nodes List:* Click the `>_` terminal icon.
+* **Integrated File Transfer:** Drag and drop files directly onto the terminal window to upload, or browse and download node directories on the fly.
 
-### Node Access
+![Web Terminal](docs/pics/screenshot-terminal_02.png)
 
-Every node in the lab is accessible via an integrated web terminal:
+---
 
-*   **WebSocket Powered**: Uses WebSockets for low-latency, bi-directional communication.
-*   **Xterm.js**: A full-featured terminal emulator in your browser, supporting copy-paste, resizing, and standard ANSI sequences.
-*   **Direct Console Access**: Connect directly to the shell of Podman containers. QEMU serial console is accesible via tmux session in the container.
+## ⚙️ In-Browser Automation (Ansible & Terraform)
 
-![Web Terminal](./docs/pics/screenshot-terminal_02.png)
+Configure and automate your lab nodes without leaving the browser:
 
-#### Open a terminal
+![Automation Dashboard](docs/pics/screenshot-20260419-170504.png)
 
-We can open a terminal in 3 ways:
+### Ansible Editor & Execution Runner
+* **Multi-File Workspace:** Edit playbooks, inventory files, roles, and group variables with tabbed navigation.
+* **Vim Mode & Settings:** Built-in Vim keybindings (`:w`, `:wq`, visual block mode) and editor customization.
+* **Workspace Profiles & Ad-Hoc Runner:** Execute full playbooks or trigger single-tag/single-host runs (`-l`, `-t`, extra args) with real-time log streaming.
 
-1. Topology View
-
-`Right Mouse-Click` on a node and choose `Open Web Terminal` 
-
-![screenshot](docs/pics/screenshot-20260419-200625.png)
-
-2. Connections View
-
-`Right Mouse-Click` on a node and choose `Open Web Terminal`
-
-![screenshot](docs/pics/screenshot-20260419-200717.png)
-
-
-3. Nodes List
-
-`Left Mouse-Click` on the `>_` symbol.
-
-![screenshot](docs/pics/screenshot-20260419-200903.png)
-
-
-
-
-
-Automation
-----------
-
-In the Automation Section we can configure ansible playbooks or terraform configurations that we want to run. The settings will be stored as part of the lab configuration. 
-
-![screenshot](docs/pics/screenshot-20260419-170504.png)
-
-### Ansible Editor
-
-In the `Settings` tab we can define the playbook and its configurations that should be run.
-
-
-![screenshot](docs/pics/screenshot-20261101-124800.png)
-
-We can also edit the files, e.g. the playbook, roles, inventory ...
-
-
-![screenshot](docs/pics/screenshot-20261101-124536.png)
-
-We can have multiple open files at the same time, create new ones, ...
-
-![screenshot](docs/pics/screenshot-20261101-124312.png)
-
-To run the playbook we press the `Run Playbook` button.
-
-![screenshot](docs/pics/screenshot-20260419-171631.png)
-
-Once the playbook is started, we're automatically redirected to the logstream output.
-
-![screenshot](docs/pics/screenshot-20260419-171800.png)
-
+![Ansible Editor](docs/pics/screenshot-20261101-124800.png)
+![Ansible Streaming](docs/pics/screenshot-20260419-171800.png)
 
 ### Terraform Editor
+* Edit and plan Terraform infrastructure definitions side-by-side with your container topologies.
 
-In the `Settings` tab
+![Terraform Editor](docs/pics/screenshot-20260419-173122.png)
 
-![screenshot](docs/pics/screenshot-20260419-172833.png)
+---
 
+## 📚 Interactive Walkthroughs & Documentation Engine
 
-As with the Ansible Editor, we can have multiple open files at the same time, create new ones, ...
+Documenting lab experiments, tutorials, and post-mortems is built directly into CTLABS:
 
+![Walkthrough Overview](docs/pics/screenshot-20261101-140107.png)
 
-![screenshot](docs/pics/screenshot-20260419-173122.png)
+### Multimedia Step Sequence
+Organize procedures into ordered steps combining three rich media types:
+1. **Terminal Recordings (`.cast`):** Record terminal actions with one click (`REC` button). Supports Asciicast v1, v2, and modern macOS Asciicast v3 formats with scrubbing and text selection.
+2. **Screen Video Recordings (`.webm` / `.mp4`):** Capture full screen or interactive rectangular crop areas with Web Audio mic mixing.
+3. **Markdown Notes with Relative Images:** Full GitHub Flavored Markdown editor with live preview, Obsidian-style image sizing (`|300x200`), emoji picker, and modal image lightboxes.
 
+### Picture Inspector
+Manage all image assets in your walkthrough set with thumbnail previews, used vs. unused section grouping, and batch deletion.
 
-Labs
-----
+### Export to Word (.docx) & Styled PDF
+Export individual steps or entire walkthrough sets as unified, professionally formatted PDF documents (with cover page, table of contents, and syntax-highlighted code blocks) or Word `.docx` documents.
 
-### Starting a lab
+![Markdown Split Editor](docs/pics/screenshot-20261101-133934.png)
+![Walkthrough Export](docs/pics/screenshot-20261101-134202.png)
 
-1. Choose a lab
+---
 
-![screenshot](docs/pics/screenshot-20260419-194022.png)
+## 📦 Managing Labs
 
+Starting, stopping, and inspecting labs is straightforward via the Web UI or CLI:
 
-2. Make sure all needed images are created
+1. **Verify Images:** The `Nodes` table shows green indicators for available base images.
+2. **Start Lab:** Click **Start** to spin up switches, bridges, containers, and QEMU virtual machines in seconds.
+3. **Stop Lab:** Click **Stop** to cleanly tear down the network namespace and free resources.
 
-![screenshot](docs/pics/screenshot-20261101-123456.png)
+![Starting a Lab](docs/pics/screenshot-20260419-194022.png)
 
+---
 
-In the `Nodes` table we can see if images used for the node are available or not. If the cube next to the image in the `Image` column is green the image is availabe and if its white it's not available.
+## 🤝 Contributing
 
-![screenshot](docs/pics/screenshot-20260419-194217.png)
+Contributions, feature ideas, and feedback are welcome!
+Feel free to open an [Issue](https://github.com/oxdeca/ctlabs/issues) or submit a [Pull Request](https://github.com/oxdeca/ctlabs/pulls).
 
-To start the lab, we click the `Start` button which redirects us to the Logstream.
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-![screenshot](docs/pics/screenshot-20260419-195448.png)
+---
 
+## 📄 License
 
-If we return to the main page (`CTLABS` menu item), we see the message that a lab was already started. We can stop the lab by clicking the `Stop` button.
-
-![screenshot](docs/pics/screenshot-20260419-195523.png)
-
-
-Walkthrough
------------
-
-**Features**:
-- Create walkthrough sets consisting of individual steps
-- supported steps:
-  - `Terminal Casts`
-  - `Markdown Documents`
-  - `Screen Recordings`
-- export/import walkthrough sets (zip-files)
-
-
-![screenshot](docs/pics/screenshot-20261101-140107.png) 
-
-![screenshot](docs/pics/screenshot-20261101-140235.png)
-
-
-We can create new guides with `Terminal Casts`, `Markdown Documents`, `Screen Videos`. 
-![Walkthroug](docs/pics/screenshot-20261101-132423.png)
-
-## Terminal Casts
-
-By clicking the `REC` button on the top of a Terminal we can start a `Cast Recording`
-
-![Terminal Cast - REC button](docs/pics/screenshot-20261101-133029.png)
-
-We stop the recording by clicking the `STOP` button.
-
-![Terminal Cast - recording](docs/pics/screenshot-20261101-133150.png)
-
-We can then find the recording in the Walkthrough added as new Step (we might need to refresh the page to see it)
-
-
-![screenshot](docs/pics/screenshot-20261101-133551.png)
-
-
-## Markdown Editor
-
-- create/edit markdown documents
-- copy/paste from clipboard
-- use emoji's
-- import/export markdown documents
-
-In split mode we can edit and get a realtime preview.
-
-![screenshot](docs/pics/screenshot-20261101-133934.png)
-
-We can export markdown documents as zip-bundle or plain text.
-
-![screenshot](docs/pics/screenshot-20261101-134202.png)
-
-## Screen Recording
-
-We can create screen recordings that we can add to the walkthrough.
-
-![screenshot](docs/pics/screenshot-20261101-134745.png)
-
-
-We can see the recording as step in the arrange list. We also can reorder the steps or move them in the `Recordings/Notes` section below, so they
-are not part of the walkthrough steps but included in the walkthrough set.
-
-![screenshot](docs/pics/screenshot-20261101-134822.png)
-
-
+Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
+root@h3:~/ctlabs# 
