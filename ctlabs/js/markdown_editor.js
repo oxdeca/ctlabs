@@ -1351,8 +1351,31 @@
         mdIsDirty = false;
         showMdStatus('saved', isAutosave ? 'Autosaved' : (commit ? 'Committed' : 'Saved'));
 
+        if (data.id && data.id !== activeId) {
+          const nextId = data.id;
+          const oldId = activeId;
+          window.activeId = nextId;
+          renameNote(oldId, nextId);
+          const oldBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(oldId)}"]`);
+          if (oldBtn) {
+            oldBtn.setAttribute('data-id', nextId);
+            oldBtn.setAttribute('data-src', '/recordings/' + encodeURIComponent(nextId));
+            const wrapper = oldBtn.closest('.rec-item-wrapper') || document.getElementById('step-' + oldId);
+            if (wrapper) {
+              wrapper.id = 'step-' + nextId;
+              wrapper.setAttribute('data-id', nextId);
+            }
+          }
+          const formRecInput = document.getElementById('walkthrough-form-recording');
+          if (formRecInput) formRecInput.value = nextId;
+          const url = new URL(window.location);
+          url.searchParams.set('recording', nextId);
+          window.history.replaceState({}, '', url.toString());
+        }
+
         if (data.title) {
-          const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+          const currId = (data.id && data.id !== activeId) ? data.id : activeId;
+          const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(currId)}"]`);
           if (activeBtn) {
             activeBtn.setAttribute('data-title', data.title);
             const titleSpan = activeBtn.querySelector('.item-title');
@@ -1383,6 +1406,20 @@
       }
     });
   }
+
+  function renameNote(oldId, newId) {
+    if (!oldId || !newId || oldId === newId) return;
+    if (mdCache[oldId] !== undefined) {
+      mdCache[newId] = mdCache[oldId];
+      delete mdCache[oldId];
+    }
+  }
+
+  window.addEventListener('recording:renamed', (e) => {
+    if (e.detail && e.detail.oldId && e.detail.newId) {
+      renameNote(e.detail.oldId, e.detail.newId);
+    }
+  });
 
   // --- Insertion Helpers ---
   function insertMarkdownBlock(snippet, targetPos = null, caretOffset = null) {
@@ -5694,7 +5731,8 @@
     insertSnippet: insertMarkdownSnippet,
     snippets: MD_SNIPPETS,
     get emojis() { return getEmojiList(); },
-    replaceEmojiShortcodes: replaceEmojiShortcodes
+    replaceEmojiShortcodes: replaceEmojiShortcodes,
+    renameNote: renameNote
   };
 
   window.addEventListener('beforeunload', () => {
@@ -5735,6 +5773,7 @@
   window.MARKDOWN_EMOJI_LIST = ctlabsEmojiList;
   window.replaceEmojiShortcodes = replaceEmojiShortcodes;
   window.replaceGitHubEmojis = replaceEmojiShortcodes;
+  window.renameNote = renameNote;
 
   try {
     Object.defineProperty(window, 'mdIsDirty', {

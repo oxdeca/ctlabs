@@ -1060,25 +1060,61 @@
     .then(data => {
       if (data && data.ok) {
         const nextId = data.id || id;
-        if (btn) {
-          btn.setAttribute('data-title', newTitle);
-          btn.setAttribute('data-id', nextId);
-          const titleSpan = btn.querySelector('.item-title');
+        const targetBtn = btn || document.querySelector(`.rec-item[data-id="${CSS.escape(id)}"]`);
+        if (targetBtn) {
+          targetBtn.setAttribute('data-title', newTitle);
+          targetBtn.setAttribute('data-id', nextId);
+          targetBtn.setAttribute('data-src', '/recordings/' + encodeURIComponent(nextId));
+          const titleSpan = targetBtn.querySelector('.item-title');
           if (titleSpan) titleSpan.textContent = newTitle;
+
+          const wrapper = targetBtn.closest('.rec-item-wrapper') || document.getElementById('step-' + id);
+          if (wrapper) {
+            wrapper.id = 'step-' + nextId;
+            wrapper.setAttribute('data-id', nextId);
+          }
+
           const currentActive = document.querySelector('.rec-item.active');
-          if (btn === currentActive) {
-            const step = btn.getAttribute('data-step');
+          const isCurrentActive = (targetBtn === currentActive) || (id === activeId) || (id === window.activeId);
+          if (isCurrentActive) {
+            const step = targetBtn.getAttribute('data-step');
             if (titleEl) {
               const span = titleEl.querySelector('span');
               const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
               if (span) span.textContent = fullTitleText;
               titleEl.title = fullTitleText;
             }
+            if (editTitle) editTitle.value = newTitle;
+
             if (nextId !== id) {
+              activeId = nextId;
+              window.activeId = nextId;
+
+              const formRecInput = document.getElementById('walkthrough-form-recording');
+              if (formRecInput) formRecInput.value = nextId;
+
+              const newSrc = '/recordings/' + encodeURIComponent(nextId);
+              if (downloadEl) downloadEl.href = newSrc + '?download=1';
+              if (deleteForm) deleteForm.action = newSrc + '/delete';
+              if (metaForm) metaForm.action = newSrc + '/meta';
+
               const url = new URL(window.location);
               url.searchParams.set('recording', nextId);
               window.history.replaceState({}, '', url.toString());
+
+              try {
+                if (activeWalkthrough) localStorage.setItem('ctlabs_last_step_' + activeWalkthrough, nextId);
+              } catch (e) {}
             }
+          }
+
+          if (nextId !== id) {
+            if (window.MarkdownEditor && typeof window.MarkdownEditor.renameNote === 'function') {
+              window.MarkdownEditor.renameNote(id, nextId);
+            }
+            window.dispatchEvent(new CustomEvent('recording:renamed', {
+              detail: { oldId: id, newId: nextId, title: newTitle }
+            }));
           }
         }
       }
@@ -1292,56 +1328,96 @@
 // --- Metadata & Note Save Handler ---
 if (metaForm) {
   metaForm.addEventListener('submit', (e) => {
-if (activeDataType === 'markdown') {
-e.preventDefault();
-const newTitle = editTitle ? editTitle.value.trim() : '';
-if (newTitle && activeId) {
-  const activeWalkthrough = (window.activeWalkthrough || (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : ''));
-  const body = new URLSearchParams({
-    title: newTitle,
-    walkthrough: activeWalkthrough
-  });
+    if (activeDataType === 'markdown') {
+      e.preventDefault();
+      const newTitle = editTitle ? editTitle.value.trim() : '';
+      if (newTitle && activeId) {
+        const activeWalkthrough = (window.activeWalkthrough || (typeof getActiveWalkthrough === 'function' ? getActiveWalkthrough() : ''));
+        const body = new URLSearchParams({
+          title: newTitle,
+          walkthrough: activeWalkthrough
+        });
 
-  fetch(metaForm.action || `/recordings/${encodeURIComponent(activeId)}/meta`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'Accept': 'application/json'
-    },
-    body: body,
-    credentials: 'same-origin'
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data && data.ok) {
-      const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
-      if (activeBtn) {
-        activeBtn.setAttribute('data-title', newTitle);
-        const titleSpan = activeBtn.querySelector('.item-title');
-        if (titleSpan) titleSpan.textContent = newTitle;
-        const step = activeBtn.getAttribute('data-step');
-        const titleEl = document.getElementById('rec-title');
-        if (titleEl) {
-          const span = titleEl.querySelector('span');
-          const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
-          if (span) span.textContent = fullTitleText;
-          titleEl.title = fullTitleText;
-        }
-      }
-      if (editTitle) editTitle.value = newTitle;
-      const statusEl = document.getElementById('md-save-status');
-      if (statusEl) {
-        statusEl.style.display = 'inline-flex';
-        setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+        fetch(metaForm.action || `/recordings/${encodeURIComponent(activeId)}/meta`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'Accept': 'application/json'
+          },
+          body: body,
+          credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.ok) {
+            const nextId = data.id || activeId;
+            const oldId = activeId;
+            const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(oldId)}"]`);
+            if (activeBtn) {
+              activeBtn.setAttribute('data-title', newTitle);
+              activeBtn.setAttribute('data-id', nextId);
+              activeBtn.setAttribute('data-src', '/recordings/' + encodeURIComponent(nextId));
+              const titleSpan = activeBtn.querySelector('.item-title');
+              if (titleSpan) titleSpan.textContent = newTitle;
+              const step = activeBtn.getAttribute('data-step');
+              const titleEl = document.getElementById('rec-title');
+              if (titleEl) {
+                const span = titleEl.querySelector('span');
+                const fullTitleText = (step ? '#' + step + ': ' : '') + newTitle;
+                if (span) span.textContent = fullTitleText;
+                titleEl.title = fullTitleText;
+              }
+              const wrapper = activeBtn.closest('.rec-item-wrapper') || document.getElementById('step-' + oldId);
+              if (wrapper) {
+                wrapper.id = 'step-' + nextId;
+                wrapper.setAttribute('data-id', nextId);
+              }
+            }
+
+            if (nextId !== oldId) {
+              activeId = nextId;
+              window.activeId = nextId;
+              const formRecInput = document.getElementById('walkthrough-form-recording');
+              if (formRecInput) formRecInput.value = nextId;
+              const newSrc = '/recordings/' + encodeURIComponent(nextId);
+              if (downloadEl) downloadEl.href = newSrc + '?download=1';
+              if (deleteForm) deleteForm.action = newSrc + '/delete';
+              if (metaForm) metaForm.action = newSrc + '/meta';
+              const url = new URL(window.location);
+              url.searchParams.set('recording', nextId);
+              window.history.replaceState({}, '', url.toString());
+
+              try {
+                if (activeWalkthrough) localStorage.setItem('ctlabs_last_step_' + activeWalkthrough, nextId);
+              } catch (e) {}
+
+              if (window.MarkdownEditor && typeof window.MarkdownEditor.renameNote === 'function') {
+                window.MarkdownEditor.renameNote(oldId, nextId);
+              }
+              window.dispatchEvent(new CustomEvent('recording:renamed', {
+                detail: { oldId: oldId, newId: nextId, title: newTitle }
+              }));
+            }
+
+            if (editTitle) editTitle.value = newTitle;
+            const statusEl = document.getElementById('md-save-status');
+            if (statusEl) {
+              statusEl.style.display = 'inline-flex';
+              setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            }
+            if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
+          } else {
+            if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to update title:', err);
+          if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
+        });
+      } else {
+        if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
       }
     }
-  })
-  .catch(err => {
-    console.error('Failed to update title:', err);
-  });
-}
-if (typeof saveMarkdownContent === 'function') saveMarkdownContent(false);
-}
   });
 }
 

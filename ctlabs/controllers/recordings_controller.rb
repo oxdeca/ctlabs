@@ -1623,7 +1623,12 @@ class RecordingsController < BaseController
 
   get '/recordings/:id/content' do
     halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
-    content = RecordingService.read_content(params[:id])
+    target_id = params[:id]
+    unless RecordingService.path_for(target_id, check_renamed: false)
+      resolved = RecordingService.resolve_renamed_id(target_id)
+      target_id = resolved if resolved
+    end
+    content = RecordingService.read_content(target_id)
     halt 404, 'Markdown step not found' if content.nil?
     content_type 'text/plain; charset=utf-8'
     content
@@ -1632,6 +1637,13 @@ class RecordingsController < BaseController
   post '/recordings/:id/content' do
     content_type :json
     halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
+
+    req_id = params[:id]
+    target_id = req_id
+    unless RecordingService.path_for(target_id, check_renamed: false)
+      resolved = RecordingService.resolve_renamed_id(target_id)
+      target_id = resolved if resolved
+    end
 
     body = request.body.read
     commit_flag = false
@@ -1656,16 +1668,16 @@ class RecordingsController < BaseController
               end
 
     if new_title && !new_title.empty? && RecordingService.respond_to?(:update_meta)
-      RecordingService.update_meta(params[:id], title: new_title)
+      RecordingService.update_meta(target_id, title: new_title)
     end
 
-    ok = RecordingService.update_content(params[:id], content, commit: commit_flag, commit_message: commit_msg)
+    ok = RecordingService.update_content(target_id, content, commit: commit_flag, commit_message: commit_msg)
     halt 500, { ok: false, error: 'Failed to save content' }.to_json unless ok
 
-    path = RecordingService.path_for(params[:id])
+    path = RecordingService.path_for(target_id)
     meta_info = path ? RecordingService.meta(path) : {}
 
-    { ok: true, id: params[:id], title: meta_info[:title] }.to_json
+    { ok: true, id: target_id, old_id: req_id, title: meta_info[:title] }.to_json
   end
 
   # --- Git Versioning Endpoints ---

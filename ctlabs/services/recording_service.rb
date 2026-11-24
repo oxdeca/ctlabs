@@ -770,7 +770,45 @@ class RecordingService
     !s.empty? && !s.include?('..') && !!(s =~ ID_RE)
   end
 
-  def self.path_for(id, walkthrough: nil)
+  def self.record_rename(old_id, new_id)
+    @renamed_ids ||= {}
+    @renamed_ids[old_id.to_s] = new_id.to_s
+  end
+
+  def self.resolve_renamed_id(id)
+    @renamed_ids ||= {}
+    curr = id.to_s
+    visited = []
+    while @renamed_ids[curr] && !visited.include?(curr)
+      visited << curr
+      curr = @renamed_ids[curr]
+    end
+    if !visited.empty?
+      return curr if path_for(curr, check_renamed: false)
+      return curr
+    end
+
+    # Git commit log check fallback
+    begin
+      cur_dir = dir
+      if File.directory?(File.join(cur_dir, '.git'))
+        log = `git -C "#{cur_dir}" log --grep="Rename recording '#{id}' to " -n 1 --pretty=format:"%s" 2>/dev/null`
+        if log =~ /Rename recording '#{Regexp.escape(id)}' to '([^']+)'/
+          found = Regexp.last_match(1)
+          if path_for(found, check_renamed: false)
+            @renamed_ids[id.to_s] = found
+            return found
+          end
+        end
+      end
+    rescue StandardError
+      nil
+    end
+
+    nil
+  end
+
+  def self.path_for(id, walkthrough: nil, check_renamed: true)
     return nil unless valid_id?(id)
     base = id.to_s
 
@@ -818,6 +856,11 @@ class RecordingService
         v_p = File.join(cdir, "#{base}#{vext}")
         return v_p if File.file?(v_p)
       end
+    end
+
+    if check_renamed && @renamed_ids.is_a?(Hash) && @renamed_ids[base] && @renamed_ids[base] != base
+      resolved = resolve_renamed_id(base)
+      return path_for(resolved, walkthrough: walkthrough, check_renamed: false) if resolved
     end
 
     nil
@@ -1711,6 +1754,7 @@ class RecordingService
       files_to_commit << new_meta if File.exist?(new_meta)
       files_to_commit += modified_manifests
       RecordingGitService.commit("Rename recording '#{old_id}' to '#{new_id}' (#{clean_title})", files: files_to_commit.uniq, slug: slug) rescue nil
+      record_rename(old_id, new_id)
     end
 
     { ok: true, old_id: old_id, id: new_id, title: clean_title, path: (new_path || old_path) }
