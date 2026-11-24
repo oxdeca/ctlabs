@@ -2,7 +2,7 @@
 
 # CTLABS 🧪
 
-### The Hybrid Container & KVM Network Lab Workbench with Interactive Walkthroughs
+### The Hands-On Playground & Learning Workbench for Systems, Security & Infrastructure Research
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Linux](https://img.shields.io/badge/Platform-Linux%20%2F%20KVM-orange.svg)](https://github.com/oxdeca/ctlabs)
@@ -12,9 +12,9 @@
 [![Documentation: Asciinema](https://img.shields.io/badge/Player-Asciicast%20v1%2Fv2%2Fv3-green.svg)](https://asciinema.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/oxdeca/ctlabs/pulls)
 
-**CTLABS** is a lightweight, web-first laboratory workbench designed for platform engineers, network architects, and DevOps practitioners. It enables rapid provisioning of complex, isolated network topologies combining **Podman containers** and **QEMU/KVM virtual machines** on a single machine or cloud instance.
+**CTLABS** is a flexible, web-first laboratory workbench designed for hands-on experimentation, technical training, interactive tutorials, security research, and operating systems study.
 
-With integrated in-browser IDEs (Ansible, Terraform, Dockerfile), real-time SVG topology visualization, zero-latency web terminals, and an interactive multimedia Walkthrough & Documentation engine, CTLABS makes infrastructure experimentation and knowledge sharing completely reproducible.
+Whether you are studying operating systems kernel internals (like **xv6**), analyzing x86/ARM exploitation, orchestrating multi-node Kubernetes clusters, or practicing complex network routing—CTLABS provides a disposable, reproducible playground. **Break things, experiment freely, and restart from a clean slate in seconds.**
 
 ---
 
@@ -24,10 +24,10 @@ With integrated in-browser IDEs (Ansible, Terraform, Dockerfile), real-time SVG 
 
 ## 📑 Table of Contents
 
-- [Why CTLABS?](#-why-ctlabs)
-- [Key Features](#-key-features)
+- [The CTLABS Philosophy](#-the-ctlabs-philosophy)
+- [Key Capabilities](#-key-capabilities)
 - [Quick Start](#-quick-start)
-- [Network Architecture](#-network-architecture)
+- [Network Architecture & Planes](#-network-architecture--planes)
 - [Interactive Network Topology](#-interactive-network-topology)
 - [Integrated Web Terminal](#-integrated-web-terminal)
 - [In-Browser Automation (Ansible & Terraform)](#-in-browser-automation-ansible--terraform)
@@ -38,39 +38,48 @@ With integrated in-browser IDEs (Ansible, Terraform, Dockerfile), real-time SVG 
 
 ---
 
-## 💡 Why CTLABS?
+## 💡 The CTLABS Philosophy
 
-Most lab environments force you to choose between heavy, resource-intensive hypervisors (GNS3, Eve-NG, Proxmox) or lightweight tools that only do containers (Containerlab, Kind, Minikube). **CTLABS bridges the gap**:
+### 1. Zero Fear of Messing Up
+Real learning and security research happen when you push systems to their breaking point. In CTLABS, all infrastructure is defined as code. You can trigger kernel panics, break network routing, execute malicious payloads, or tear down services—and then spin the entire environment back up into a pristine state with one click.
 
-| Feature | CTLABS | Eve-NG / GNS3 | Vagrant / VirtualBox | Containerlab |
-| :--- | :---: | :---: | :---: | :---: |
-| **Hybrid (Containers + QEMU VMs)** | ✅ **Native** | ⚠️ VM-heavy | ❌ VMs only | ⚠️ Mostly containers |
-| **Footprint & Speed** | ⚡ **Ultra-lightweight** | 🐢 Heavy footprint | 🐢 Slow boot times | ⚡ Lightweight |
-| **Web UI & Management Console** | ✅ **Built-in** | ⚠️ Clunky legacy UI | ❌ CLI only | ❌ CLI only |
-| **Live SVG Topology Maps** | ✅ **Dynamic (Data & Mgmt)** | ⚠️ Manual layout | ❌ None | ⚠️ Graphviz / D3 |
-| **Built-in Web Terminals** | ✅ **xterm.js + File Transfer** | ⚠️ Requires native telnet | ❌ SSH CLI only | ❌ SSH CLI only |
-| **In-Browser Ansible / Terraform IDE** | ✅ **With live streaming** | ❌ None | ❌ None | ❌ None |
-| **Interactive Walkthrough Player** | ✅ **Casts, Videos & Notes** | ❌ None | ❌ None | ❌ None |
-| **1-Click DOCX & PDF Export** | ✅ **Built-in** | ❌ None | ❌ None | ❌ None |
-| **Single-Command Setup** | ✅ `curl ... \| bash` | ❌ Multi-GB ISO install | ⚠️ Multi-tool setup | ⚠️ Package install |
+### 2. Hybrid & Heterogeneous Environments
+No single virtualization technology fits every experiment. CTLABS lets you combine:
+* **High-density Podman containers** for lightweight services, switches, routers, and tools.
+* **Full QEMU/KVM Virtual Machines** nested seamlessly inside containers and connected via TAP interfaces when you need real kernel access, custom storage drivers, or non-Linux OSes (Windows, BSD).
+* **Multi-Architecture Support:** Leverage QEMU's emulation capabilities to run cross-architecture environments (e.g. x86_64, ARM, RISC-V).
+* **Study & Research Labs:** Easily deploy specialized targets such as **xv6** teaching operating systems, exploit testing sandboxes, or multi-node Kubernetes clusters.
+
+### 3. Integrated Learning & Walkthrough Companion
+Never juggle between a terminal, a video recorder, and a separate documentation tool. CTLABS integrates an interactive **Walkthrough Engine** directly alongside your running machines: record terminal sessions (`.cast`), capture screen video with audio, write rich Markdown notes with diagrams and flashcards, and export your findings into standalone PDF and Word documents.
+
+### 4. A Controlled Sandbox for Autonomous AI Agents & Systems Development
+Autonomous AI coding, DevOps, and security agents need real environments with root privileges, actual network interfaces, and system services—without endangering host stability or sensitive networks. CTLABS is the ideal controlled execution sandbox:
+* **True Isolation:** Isolated network namespaces, private Linux VRFs, and scoped cgroups confine agent activity safely.
+* **Safe Autonomous Execution:** Agents can compile kernels, test server daemons, reconfigure firewalls, and run Ansible automation freely.
+* **Instant Teardown & Reset:** If an agent hallucinates, breaks network routes, or panics a kernel, the entire environment resets to a clean baseline in seconds.
+* **Self-Hosting & Dogfooding:** In fact, CTLABS develops, debugs, and runs its own server daemon (`ctlabs-server`) and companion AI agents inside this exact controlled sandbox!
+
+> *"Really, there is no limit other than your imagination."*
 
 ---
 
-## ✨ Key Features
+## ✨ Key Capabilities
 
-* **Hybrid Virtualization:** Combine high-density Podman containers and full QEMU/KVM virtual machines inside the same isolated network fabric via TAP interfaces.
-* **Declarative Lab-as-Code:** Define multi-node environments, NICs, and link interconnections with clean, readable YAML definitions.
-* **Segregated Network Planes:** Automatic segregation of Management (`mgmt`), Data (`data`), Transit (`transit`), and Edge (`edge`) networks with Linux VRF isolation.
-* **Interactive SVG Topology Visualizer:** Auto-generates real-time, interactive maps with pan/zoom, link inspections, and right-click terminal launching.
-* **Low-Latency Web Terminals:** Full xterm.js terminals with direct container exec, QEMU serial console access, drag-and-drop file upload, directory downloads, and tmux persistence.
-* **In-Browser Automation IDE:** Multi-file editors for Ansible, Terraform, and Dockerfiles with workspace profiles, ad-hoc execution runners, Vim mode, and live streaming output.
+* **Heterogeneous Hybrid Labs:** Run containers and QEMU virtual machines on the same isolated virtual network fabric.
+* **Controlled AI Agent Sandbox:** Safe, reproducible multi-node playground for autonomous AI agents, security tooling, and software development.
+* **Declarative Lab-as-Code:** Define multi-node topologies, network links, and hardware profiles in simple, readable YAML.
+* **Isolated Network Planes:** Automatic segregation of Management (`mgmt`), Data (`data`), Transit (`transit`), and Edge (`edge`) networks with Linux VRF isolation.
+* **Interactive SVG Topology Maps:** Real-time visual network diagrams with pan/zoom, link inspection, and right-click terminal launching.
+* **Zero-Latency Web Terminals:** Full xterm.js terminals with direct container exec, QEMU serial console access, drag-and-drop file upload, directory downloads, and tmux persistence.
+* **In-Browser Automation IDE:** Tabbed editors for Ansible, Terraform, and Dockerfiles with workspace profiles, ad-hoc execution runners, Vim mode, and live unbuffered streaming logs.
 * **Ad-Hoc Runtime DNAT:** Expose lab ports to the host or public internet on the fly with a complete audit trail in operational logs.
-* **Interactive Walkthroughs & Documentation:**
-  * Record terminal sessions (`.cast` with native Asciicast v1/v2/v3 support).
-  * Record browser screen videos (`.webm`/`.mp4`) with rectangular crop selection and mic mixing.
-  * Rich Markdown notes with relative image links, interactive lightbox, emoji picker, and Vi mode.
-  * One-click export to standalone Word (`.docx`) and styled, print-ready PDF reports with embedded diagrams.
-  * Export/import complete lab sets as portable zip bundles.
+* **Interactive Walkthroughs & Documentation Engine:**
+  * Record terminal sessions (`.cast` with native Asciicast v1, v2, and v3 support).
+  * Record screen videos (`.webm` / `.mp4`) with rectangular crop selection and mic mixing.
+  * Rich Markdown notes with relative image links, Obsidian-style resizing (`|300x200`), and modal lightboxes.
+  * One-click export to standalone Word (`.docx`) and styled, print-ready PDF reports.
+  * Export and import complete lab walkthrough sets as portable zip bundles.
 
 ---
 
@@ -78,7 +87,7 @@ Most lab environments force you to choose between heavy, resource-intensive hype
 
 ### 1. Prerequisites
 
-A clean Linux host or VM running **CentOS Stream 9 / RHEL 9** (or compatible enterprise Linux) with **nested virtualization enabled**:
+A clean Linux host or VM running **CentOS Stream 9 / RHEL 9** with **nested virtualization enabled**:
 
 ```bash
 # Verify nested virtualization is supported (result should be > 0)
@@ -120,7 +129,7 @@ The installer configures dependencies (Podman, QEMU/KVM, Ruby, systemd services)
 
 ---
 
-### 3. Accessing the Web Console
+### 3. Accessing the Web Workbench
 
 Open your browser and navigate to:
 ```
@@ -133,9 +142,9 @@ https://<YOUR_VM_IP>:5678
 
 ---
 
-## 🌐 Network Architecture
+## 🌐 Network Architecture & Planes
 
-CTLABS automatically segments network traffic into distinct planes to accurately simulate real-world data centers and enterprise topologies:
+CTLABS automatically segments network traffic into distinct planes to accurately simulate real-world data centers, cloud boundaries, and enterprise topologies:
 
 ```yaml
 topology:
@@ -235,7 +244,7 @@ Configure and automate your lab nodes without leaving the browser:
 
 ## 📚 Interactive Walkthroughs & Documentation Engine
 
-Documenting lab experiments, tutorials, and post-mortems is built directly into CTLABS:
+Documenting lab experiments, security investigations, tutorials, and post-mortems is built directly into CTLABS:
 
 ![Walkthrough Overview](docs/pics/screenshot-20261101-140107.png)
 
@@ -270,7 +279,7 @@ Starting, stopping, and inspecting labs is straightforward via the Web UI or CLI
 
 ## 🤝 Contributing
 
-Contributions, feature ideas, and feedback are welcome!
+Contributions, lab ideas, and feedback are welcome!
 Feel free to open an [Issue](https://github.com/oxdeca/ctlabs/issues) or submit a [Pull Request](https://github.com/oxdeca/ctlabs/pulls).
 
 1. Fork the Project
