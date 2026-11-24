@@ -4110,9 +4110,9 @@ if (metaForm) {
           cm.setValue(val.replace(regex, `![$1](images/${newFilename})`));
         } else {
           if (window.MarkdownEditor && typeof window.MarkdownEditor.insertBlock === 'function') {
-            window.MarkdownEditor.insertBlock(newSnippet, cm.getCursor());
+            window.MarkdownEditor.insertBlock(newSnippet, cm.getCursor(), null, true);
           } else if (typeof insertMarkdownBlock === 'function') {
-            insertMarkdownBlock(newSnippet, cm.getCursor());
+            insertMarkdownBlock(newSnippet, cm.getCursor(), null, true);
           }
         }
         if (ta) ta.value = cm.getValue();
@@ -4123,9 +4123,9 @@ if (metaForm) {
           ta.value = val.replace(regex, `![$1](images/${newFilename})`);
         } else {
           if (window.MarkdownEditor && typeof window.MarkdownEditor.insertBlock === 'function') {
-            window.MarkdownEditor.insertBlock(newSnippet);
+            window.MarkdownEditor.insertBlock(newSnippet, null, null, true);
           } else if (typeof insertMarkdownBlock === 'function') {
-            insertMarkdownBlock(newSnippet);
+            insertMarkdownBlock(newSnippet, null, null, true);
           }
         }
       }

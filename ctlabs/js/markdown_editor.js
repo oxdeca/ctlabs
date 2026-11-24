@@ -774,15 +774,44 @@
 
       mdCodeEditor.on('paste', (cm, e) => {
         const clipboard = e.clipboardData || window.clipboardData;
-        if (!clipboard || !clipboard.items) return;
-        for (let i = 0; i < clipboard.items.length; i++) {
-          const item = clipboard.items[i];
-          if (item.kind === 'file' && item.type.startsWith('image/')) {
+        if (!clipboard) return;
+
+        if (clipboard.items) {
+          for (let i = 0; i < clipboard.items.length; i++) {
+            const item = clipboard.items[i];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+              e.preventDefault();
+              if (typeof e.stopPropagation === 'function') e.stopPropagation();
+              const file = item.getAsFile();
+              if (file) uploadAndInsertImage(file, cm.getCursor());
+              return;
+            }
+          }
+        }
+
+        const text = clipboard.getData('text/plain');
+        if (text) {
+          const trimmed = text.trim();
+          const isUrl = /^https?:\/\/\S+$/i.test(trimmed) || /^images\/\S+$/i.test(trimmed) || /^#\S+$/i.test(trimmed);
+          const isLinkOrImg = /^!?\[.*\]\(.*\)$/.test(trimmed);
+
+          if (cm.somethingSelected() && isUrl) {
             e.preventDefault();
             if (typeof e.stopPropagation === 'function') e.stopPropagation();
-            const file = item.getAsFile();
-            if (file) uploadAndInsertImage(file, cm.getCursor());
-            break;
+            const selectedText = cm.getSelection();
+            cm.replaceSelection(`[${selectedText}](${trimmed})`);
+            onMarkdownContentChanged();
+            saveMarkdownContent(false);
+            return;
+          }
+
+          if ((isUrl || isLinkOrImg) && !trimmed.includes('\n') && (text.startsWith('\n') || text.endsWith('\n') || text.startsWith('\r') || text.endsWith('\r') || text !== trimmed)) {
+            e.preventDefault();
+            if (typeof e.stopPropagation === 'function') e.stopPropagation();
+            cm.replaceSelection(trimmed);
+            onMarkdownContentChanged();
+            saveMarkdownContent(false);
+            return;
           }
         }
       });
@@ -804,19 +833,30 @@
         e._ctlabsHandled = true;
 
         const files = getDroppedFiles(e.dataTransfer);
-        if (files.length === 0) return;
+        if (files && files.length > 0) {
+          const isSingleImg = files.length === 1 && (
+            (files[0].type && files[0].type.startsWith('image/')) ||
+            (/\.(png|jpe?g|gif|svg|webp)$/i.test(files[0].name || ''))
+          );
 
-        const isSingleImg = files.length === 1 && (
-          (files[0].type && files[0].type.startsWith('image/')) ||
-          (/\.(png|jpe?g|gif|svg|webp)$/i.test(files[0].name || ''))
-        );
+          if (isSingleImg) {
+            const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
+            if (dropPos) cm.setCursor(dropPos);
+            uploadAndInsertImage(files[0], dropPos || cm.getCursor());
+          } else if (typeof window.uploadImportFiles === 'function') {
+            window.uploadImportFiles(files);
+          }
+          return;
+        }
 
-        if (isSingleImg) {
-          const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window');
-          if (dropPos) cm.setCursor(dropPos);
-          uploadAndInsertImage(files[0], dropPos || cm.getCursor());
-        } else if (typeof window.uploadImportFiles === 'function') {
-          window.uploadImportFiles(files);
+        if (e.dataTransfer) {
+          const text = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+          if (text) {
+            const dropPos = cm.coordsChar({ left: e.clientX, top: e.clientY }, 'window') || cm.getCursor();
+            const trimmed = text.trim();
+            cm.setCursor(dropPos);
+            insertMarkdownBlock(trimmed, dropPos, null, true);
+          }
         }
       });
 
@@ -1422,7 +1462,26 @@
   });
 
   // --- Insertion Helpers ---
-  function insertMarkdownBlock(snippet, targetPos = null, caretOffset = null) {
+  function insertMarkdownInline(snippet, targetPos = null, caretOffset = null) {
+    return insertMarkdownBlock(snippet, targetPos, caretOffset, true);
+  }
+
+  function insertMarkdownBlock(snippet, targetPos = null, caretOffset = null, isInline = null) {
+    if (typeof snippet !== 'string') snippet = String(snippet || '');
+    const trimmedSnippet = snippet.trim();
+    const shouldBeInline = (typeof isInline === 'boolean')
+      ? isInline
+      : (
+          !snippet.includes('\n') && (
+            /^!\[.*\]\(.*\)$/.test(trimmedSnippet) ||
+            /^\[.*\]\(.*\)$/.test(trimmedSnippet) ||
+            /^https?:\/\/\S+$/i.test(trimmedSnippet) ||
+            /^<img\b[^>]*>$/i.test(trimmedSnippet) ||
+            /^<a\b[^>]*>.*?<\/a>$/i.test(trimmedSnippet) ||
+            !snippet.includes('\n')
+          )
+        );
+
     const offset = (caretOffset === null || caretOffset === undefined) ? snippet.length : caretOffset;
     const cm = getMdEditor();
 
@@ -1433,8 +1492,14 @@
       const cmIndex = cm.indexFromPos(cursor);
       const before = cmVal.substring(0, cmIndex);
       const after = cmVal.substring(cmIndex);
-      const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
-      const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+
+      let prefix = '';
+      let suffix = '';
+      if (!shouldBeInline) {
+        prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+        suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+      }
+
       const block = `${prefix}${snippet}${suffix}`;
 
       doc.replaceRange(block, cursor);
@@ -1449,8 +1514,14 @@
       const end = (targetPos && typeof targetPos.index === 'number') ? targetPos.index : (mdTextarea.selectionEnd !== undefined ? mdTextarea.selectionEnd : mdTextarea.value.length);
       const before = mdTextarea.value.substring(0, start);
       const after = mdTextarea.value.substring(end);
-      const prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
-      const suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+
+      let prefix = '';
+      let suffix = '';
+      if (!shouldBeInline) {
+        prefix = (before.length > 0 && !before.endsWith('\n')) ? '\n\n' : (before.endsWith('\n') && !before.endsWith('\n\n') ? '\n' : '');
+        suffix = (!after.startsWith('\n')) ? '\n\n' : (after.startsWith('\n') && !after.startsWith('\n\n') ? '\n' : '');
+      }
+
       const block = `${prefix}${snippet}${suffix}`;
 
       mdTextarea.value = before + block + after;
@@ -1626,7 +1697,7 @@
         const altText = rawName || 'Picture';
         const cm = getMdEditor();
         const imgTarget = data.filename ? `images/${data.filename}` : (data.url || 'images/image.png');
-        insertMarkdownBlock(`![${altText}](${imgTarget})`, cm ? cm.getCursor() : targetPos);
+        insertMarkdownBlock(`![${altText}](${imgTarget})`, targetPos || (cm ? cm.getCursor() : null), null, true);
       } else {
         alert('Failed to upload picture: ' + (data.error || 'Unknown error'));
         if (mdSaveStatus) mdSaveStatus.style.display = 'none';
@@ -5602,14 +5673,49 @@
 
       mdTextarea.addEventListener('paste', (e) => {
         const clipboard = e.clipboardData || window.clipboardData;
-        if (!clipboard || !clipboard.items) return;
-        for (let i = 0; i < clipboard.items.length; i++) {
-          const item = clipboard.items[i];
-          if (item.kind === 'file' && item.type.startsWith('image/')) {
+        if (!clipboard) return;
+
+        if (clipboard.items) {
+          for (let i = 0; i < clipboard.items.length; i++) {
+            const item = clipboard.items[i];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+              e.preventDefault();
+              const file = item.getAsFile();
+              if (file) uploadAndInsertImage(file, { index: mdTextarea.selectionStart });
+              return;
+            }
+          }
+        }
+
+        const text = clipboard.getData('text/plain');
+        if (text) {
+          const trimmed = text.trim();
+          const start = mdTextarea.selectionStart;
+          const end = mdTextarea.selectionEnd;
+          const hasSelection = (typeof start === 'number' && typeof end === 'number' && start !== end);
+          const isUrl = /^https?:\/\/\S+$/i.test(trimmed) || /^images\/\S+$/i.test(trimmed) || /^#\S+$/i.test(trimmed);
+          const isLinkOrImg = /^!?\[.*\]\(.*\)$/.test(trimmed);
+
+          if (hasSelection && isUrl) {
             e.preventDefault();
-            const file = item.getAsFile();
-            if (file) uploadAndInsertImage(file, { index: mdTextarea.selectionStart });
-            break;
+            const selectedText = mdTextarea.value.substring(start, end);
+            const replacement = `[${selectedText}](${trimmed})`;
+            mdTextarea.value = mdTextarea.value.substring(0, start) + replacement + mdTextarea.value.substring(end);
+            mdTextarea.selectionStart = mdTextarea.selectionEnd = start + replacement.length;
+            onMarkdownContentChanged();
+            saveMarkdownContent(false);
+            return;
+          }
+
+          if ((isUrl || isLinkOrImg) && !trimmed.includes('\n') && (text.startsWith('\n') || text.endsWith('\n') || text.startsWith('\r') || text.endsWith('\r') || text !== trimmed)) {
+            e.preventDefault();
+            const replaceStart = (typeof start === 'number') ? start : mdTextarea.value.length;
+            const replaceEnd = (typeof end === 'number') ? end : replaceStart;
+            mdTextarea.value = mdTextarea.value.substring(0, replaceStart) + trimmed + mdTextarea.value.substring(replaceEnd);
+            mdTextarea.selectionStart = mdTextarea.selectionEnd = replaceStart + trimmed.length;
+            onMarkdownContentChanged();
+            saveMarkdownContent(false);
+            return;
           }
         }
       });
@@ -5711,6 +5817,7 @@
     isDirty: () => mdIsDirty,
     renderPreview: renderMarkdownPreview,
     insertBlock: insertMarkdownBlock,
+    insertInline: insertMarkdownInline,
     uploadImage: uploadAndInsertImage,
     openGraphviz: openGraphvizModal,
     initGraphvizEditor: initGraphvizCodeEditor,
@@ -5753,6 +5860,7 @@
   window.loadMarkdownContent = loadMarkdownContent;
   window.saveMarkdownContent = saveMarkdownContent;
   window.insertMarkdownBlock = insertMarkdownBlock;
+  window.insertMarkdownInline = insertMarkdownInline;
   window.uploadAndInsertImage = uploadAndInsertImage;
   window.openGraphvizModal = openGraphvizModal;
   window.saveAndInsertGraphviz = saveAndInsertGraphviz;
