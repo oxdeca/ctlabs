@@ -284,4 +284,3 @@ Feel free to open an [Issue](https://github.com/oxdeca/ctlabs/issues) or submit 
 ## 📄 License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for more information.
-root@h3:~/ctlabs# 
