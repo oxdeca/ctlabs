@@ -65,8 +65,27 @@ window.loadAvailableRepositories = async function() {
 // ----------------------------------------------------------------------------
 // --- ANSIBLE ---
 // ----------------------------------------------------------------------------
+const ANS_SAVE_BTN_DEFAULT_HTML = '<i class="fas fa-save"></i> Save All Files';
+const ANS_RUN_BTN_DEFAULT_HTML = '<i class="fas fa-play"></i> Run Now';
+let ansSaveTimer = null;
+window.__ansibleIsSaving = false;
+
 window.openAnsTab = function(tabId) {
   window.currentAnsibleTab = tabId;
+
+  // If no save is actively in flight, reset save button to idle state so switching tabs clears any stale timer/state
+  if (!window.__ansibleIsSaving) {
+    if (ansSaveTimer) {
+      clearTimeout(ansSaveTimer);
+      ansSaveTimer = null;
+    }
+    const saveBtn = document.getElementById('ans-save-btn');
+    if (saveBtn && saveBtn.innerHTML !== ANS_SAVE_BTN_DEFAULT_HTML) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = ANS_SAVE_BTN_DEFAULT_HTML;
+    }
+  }
+
   document.querySelectorAll(".ans-tab").forEach(tab => tab.style.display = "none");
       
   document.querySelectorAll(".ans-tablink").forEach(btn => {
@@ -654,6 +673,9 @@ window.loadAnsProfiles = async function() {
 };
 
   window.saveAnsibleConfig = async function(options = {}) {
+      if (window.__ansibleIsSaving) return false;
+      window.__ansibleIsSaving = true;
+
       const resultDiv = document.getElementById('ansible-editor-result');
       if (window.snapshotActiveAnsibleWorkspace) {
         window.snapshotActiveAnsibleWorkspace();
@@ -701,7 +723,10 @@ window.loadAnsProfiles = async function() {
 
       // Disable while the request is in flight so a second click can't fire a duplicate save
       const saveBtn = document.getElementById('ans-save-btn');
-      const saveBtnHtml = saveBtn ? saveBtn.innerHTML : null;
+      if (ansSaveTimer) {
+        clearTimeout(ansSaveTimer);
+        ansSaveTimer = null;
+      }
       if (saveBtn) {
           saveBtn.disabled = true;
           saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -729,7 +754,13 @@ window.loadAnsProfiles = async function() {
               if (saveBtn) {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved';
-                setTimeout(() => { if (saveBtn) saveBtn.innerHTML = saveBtnHtml; }, 2000);
+                if (ansSaveTimer) clearTimeout(ansSaveTimer);
+                ansSaveTimer = setTimeout(() => {
+                  if (saveBtn && !window.__ansibleIsSaving) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = ANS_SAVE_BTN_DEFAULT_HTML;
+                  }
+                }, 2000);
               }
 
               // Update Vim status key indicator if visible
@@ -771,8 +802,14 @@ window.loadAnsProfiles = async function() {
             resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
             resultDiv.innerHTML = '❌ ' + err.message;
           }
-          if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
+          if (ansSaveTimer) clearTimeout(ansSaveTimer);
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = ANS_SAVE_BTN_DEFAULT_HTML;
+          }
           return false;
+      } finally {
+          window.__ansibleIsSaving = false;
       }
   };
 
@@ -870,7 +907,6 @@ window.loadAnsProfiles = async function() {
 
   window.saveAndRunAnsible = async function() {
     const runBtn = document.getElementById('ans-run-btn');
-    const runBtnHtml = runBtn ? runBtn.innerHTML : null;
     if (runBtn) {
       runBtn.disabled = true;
       runBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
@@ -878,7 +914,7 @@ window.loadAnsProfiles = async function() {
 
     const saved = await window.saveAnsibleConfig();
     if (!saved) {
-      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = ANS_RUN_BTN_DEFAULT_HTML; }
       return;
     }
 
@@ -927,7 +963,7 @@ window.loadAnsProfiles = async function() {
             scrollStatusEl: 'ans-modal-scroll-status',
             stopBtnEl: 'ans-modal-stop-adhoc-btn',
             runBtnEl: runBtn,
-            runBtnOriginalHtml: '<i class="fas fa-play"></i> Run Now',
+            runBtnOriginalHtml: ANS_RUN_BTN_DEFAULT_HTML,
             fullLogLinkEl: 'ans-modal-full-log-link',
             pollerKey: 'modal'
           });
@@ -936,11 +972,11 @@ window.loadAnsProfiles = async function() {
         }
       } else {
         alert("Error starting playbook: " + (data.error || 'Failed to start'));
-        if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+        if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = ANS_RUN_BTN_DEFAULT_HTML; }
       }
     } catch(err) {
       alert("Error starting playbook: " + err.message);
-      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = runBtnHtml; }
+      if (runBtn) { runBtn.disabled = false; runBtn.innerHTML = ANS_RUN_BTN_DEFAULT_HTML; }
     }
   };
 
@@ -1814,8 +1850,23 @@ document.addEventListener('DOMContentLoaded', () => {
 // ----------------------------------------------------------------------------
 // --- TERRAFORM ---
 // ----------------------------------------------------------------------------
+const TF_SAVE_BTN_DEFAULT_HTML = '<i class="fas fa-save"></i> Save All Files';
+let tfSaveTimer = null;
+window.__terraformIsSaving = false;
 
 window.openTfTab = function(tabId) {
+      if (!window.__terraformIsSaving) {
+        if (tfSaveTimer) {
+          clearTimeout(tfSaveTimer);
+          tfSaveTimer = null;
+        }
+        const saveBtn = document.getElementById('tf-save-btn');
+        if (saveBtn && saveBtn.innerHTML !== TF_SAVE_BTN_DEFAULT_HTML) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = TF_SAVE_BTN_DEFAULT_HTML;
+        }
+      }
+
       document.querySelectorAll(".tf-tab").forEach(tab => tab.style.display = "none");
       
       document.querySelectorAll(".tf-tablink").forEach(btn => {
@@ -2215,10 +2266,16 @@ window.openTfTab = function(tabId) {
       resultDiv.style.cssText = 'background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid #f59e0b; display: block; margin-top: 15px; padding: 8px;';
       resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving files...';
 
+      if (window.__terraformIsSaving) return false;
+      window.__terraformIsSaving = true;
+
       // Disable while the request is in flight so a second click can't fire a
       // duplicate save (the two POSTs would race the reload below).
       const saveBtn = document.getElementById('tf-save-btn');
-      const saveBtnHtml = saveBtn ? saveBtn.innerHTML : null;
+      if (tfSaveTimer) {
+        clearTimeout(tfSaveTimer);
+        tfSaveTimer = null;
+      }
       if (saveBtn) {
           saveBtn.disabled = true;
           saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -2234,6 +2291,17 @@ window.openTfTab = function(tabId) {
           if (res.ok) {
               resultDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 15px; padding: 8px;';
               resultDiv.textContent = '✅ All files saved successfully.';
+              if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i class="fas fa-check"></i> Saved';
+                if (tfSaveTimer) clearTimeout(tfSaveTimer);
+                tfSaveTimer = setTimeout(() => {
+                  if (saveBtn && !window.__terraformIsSaving) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = TF_SAVE_BTN_DEFAULT_HTML;
+                  }
+                }, 2000);
+              }
               setTimeout(() => location.reload(), 800);
           } else {
               const errText = await res.text();
@@ -2244,7 +2312,13 @@ window.openTfTab = function(tabId) {
       } catch (err) {
           resultDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 15px; padding: 8px; max-height: 200px; overflow-y: auto;';
           resultDiv.innerHTML = '❌ ' + err.message;
-          if (saveBtn) { saveBtn.disabled = false; saveBtn.innerHTML = saveBtnHtml; }
+          if (tfSaveTimer) clearTimeout(tfSaveTimer);
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = TF_SAVE_BTN_DEFAULT_HTML;
+          }
+      } finally {
+          window.__terraformIsSaving = false;
       }
   };
 

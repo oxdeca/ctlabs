@@ -319,6 +319,7 @@ window.addEventListener('keydown', function(e) {
     if (!modal || modal.style.display === 'none') return;
     if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
+        if (window.__ansibleIsSaving) return;
         if (typeof window.saveAnsibleConfig === 'function') {
             window.saveAnsibleConfig();
         }
