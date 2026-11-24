@@ -893,11 +893,11 @@
       renderer: {
         blockquote(quote) {
           const quoteHtml = (typeof quote === 'object' && quote !== null) ? (quote.text || '') : (quote || '');
-          const match = quoteHtml.match(/^\s*<p>\s*\[!(NOTE|INFO|TIP|IMPORTANT|WARNING|CAUTION)\](?:\s*<br\s*\/?>|\n|\s+)?([\s\S]*?)<\/p>([\s\S]*)$/i);
-          if (!match) {
+          const pMatch = quoteHtml.match(/^\s*<p>\s*\[!(NOTE|INFO|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*([\s\S]*?)<\/p>([\s\S]*)$/i);
+          if (!pMatch) {
             return `<blockquote>${quoteHtml}</blockquote>`;
           }
-          const type = match[1].toLowerCase();
+          const type = pMatch[1].toLowerCase();
           const ALERT_CONFIGS = {
             note:      { title: 'Note',      icon: 'fas fa-info-circle' },
             info:      { title: 'Info',      icon: 'fas fa-info-circle' },
@@ -907,18 +907,37 @@
             caution:   { title: 'Caution',   icon: 'fas fa-fire' }
           };
           const cfg = ALERT_CONFIGS[type] || ALERT_CONFIGS.note;
-          const firstP = match[2].trim();
-          const rest = match[3] || '';
-          let body = '';
-          if (firstP) {
-            body += `<p>${firstP}</p>`;
-          }
-          body += rest;
+          const firstPContent = pMatch[2];
+          const rest = pMatch[3] || '';
 
-          return `<div class="markdown-alert markdown-alert-${type}">` +
-                 `<div class="markdown-alert-title"><i class="${cfg.icon}" title="${cfg.title}"></i></div>` +
-                 `<div class="markdown-alert-content">${body}</div>` +
-                 `</div>`;
+          const lines = firstPContent.split(/<br\s*\/?>|\n/);
+          const rawTitle = (lines[0] || '').trim();
+          const firstPBody = lines.slice(1).join('<br>').trim();
+
+          if (rawTitle) {
+            let body = '';
+            if (firstPBody) {
+              body += `<p>${firstPBody}</p>`;
+            }
+            body += rest;
+
+            return `<div class="markdown-alert markdown-alert-${type}">` +
+                   `<div class="markdown-alert-title"><i class="${cfg.icon}" title="${cfg.title}"></i> <span>${rawTitle}</span></div>` +
+                   (body ? `<div class="markdown-alert-content">${body}</div>` : '') +
+                   `</div>`;
+          } else {
+            let body = '';
+            if (firstPBody) {
+              body += `<p><i class="${cfg.icon}" title="${cfg.title}"></i> ${firstPBody}</p>`;
+            } else {
+              body += `<p><i class="${cfg.icon}" title="${cfg.title}"></i></p>`;
+            }
+            body += rest;
+
+            return `<div class="markdown-alert markdown-alert-${type} markdown-alert-compact">` +
+                   `<div class="markdown-alert-content">${body}</div>` +
+                   `</div>`;
+          }
         },
         image(arg0, arg1, arg2) {
           let href = '', title = '', text = '';
@@ -1563,44 +1582,44 @@
     callout_note: {
       template: (selected) => {
         const text = selected ? selected : 'Note details here...';
-        return `> [!NOTE]\n> ${text}`;
+        return `> [!NOTE] Note\n> ${text}`;
       },
-      caretOffset: 12
+      caretOffset: 14
     },
     callout_info: {
       template: (selected) => {
         const text = selected ? selected : 'Info details here...';
-        return `> [!INFO]\n> ${text}`;
+        return `> [!INFO] Info\n> ${text}`;
       },
-      caretOffset: 12
+      caretOffset: 14
     },
     callout_tip: {
       template: (selected) => {
         const text = selected ? selected : 'Tip advice here...';
-        return `> [!TIP]\n> ${text}`;
+        return `> [!TIP] Tip\n> ${text}`;
       },
-      caretOffset: 11
+      caretOffset: 13
     },
     callout_warning: {
       template: (selected) => {
         const text = selected ? selected : 'Warning details here...';
-        return `> [!WARNING]\n> ${text}`;
+        return `> [!WARNING] Warning\n> ${text}`;
       },
-      caretOffset: 15
+      caretOffset: 17
     },
     callout_important: {
       template: (selected) => {
         const text = selected ? selected : 'Important details here...';
-        return `> [!IMPORTANT]\n> ${text}`;
+        return `> [!IMPORTANT] Important\n> ${text}`;
       },
-      caretOffset: 17
+      caretOffset: 19
     },
     callout_caution: {
       template: (selected) => {
         const text = selected ? selected : 'Caution details here...';
-        return `> [!CAUTION]\n> ${text}`;
+        return `> [!CAUTION] Caution\n> ${text}`;
       },
-      caretOffset: 15
+      caretOffset: 17
     },
     code_block: {
       template: (selected) => {
@@ -1615,6 +1634,62 @@
     }
   };
 
+  let activeSnippetIndex = -1;
+
+  function focusMdEditor() {
+    const cm = getMdEditor();
+    if (cm) {
+      cm.focus();
+    } else if (mdTextarea) {
+      mdTextarea.focus();
+    }
+  }
+
+  function clearSnippetActive() {
+    if (!mdSnippetsMenu) return;
+    activeSnippetIndex = -1;
+    const items = mdSnippetsMenu.querySelectorAll('.md-snippet-item');
+    items.forEach(item => {
+      item.classList.remove('active');
+      item.style.background = 'transparent';
+    });
+  }
+
+  function setSnippetActiveIndex(idx, shouldFocus = true) {
+    if (!mdSnippetsMenu) return;
+    const items = Array.from(mdSnippetsMenu.querySelectorAll('.md-snippet-item'));
+    if (!items.length) {
+      activeSnippetIndex = -1;
+      return;
+    }
+    if (idx < 0) {
+      clearSnippetActive();
+      return;
+    }
+    if (idx >= items.length) idx = items.length - 1;
+    activeSnippetIndex = idx;
+
+    items.forEach((item, i) => {
+      if (i === idx) {
+        item.classList.add('active');
+        item.style.background = '#334155';
+        if (shouldFocus) {
+          try {
+            item.focus({ preventScroll: true });
+          } catch (err) {
+            item.focus();
+          }
+        }
+        if (typeof item.scrollIntoView === 'function') {
+          item.scrollIntoView({ block: 'nearest' });
+        }
+      } else {
+        item.classList.remove('active');
+        item.style.background = 'transparent';
+      }
+    });
+  }
+
   function toggleMdSnippetsMenu(force) {
     if (!mdSnippetsMenu) return;
     const isClosed = !mdSnippetsMenu.style.display || mdSnippetsMenu.style.display === 'none';
@@ -1624,14 +1699,25 @@
       mdSnippetsBtn.style.background = show ? '#334155' : '#1e293b';
       mdSnippetsBtn.style.borderColor = show ? '#38bdf8' : '#475569';
     }
-    if (show && mdEmojiMenu && mdEmojiMenu.style.display !== 'none') {
-      toggleMdEmojiMenu(false);
-    }
-    if (show && mdGitMenu && mdGitMenu.style.display !== 'none') {
-      mdGitMenu.style.display = 'none';
-    }
-    if (show && mdSettingsMenu && mdSettingsMenu.style.display !== 'none') {
-      mdSettingsMenu.style.display = 'none';
+    if (show) {
+      if (mdEmojiMenu && mdEmojiMenu.style.display !== 'none') {
+        toggleMdEmojiMenu(false);
+      }
+      if (mdGitMenu && mdGitMenu.style.display !== 'none') {
+        mdGitMenu.style.display = 'none';
+      }
+      if (mdSettingsMenu && mdSettingsMenu.style.display !== 'none') {
+        mdSettingsMenu.style.display = 'none';
+      }
+      setSnippetActiveIndex(0, true);
+      setTimeout(() => {
+        if (mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+          setSnippetActiveIndex(activeSnippetIndex >= 0 ? activeSnippetIndex : 0, true);
+        }
+      }, 30);
+    } else {
+      setSnippetActiveIndex(-1, false);
+      focusMdEditor();
     }
   }
 
@@ -1914,6 +2000,9 @@
     const shouldOpen = (open !== undefined) ? open : isClosed;
     mdEmojiMenu.style.display = shouldOpen ? 'flex' : 'none';
     if (shouldOpen) {
+      if (mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+        toggleMdSnippetsMenu(false);
+      }
       if (ctlabsEmojiList.length === 0) {
         await loadCtlabsEmojis();
       }
@@ -3086,6 +3175,9 @@
     const shouldOpen = (open !== undefined) ? open : isClosed;
     mdGraphvizEmojiMenu.style.display = shouldOpen ? 'flex' : 'none';
     if (shouldOpen) {
+      if (mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+        toggleMdSnippetsMenu(false);
+      }
       if (ctlabsEmojiList.length === 0) {
         await loadCtlabsEmojis();
       }
@@ -5459,6 +5551,9 @@
         mdGitMenu.style.display = isOpen ? 'none' : 'block';
         mdGitBtn.style.background = isOpen ? '#1e293b' : '#334155';
         mdGitBtn.style.borderColor = isOpen ? '#475569' : '#10b981';
+        if (!isOpen && mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+          toggleMdSnippetsMenu(false);
+        }
       });
 
       document.addEventListener('click', (e) => {
@@ -5502,6 +5597,9 @@
         mdSettingsMenu.style.display = isOpen ? 'none' : 'block';
         mdSettingsBtn.style.background = isOpen ? '#1e293b' : '#334155';
         mdSettingsBtn.style.borderColor = isOpen ? '#475569' : '#38bdf8';
+        if (!isOpen && mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
+          toggleMdSnippetsMenu(false);
+        }
       });
 
       document.addEventListener('click', (e) => {
@@ -5576,7 +5674,12 @@
     }
 
     if (mdSnippetsMenu) {
-      mdSnippetsMenu.querySelectorAll('.md-snippet-item').forEach(item => {
+      const items = Array.from(mdSnippetsMenu.querySelectorAll('.md-snippet-item'));
+      items.forEach((item, index) => {
+        item.addEventListener('mouseenter', () => {
+          setSnippetActiveIndex(index, false);
+        });
+
         item.addEventListener('click', (e) => {
           e.stopPropagation();
           const snippetKey = item.getAttribute('data-snippet');
@@ -5584,6 +5687,55 @@
         });
       });
     }
+
+    // Capture-phase keydown listener for snippets menu keyboard navigation
+    window.addEventListener('keydown', (e) => {
+      if (!mdSnippetsMenu || mdSnippetsMenu.style.display === 'none') return;
+
+      const items = Array.from(mdSnippetsMenu.querySelectorAll('.md-snippet-item'));
+      if (!items.length) return;
+
+      const key = e.key;
+
+      if (key === 'ArrowDown' || key === 'Down') {
+        e.preventDefault();
+        e.stopPropagation();
+        const nextIdx = (activeSnippetIndex + 1) % items.length;
+        setSnippetActiveIndex(nextIdx, true);
+      } else if (key === 'ArrowUp' || key === 'Up') {
+        e.preventDefault();
+        e.stopPropagation();
+        const prevIdx = (activeSnippetIndex - 1 + items.length) % items.length;
+        setSnippetActiveIndex(prevIdx, true);
+      } else if (key === 'Home') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSnippetActiveIndex(0, true);
+      } else if (key === 'End') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSnippetActiveIndex(items.length - 1, true);
+      } else if (key === 'Enter' || key === ' ' || key === 'Spacebar') {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetIdx = (activeSnippetIndex >= 0 && activeSnippetIndex < items.length) ? activeSnippetIndex : 0;
+        items[targetIdx].click();
+      } else if (key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMdSnippetsMenu(false);
+      } else if (key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        const step = e.shiftKey ? -1 : 1;
+        const nextIdx = (activeSnippetIndex + step + items.length) % items.length;
+        setSnippetActiveIndex(nextIdx, true);
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (key === 's' || key === 'S')) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleMdSnippetsMenu(false);
+      }
+    }, true);
 
     document.addEventListener('click', (e) => {
       if (mdSnippetsMenu && mdSnippetsMenu.style.display !== 'none') {
@@ -5642,10 +5794,13 @@
           mdTextarea.value = mdTextarea.value.substring(0, start) + '  ' + mdTextarea.value.substring(end);
           mdTextarea.selectionStart = mdTextarea.selectionEnd = start + 2;
           onMarkdownContentChanged();
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
           e.preventDefault();
           saveMarkdownContent(false);
-        } else if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+          e.preventDefault();
+          toggleMdSnippetsMenu();
+        } else if ((e.ctrlKey || e.metaKey) && (e.key === 'e' || e.key === 'E')) {
           e.preventDefault();
           toggleMdEmojiMenu();
         } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
@@ -5836,6 +5991,8 @@
     toggleEmoji: toggleMdEmojiMenu,
     toggleSnippets: toggleMdSnippetsMenu,
     insertSnippet: insertMarkdownSnippet,
+    setActiveSnippet: setSnippetActiveIndex,
+    focusEditor: focusMdEditor,
     snippets: MD_SNIPPETS,
     get emojis() { return getEmojiList(); },
     replaceEmojiShortcodes: replaceEmojiShortcodes,

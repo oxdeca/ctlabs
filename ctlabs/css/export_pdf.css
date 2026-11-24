@@ -147,6 +147,32 @@ blockquote p:last-child {
 }
 .markdown-alert-title i {
   font-size: 1.15em;
+  flex-shrink: 0;
+}
+.markdown-alert.markdown-alert-compact .markdown-alert-content > p:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.markdown-alert.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  font-size: 1.15em;
+  flex-shrink: 0;
+}
+.markdown-alert-note.markdown-alert-compact .markdown-alert-content > p:first-child i,
+.markdown-alert-info.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  color: #0284c7;
+}
+.markdown-alert-tip.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  color: #059669;
+}
+.markdown-alert-important.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  color: #7c3aed;
+}
+.markdown-alert-warning.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  color: #d97706;
+}
+.markdown-alert-caution.markdown-alert-compact .markdown-alert-content > p:first-child i {
+  color: #dc2626;
 }
 
 .markdown-alert-note,

@@ -2548,16 +2548,20 @@ class RecordingService
       prefix = $1
       tag = $2.upcase
       rest = $3.to_s.strip
-      label = case tag
-              when 'NOTE' then 'Note:'
-              when 'INFO' then 'Info:'
-              when 'TIP' then 'Tip:'
-              when 'IMPORTANT' then 'Important:'
-              when 'WARNING' then 'Warning:'
-              when 'CAUTION' then 'Caution:'
-              else "#{tag.capitalize}:"
-              end
-      rest.empty? ? "#{prefix}**#{label}**" : "#{prefix}**#{label}** #{rest}"
+      if rest.empty?
+        label = case tag
+                when 'NOTE' then 'Note:'
+                when 'INFO' then 'Info:'
+                when 'TIP' then 'Tip:'
+                when 'IMPORTANT' then 'Important:'
+                when 'WARNING' then 'Warning:'
+                when 'CAUTION' then 'Caution:'
+                else "#{tag.capitalize}:"
+                end
+        "#{prefix}**#{label}**"
+      else
+        "#{prefix}**#{rest}**"
+      end
     end
 
     # 1. Convert HTML <img> tags to Markdown images with attributes
