@@ -251,9 +251,12 @@
   align-items: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 0.95em;
-  margin-bottom: 8px;
+  font-size: 1.05em;
+  margin-bottom: 6px;
   line-height: 1.2;
+}
+.markdown-body .markdown-alert .markdown-alert-title i {
+  font-size: 1.15em;
 }
 .markdown-body .markdown-alert .markdown-alert-content {
   color: #cbd5e1;

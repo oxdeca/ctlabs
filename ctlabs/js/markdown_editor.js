@@ -916,7 +916,7 @@
           body += rest;
 
           return `<div class="markdown-alert markdown-alert-${type}">` +
-                 `<div class="markdown-alert-title"><i class="${cfg.icon}"></i> ${cfg.title}</div>` +
+                 `<div class="markdown-alert-title"><i class="${cfg.icon}" title="${cfg.title}"></i></div>` +
                  `<div class="markdown-alert-content">${body}</div>` +
                  `</div>`;
         },
