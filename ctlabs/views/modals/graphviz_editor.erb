@@ -8,95 +8,38 @@
 <!-- Graphviz Diagram Modal -->
 <div id="md-graphviz-modal" class="w3-modal" style="z-index: 10001; padding: 2vh 2vw; box-sizing: border-box; overflow: hidden;">
   <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; width: 100%; max-width: none; height: 100%; max-height: none; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);">
-    <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none;">
-      <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;"><i class="fas fa-project-diagram"></i> Graphviz Diagram</h3>
-      <span onclick="document.getElementById('md-graphviz-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+    <header style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 10px 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; flex: none; width: 100%; box-sizing: border-box;">
+      <h3 style="margin: 0; font-size: 1.1em; font-weight: 600; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-project-diagram"></i> Graphviz Diagram
+      </h3>
+      <button type="button" onclick="document.getElementById('md-graphviz-modal').style.display='none'" class="w3-button w3-small w3-round w3-hover-red" style="background: transparent; border: 1px solid transparent; color: #94a3b8; padding: 4px 10px; display: inline-flex; align-items: center; justify-content: center; height: 28px; font-size: 1.2em; line-height: 1; flex-shrink: 0; cursor: pointer;" title="Close (Esc)">
+        &times;
+      </button>
     </header>
-    <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; min-height: 0;">
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; flex: none;">
-        <div style="flex: 1 1 360px; min-width: 280px;">
-          <label for="md-graphviz-existing" style="display: flex; justify-content: space-between; align-items: center; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">
-            <span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-sitemap" style="color: #38bdf8;"></i> Diagram</span>
-            <span id="md-graphviz-current-label" style="font-size: 0.82em; font-weight: 500; color: #38bdf8; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-          </label>
-          <div style="display: flex; gap: 6px; align-items: center;">
-            <select id="md-graphviz-existing" title="Select a diagram to edit or choose New Diagram" style="flex: 1; min-width: 130px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 7px 10px; border-radius: 4px; font-size: 0.88em; height: 38px;">
-              <option value="">+ New diagram (unsaved)</option>
-            </select>
-            <input type="hidden" id="md-graphviz-name" value="" />
-            <button type="button" id="md-graphviz-new-btn" title="Create a new blank diagram" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; padding: 0 11px; height: 38px; font-size: 0.84em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; flex: none; box-sizing: border-box;">
-              <i class="fas fa-plus"></i> <span>New</span>
-            </button>
-            <button type="button" id="md-graphviz-save-as-new-btn" title="Save current diagram as a new diagram with a new name" class="w3-button w3-round" style="background: #334155; border: 1px solid #475569; color: #e2e8f0; padding: 0 11px; height: 38px; font-size: 0.84em; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; flex: none; box-sizing: border-box;">
-              <i class="fas fa-copy"></i> <span>Save as New</span>
-            </button>
-            <button type="button" id="md-graphviz-rename-btn" title="Rename this diagram" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; padding: 0 10px; height: 38px; font-size: 0.85em; display: none; align-items: center; justify-content: center; flex: none; box-sizing: border-box;">
+    <div style="padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0;">
+      <!-- Toolbar below header: New, Title on left; Save, Settings on right -->
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; flex: none; background: #131d31; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px;">
+        <!-- Left: Title input, Rename -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 auto; min-width: 250px;">
+          <input type="hidden" id="md-graphviz-existing" value="" />
+
+          <div style="display: inline-flex; align-items: center; gap: 6px; flex: 1 1 300px; max-width: 520px;">
+            <span style="color: #94a3b8; font-size: 0.84em; font-weight: 500; display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
+              <i class="fas fa-tag" style="color: #38bdf8;"></i> Title:
+            </span>
+            <input type="text" id="md-graphviz-name" placeholder="diagram_name" spellcheck="false" autocomplete="off" title="Diagram title (filename)" style="flex: 1; min-width: 180px; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 10px; border-radius: 4px; font-size: 0.88em; height: 32px; font-family: monospace;" />
+            <button type="button" id="md-graphviz-rename-btn" title="Rename this diagram file on disk" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; width: 32px; height: 32px; padding: 0; font-size: 0.84em; display: none; align-items: center; justify-content: center; flex: none; box-sizing: border-box;">
               <i class="fas fa-pencil-alt"></i>
             </button>
           </div>
         </div>
-        <div style="flex: 0 1 160px; min-width: 130px;">
-          <label for="md-graphviz-engine" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Layout engine</label>
-          <select id="md-graphviz-engine" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
-            <option value="dot" selected>dot (hierarchical)</option>
-            <option value="neato">neato (spring model)</option>
-            <option value="fdp">fdp (force-directed)</option>
-            <option value="sfdp">sfdp (large graphs)</option>
-            <option value="circo">circo (circular)</option>
-            <option value="twopi">twopi (radial)</option>
-            <option value="osage">osage (clustered)</option>
-            <option value="patchwork">patchwork (treemap)</option>
-          </select>
-        </div>
-        <div style="flex: 0 1 200px; min-width: 170px;">
-          <label for="md-graphviz-template" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Insert template</label>
-          <select id="md-graphviz-template" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em;">
-            <option value="">Select template…</option>
-            <optgroup label="Current Lab Maps">
-              <option value="lab_topo">Topology (Data Network)</option>
-              <option value="lab_mgmt_topo">Topology (Management Network)</option>
-              <option value="lab_con">Connections (Data Network)</option>
-              <option value="lab_mgmt_con">Connections (Management Network)</option>
-            </optgroup>
-            <optgroup label="ERB Topology Templates (Building Blocks)">
-              <option value="erb_enterprise">Enterprise Network (ERB)</option>
-              <option value="erb_k8s">Kubernetes Cluster (ERB)</option>
-              <option value="erb_microservices">Microservices &amp; DBs (ERB)</option>
-              <option value="erb_dynamic_loop">Dynamic Hosts Loop (ERB)</option>
-            </optgroup>
-            <optgroup label="Classic DOT Templates">
-              <option value="flowchart_lr">Flowchart (LR)</option>
-              <option value="flowchart_tb">Flowchart (TB)</option>
-              <option value="network">Network Topology</option>
-              <option value="state_machine">State Machine</option>
-              <option value="records">Data Structures / Record</option>
-            </optgroup>
-          </select>
-        </div>
-        <div style="flex: 0 0 auto;">
-          <label for="md-graphviz-bg" style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Preview BG</label>
-          <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box; gap: 4px;">
-            <button type="button" id="md-graphviz-bg-white" title="White background" style="width: 26px; height: 26px; border-radius: 3px; border: 2px solid #38bdf8; background: #ffffff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
-            <button type="button" id="md-graphviz-bg-slate" title="Slate dark background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
-            <button type="button" id="md-graphviz-bg-checker" title="Transparent checkerboard background" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; background: repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 8px 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
-            <label title="Custom color picker" style="width: 26px; height: 26px; border-radius: 3px; border: 1px solid #475569; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin: 0; background: #334155;">
-              <i class="fas fa-eye-dropper" style="font-size: 11px; color: #94a3b8; pointer-events: none;"></i>
-              <input type="color" id="md-graphviz-bg-picker" value="#ffffff" style="opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;" />
-            </label>
-          </div>
-        </div>
-        <div style="flex: 0 0 auto;">
-          <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px;">Panes</label>
-          <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 38px; box-sizing: border-box;">
-            <button type="button" id="md-graphviz-layout-side" title="Side by side: Source left, Preview right" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: #0284c7; color: #ffffff; font-weight: 600;">
-              <i class="fas fa-columns"></i>
-              <span>Left / Right</span>
-            </button>
-            <button type="button" id="md-graphviz-layout-stack" title="Stacked: Preview top, Source bottom" style="padding: 4px 10px; font-size: 0.82em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 32px; transition: background 0.15s, color 0.15s; background: transparent; color: #94a3b8; font-weight: 400;">
-              <i class="fas fa-bars"></i>
-              <span>Top / Bottom</span>
-            </button>
-          </div>
+
+        <!-- Right: Save Changes -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+          <button type="button" id="md-graphviz-insert-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; height: 32px; padding: 0 14px; font-size: 0.84em; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box;">
+            <i id="md-graphviz-insert-icon" class="fas fa-save"></i>
+            <span id="md-graphviz-insert-text">Save Changes</span>
+          </button>
         </div>
       </div>
       <div id="md-graphviz-split-container" style="display: flex; flex-direction: row; align-items: stretch; flex: 1; min-height: 0; position: relative;">
@@ -126,20 +69,32 @@
                   <!-- Dynamic Custom Blocks Section (Global) -->
                   <div id="md-graphviz-custom-blocks-container"></div>
 
-                  <!-- 1. ERB Loops & Logic (On top!) -->
-                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 2px;">⚡ ERB Loops &amp; Logic</div>
+                  <!-- 1. Layout Themes -->
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 2px;">🎨 Layout Themes</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_slate" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🌌 Cyber Slate (Dark)</span><code style="font-size:0.85em; color:#38bdf8;">theme: :slate</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_light" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>📄 Clean Paper (Light)</span><code style="font-size:0.85em; color:#0284c7;">theme: :light</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_nord" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>❄️ Nord Arctic (Cyan)</span><code style="font-size:0.85em; color:#88c0d0;">theme: :nord</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_dracula" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🧛 Dracula (Purple)</span><code style="font-size:0.85em; color:#bd93f9;">theme: :dracula</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_amber" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🍯 Amber Gold (Warm)</span><code style="font-size:0.85em; color:#f59e0b;">theme: :amber</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="theme_emerald" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🌲 Emerald Forest (Green)</span><code style="font-size:0.85em; color:#10b981;">theme: :emerald</code></button>
+
+                  <!-- 2. ERB Loops & Logic -->
+                  <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 4px;">⚡ ERB Loops &amp; Logic</div>
                   <button type="button" class="md-gv-snippet-item" data-snippet="header" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🎨 Graph Header</span><code style="font-size:0.85em; color:#94a3b8;">graph_header(...)</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="loop" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🔁 Loop (.each)</span><code style="font-size:0.85em; color:#94a3b8;">&lt;% ...each %&gt;</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="condition" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>❓ Condition (if/else)</span><code style="font-size:0.85em; color:#94a3b8;">&lt;% if ... %&gt;</code></button>
 
                   <!-- 2. General Nodes & HTML Formatting -->
                   <div style="padding: 4px 10px; font-size: 0.75em; text-transform: uppercase; letter-spacing: 0.5px; color: #38bdf8; font-weight: 700; background: #1e293b; margin-top: 4px;">🔲 General Nodes &amp; HTML</div>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="step" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">⚙️ Step / Task (DSL)</span><code style="font-size:0.85em; color:#94a3b8;">step(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="decision" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#f59e0b;">🔶 Decision Diamond (DSL)</span><code style="font-size:0.85em; color:#94a3b8;">decision(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="state_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">🔄 State Node (DSL)</span><code style="font-size:0.85em; color:#94a3b8;">state_node(...)</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="plain_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🔲 Plain Node (DSL)</span><code style="font-size:0.85em; color:#94a3b8;">plain_node(...)</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="plain_node_dot" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>⬜ Plain Node (DOT)</span><code style="font-size:0.85em; color:#94a3b8;">node [shape=box]</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="html_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>📑 HTML Node (DSL)</span><code style="font-size:0.85em; color:#94a3b8;">html_node(...)</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="html_node_dot" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>📊 HTML Table (DOT)</span><code style="font-size:0.85em; color:#94a3b8;">&lt;table border="1"&gt;</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="html_font_attr" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span>🎨 HTML Font Tag</span><code style="font-size:0.85em; color:#94a3b8;">&lt;font color="..."&gt;</code></button>
-                  <button type="button" class="md-gv-snippet-item" data-snippet="table_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">📋 Table Record</span><code style="font-size:0.85em; color:#94a3b8;">table_node(...)</code></button>
+                  <button type="button" class="md-gv-snippet-item" data-snippet="table_node" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">📋 Table Record</span><code style="font-size:0.85em; color:#94a3b8;">table_node(..., icon: "📊")</code></button>
                   <button type="button" class="md-gv-snippet-item" data-snippet="badge" style="display: flex; align-items: center; justify-content: space-between; width: 100%; text-align: left; padding: 6px 12px; background: transparent; border: none; color: #cbd5e1; cursor: pointer;"><span style="color:#38bdf8;">🏷️ Pill Badge</span><code style="font-size:0.85em; color:#94a3b8;">badge(...)</code></button>
 
                   <!-- 3. Network & Hardware -->
@@ -287,51 +242,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- Editor Settings Menu (Wrap, Vim, Font) -->
-              <div id="md-graphviz-settings-wrapper" style="position: relative; display: inline-block;">
-                <button type="button" id="md-graphviz-settings-btn" title="Editor settings (Wrap, Vim, Font)" style="height: 28px; width: 28px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-cog" style="color: #94a3b8;"></i>
-                </button>
-                <div id="md-graphviz-settings-menu" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 4px; min-width: 240px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
-                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
-                    Editor Settings
-                  </div>
-                  <label id="md-graphviz-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                      <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap lines
-                    </span>
-                    <input type="checkbox" id="md-graphviz-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
-                  </label>
-                  <label id="md-graphviz-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                    <span style="display: flex; align-items: center; gap: 8px;">
-                      <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
-                    </span>
-                    <input type="checkbox" id="md-graphviz-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
-                  </label>
-                  <div style="padding: 8px 12px; border-top: 1px solid #334155; margin-top: 4px;">
-                    <div style="font-size: 0.82em; color: #cbd5e1; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                      <i class="fas fa-font" style="color: #38bdf8; width: 14px; text-align: center;"></i> Font family
-                    </div>
-                    <select id="md-graphviz-font-family" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 0.82em; cursor: pointer;">
-                      <option value="courier" selected>Courier</option>
-                      <option value="mono">System Monospace</option>
-                      <option value="consolas">Consolas / SFMono</option>
-                      <option value="fira">Fira Code</option>
-                    </select>
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
-                      <span style="font-size: 0.82em; color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
-                        <i class="fas fa-text-height" style="color: #38bdf8; width: 14px; text-align: center;"></i> Font size
-                      </span>
-                      <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 26px; box-sizing: border-box;">
-                        <button type="button" id="md-graphviz-font-dec" title="Decrease editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0;">&minus;</button>
-                        <span id="md-graphviz-font-size-label" style="min-width: 32px; text-align: center; font-size: 0.75em; color: #38bdf8; font-family: monospace; font-weight: 600; user-select: none;">13px</span>
-                        <button type="button" id="md-graphviz-font-inc" title="Increase editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0;">+</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
             <span style="color: #64748b; font-size: 0.75em;">Tab = indent &middot; Ctrl+S = save &middot; Ctrl+Enter = render</span>
           </div>
@@ -375,7 +285,106 @@
           <i id="md-graphviz-splitter-grip" class="fas fa-grip-vertical" style="color: #64748b; font-size: 10px; pointer-events: none;"></i>
         </div>
         <div id="md-graphviz-preview-pane" style="display: flex; flex-direction: column; min-height: 0; min-width: 150px; flex: 1; box-sizing: border-box;">
-          <label style="display: block; color: #f8fafc; font-size: 0.85em; font-weight: 600; margin-bottom: 6px; flex: none;">Preview <span style="color: #64748b; font-weight: 400;">(live &mdash; drag to pan, scroll to zoom)</span></label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex: none; gap: 8px; height: 28px;">
+            <label style="color: #f8fafc; font-size: 0.85em; font-weight: 600; margin: 0; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="fas fa-eye" style="color: #38bdf8;"></i> Preview <span style="color: #64748b; font-weight: 400; font-size: 0.88em;">(live)</span>
+            </label>
+            <div style="display: inline-flex; align-items: center; gap: 6px;">
+              <div id="md-graphviz-settings-wrapper" style="position: relative; display: inline-block; z-index: 50;">
+                <button type="button" id="md-graphviz-settings-btn" title="Editor &amp; Preview Settings" style="height: 28px; width: 28px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-cog" style="color: #94a3b8; font-size: 0.95em;"></i>
+                </button>
+                <div id="md-graphviz-settings-menu" style="display: none; position: absolute; right: 0; top: calc(100% + 4px); width: 280px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 12px 30px rgba(0,0,0,0.7); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                  <!-- Section 1: Editor Settings -->
+                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                    <i class="fas fa-edit" style="color: #38bdf8; margin-right: 4px;"></i> Editor Settings
+                  </div>
+                  <label id="md-graphviz-setting-wrap-label" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-align-left" style="color: #38bdf8; width: 14px; text-align: center;"></i> Wrap lines
+                    </span>
+                    <input type="checkbox" id="md-graphviz-setting-wrap-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+                  </label>
+                  <label id="md-graphviz-setting-vim-label" style="display: flex; align-items: center; justify-content: space-between; padding: 7px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                      <i class="fas fa-terminal" style="color: #22c55e; width: 14px; text-align: center;"></i> Vi / Vim keybindings
+                    </span>
+                    <input type="checkbox" id="md-graphviz-setting-vim-checkbox" style="cursor: pointer; accent-color: #22c55e; width: 15px; height: 15px;" />
+                  </label>
+                  <div style="padding: 7px 12px; border-top: 1px solid #334155;">
+                    <div style="font-size: 0.82em; color: #cbd5e1; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-font" style="color: #38bdf8; width: 14px; text-align: center;"></i> Font family
+                    </div>
+                    <select id="md-graphviz-font-family" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #cbd5e1; padding: 4px 8px; border-radius: 4px; font-size: 0.82em; cursor: pointer;">
+                      <option value="courier" selected>Courier</option>
+                      <option value="mono">System Monospace</option>
+                      <option value="consolas">Consolas / SFMono</option>
+                      <option value="fira">Fira Code</option>
+                    </select>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                      <span style="font-size: 0.82em; color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-text-height" style="color: #38bdf8; width: 14px; text-align: center;"></i> Font size
+                      </span>
+                      <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; height: 26px; box-sizing: border-box;">
+                        <button type="button" id="md-graphviz-font-dec" title="Decrease editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0;">&minus;</button>
+                        <span id="md-graphviz-font-size-label" style="min-width: 32px; text-align: center; font-size: 0.75em; color: #38bdf8; font-family: monospace; font-weight: 600; user-select: none;">13px</span>
+                        <button type="button" id="md-graphviz-font-inc" title="Increase editor font size" style="width: 22px; height: 100%; border: none; background: transparent; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; padding: 0;">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Section 2: Preview Settings -->
+                  <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-top: 1px solid #334155; border-bottom: 1px solid #334155; margin-top: 4px; margin-bottom: 4px;">
+                    <i class="fas fa-eye" style="color: #38bdf8; margin-right: 4px;"></i> Preview Settings
+                  </div>
+                  <div style="padding: 6px 12px;">
+                    <div style="font-size: 0.82em; color: #cbd5e1; margin-bottom: 5px; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-cogs" style="color: #38bdf8; width: 14px; text-align: center;"></i> Layout engine
+                    </div>
+                    <select id="md-graphviz-engine" title="Layout engine" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 4px 8px; border-radius: 4px; font-size: 0.82em; cursor: pointer;">
+                      <option value="dot" selected>dot (hierarchical)</option>
+                      <option value="neato">neato (spring model)</option>
+                      <option value="fdp">fdp (force-directed)</option>
+                      <option value="sfdp">sfdp (large graphs)</option>
+                      <option value="circo">circo (circular)</option>
+                      <option value="twopi">twopi (radial)</option>
+                      <option value="osage">osage (clustered)</option>
+                      <option value="patchwork">patchwork (treemap)</option>
+                    </select>
+                  </div>
+                  <div style="padding: 6px 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.82em; color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-fill-drip" style="color: #38bdf8; width: 14px; text-align: center;"></i> Background
+                    </span>
+                    <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 30px; box-sizing: border-box; gap: 4px;">
+                      <button type="button" id="md-graphviz-bg-white" title="White background" style="width: 22px; height: 22px; border-radius: 3px; border: 2px solid #38bdf8; background: #ffffff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                      <button type="button" id="md-graphviz-bg-slate" title="Slate dark background" style="width: 22px; height: 22px; border-radius: 3px; border: 1px solid #475569; background: #0f172a; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                      <button type="button" id="md-graphviz-bg-checker" title="Checkerboard background" style="width: 22px; height: 22px; border-radius: 3px; border: 1px solid #475569; background: repeating-conic-gradient(#cbd5e1 0% 25%, #f1f5f9 0% 50%) 50% / 8px 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0;"></button>
+                      <label title="Custom color picker" style="width: 22px; height: 22px; border-radius: 3px; border: 1px solid #475569; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; margin: 0; background: #334155;">
+                        <i class="fas fa-eye-dropper" style="font-size: 10px; color: #94a3b8; pointer-events: none;"></i>
+                        <input type="color" id="md-graphviz-bg-picker" value="#ffffff" style="opacity: 0; position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer;" />
+                      </label>
+                    </div>
+                  </div>
+                  <div style="padding: 6px 12px 10px 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.82em; color: #cbd5e1; display: flex; align-items: center; gap: 6px;">
+                      <i class="fas fa-columns" style="color: #38bdf8; width: 14px; text-align: center;"></i> Panes layout
+                    </span>
+                    <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 2px; height: 30px; box-sizing: border-box;">
+                      <button type="button" id="md-graphviz-layout-side" title="Side by side: Source left, Preview right" style="padding: 2px 8px; font-size: 0.78em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; height: 24px; transition: background 0.15s, color 0.15s; background: #0284c7; color: #ffffff; font-weight: 600;">
+                        <i class="fas fa-columns"></i>
+                        <span>Side</span>
+                      </button>
+                      <button type="button" id="md-graphviz-layout-stack" title="Stacked: Preview top, Source bottom" style="padding: 2px 8px; font-size: 0.78em; border-radius: 3px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; height: 24px; transition: background 0.15s, color 0.15s; background: transparent; color: #94a3b8; font-weight: 400;">
+                        <i class="fas fa-bars"></i>
+                        <span>Stack</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="md-graphviz-preview" style="position: relative; flex: 1; min-height: 120px; box-sizing: border-box; border: 1px solid #334155; border-radius: 6px; background: #ffffff; overflow: hidden; cursor: grab; touch-action: none; user-select: none;">
             <span id="md-graphviz-preview-empty" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 0.85em; pointer-events: none;">Render to preview</span>
             <img id="md-graphviz-preview-img" alt="Graphviz preview" draggable="false" style="display: none; position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; max-height: none; user-select: none; -webkit-user-drag: none; will-change: transform;" />
@@ -389,16 +398,12 @@
         </div>
       </div>
       <div id="md-graphviz-error" style="display: none; color: #fca5a5; background: #450a0a; border: 1px solid #7f1d1d; border-radius: 6px; padding: 8px 10px; font-size: 0.82em; white-space: pre-wrap; max-height: 120px; overflow: auto;"></div>
-      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; flex: none;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <button type="button" id="md-graphviz-delete-btn" class="w3-button w3-round" style="display: none; background: #7f1d1d; color: #fecaca; font-size: 0.85em; padding: 6px 14px; font-weight: 600; align-items: center; gap: 6px;"><i class="fas fa-trash-alt"></i> Delete Diagram</button>
-          <span id="md-graphviz-status" style="color: #94a3b8; font-size: 0.8em;"></span>
+          <span id="md-graphviz-status" style="color: #94a3b8; font-size: 0.82em;"></span>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" id="md-graphviz-download-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-download"></i> Download SVG</button>
-          <button type="button" id="md-graphviz-render-btn" class="w3-button w3-round" style="background: #475569; color: #f8fafc; font-size: 0.85em; padding: 6px 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-play"></i> Render</button>
-          <button type="button" id="md-graphviz-insert-btn" class="w3-button w3-round" style="background: #0284c7; color: #ffffff; font-size: 0.85em; padding: 6px 16px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><i id="md-graphviz-insert-icon" class="fas fa-plus"></i> <span id="md-graphviz-insert-text">Save &amp; Insert</span></button>
-          <button type="button" id="md-graphviz-close-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 14px; font-weight: 600;">Close</button>
+          <button type="button" id="md-graphviz-close-btn" class="w3-button w3-round" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; font-size: 0.85em; padding: 6px 16px; font-weight: 500;">Close</button>
         </div>
       </div>
     </div>
@@ -438,6 +443,122 @@
     <div style="padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 8px;">
       <button type="button" id="md-graphviz-block-cancel-btn" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; border-radius: 4px; padding: 6px 14px; font-size: 0.84em; cursor: pointer;">Cancel</button>
       <button type="button" id="md-graphviz-block-save-btn" style="background: #0284c7; border: 1px solid #38bdf8; color: #ffffff; border-radius: 4px; padding: 6px 16px; font-size: 0.84em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-save"></i> Save Global Block</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Diagram Modal (Choose title, starting template with live preview, and layout engine) -->
+<div id="md-graphviz-new-modal" class="w3-modal" style="z-index: 10005; background: rgba(0, 0, 0, 0.75); display: none;">
+  <div class="w3-modal-content w3-round-large" style="background: #1e293b; color: #f8fafc; border: 1px solid #475569; max-width: 860px; width: 94%; margin: 5vh auto; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.85); display: flex; flex-direction: column;">
+    <div style="padding: 12px 18px; background: #0f172a; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; flex: none;">
+      <span style="font-weight: 600; font-size: 1em; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
+        <i class="fas fa-plus-circle"></i> Create New Diagram
+      </span>
+      <button type="button" id="md-graphviz-new-modal-close" style="background: transparent; border: none; color: #94a3b8; font-size: 1.2em; cursor: pointer;" title="Close">&times;</button>
+    </div>
+    <div style="padding: 16px 18px; display: flex; gap: 18px; flex-wrap: wrap;">
+      <!-- Left Column: Settings -->
+      <div style="flex: 1 1 320px; min-width: 280px; display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <label for="md-graphviz-new-name-input" style="display: block; font-size: 0.85em; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+            <i class="fas fa-tag" style="color: #38bdf8;"></i> Diagram Title
+          </label>
+          <input type="text" id="md-graphviz-new-name-input" placeholder="e.g. core_network" spellcheck="false" autocomplete="off" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 7px 10px; color: #f8fafc; font-size: 0.9em; font-family: monospace;" />
+        </div>
+
+        <div>
+          <label for="md-graphviz-new-template-select" style="display: block; font-size: 0.85em; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+            <i class="fas fa-layer-group" style="color: #38bdf8;"></i> Starting Template
+          </label>
+          <select id="md-graphviz-new-template-select" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 7px 10px; color: #f8fafc; font-size: 0.9em; cursor: pointer;">
+            <option value="__blank__">Blank Diagram (Default starter)</option>
+            <optgroup label="Cloud &amp; Infrastructure">
+              <option value="erb_enterprise">Enterprise Multi-Tier Architecture (Cyber Slate)</option>
+              <option value="erb_cloud_vpc">Cloud VPC &amp; Subnets (Nord Arctic)</option>
+              <option value="erb_k8s">Kubernetes Cluster &amp; Namespaces (Cyan)</option>
+              <option value="erb_cicd">Automated CI/CD Delivery Pipeline (Emerald)</option>
+              <option value="erb_network">Multi-Tier Network &amp; DMZ Topology (Cyber Slate)</option>
+            </optgroup>
+            <optgroup label="Systems &amp; Software Architecture">
+              <option value="erb_microservices">Event-Driven Microservices &amp; Kafka (Dracula)</option>
+              <option value="erb_raft">Distributed Consensus / Raft Protocol (Amber)</option>
+              <option value="erb_data_pipeline">Big Data &amp; Real-Time Analytics Pipeline</option>
+              <option value="erb_erd">Relational Database Schema / ERD (Clean Light)</option>
+              <option value="erb_c4">C4 Container Architecture Overview</option>
+              <option value="erb_dynamic_loop">Dynamic Server Farm Loop (Ruby)</option>
+            </optgroup>
+            <optgroup label="Processes, Flowcharts &amp; Lifecycle">
+              <option value="erb_flowchart">Decision Flowchart &amp; Routing (Clean Light)</option>
+              <option value="erb_pipeline">Data &amp; Task Pipeline (Nord Arctic)</option>
+              <option value="erb_state_machine">State Transition Lifecycle &amp; FSM (Amber)</option>
+              <option value="erb_records">Memory Records &amp; Data Structures (Slate)</option>
+            </optgroup>
+            <optgroup label="Current Lab Maps (CTLABS)">
+              <option value="lab_topo">Topology (Data Network)</option>
+              <option value="lab_mgmt_topo">Topology (Management Network)</option>
+              <option value="lab_con">Connections (Data Network)</option>
+              <option value="lab_mgmt_con">Connections (Management Network)</option>
+            </optgroup>
+          </select>
+          <div id="md-graphviz-new-template-desc" style="margin-top: 6px; font-size: 0.78em; color: #94a3b8; line-height: 1.4; background: rgba(15, 23, 42, 0.5); padding: 6px 10px; border-radius: 4px; border: 1px solid #334155; min-height: 40px; box-sizing: border-box;">
+            Default starter with 3 basic nodes.
+          </div>
+        </div>
+
+        <div>
+          <label for="md-graphviz-new-theme-select" style="display: block; font-size: 0.85em; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+            <i class="fas fa-palette" style="color: #38bdf8;"></i> Layout Theme
+          </label>
+          <select id="md-graphviz-new-theme-select" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 7px 10px; color: #f8fafc; font-size: 0.9em; cursor: pointer;">
+            <option value="auto" selected>Auto (from Template)</option>
+            <option value="slate">🌌 Cyber Slate (Dark Blue)</option>
+            <option value="light">📄 Clean Paper (Light)</option>
+            <option value="nord">❄️ Nord Arctic (Cyan / Frost)</option>
+            <option value="dracula">🧛 Dracula (Synthwave Purple)</option>
+            <option value="amber">🍯 Amber Gold (Warm Dark)</option>
+            <option value="emerald">🌲 Emerald Forest (Dark Green)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="md-graphviz-new-engine-select" style="display: block; font-size: 0.85em; font-weight: 600; color: #cbd5e1; margin-bottom: 6px;">
+            <i class="fas fa-cogs" style="color: #38bdf8;"></i> Layout Engine
+          </label>
+          <select id="md-graphviz-new-engine-select" style="width: 100%; box-sizing: border-box; background: #0f172a; border: 1px solid #475569; border-radius: 4px; padding: 7px 10px; color: #f8fafc; font-size: 0.9em; cursor: pointer;">
+            <option value="dot" selected>dot (hierarchical)</option>
+            <option value="neato">neato (spring model)</option>
+            <option value="fdp">fdp (force-directed)</option>
+            <option value="sfdp">sfdp (large graphs)</option>
+            <option value="circo">circo (circular)</option>
+            <option value="twopi">twopi (radial)</option>
+            <option value="osage">osage (clustered)</option>
+            <option value="patchwork">patchwork (treemap)</option>
+          </select>
+        </div>
+        <div id="md-graphviz-new-error" style="display: none; color: #fca5a5; background: #450a0a; border: 1px solid #7f1d1d; border-radius: 4px; padding: 6px 10px; font-size: 0.82em;"></div>
+      </div>
+
+      <!-- Right Column: Live Template Preview -->
+      <div style="flex: 1 1 380px; min-width: 280px; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label style="font-size: 0.85em; font-weight: 600; color: #cbd5e1; display: flex; align-items: center; gap: 6px; margin: 0;">
+            <i class="fas fa-eye" style="color: #38bdf8;"></i> Template Preview
+          </label>
+          <span id="md-graphviz-new-preview-status" style="font-size: 0.74em; color: #64748b;">Live preview</span>
+        </div>
+        <div id="md-graphviz-new-preview-container" style="flex: 1; min-height: 250px; max-height: 310px; background: #1e293b; border: 1px solid #334155; border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 8px; box-sizing: border-box;">
+          <div id="md-graphviz-new-preview-loading" style="display: none; position: absolute; inset: 0; background: rgba(15, 23, 42, 0.7); z-index: 5; align-items: center; justify-content: center; color: #38bdf8; font-size: 0.85em; gap: 8px;">
+            <i class="fas fa-spinner fa-spin"></i> Loading preview...
+          </div>
+          <div id="md-graphviz-new-preview-svg" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="padding: 12px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 8px; flex: none;">
+      <button type="button" id="md-graphviz-new-modal-cancel" style="background: #1e293b; border: 1px solid #475569; color: #cbd5e1; border-radius: 4px; padding: 7px 16px; font-size: 0.85em; cursor: pointer;">Cancel</button>
+      <button type="button" id="md-graphviz-new-modal-create" style="background: #0284c7; border: 1px solid #38bdf8; color: #ffffff; border-radius: 4px; padding: 7px 18px; font-size: 0.85em; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+        <i class="fas fa-plus"></i> Create Diagram
+      </button>
     </div>
   </div>
 </div>

@@ -38,6 +38,14 @@
   const stepContextCopyLink = document.getElementById('step-context-copy-link');
   let stepContextBtn = null;
   let pendingMdEditMode = false;
+
+  const mdImgContextMenu = document.getElementById('md-img-context-menu');
+  const mdImgContextTitle = document.getElementById('md-img-context-title');
+  const mdImgContextDownload = document.getElementById('md-img-context-download');
+  const mdImgContextEditDiagram = document.getElementById('md-img-context-edit-diagram');
+  const mdImgContextCopyLink = document.getElementById('md-img-context-copy-link');
+  const mdImgContextOpenTab = document.getElementById('md-img-context-open-tab');
+  let currentContextImg = null;
   const recsList = document.getElementById('recs-list');
   const otherList = document.getElementById('other-list');
   const importBtn = document.getElementById('import-btn');
@@ -995,6 +1003,65 @@
     stepContextBtn = null;
   }
 
+  function hideImageContextMenu() {
+    if (mdImgContextMenu) mdImgContextMenu.style.display = 'none';
+    currentContextImg = null;
+  }
+
+  function downloadImageOrDiagram(src, suggestedName) {
+    if (!src) return;
+    let filename = (suggestedName || '').trim();
+    if (!filename) {
+      try {
+        const u = new URL(src, window.location.href);
+        filename = decodeURIComponent(u.pathname.split('/').pop() || '');
+      } catch (_) {
+        filename = 'image';
+      }
+    }
+    filename = (filename || 'image').split('?')[0];
+    if (!filename.includes('.')) {
+      filename += '.png';
+    }
+
+    if (src.startsWith('data:')) {
+      const a = document.createElement('a');
+      a.href = src;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      return;
+    }
+
+    // Blob download to ensure browser download attribute behavior
+    fetch(src, { credentials: 'same-origin' })
+      .then(res => {
+        if (!res.ok) throw new Error('Download request failed');
+        return res.blob();
+      })
+      .then(blob => {
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      })
+      .catch(() => {
+        const a = document.createElement('a');
+        a.href = src;
+        a.download = filename;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+  }
+  window.downloadImageOrDiagram = downloadImageOrDiagram;
+
   function stepLinkFor(btn) {
     const id = btn.getAttribute('data-id') || '';
     if (!id) return null;
@@ -1005,39 +1072,102 @@
   }
 
   document.addEventListener('contextmenu', (e) => {
+    // 1. Sidebar step item context menu
     const btn = e.target.closest('.rec-item');
-    if (!btn || !stepContextMenu) return;
-    e.preventDefault();
-    stepContextBtn = btn;
+    if (btn && stepContextMenu) {
+      hideImageContextMenu();
+      e.preventDefault();
+      stepContextBtn = btn;
 
-    const id = btn.getAttribute('data-id') || '';
-    const step = btn.getAttribute('data-step') || '';
-    const dataType = btn.getAttribute('data-type') || 'terminal';
-    const titleNode = btn.querySelector('.item-title');
-    const title = (btn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || id || 'Step').trim();
-    if (stepContextTitle) stepContextTitle.textContent = (step ? '#' + step + ' ' : '') + title;
+      const id = btn.getAttribute('data-id') || '';
+      const step = btn.getAttribute('data-step') || '';
+      const dataType = btn.getAttribute('data-type') || 'terminal';
+      const titleNode = btn.querySelector('.item-title');
+      const title = (btn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || id || 'Step').trim();
+      if (stepContextTitle) stepContextTitle.textContent = (step ? '#' + step + ' ' : '') + title;
 
-    if (stepContextEdit) {
-      stepContextEdit.style.display = (dataType === 'markdown') ? 'flex' : 'none';
+      if (stepContextEdit) {
+        stepContextEdit.style.display = (dataType === 'markdown') ? 'flex' : 'none';
+      }
+
+      const currentStatus = (btn.getAttribute('data-status') || 'none').toLowerCase();
+      stepContextMenu.querySelectorAll('.step-status-option').forEach(opt => {
+        const optStatus = opt.getAttribute('data-status');
+        const check = opt.querySelector('.step-status-active-check');
+        if (check) {
+          check.style.display = (optStatus === currentStatus) ? 'inline-block' : 'none';
+        }
+      });
+
+      stepContextMenu.style.display = 'block';
+      const rect = stepContextMenu.getBoundingClientRect();
+      let x = e.clientX;
+      let y = e.clientY;
+      if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+      if (y + rect.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - rect.height - 8);
+      stepContextMenu.style.left = x + 'px';
+      stepContextMenu.style.top = y + 'px';
+      return;
     }
 
-    const currentStatus = (btn.getAttribute('data-status') || 'none').toLowerCase();
-    stepContextMenu.querySelectorAll('.step-status-option').forEach(opt => {
-      const optStatus = opt.getAttribute('data-status');
-      const check = opt.querySelector('.step-status-active-check');
-      if (check) {
-        check.style.display = (optStatus === currentStatus) ? 'inline-block' : 'none';
-      }
-    });
+    // 2. Picture / Diagram context menu in markdown preview pane, lightbox stage, or graphviz preview
+    const img = e.target.closest('img');
+    if (img && mdImgContextMenu) {
+      const inMdPreview = (mdPreviewPane && mdPreviewPane.contains(img)) || img.closest('.markdown-body') || img.closest('#md-preview-pane');
+      const inLightbox = img.id === 'image-modal-img' || img.closest('#image-modal-stage');
+      const inGvPreview = img.id === 'md-graphviz-preview-img' || img.closest('#md-graphviz-preview');
 
-    stepContextMenu.style.display = 'block';
-    const rect = stepContextMenu.getBoundingClientRect();
-    let x = e.clientX;
-    let y = e.clientY;
-    if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
-    if (y + rect.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - rect.height - 8);
-    stepContextMenu.style.left = x + 'px';
-    stepContextMenu.style.top = y + 'px';
+      if (inMdPreview || inLightbox || inGvPreview) {
+        hideStepContextMenu();
+        e.preventDefault();
+        e.stopPropagation();
+
+        currentContextImg = img;
+        const src = img.currentSrc || img.src || '';
+        let fname = '';
+        try {
+          const u = new URL(src, window.location.href);
+          fname = decodeURIComponent(u.pathname.split('/').pop() || '');
+        } catch (_) {
+          fname = (img.alt || 'image').trim();
+        }
+        fname = (fname || 'image').split('?')[0];
+
+        if (mdImgContextTitle) {
+          mdImgContextTitle.textContent = fname || img.alt || 'IMAGE';
+        }
+
+        if (mdImgContextOpenTab) {
+          mdImgContextOpenTab.href = src;
+        }
+
+        // Check if diagram
+        const base = getBaseFromImageUrl(src);
+        if (mdImgContextEditDiagram) {
+          if (base && (cachedDiagramBases.has(base) || /\.svg$/i.test(fname))) {
+            mdImgContextEditDiagram.style.display = 'flex';
+            mdImgContextEditDiagram.onclick = (ev) => {
+              ev.stopPropagation();
+              hideImageContextMenu();
+              if (typeof closeImageModal === 'function') closeImageModal();
+              openGraphvizModal(base);
+            };
+          } else {
+            mdImgContextEditDiagram.style.display = 'none';
+          }
+        }
+
+        mdImgContextMenu.style.display = 'block';
+        const rect = mdImgContextMenu.getBoundingClientRect();
+        let x = e.clientX;
+        let y = e.clientY;
+        if (x + rect.width > window.innerWidth - 8) x = Math.max(8, window.innerWidth - rect.width - 8);
+        if (y + rect.height > window.innerHeight - 8) y = Math.max(8, window.innerHeight - rect.height - 8);
+        mdImgContextMenu.style.left = `${x}px`;
+        mdImgContextMenu.style.top = `${y}px`;
+        return;
+      }
+    }
   });
 
   function saveStepTitle(id, newTitle, btn) {
@@ -1290,16 +1420,61 @@
     });
   }
 
+  if (mdImgContextDownload) {
+    mdImgContextDownload.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!currentContextImg) return;
+      const img = currentContextImg;
+      const src = img.currentSrc || img.src;
+      let fname = '';
+      try {
+        const u = new URL(src, window.location.href);
+        fname = decodeURIComponent(u.pathname.split('/').pop() || '');
+      } catch (_) {
+        fname = (img.alt || 'image').trim();
+      }
+      fname = (fname || 'image').split('?')[0];
+      downloadImageOrDiagram(src, fname);
+      hideImageContextMenu();
+    });
+  }
+
+  if (mdImgContextCopyLink) {
+    mdImgContextCopyLink.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!currentContextImg) return;
+      const src = currentContextImg.currentSrc || currentContextImg.src;
+      copyTextToClipboard(src);
+      hideImageContextMenu();
+    });
+  }
+
+  if (mdImgContextOpenTab) {
+    mdImgContextOpenTab.addEventListener('click', () => {
+      hideImageContextMenu();
+    });
+  }
+
   document.addEventListener('click', (e) => {
     if (stepContextMenu && stepContextMenu.style.display !== 'none' && !stepContextMenu.contains(e.target)) {
       hideStepContextMenu();
     }
+    if (mdImgContextMenu && mdImgContextMenu.style.display !== 'none' && !mdImgContextMenu.contains(e.target)) {
+      hideImageContextMenu();
+    }
   });
-  document.addEventListener('scroll', hideStepContextMenu, true);
-  window.addEventListener('resize', hideStepContextMenu);
+  document.addEventListener('scroll', () => {
+    hideStepContextMenu();
+    hideImageContextMenu();
+  }, true);
+  window.addEventListener('resize', () => {
+    hideStepContextMenu();
+    hideImageContextMenu();
+  });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       hideStepContextMenu();
+      hideImageContextMenu();
       if (renameStepModal && renameStepModal.style.display === 'block') {
         closeRenameStepModalFn();
       }

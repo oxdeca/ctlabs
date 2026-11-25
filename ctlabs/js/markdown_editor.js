@@ -27,10 +27,27 @@
   const mdGraphvizModal = document.getElementById('md-graphviz-modal');
   const mdGraphvizName = document.getElementById('md-graphviz-name');
   const mdGraphvizExisting = document.getElementById('md-graphviz-existing');
+  const mdGraphvizOpenBtn = document.getElementById('md-graphviz-open-btn');
+  const mdGraphvizOpenMenu = document.getElementById('md-graphviz-open-menu');
+  const mdGraphvizOpenList = document.getElementById('md-graphviz-open-list');
   const mdGraphvizNewBtn = document.getElementById('md-graphviz-new-btn');
+  const mdGraphvizNewModal = document.getElementById('md-graphviz-new-modal');
+  const mdGraphvizNewNameInput = document.getElementById('md-graphviz-new-name-input');
+  const mdGraphvizNewTemplateSelect = document.getElementById('md-graphviz-new-template-select');
+  const mdGraphvizNewThemeSelect = document.getElementById('md-graphviz-new-theme-select');
+  const mdGraphvizNewEngineSelect = document.getElementById('md-graphviz-new-engine-select');
+  const mdGraphvizNewModalCreate = document.getElementById('md-graphviz-new-modal-create');
+  const mdGraphvizNewModalCancel = document.getElementById('md-graphviz-new-modal-cancel');
+  const mdGraphvizNewModalClose = document.getElementById('md-graphviz-new-modal-close');
+  const mdGraphvizNewError = document.getElementById('md-graphviz-new-error');
+  const mdGraphvizNewTemplateDesc = document.getElementById('md-graphviz-new-template-desc');
+  const mdGraphvizNewPreviewContainer = document.getElementById('md-graphviz-new-preview-container');
+  const mdGraphvizNewPreviewLoading = document.getElementById('md-graphviz-new-preview-loading');
+  const mdGraphvizNewPreviewSvg = document.getElementById('md-graphviz-new-preview-svg');
+  const mdGraphvizNewPreviewStatus = document.getElementById('md-graphviz-new-preview-status');
   const mdGraphvizSaveAsNewBtn = document.getElementById('md-graphviz-save-as-new-btn');
   const mdGraphvizRenameBtn = document.getElementById('md-graphviz-rename-btn');
-  const mdGraphvizCurrentLabel = document.getElementById('md-graphviz-current-label');
+  const mdGraphvizModeBadge = document.getElementById('md-graphviz-mode-badge');
   const mdGraphvizEngine = document.getElementById('md-graphviz-engine');
   const mdGraphvizTemplate = document.getElementById('md-graphviz-template');
   const mdGraphvizTabSource = document.getElementById('md-graphviz-tab-source');
@@ -94,7 +111,6 @@
   const mdGraphvizStatus = document.getElementById('md-graphviz-status');
   const mdGraphvizRenderBtn = document.getElementById('md-graphviz-render-btn');
   const mdGraphvizDownloadBtn = document.getElementById('md-graphviz-download-btn');
-  const mdGraphvizDeleteBtn = document.getElementById('md-graphviz-delete-btn');
   const mdGraphvizSaveNewBtn = document.getElementById('md-graphviz-save-new-btn');
   const mdGraphvizInsertBtn = document.getElementById('md-graphviz-insert-btn');
   const mdGraphvizInsertText = document.getElementById('md-graphviz-insert-text');
@@ -2378,6 +2394,9 @@
 <% end %>`,
 
     // General Nodes & HTML Formatting
+    step: '<%= step("step1", name: "Process Task", subtitle: "Worker") %>',
+    decision: '<%= decision("check", label: "Is Valid?") %>',
+    state_node: '<%= state_node("state1", label: "Active") %>',
     plain_node: '<%= plain_node("node1", label: "Application Server", shape: "box") %>',
     plain_node_dot: `node1 [label="Application Server", shape=box, style="rounded,filled", color="#38bdf8", fillcolor="#0f172a", fontcolor="#f8fafc"];`,
     html_node: '<%= html_node("web01", title: "Web Frontend", content: "Nginx • Port 443", color: "#38bdf8", text_color: "#38bdf8", font: "Helvetica") %>',
@@ -2395,7 +2414,7 @@
   </table>
 >];`,
     html_font_attr: `<font color="#38bdf8" face="Helvetica, Arial, sans-serif" point-size="12">Label Text</font>`,
-    table_node: '<%= table_node("metrics", title: "Node Metrics", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
+    table_node: '<%= table_node("metrics", title: "Node Metrics", icon: "📊", rows: [["CPU", "4 Cores"], ["RAM", "16 GB"], ["Disk", "250 GB SSD"]]) %>',
     badge: '<%= badge("status", "HEALTHY", color: "#22c55e") %>',
 
     // Network & Hardware
@@ -2434,12 +2453,20 @@
     same_rank: `{ rank=same; node_a; node_b; }`,
     rank_source: `{ rank=source; ingress_node; }`,
     rank_sink: `{ rank=sink; egress_node; }`,
-    spacer_node: `spacer_1 [style=invis, shape=point, width=0.1, label=""];`
+    spacer_node: `spacer_1 [style=invis, shape=point, width=0.1, label=""];`,
+
+    // Layout Themes
+    theme_slate: '<%= graph_header("Architecture Diagram", theme: :slate, rankdir: "TB") %>',
+    theme_light: '<%= graph_header("Architecture Diagram", theme: :light, rankdir: "TB") %>',
+    theme_nord: '<%= graph_header("Architecture Diagram", theme: :nord, rankdir: "TB") %>',
+    theme_dracula: '<%= graph_header("Architecture Diagram", theme: :dracula, rankdir: "TB") %>',
+    theme_amber: '<%= graph_header("Architecture Diagram", theme: :amber, rankdir: "TB") %>',
+    theme_emerald: '<%= graph_header("Architecture Diagram", theme: :emerald, rankdir: "TB") %>'
   };
 
   const MD_GRAPHVIZ_TEMPLATES = {
     erb_enterprise: `digraph EnterpriseNetwork {
-  <%= graph_header("Enterprise Network Architecture", rankdir: "TB") %>
+  <%= graph_header("Enterprise Network Architecture", theme: :slate, rankdir: "TB") %>
 
   <%= cloud("wan", name: "Internet / WAN", subtitle: "BGP AS 65000") %>
   <%= firewall("edge_fw", name: "Perimeter Firewall", ip: "203.0.113.1") %>
@@ -2467,18 +2494,55 @@
   <%= links("web01", "pg01", "redis01") %>
   <%= links("web02", "pg01", "redis01") %>
 }`,
+    erb_cloud_vpc: `digraph CloudVPC {
+  <%= graph_header("Cloud Virtual Private Cloud (VPC)", theme: :nord, rankdir: "TB") %>
+
+  <%= cloud("inet", name: "Internet / Users", subtitle: "Public Traffic") %>
+  <%= gateway("igw", name: "Internet Gateway", ip: "198.51.100.1") %>
+
+  <%= cluster_start("vpc", label: "AWS VPC (10.100.0.0/16)", color: "#88c0d0") %>
+    <%= cluster_start("public_subnet", label: "Public Subnet (10.100.1.0/24)", color: "#81a1c1") %>
+      <%= loadbalancer("alb", name: "Application LB", ip: "10.100.1.10") %>
+      <%= host("bastion", name: "SSH Bastion", ip: "10.100.1.20") %>
+      <%= gateway("nat_gw", name: "NAT Gateway", ip: "10.100.1.5") %>
+    <%= cluster_end %>
+
+    <%= cluster_start("private_app", label: "Private App Subnet (10.100.10.0/24)", color: "#5e81ac") %>
+      <%= host("app01", name: "App Worker 01", ip: "10.100.10.11") %>
+      <%= host("app02", name: "App Worker 02", ip: "10.100.10.12") %>
+    <%= cluster_end %>
+
+    <%= cluster_start("db_subnet", label: "Isolated Database Subnet (10.100.20.0/24)", color: "#b48ead") %>
+      <%= database("rds_primary", name: "Aurora Primary", ip: "10.100.20.15", engine: "PostgreSQL 16") %>
+      <%= database("rds_replica", name: "Aurora Read Replica", ip: "10.100.20.16", engine: "PostgreSQL 16") %>
+    <%= cluster_end %>
+  <%= cluster_end %>
+
+  <%= link("inet", "igw") %>
+  <%= link("igw", "alb", label: ":443 HTTPS") %>
+  <%= link("igw", "bastion", label: ":22 SSH") %>
+  <%= links("alb", "app01", "app02") %>
+  <%= link("bastion", "app01", style: "dotted", label: "mgmt") %>
+  <%= link("bastion", "app02", style: "dotted", label: "mgmt") %>
+  <%= link("app01", "nat_gw", style: "dashed", label: "outbound") %>
+  <%= link("app02", "nat_gw", style: "dashed", label: "outbound") %>
+  <%= link("nat_gw", "igw", style: "dashed") %>
+  <%= link("app01", "rds_primary", label: "read/write") %>
+  <%= link("app02", "rds_replica", label: "read only") %>
+  <%= link("rds_primary", "rds_replica", style: "dashed", label: "sync") %>
+}`,
     erb_k8s: `digraph KubernetesCluster {
-  <%= graph_header("Kubernetes Cluster Topology", rankdir: "LR") %>
+  <%= graph_header("Kubernetes Cluster Topology", theme: :nord, rankdir: "LR") %>
 
   <%= gateway("ingress", name: "Ingress Controller", ip: "192.168.10.50") %>
 
-  <%= cluster_start("prod_ns", label: "Namespace: production", color: "#38bdf8") %>
+  <%= cluster_start("prod_ns", label: "Namespace: production", color: "#88c0d0") %>
     <%= k8s_pod("frontend", name: "frontend-deploy", namespace: "production", ip: "10.244.1.15") %>
     <%= k8s_pod("api", name: "api-service", namespace: "production", ip: "10.244.2.22") %>
     <%= database("db", name: "postgres-statefulset", ip: "10.244.3.4", engine: "Postgres 16") %>
   <%= cluster_end %>
 
-  <%= cluster_start("monitoring_ns", label: "Namespace: monitoring", color: "#a855f7") %>
+  <%= cluster_start("monitoring_ns", label: "Namespace: monitoring", color: "#b48ead") %>
     <%= k8s_pod("prom", name: "prometheus-k8s", namespace: "monitoring") %>
     <%= k8s_pod("grafana", name: "grafana", namespace: "monitoring") %>
   <%= cluster_end %>
@@ -2489,12 +2553,41 @@
   <%= link("api", "db", label: "SQL") %>
   <%= links("prom", "frontend", "api", "db") %>
 }`,
+    erb_cicd: `digraph CICDPipeline {
+  <%= graph_header("Automated CI/CD Delivery Pipeline", theme: :emerald, rankdir: "LR") %>
+
+  <%= host("dev", name: "Engineer Workstation", subtitle: "Git Push") %>
+  <%= gateway("scm", name: "GitHub / GitLab", subtitle: "Webhook Trigger") %>
+
+  <%= cluster_start("ci_stage", label: "Continuous Integration (CI)", color: "#10b981") %>
+    <%= host("lint", name: "Static Lint & Test", subtitle: "Pytest / Jest") %>
+    <%= host("sec_scan", name: "Security & SAST", subtitle: "Trivy / Sonar") %>
+    <%= host("builder", name: "Docker Container Build", subtitle: "Multi-arch image") %>
+  <%= cluster_end %>
+
+  <%= database("registry", name: "Container Registry", engine: "Harbor / ECR") %>
+
+  <%= cluster_start("cd_stage", label: "Continuous Delivery (CD)", color: "#34d399") %>
+    <%= k8s_pod("staging", name: "Staging Cluster", namespace: "staging") %>
+    <%= switch("gate", name: "Approval Gate", subtitle: "Automated Smoke Tests") %>
+    <%= k8s_pod("prod", name: "Production Fleet", namespace: "production") %>
+  <%= cluster_end %>
+
+  <%= link("dev", "scm", label: "git commit") %>
+  <%= link("scm", "lint", label: "push main") %>
+  <%= link("lint", "sec_scan", label: "passed") %>
+  <%= link("sec_scan", "builder", label: "clean") %>
+  <%= link("builder", "registry", label: "push image") %>
+  <%= link("registry", "staging", label: "deploy") %>
+  <%= link("staging", "gate", label: "e2e tests") %>
+  <%= link("gate", "prod", label: "promote v1.4.0") %>
+}`,
     erb_microservices: `digraph MicroservicesSystem {
-  <%= graph_header("Microservices Architecture", rankdir: "TB") %>
+  <%= graph_header("Microservices Architecture", theme: :dracula, rankdir: "TB") %>
 
   <%= gateway("apigw", name: "API Gateway (Kong)", ip: "10.0.0.10") %>
 
-  <%= cluster_start("services", label: "Microservices", color: "#38bdf8") %>
+  <%= cluster_start("services", label: "Microservices", color: "#bd93f9") %>
     <%= host("auth_svc", name: "Auth Service", subtitle: "Go / JWT") %>
     <%= host("user_svc", name: "User Service", subtitle: "Node.js") %>
     <%= host("order_svc", name: "Order Service", subtitle: "Rust") %>
@@ -2502,7 +2595,7 @@
 
   <%= switch("event_bus", name: "Kafka Event Bus", subtitle: "Cluster") %>
 
-  <%= cluster_start("storage", label: "Datastores", color: "#ec4899") %>
+  <%= cluster_start("storage", label: "Datastores", color: "#ff79c6") %>
     <%= database("auth_redis", name: "Token Cache", engine: "Redis") %>
     <%= database("user_db", name: "Users DB", engine: "PostgreSQL") %>
     <%= database("order_db", name: "Orders DB", engine: "PostgreSQL") %>
@@ -2514,8 +2607,154 @@
   <%= link("order_svc", "order_db") %>
   <%= links("event_bus", "user_svc", "order_svc") %>
 }`,
+    erb_raft: `digraph RaftConsensus {
+  <%= graph_header("Distributed Consensus (Raft Protocol)", theme: :amber, rankdir: "TB") %>
+
+  <%= host("client", name: "Client Application", ip: "10.0.0.50", subtitle: "Write Request") %>
+
+  <%= cluster_start("quorum", label: "Raft Cluster Quorum (Term 4)", color: "#f59e0b") %>
+    <%= router("leader", name: "Node A (Leader)", ip: "10.0.0.1", subtitle: "Lease Active") %>
+    <%= host("follower_b", name: "Node B (Follower)", ip: "10.0.0.2", subtitle: "State: In-Sync") %>
+    <%= host("follower_c", name: "Node C (Follower)", ip: "10.0.0.3", subtitle: "State: In-Sync") %>
+    <%= host("candidate_d", name: "Node D (Follower)", ip: "10.0.0.4", subtitle: "Election Timer") %>
+  <%= cluster_end %>
+
+  <%= database("wal_log", name: "Replicated WAL Log", engine: "Disk Append Only") %>
+
+  <%= link("client", "leader", label: "PUT /key") %>
+  <%= link("leader", "wal_log", label: "Append Entries") %>
+  <%= link("leader", "follower_b", label: "Heartbeat / Replicate") %>
+  <%= link("leader", "follower_c", label: "Heartbeat / Replicate") %>
+  <%= link("leader", "candidate_d", style: "dashed", label: "Heartbeat") %>
+  <%= link("follower_b", "wal_log", style: "dotted", label: "Commit Ack") %>
+  <%= link("follower_c", "wal_log", style: "dotted", label: "Commit Ack") %>
+}`,
+    erb_data_pipeline: `digraph DataPipeline {
+  <%= graph_header("Real-Time Analytics & Big Data Pipeline", theme: :slate, rankdir: "LR") %>
+
+  <%= cloud("iot_sources", name: "IoT Edge Devices", subtitle: "MQTT Feeds") %>
+  <%= database("cdc_db", name: "Transactional OLTP", engine: "PostgreSQL Debezium") %>
+
+  <%= switch("kafka", name: "Apache Kafka Streaming", subtitle: "Topics: telemetry, events") %>
+
+  <%= cluster_start("processing", label: "Stream Processing", color: "#38bdf8") %>
+    <%= host("flink", name: "Apache Flink", subtitle: "Stateful Windowing") %>
+    <%= host("spark", name: "Spark Streaming", subtitle: "ETL & Aggregations") %>
+  <%= cluster_end %>
+
+  <%= database("s3_lake", name: "Object Storage Lake", engine: "MinIO / S3 Parquet") %>
+  <%= database("clickhouse", name: "ClickHouse OLAP", engine: "Real-Time Analytical DB") %>
+
+  <%= host("grafana", name: "Grafana Dashboards", subtitle: "Executive Metrics") %>
+  <%= host("ml_model", name: "ML Inference API", subtitle: "Anomaly Detection") %>
+
+  <%= link("iot_sources", "kafka") %>
+  <%= link("cdc_db", "kafka") %>
+  <%= link("kafka", "flink", label: "consume") %>
+  <%= link("kafka", "spark", label: "batch micro") %>
+  <%= link("flink", "clickhouse", label: "sub-second write") %>
+  <%= link("spark", "s3_lake", label: "historical write") %>
+  <%= link("s3_lake", "clickhouse", style: "dashed", label: "backfill") %>
+  <%= link("clickhouse", "grafana", label: "live queries") %>
+  <%= link("clickhouse", "ml_model", label: "feature store") %>
+}`,
+    erb_erd: `digraph RelationalSchema {
+  <%= graph_header("Relational Database Schema (ERD)", theme: :light, rankdir: "LR") %>
+
+  users [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ffffff" color="#0284c7">
+      <tr><td bgcolor="#0284c7" align="center"><font color="#ffffff" face="Helvetica"><b>users</b></font></td></tr>
+      <tr><td align="left"><font color="#0284c7"><b>PK</b></font> id: UUID</td></tr>
+      <tr><td align="left">   email: VARCHAR(255)</td></tr>
+      <tr><td align="left">   password_hash: VARCHAR</td></tr>
+      <tr><td align="left">   created_at: TIMESTAMP</td></tr>
+    </table>
+  >];
+
+  orders [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ffffff" color="#0284c7">
+      <tr><td bgcolor="#0284c7" align="center"><font color="#ffffff" face="Helvetica"><b>orders</b></font></td></tr>
+      <tr><td align="left"><font color="#0284c7"><b>PK</b></font> id: UUID</td></tr>
+      <tr><td align="left"><font color="#64748b"><b>FK</b></font> user_id: UUID</td></tr>
+      <tr><td align="left">   status: VARCHAR(32)</td></tr>
+      <tr><td align="left">   total_cents: INT</td></tr>
+      <tr><td align="left">   created_at: TIMESTAMP</td></tr>
+    </table>
+  >];
+
+  order_items [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ffffff" color="#0284c7">
+      <tr><td bgcolor="#0284c7" align="center"><font color="#ffffff" face="Helvetica"><b>order_items</b></font></td></tr>
+      <tr><td align="left"><font color="#0284c7"><b>PK</b></font> id: UUID</td></tr>
+      <tr><td align="left"><font color="#64748b"><b>FK</b></font> order_id: UUID</td></tr>
+      <tr><td align="left"><font color="#64748b"><b>FK</b></font> product_id: UUID</td></tr>
+      <tr><td align="left">   quantity: INT</td></tr>
+      <tr><td align="left">   unit_price: INT</td></tr>
+    </table>
+  >];
+
+  products [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ffffff" color="#0284c7">
+      <tr><td bgcolor="#0284c7" align="center"><font color="#ffffff" face="Helvetica"><b>products</b></font></td></tr>
+      <tr><td align="left"><font color="#0284c7"><b>PK</b></font> id: UUID</td></tr>
+      <tr><td align="left">   sku: VARCHAR(64)</td></tr>
+      <tr><td align="left">   title: VARCHAR(255)</td></tr>
+      <tr><td align="left">   price_cents: INT</td></tr>
+      <tr><td align="left">   stock: INT</td></tr>
+    </table>
+  >];
+
+  payments [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="4" bgcolor="#ffffff" color="#0284c7">
+      <tr><td bgcolor="#0284c7" align="center"><font color="#ffffff" face="Helvetica"><b>payments</b></font></td></tr>
+      <tr><td align="left"><font color="#0284c7"><b>PK</b></font> id: UUID</td></tr>
+      <tr><td align="left"><font color="#64748b"><b>FK</b></font> order_id: UUID</td></tr>
+      <tr><td align="left">   provider: VARCHAR(64)</td></tr>
+      <tr><td align="left">   amount: INT</td></tr>
+      <tr><td align="left">   status: VARCHAR(32)</td></tr>
+    </table>
+  >];
+
+  users -> orders [label="1 : N", color="#0284c7", fontcolor="#0284c7", fontsize=10];
+  orders -> order_items [label="1 : N", color="#0284c7", fontcolor="#0284c7", fontsize=10];
+  products -> order_items [label="1 : N", color="#0284c7", fontcolor="#0284c7", fontsize=10];
+  orders -> payments [label="1 : 1", color="#0284c7", fontcolor="#0284c7", fontsize=10];
+}`,
+    erb_c4: `digraph C4ContainerDiagram {
+  <%= graph_header("C4 Model: Container Architecture", theme: :slate, rankdir: "TB") %>
+
+  <%= host("user", name: "Customer [Person]", subtitle: "E-Commerce Shopper") %>
+
+  <%= cluster_start("boundary", label: "Software System Boundary", color: "#38bdf8") %>
+    <%= host("spa", name: "Single-Page Application", subtitle: "TypeScript / React [Web]") %>
+    <%= host("mobile", name: "Mobile Application", subtitle: "Flutter / iOS / Android [App]") %>
+    <%= gateway("apigw", name: "API Gateway", subtitle: "Envoy Reverse Proxy") %>
+
+    <%= cluster_start("services", label: "Microservices", color: "#10b981") %>
+      <%= host("auth_svc", name: "Auth & Identity", subtitle: "Go Service") %>
+      <%= host("catalog_svc", name: "Product Catalog", subtitle: "Java / Spring Boot") %>
+      <%= host("order_svc", name: "Order Processing", subtitle: "Node.js / Express") %>
+    <%= cluster_end %>
+
+    <%= cluster_start("data_layer", label: "Persistence & Messaging", color: "#ec4899") %>
+      <%= database("main_db", name: "Primary Database", engine: "PostgreSQL 16") %>
+      <%= database("cache", name: "Session Cache", engine: "Redis Cluster") %>
+      <%= switch("mq", name: "Event Bus", subtitle: "RabbitMQ") %>
+    <%= cluster_end %>
+  <%= cluster_end %>
+
+  <%= link("user", "spa", label: "Visits shop") %>
+  <%= link("user", "mobile", label: "Uses app") %>
+  <%= link("spa", "apigw", label: "HTTPS / JSON") %>
+  <%= link("mobile", "apigw", label: "HTTPS / JSON") %>
+  <%= links("apigw", "auth_svc", "catalog_svc", "order_svc") %>
+  <%= link("auth_svc", "cache", label: "Tokens") %>
+  <%= link("catalog_svc", "main_db", label: "Reads/Writes") %>
+  <%= link("order_svc", "main_db", label: "ACID Orders") %>
+  <%= link("order_svc", "mq", label: "OrderCreated Event") %>
+}`,
     erb_dynamic_loop: `digraph DynamicCluster {
-  <%= graph_header("Dynamic Server Farm", rankdir: "TB") %>
+  <%= graph_header("Dynamic Server Farm", theme: :slate, rankdir: "TB") %>
 
   <%= router("lb01", name: "HAProxy Load Balancer", ip: "10.10.0.1") %>
 
@@ -2532,111 +2771,196 @@
     <%= link("node_0" + i.to_s, "shared_storage", style: "dashed") %>
   <% end %>
 }`,
-    flowchart_lr: `digraph flowchart_lr {
-  rankdir=LR;
-  node [shape=box, style="rounded,filled", fillcolor="#f1f5f9", color="#475569", fontname="sans-serif", fontcolor="#0f172a"];
-  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+    erb_network: `digraph MultiTierNetwork {
+  <%= graph_header("Multi-Tier Network Architecture", theme: :slate, rankdir: "TB") %>
 
-  start [label="Start", shape=ellipse, fillcolor="#dbeafe", color="#3b82f6"];
-  step1 [label="Process Task"];
-  check [label="Success?", shape=diamond, fillcolor="#fef3c7", color="#f59e0b"];
-  end   [label="Done", shape=ellipse, fillcolor="#dcfce7", color="#22c55e"];
+  <%= cloud("inet", name: "Internet / WAN", subtitle: "Public IP") %>
+  <%= firewall("edge_fw", name: "Edge Firewall", ip: "198.51.100.1") %>
+  <%= router("core_rtr", name: "Core Router", ip: "10.0.0.1") %>
 
-  start -> step1;
-  step1 -> check;
-  check -> end [label="Yes"];
-  check -> step1 [label="Retry (No)"];
+  <%= cluster_start("dmz", label: "DMZ Subnet (10.0.1.0/24)", color: "#f59e0b") %>
+    <%= loadbalancer("lb", name: "Nginx Load Balancer", ip: "10.0.1.10") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("app_tier", label: "Application Tier (10.0.2.0/24)", color: "#38bdf8") %>
+    <%= host("app1", name: "App Server 1", ip: "10.0.2.11") %>
+    <%= host("app2", name: "App Server 2", ip: "10.0.2.12") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("db_tier", label: "Database Tier (10.0.3.0/24)", color: "#ec4899") %>
+    <%= database("pg_db", name: "PostgreSQL Primary", ip: "10.0.3.10", engine: "PostgreSQL 16") %>
+    <%= database("redis_cache", name: "Redis Cache", ip: "10.0.3.20", engine: "Redis 7") %>
+  <%= cluster_end %>
+
+  <%= chain("inet", "edge_fw", "core_rtr", "lb") %>
+  <%= links("lb", "app1", "app2") %>
+  <%= links("app1", "pg_db", "redis_cache") %>
+  <%= links("app2", "pg_db", "redis_cache") %>
 }`,
-    flowchart_tb: `digraph flowchart_tb {
-  rankdir=TB;
-  node [shape=box, style="rounded,filled", fillcolor="#f8fafc", color="#64748b", fontname="sans-serif", fontcolor="#0f172a"];
-  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+    erb_flowchart: `digraph ProcessFlowchart {
+  <%= graph_header("Order Processing Flow", theme: :light, rankdir: "TB") %>
 
-  input  [label="User Input", shape=ellipse, fillcolor="#e0e7ff", color="#6366f1"];
-  parse  [label="Validate & Parse"];
-  route  [label="Route Request", shape=diamond, fillcolor="#fef3c7", color="#f59e0b"];
-  render [label="Render View"];
-  api    [label="JSON API Response"];
+  <%= plain_node("start", label: "Start Request", shape: "ellipse", color: "#0284c7") %>
+  <%= step("validate", name: "Validate Order Payload", subtitle: "JSON Schema") %>
+  <%= decision("check_stock", label: "Items in Stock?", color: "#d97706") %>
+  <%= step("charge_card", name: "Charge Payment", subtitle: "Stripe API", color: "#16a34a") %>
+  <%= step("reject", name: "Out of Stock Notification", subtitle: "Send Email", color: "#dc2626") %>
+  <%= plain_node("done", label: "Order Fulfilled (200 OK)", shape: "ellipse", color: "#16a34a") %>
 
-  input -> parse;
-  parse -> route;
-  route -> render [label="HTML"];
-  route -> api [label="JSON"];
+  <%= link("start", "validate") %>
+  <%= link("validate", "check_stock") %>
+  <%= link("check_stock", "charge_card", label: "Yes (Available)") %>
+  <%= link("check_stock", "reject", label: "No (Depleted)", color: "#dc2626") %>
+  <%= link("charge_card", "done") %>
 }`,
-    network: `digraph network_topology {
-  rankdir=TB;
-  compound=true;
-  node [shape=box, style="filled,rounded", fontname="sans-serif", fontsize=11];
-  edge [color="#475569", fontname="sans-serif", fontsize=10];
+    erb_pipeline: `digraph DataProcessingPipeline {
+  <%= graph_header("Data Processing Pipeline", theme: :nord, rankdir: "LR") %>
 
-  subgraph cluster_dmz {
-    label="Public / DMZ";
-    style="rounded,dashed";
-    color="#94a3b8";
-    fontname="sans-serif";
-    fontcolor="#475569";
-    lb [label="Load Balancer\\n(Nginx)", fillcolor="#e0f2fe", color="#0284c7"];
-  }
+  <%= cloud("source", name: "External Data Feeds", subtitle: "REST / S3") %>
+  <%= step("ingest", name: "Ingestion Worker", subtitle: "Batch Ingest", color: "#88c0d0") %>
+  <%= step("transform", name: "Transform & Cleanse", subtitle: "Deduplication", color: "#81a1c1") %>
+  <%= database("lake", name: "Data Warehouse", engine: "ClickHouse OLAP", color: "#b48ead") %>
+  <%= host("dashboard", name: "Analytics Dashboard", subtitle: "Metabase", color: "#a3be8c") %>
 
-  subgraph cluster_app {
-    label="App Tier (Private)";
-    style="rounded,dashed";
-    color="#94a3b8";
-    fontname="sans-serif";
-    fontcolor="#475569";
-    app1 [label="App Server 1", fillcolor="#ede9fe", color="#7c3aed"];
-    app2 [label="App Server 2", fillcolor="#ede9fe", color="#7c3aed"];
-  }
-
-  subgraph cluster_data {
-    label="Database Tier";
-    style="rounded,dashed";
-    color="#94a3b8";
-    fontname="sans-serif";
-    fontcolor="#475569";
-    db [label="Primary DB\\n(PostgreSQL)", shape=cylinder, fillcolor="#dcfce7", color="#16a34a"];
-    cache [label="Cache (Redis)", shape=cylinder, fillcolor="#fee2e2", color="#dc2626"];
-  }
-
-  client [label="Clients\\n(Web & Mobile)", shape=ellipse, fillcolor="#f1f5f9", color="#64748b"];
-
-  client -> lb;
-  lb -> app1;
-  lb -> app2;
-  app1 -> db;
-  app2 -> db;
-  app1 -> cache;
-  app2 -> cache;
+  <%= chain("source", "ingest", "transform", "lake", "dashboard") %>
 }`,
-    state_machine: `digraph state_machine {
-  rankdir=LR;
-  node [shape=circle, style="filled", fillcolor="#f8fafc", color="#475569", fontname="sans-serif", fontcolor="#0f172a", width=0.9, fixedsize=true];
-  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+    erb_state_machine: `digraph OrderLifecycleFSM {
+  <%= graph_header("Order Lifecycle State Machine", theme: :amber, rankdir: "LR") %>
 
-  init [shape=point, width=0.2];
-  idle [label="Idle", fillcolor="#e0f2fe", color="#0284c7"];
-  run  [label="Running", fillcolor="#fef3c7", color="#d97706"];
-  done [label="Done", shape=doublecircle, fillcolor="#dcfce7", color="#16a34a"];
-  fail [label="Failed", shape=doublecircle, fillcolor="#fee2e2", color="#dc2626"];
+  <%= state_node("init", type: :start, color: "#f59e0b") %>
+  <%= state_node("pending", label: "Pending", color: "#38bdf8") %>
+  <%= state_node("processing", label: "Processing", color: "#f59e0b") %>
+  <%= state_node("completed", label: "Completed", type: :done, color: "#22c55e") %>
+  <%= state_node("cancelled", label: "Cancelled", type: :error, color: "#ef4444") %>
 
-  init -> idle;
-  idle -> run [label="start"];
-  run -> idle [label="pause"];
-  run -> done [label="complete"];
-  run -> fail [label="error"];
-  fail -> run [label="retry"];
+  <%= link("init", "pending", label: "create") %>
+  <%= link("pending", "processing", label: "pay_received") %>
+  <%= link("pending", "cancelled", label: "timeout") %>
+  <%= link("processing", "completed", label: "shipped") %>
+  <%= link("processing", "cancelled", label: "refunded") %>
 }`,
-    records: `digraph record_example {
-  rankdir=LR;
-  node [shape=record, fontname="sans-serif", fontsize=11, style="filled", fillcolor="#f8fafc", color="#475569"];
-  edge [color="#64748b", fontname="sans-serif", fontsize=10];
+    erb_records: `digraph MemoryDataStructures {
+  <%= graph_header("Memory Record & Buffer Structures", theme: :slate, rankdir: "LR") %>
 
-  node0 [label="<f0> head | <f1> tail"];
-  node1 [label="<f0> val: 42 | <f1> next"];
-  node2 [label="<f0> val: 99 | <f1> next = null"];
+  <%= table_node("user_record", title: "User Struct (0x7ffe)", rows: [
+    ["id", "uint64 (42)"],
+    ["flags", "0x00FF"],
+    ["email_ptr", "*const char"],
+    ["next", "*Node -> 0x80a0"]
+  ], color: "#38bdf8") %>
 
-  node0:f0 -> node1:f0;
-  node1:f1 -> node2:f0;
+  <%= table_node("session_record", title: "Session Buffer (0x80a0)", rows: [
+    ["session_id", "UUID v4"],
+    ["expires_at", "int64 (Unix timestamp)"],
+    ["role", "Role::Admin"],
+    ["next", "nullptr"]
+  ], color: "#10b981") %>
+
+  <%= link("user_record", "session_record", label: "next pointer", color: "#38bdf8") %>
+}`,
+    // Backward compatibility aliases
+    flowchart_clean_light: `digraph ProcessFlowchart {
+  <%= graph_header("Order Processing Flow", theme: :light, rankdir: "TB") %>
+
+  <%= plain_node("start", label: "Start Request", shape: "ellipse", color: "#0284c7") %>
+  <%= step("validate", name: "Validate Order Payload", subtitle: "JSON Schema") %>
+  <%= decision("check_stock", label: "Items in Stock?", color: "#d97706") %>
+  <%= step("charge_card", name: "Charge Payment", subtitle: "Stripe API", color: "#16a34a") %>
+  <%= step("reject", name: "Out of Stock Notification", subtitle: "Send Email", color: "#dc2626") %>
+  <%= plain_node("done", label: "Order Fulfilled (200 OK)", shape: "ellipse", color: "#16a34a") %>
+
+  <%= link("start", "validate") %>
+  <%= link("validate", "check_stock") %>
+  <%= link("check_stock", "charge_card", label: "Yes (Available)") %>
+  <%= link("check_stock", "reject", label: "No (Depleted)", color: "#dc2626") %>
+  <%= link("charge_card", "done") %>
+}`,
+    flowchart_lr: `digraph ProcessFlowchartLR {
+  <%= graph_header("Process Flowchart", theme: :nord, rankdir: "LR") %>
+
+  <%= plain_node("start", label: "Start", shape: "ellipse", color: "#38bdf8") %>
+  <%= step("step1", name: "Process Task", subtitle: "Worker") %>
+  <%= decision("check", label: "Success?", color: "#f59e0b") %>
+  <%= plain_node("done", label: "Done", shape: "ellipse", color: "#22c55e") %>
+
+  <%= link("start", "step1") %>
+  <%= link("step1", "check") %>
+  <%= link("check", "done", label: "Yes") %>
+  <%= link("check", "step1", label: "Retry (No)", color: "#ef4444") %>
+}`,
+    flowchart_tb: `digraph PipelineFlowchartTB {
+  <%= graph_header("Request Pipeline", theme: :slate, rankdir: "TB") %>
+
+  <%= plain_node("input", label: "User Input", shape: "ellipse", color: "#38bdf8") %>
+  <%= step("parse", name: "Validate & Parse", subtitle: "JSON Schema") %>
+  <%= decision("route", label: "Route Request", color: "#f59e0b") %>
+  <%= step("render", name: "Render View", subtitle: "HTML Engine") %>
+  <%= step("api", name: "JSON API Response", subtitle: "FastAPI") %>
+
+  <%= link("input", "parse") %>
+  <%= link("parse", "route") %>
+  <%= link("route", "render", label: "HTML") %>
+  <%= link("route", "api", label: "JSON") %>
+}`,
+    network: `digraph MultiTierNetwork {
+  <%= graph_header("Multi-Tier Network Architecture", theme: :slate, rankdir: "TB") %>
+
+  <%= cloud("inet", name: "Internet / WAN", subtitle: "Public IP") %>
+  <%= firewall("edge_fw", name: "Edge Firewall", ip: "198.51.100.1") %>
+  <%= router("core_rtr", name: "Core Router", ip: "10.0.0.1") %>
+
+  <%= cluster_start("dmz", label: "DMZ Subnet (10.0.1.0/24)", color: "#f59e0b") %>
+    <%= loadbalancer("lb", name: "Nginx Load Balancer", ip: "10.0.1.10") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("app_tier", label: "Application Tier (10.0.2.0/24)", color: "#38bdf8") %>
+    <%= host("app1", name: "App Server 1", ip: "10.0.2.11") %>
+    <%= host("app2", name: "App Server 2", ip: "10.0.2.12") %>
+  <%= cluster_end %>
+
+  <%= cluster_start("db_tier", label: "Database Tier (10.0.3.0/24)", color: "#ec4899") %>
+    <%= database("pg_db", name: "PostgreSQL Primary", ip: "10.0.3.10", engine: "PostgreSQL 16") %>
+    <%= database("redis_cache", name: "Redis Cache", ip: "10.0.3.20", engine: "Redis 7") %>
+  <%= cluster_end %>
+
+  <%= chain("inet", "edge_fw", "core_rtr", "lb") %>
+  <%= links("lb", "app1", "app2") %>
+  <%= links("app1", "pg_db", "redis_cache") %>
+  <%= links("app2", "pg_db", "redis_cache") %>
+}`,
+    state_machine: `digraph OrderLifecycleFSM {
+  <%= graph_header("Order Lifecycle State Machine", theme: :amber, rankdir: "LR") %>
+
+  <%= state_node("init", type: :start, color: "#f59e0b") %>
+  <%= state_node("pending", label: "Pending", color: "#38bdf8") %>
+  <%= state_node("processing", label: "Processing", color: "#f59e0b") %>
+  <%= state_node("completed", label: "Completed", type: :done, color: "#22c55e") %>
+  <%= state_node("cancelled", label: "Cancelled", type: :error, color: "#ef4444") %>
+
+  <%= link("init", "pending", label: "create") %>
+  <%= link("pending", "processing", label: "pay_received") %>
+  <%= link("pending", "cancelled", label: "timeout") %>
+  <%= link("processing", "completed", label: "shipped") %>
+  <%= link("processing", "cancelled", label: "refunded") %>
+}`,
+    records: `digraph MemoryDataStructures {
+  <%= graph_header("Memory Record & Buffer Structures", theme: :slate, rankdir: "LR") %>
+
+  <%= table_node("user_record", title: "User Struct (0x7ffe)", rows: [
+    ["id", "uint64 (42)"],
+    ["flags", "0x00FF"],
+    ["email_ptr", "*const char"],
+    ["next", "*Node -> 0x80a0"]
+  ], color: "#38bdf8") %>
+
+  <%= table_node("session_record", title: "Session Buffer (0x80a0)", rows: [
+    ["session_id", "UUID v4"],
+    ["expires_at", "int64 (Unix timestamp)"],
+    ["role", "Role::Admin"],
+    ["next", "nullptr"]
+  ], color: "#10b981") %>
+
+  <%= link("user_record", "session_record", label: "next pointer", color: "#38bdf8") %>
 }`
   };
 
@@ -2757,6 +3081,7 @@
     const shouldOpen = (open !== undefined) ? open : isClosed;
     mdGraphvizSettingsMenu.style.display = shouldOpen ? 'block' : 'none';
     if (shouldOpen) {
+      if (mdGraphvizOpenMenu) mdGraphvizOpenMenu.style.display = 'none';
       if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
       if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
       if (mdGraphvizSettingWrapCheckbox) mdGraphvizSettingWrapCheckbox.checked = !!mdGraphvizLineWrap;
@@ -3775,6 +4100,9 @@
 
   function scheduleGraphvizPreview() {
     clearTimeout(mdGraphvizDebounceTimer);
+    if (mdGraphvizCurrentMode === 'saved') {
+      setGraphvizEditorMode('modified', mdGraphvizName ? mdGraphvizName.value : '');
+    }
     mdGraphvizDebounceTimer = setTimeout(() => {
       if (!mdGraphvizModal || mdGraphvizModal.style.display !== 'block') return;
       const currentVal = getGraphvizEditorValue();
@@ -3808,8 +4136,102 @@
     return `${base}-${idx}`;
   }
 
+  let mdGraphvizCurrentMode = 'new'; // 'new' | 'saved' | 'modified'
+
+  function setGraphvizEditorMode(mode, name = '') {
+    mdGraphvizCurrentMode = mode;
+    const isNew = mode === 'new';
+    const isSaved = mode === 'saved';
+    const isModified = mode === 'modified';
+
+    if (mdGraphvizModeBadge) {
+      if (isNew) {
+        mdGraphvizModeBadge.textContent = 'NEW';
+        mdGraphvizModeBadge.title = 'New unsaved diagram';
+        mdGraphvizModeBadge.style.background = '#065f46';
+        mdGraphvizModeBadge.style.color = '#6ee7b7';
+        mdGraphvizModeBadge.style.border = '1px solid #059669';
+      } else if (isModified) {
+        mdGraphvizModeBadge.textContent = 'MODIFIED';
+        mdGraphvizModeBadge.title = 'Diagram has unsaved changes';
+        mdGraphvizModeBadge.style.background = '#78350f';
+        mdGraphvizModeBadge.style.color = '#fde68a';
+        mdGraphvizModeBadge.style.border = '1px solid #b45309';
+      } else {
+        mdGraphvizModeBadge.textContent = 'SAVED';
+        mdGraphvizModeBadge.title = 'Saved diagram';
+        mdGraphvizModeBadge.style.background = '#0369a1';
+        mdGraphvizModeBadge.style.color = '#bae6fd';
+        mdGraphvizModeBadge.style.border = '1px solid #0284c7';
+      }
+    }
+
+    if (isNew) {
+      if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'none';
+      if (mdGraphvizSaveAsNewBtn) mdGraphvizSaveAsNewBtn.style.display = 'none';
+      if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+      if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
+    } else {
+      const activeBase = name || (mdGraphvizExisting && mdGraphvizExisting.value) || (mdGraphvizName && mdGraphvizName.value) || '';
+      if (mdGraphvizExisting && activeBase && cachedDiagramBases && cachedDiagramBases.has(activeBase)) {
+        mdGraphvizExisting.value = activeBase;
+      }
+      if (mdGraphvizRenameBtn) {
+        mdGraphvizRenameBtn.style.display = 'inline-flex';
+        mdGraphvizRenameBtn.style.background = '#1e293b';
+        mdGraphvizRenameBtn.style.color = '#cbd5e1';
+      }
+      if (mdGraphvizSaveAsNewBtn) mdGraphvizSaveAsNewBtn.style.display = 'inline-flex';
+
+      const isReferenced = isDiagramReferencedInActiveNote(activeBase, `${activeBase}.svg`);
+      if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = isReferenced ? 'fas fa-save' : 'fas fa-plus';
+      if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = isReferenced ? 'Save Changes' : 'Save & Insert';
+    }
+  }
+
+  function updateGraphvizOpenList(list) {
+    if (!mdGraphvizOpenList) return;
+    mdGraphvizOpenList.innerHTML = '';
+    const bases = Array.isArray(list) ? list.map(item => item && item.base).filter(Boolean) : Array.from(cachedDiagramBases || []);
+    if (!bases || bases.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.padding = '10px 14px';
+      empty.style.color = '#64748b';
+      empty.style.fontSize = '0.82em';
+      empty.textContent = 'No saved diagrams found';
+      mdGraphvizOpenList.appendChild(empty);
+      return;
+    }
+    bases.forEach(base => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'md-gv-open-item';
+      btn.style.display = 'flex';
+      btn.style.alignItems = 'center';
+      btn.style.justifyContent = 'space-between';
+      btn.style.width = '100%';
+      btn.style.textAlign = 'left';
+      btn.style.padding = '8px 14px';
+      btn.style.background = 'transparent';
+      btn.style.border = 'none';
+      btn.style.color = '#e2e8f0';
+      btn.style.cursor = 'pointer';
+      btn.style.fontSize = '0.84em';
+      btn.style.fontFamily = 'monospace';
+      btn.style.transition = 'background 0.15s, color 0.15s';
+      btn.innerHTML = `<span style="display:flex;align-items:center;gap:8px;"><i class="fas fa-file-code" style="color:#38bdf8;"></i><span>${base}.svg</span></span><i class="fas fa-chevron-right" style="font-size:0.75em;color:#64748b;"></i>`;
+      btn.onmouseover = () => { btn.style.background = '#1e293b'; btn.style.color = '#38bdf8'; };
+      btn.onmouseout = () => { btn.style.background = 'transparent'; btn.style.color = '#e2e8f0'; };
+      btn.onclick = () => {
+        if (mdGraphvizOpenMenu) mdGraphvizOpenMenu.style.display = 'none';
+        loadGraphvizSource(base);
+      };
+      mdGraphvizOpenList.appendChild(btn);
+    });
+  }
+
   function loadGraphvizSources(selectedBase = '') {
-    if (!mdGraphvizExisting) return Promise.resolve();
     const activeWalkthrough = getActiveWalkthrough();
     return fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources`, {
       credentials: 'same-origin'
@@ -3821,30 +4243,17 @@
       if (window.CtlabsWalkthrough) {
         window.CtlabsWalkthrough.cachedDiagramBases = cachedDiagramBases;
       }
-      const current = selectedBase || mdGraphvizExisting.value || '';
-      mdGraphvizExisting.innerHTML = '';
-      const blank = document.createElement('option');
-      blank.value = '';
-      const nameVal = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value.trim()) || '';
-      blank.textContent = nameVal ? `${nameVal} (unsaved)` : '+ New diagram (unsaved)';
-      mdGraphvizExisting.appendChild(blank);
-      list.forEach(item => {
-        if (!item || !item.base) return;
-        const opt = document.createElement('option');
-        opt.value = item.base;
-        opt.textContent = item.base;
-        mdGraphvizExisting.appendChild(opt);
-      });
+      updateGraphvizOpenList(list);
+
+      const current = selectedBase || (mdGraphvizExisting && mdGraphvizExisting.value) || '';
       if (current && cachedDiagramBases.has(current)) {
-        mdGraphvizExisting.value = current;
-        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${current}`;
-        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
+        if (mdGraphvizExisting) mdGraphvizExisting.value = current;
+        if (mdGraphvizName) mdGraphvizName.value = current;
+        setGraphvizEditorMode('saved', current);
       } else {
-        mdGraphvizExisting.value = '';
-        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = nameVal ? `New: ${nameVal}` : '(New diagram)';
-        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = nameVal ? 'inline-flex' : 'none';
-        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
+        if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+        const nameVal = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value.trim()) || '';
+        setGraphvizEditorMode('new', nameVal);
       }
     })
     .catch(() => {});
@@ -3857,16 +4266,7 @@
       setGraphvizPreview(null);
       const newName = (mdGraphvizName && mdGraphvizName.value && mdGraphvizName.value !== base) ? mdGraphvizName.value : suggestNewDiagramName();
       if (mdGraphvizName) mdGraphvizName.value = newName;
-      if (mdGraphvizExisting) {
-        let blank = mdGraphvizExisting.querySelector('option[value=""]');
-        if (blank) blank.textContent = `${newName} (unsaved)`;
-        mdGraphvizExisting.value = '';
-      }
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-      if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
-      if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+      setGraphvizEditorMode('new', newName);
       if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
       setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
       return renderGraphviz({ silent: true });
@@ -3882,13 +4282,7 @@
         setGraphvizEditorValue(data.source);
         if (mdGraphvizName) mdGraphvizName.value = base;
         if (mdGraphvizExisting) mdGraphvizExisting.value = base;
-        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${base}`;
-        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-
-        const isReferenced = isDiagramReferencedInActiveNote(base, `${base}.svg`);
-        if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = isReferenced ? 'Save Changes' : 'Save & Insert';
-        if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = isReferenced ? 'fas fa-save' : 'fas fa-plus';
+        setGraphvizEditorMode('saved', base);
 
         setGraphvizError('');
         mdGraphvizPendingFit = true;
@@ -3963,40 +4357,263 @@
     });
   }
 
-  function startNewGraphvizDiagram() {
-    const defaultName = suggestNewDiagramName();
-    const entered = prompt('Create a new diagram:\nEnter diagram name:', defaultName);
-    if (entered === null) return;
+  const MD_GRAPHVIZ_TEMPLATE_DESCRIPTIONS = {
+    __blank__: 'Default starter diagram with 3 basic nodes (Start → Process → Done). Great for starting clean.',
+    lab_topo: 'Current live lab data network topology, including routers, switches, and hosts.',
+    lab_mgmt_topo: 'Current live lab management network topology map.',
+    lab_con: 'Current live lab data network connections and port linkages.',
+    lab_mgmt_con: 'Current live lab management network connections map.',
+    erb_enterprise: 'Enterprise architecture (DSL/ERB) with WAN, firewall, DMZ, load balancers, and databases.',
+    erb_cloud_vpc: 'Multi-tier cloud VPC architecture with public/private/database subnets, ALB, Bastion, and Aurora Multi-AZ.',
+    erb_k8s: 'Kubernetes cluster architecture (DSL/ERB) with Ingress, pods, and namespaces.',
+    erb_cicd: 'Automated CI/CD delivery pipeline from Git commit through testing, security scans, container builds, and staging/production promotion.',
+    erb_network: 'Multi-tier network & DMZ topology diagram (DSL/ERB) with perimeter firewall and core switches.',
+    erb_microservices: 'Microservices ecosystem (DSL/ERB) with API Gateway, Kafka event bus, and persistent storage.',
+    erb_raft: 'Distributed consensus visualization using Raft protocol with Leader lease, Follower nodes, Heartbeat replication, and WAL storage.',
+    erb_data_pipeline: 'High-throughput real-time data streaming pipeline with Kafka, Flink/Spark, S3 data lake, and ClickHouse OLAP warehouse.',
+    erb_erd: 'Clean light relational database entity-relationship schema (ERD) with users, orders, products, and typed record tables.',
+    erb_c4: 'C4 model container architecture diagram with users, SPA/Mobile apps, API gateway, microservices, and databases.',
+    erb_dynamic_loop: 'Dynamic cluster (DSL/ERB) using Ruby loops to generate worker nodes and storage links.',
+    erb_flowchart: 'Modern clean decision flowchart (DSL/ERB) with decision diamonds, task steps, and terminal capsules.',
+    erb_pipeline: 'Top-to-bottom or left-to-right task processing pipeline (DSL/ERB) with inputs, routing, and workers.',
+    erb_state_machine: 'State transition lifecycle & FSM diagram (DSL/ERB) with initial, intermediate, and terminal states.',
+    erb_records: 'Data structures & memory record buffers (DSL/ERB) using styled typed table layouts.',
+    // Legacy aliases
+    flowchart_clean_light: 'Modern clean decision flowchart (DSL/ERB) with decision diamonds, task steps, and terminal capsules.',
+    flowchart_lr: 'Left-to-right process flowchart (DSL/ERB) with decision diamonds and step nodes.',
+    flowchart_tb: 'Top-to-bottom pipeline flowchart (DSL/ERB) with inputs, routing, and outputs.',
+    network: 'Multi-subnet network topology diagram (DSL/ERB) with perimeter firewall and core switches.',
+    state_machine: 'State transition diagram (DSL/ERB) with initial, intermediate, and terminal states.',
+    records: 'Data structures diagram (DSL/ERB) using table and record port shapes.'
+  };
 
-    let cleanName = entered.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
-    if (!cleanName) cleanName = 'diagram';
+  function applyThemeToSource(src, selectedTheme) {
+    if (!src || !selectedTheme || selectedTheme === 'auto') return src;
+    // If ERB template contains graph_header, adjust or inject theme parameter
+    if (src.includes('graph_header(')) {
+      if (/graph_header\([^)]*theme:\s*:[a-z_]+/i.test(src)) {
+        return src.replace(/(graph_header\([^)]*theme:\s*):[a-z_]+/i, `$1:${selectedTheme}`);
+      } else {
+        return src.replace(/(graph_header\([^,)]+)/i, `$1, theme: :${selectedTheme}`);
+      }
+    }
+    // If pure DOT diagram, adjust bgcolor
+    const bgColors = {
+      slate: '#0b1120',
+      light: '#ffffff',
+      nord: '#242933',
+      dracula: '#282a36',
+      amber: '#1c1917',
+      emerald: '#062017'
+    };
+    const bg = bgColors[selectedTheme];
+    if (bg) {
+      if (/bgcolor\s*=\s*"[^"]*"/i.test(src)) {
+        return src.replace(/bgcolor\s*=\s*"[^"]*"/i, `bgcolor="${bg}"`);
+      } else if (/digraph\s+[^{]+\{/i.test(src)) {
+        return src.replace(/(digraph\s+[^{]+\{)/i, `$1\n  bgcolor="${bg}";`);
+      }
+    }
+    return src;
+  }
 
-    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
-      alert(`A diagram named "${cleanName}" already exists. Please choose a different name or select it from the Diagram dropdown.`);
+  const mdGraphvizNewTplCache = new Map();
+  let mdGraphvizNewTplReqSeq = 0;
+
+  function updateNewDiagramTemplatePreview() {
+    if (!mdGraphvizNewModal || mdGraphvizNewModal.style.display === 'none') return;
+    const tplKey = mdGraphvizNewTemplateSelect ? mdGraphvizNewTemplateSelect.value : '__blank__';
+    const engine = mdGraphvizNewEngineSelect ? mdGraphvizNewEngineSelect.value : 'dot';
+    const theme = mdGraphvizNewThemeSelect ? mdGraphvizNewThemeSelect.value : 'auto';
+
+    if (mdGraphvizNewTemplateDesc) {
+      mdGraphvizNewTemplateDesc.textContent = MD_GRAPHVIZ_TEMPLATE_DESCRIPTIONS[tplKey] || 'Custom starting template.';
+    }
+
+    const cacheKey = `${tplKey}:${engine}:${theme}`;
+    if (mdGraphvizNewTplCache.has(cacheKey)) {
+      renderTemplatePreviewSvg(mdGraphvizNewTplCache.get(cacheKey));
       return;
     }
 
-    setGraphvizEditorValue(makeGraphvizDefaultSource(cleanName));
-    if (mdGraphvizName) mdGraphvizName.value = cleanName;
-    if (mdGraphvizExisting) {
-      let blank = mdGraphvizExisting.querySelector('option[value=""]');
-      if (!blank) {
-        blank = document.createElement('option');
-        blank.value = '';
-        mdGraphvizExisting.insertBefore(blank, mdGraphvizExisting.firstChild);
-      }
-      blank.textContent = `${cleanName} (unsaved)`;
-      mdGraphvizExisting.value = '';
+    if (mdGraphvizNewPreviewLoading) mdGraphvizNewPreviewLoading.style.display = 'flex';
+    if (mdGraphvizNewPreviewStatus) mdGraphvizNewPreviewStatus.textContent = 'Rendering...';
+
+    const currentSeq = ++mdGraphvizNewTplReqSeq;
+
+    const requestPreview = (source) => {
+      const activeWalkthrough = getActiveWalkthrough();
+      const body = new URLSearchParams();
+      body.set('source', source);
+      body.set('engine', engine);
+      body.set('walkthrough', activeWalkthrough || '');
+
+      return fetch('/recordings/graphviz/preview', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (currentSeq !== mdGraphvizNewTplReqSeq) return;
+        if (data.ok && data.svg) {
+          mdGraphvizNewTplCache.set(cacheKey, data.svg);
+          renderTemplatePreviewSvg(data.svg);
+        } else {
+          showTemplatePreviewError(data.error || 'Preview failed');
+        }
+      })
+      .catch(err => {
+        if (currentSeq !== mdGraphvizNewTplReqSeq) return;
+        showTemplatePreviewError(err.message || 'Error rendering preview');
+      });
+    };
+
+    if (tplKey.startsWith('lab_')) {
+      const mapType = tplKey.replace(/^lab_/, '');
+      fetch(`/maps/dot/${encodeURIComponent(mapType)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (currentSeq !== mdGraphvizNewTplReqSeq) return;
+          const dotSrc = (data.ok && data.dot) ? data.dot : '';
+          let source = formatGraphvizDocHeader('diagram') + dotSrc;
+          source = applyThemeToSource(source, theme);
+          requestPreview(source);
+        })
+        .catch(err => {
+          if (currentSeq !== mdGraphvizNewTplReqSeq) return;
+          let source = makeGraphvizDefaultSource('diagram');
+          source = applyThemeToSource(source, theme);
+          requestPreview(source);
+        });
+      return;
     }
-    if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
-    if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-    if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-    if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
-    if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+
+    let source = '';
+    if (tplKey && tplKey !== '__blank__' && MD_GRAPHVIZ_TEMPLATES[tplKey]) {
+      source = formatGraphvizDocHeader('diagram') + MD_GRAPHVIZ_TEMPLATES[tplKey];
+    } else {
+      source = makeGraphvizDefaultSource('diagram');
+    }
+    source = applyThemeToSource(source, theme);
+    requestPreview(source);
+  }
+
+  function renderTemplatePreviewSvg(svgStr) {
+    if (mdGraphvizNewPreviewLoading) mdGraphvizNewPreviewLoading.style.display = 'none';
+    if (mdGraphvizNewPreviewStatus) mdGraphvizNewPreviewStatus.textContent = 'Preview';
+    if (!mdGraphvizNewPreviewSvg) return;
+
+    let cleanSvg = svgStr;
+    cleanSvg = cleanSvg.replace(/<svg\b([^>]*)>/i, (m, attrs) => {
+      return `<svg ${attrs} style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; display: block; margin: auto;">`;
+    });
+    mdGraphvizNewPreviewSvg.innerHTML = cleanSvg;
+  }
+
+  function showTemplatePreviewError(msg) {
+    if (mdGraphvizNewPreviewLoading) mdGraphvizNewPreviewLoading.style.display = 'none';
+    if (mdGraphvizNewPreviewStatus) mdGraphvizNewPreviewStatus.textContent = 'Error';
+    if (mdGraphvizNewPreviewSvg) {
+      mdGraphvizNewPreviewSvg.innerHTML = `<div style="color: #ef4444; font-size: 0.8em; text-align: center; padding: 12px;"><i class="fas fa-exclamation-triangle" style="font-size: 1.5em; display: block; margin-bottom: 6px;"></i>${escapeHtml(msg)}</div>`;
+    }
+  }
+
+  function openNewDiagramModal() {
+    if (!mdGraphvizNewModal) return;
+    const defaultName = suggestNewDiagramName();
+    if (mdGraphvizNewNameInput) {
+      mdGraphvizNewNameInput.value = defaultName;
+    }
+    if (mdGraphvizNewTemplateSelect) {
+      mdGraphvizNewTemplateSelect.value = '__blank__';
+    }
+    if (mdGraphvizNewThemeSelect) {
+      mdGraphvizNewThemeSelect.value = 'auto';
+    }
+    if (mdGraphvizNewEngineSelect && mdGraphvizEngine) {
+      mdGraphvizNewEngineSelect.value = mdGraphvizEngine.value || 'dot';
+    }
+    if (mdGraphvizNewError) {
+      mdGraphvizNewError.style.display = 'none';
+      mdGraphvizNewError.textContent = '';
+    }
+    mdGraphvizNewModal.style.display = 'block';
+    updateNewDiagramTemplatePreview();
+    setTimeout(() => {
+      if (mdGraphvizNewNameInput) {
+        mdGraphvizNewNameInput.focus();
+        mdGraphvizNewNameInput.select();
+      }
+    }, 40);
+  }
+
+  function createNewDiagramFromModal() {
+    const nameInput = mdGraphvizNewNameInput ? mdGraphvizNewNameInput.value.trim() : '';
+    let cleanName = nameInput.replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+    if (!cleanName) cleanName = 'diagram';
+
+    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
+      if (mdGraphvizNewError) {
+        mdGraphvizNewError.textContent = `A diagram named "${cleanName}" already exists. Please choose a different name.`;
+        mdGraphvizNewError.style.display = 'block';
+      }
+      return;
+    }
+
+    const tplKey = mdGraphvizNewTemplateSelect ? mdGraphvizNewTemplateSelect.value : '__blank__';
+    const chosenEngine = mdGraphvizNewEngineSelect ? mdGraphvizNewEngineSelect.value : 'dot';
+    const theme = mdGraphvizNewThemeSelect ? mdGraphvizNewThemeSelect.value : 'auto';
+    if (mdGraphvizEngine) {
+      mdGraphvizEngine.value = chosenEngine;
+    }
+
+    if (mdGraphvizNewModal) mdGraphvizNewModal.style.display = 'none';
+
+    if (tplKey.startsWith('lab_')) {
+      const mapType = tplKey.replace(/^lab_/, '');
+      fetch(`/maps/dot/${encodeURIComponent(mapType)}`)
+        .then(r => r.json())
+        .then(data => {
+          const dotSrc = (data.ok && data.dot) ? data.dot : '';
+          let templateSource = formatGraphvizDocHeader(cleanName) + dotSrc;
+          templateSource = applyThemeToSource(templateSource, theme);
+          applyCreatedDiagram(cleanName, templateSource);
+        })
+        .catch(err => {
+          let fallback = makeGraphvizDefaultSource(cleanName);
+          fallback = applyThemeToSource(fallback, theme);
+          applyCreatedDiagram(cleanName, fallback);
+        });
+      return;
+    }
+
+    let source = '';
+    if (tplKey && tplKey !== '__blank__' && MD_GRAPHVIZ_TEMPLATES[tplKey]) {
+      source = formatGraphvizDocHeader(cleanName) + MD_GRAPHVIZ_TEMPLATES[tplKey];
+    } else {
+      source = makeGraphvizDefaultSource(cleanName);
+    }
+    source = applyThemeToSource(source, theme);
+    applyCreatedDiagram(cleanName, source);
+  }
+
+  function applyCreatedDiagram(name, source) {
+    if (mdGraphvizName) mdGraphvizName.value = name;
+    if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+    setGraphvizEditorValue(source);
+    setGraphvizEditorMode('new', name);
     setGraphvizError('');
-    if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Started new diagram: ${cleanName}`;
+    if (mdGraphvizStatus) mdGraphvizStatus.textContent = `New diagram: ${name}`;
     renderGraphviz({ silent: true });
-    if (mdGraphvizCodeEditor) mdGraphvizCodeEditor.focus();
+    if (mdGraphvizCodeEditor && typeof mdGraphvizCodeEditor.focus === 'function') {
+      mdGraphvizCodeEditor.focus();
+    }
+  }
+
+  function startNewGraphvizDiagram() {
+    openNewDiagramModal();
   }
 
   function saveCurrentDiagramAsNew() {
@@ -4026,30 +4643,30 @@
     if (!current) return;
     const isUnsaved = !mdGraphvizExisting || !mdGraphvizExisting.value;
 
-    const entered = prompt(`Rename diagram "${current}":\nEnter new name:`, current);
-    if (entered === null) return;
-
-    let cleanName = entered.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
-    if (!cleanName || cleanName === current) return;
-
-    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
-      alert(`A diagram named "${cleanName}" already exists.`);
+    if (isUnsaved) {
+      if (mdGraphvizName) mdGraphvizName.focus();
       return;
     }
 
-    if (isUnsaved) {
-      if (mdGraphvizName) mdGraphvizName.value = cleanName;
-      if (mdGraphvizExisting) {
-        let blank = mdGraphvizExisting.querySelector('option[value=""]');
-        if (blank) blank.textContent = `${cleanName} (unsaved)`;
-        mdGraphvizExisting.value = '';
-      }
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${cleanName}`;
-      const curSrc = getGraphvizEditorValue();
-      if (GRAPHVIZ_DOC_HEADER_REGEX.test(curSrc)) {
-        setGraphvizEditorValue(updateGraphvizDocHeader(curSrc, cleanName));
-      }
-      if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Renamed to ${cleanName}`;
+    const currentInputVal = mdGraphvizName ? mdGraphvizName.value.trim() : '';
+    let targetName = current;
+    if (currentInputVal && currentInputVal !== current) {
+      targetName = currentInputVal;
+    } else {
+      const entered = prompt(`Rename diagram "${current}":\nEnter new name:`, current);
+      if (entered === null) return;
+      targetName = entered;
+    }
+
+    let cleanName = targetName.trim().replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+    if (!cleanName || cleanName === current) {
+      if (mdGraphvizName) mdGraphvizName.value = current;
+      return;
+    }
+
+    if (cachedDiagramBases && cachedDiagramBases.has(cleanName)) {
+      alert(`A diagram named "${cleanName}" already exists.`);
+      if (mdGraphvizName) mdGraphvizName.value = current;
       return;
     }
 
@@ -4063,6 +4680,7 @@
       const data = await res.json();
       if (!res.ok || !data.ok) {
         setGraphvizError(data.error || 'Failed to rename diagram.');
+        if (mdGraphvizName) mdGraphvizName.value = current;
         return;
       }
 
@@ -4086,7 +4704,7 @@
       }
 
       if (mdGraphvizName) mdGraphvizName.value = cleanName;
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${cleanName}`;
+      setGraphvizEditorMode('saved', cleanName);
       await loadGraphvizSources(cleanName);
       setGraphvizStatus(`Renamed to ${cleanName}`);
       renderGraphviz({ silent: true });
@@ -4209,11 +4827,7 @@
       if (data.base) {
         if (mdGraphvizExisting) mdGraphvizExisting.value = data.base;
         if (mdGraphvizName) mdGraphvizName.value = data.base;
-        if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${data.base}`;
-        if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-        if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-        if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save Changes';
-        if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-save';
+        setGraphvizEditorMode('saved', data.base);
         loadGraphvizSources(data.base);
       }
 
@@ -4251,67 +4865,6 @@
     });
   }
 
-  function deleteGraphvizDiagram() {
-    const base = mdGraphvizExisting ? mdGraphvizExisting.value : '';
-    if (!base) return;
-
-    if (!confirm(`Delete diagram "${base}"? This will remove the source DOT file and the rendered image.`)) {
-      return;
-    }
-
-    setGraphvizError('');
-    if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.disabled = true;
-    if (mdGraphvizStatus) mdGraphvizStatus.textContent = 'Deleting…';
-
-    const activeWalkthrough = getActiveWalkthrough();
-    fetch(`/walkthroughs/${encodeURIComponent(activeWalkthrough || '')}/graphviz/sources/${encodeURIComponent(base)}/delete`, {
-      method: 'POST',
-      credentials: 'same-origin'
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (!data.ok) {
-        setGraphvizError(data.error || 'Failed to delete diagram.');
-        if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
-        return;
-      }
-
-      cachedDiagramBases.delete(base);
-      if (window.CtlabsWalkthrough && window.CtlabsWalkthrough.cachedDiagramBases) {
-        window.CtlabsWalkthrough.cachedDiagramBases.delete(base);
-      }
-      const newName = suggestNewDiagramName();
-      if (mdGraphvizName) mdGraphvizName.value = newName;
-      if (mdGraphvizExisting) {
-        let blank = mdGraphvizExisting.querySelector('option[value=""]');
-        if (!blank) {
-          blank = document.createElement('option');
-          blank.value = '';
-          mdGraphvizExisting.insertBefore(blank, mdGraphvizExisting.firstChild);
-        }
-        blank.textContent = `${newName} (unsaved)`;
-        mdGraphvizExisting.value = '';
-      }
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
-      setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
-      if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-      if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
-      if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
-      if (mdGraphvizStatus) mdGraphvizStatus.textContent = `Deleted ${base}`;
-
-      loadGraphvizSources();
-      renderGraphviz({ silent: true });
-    })
-    .catch(err => {
-      setGraphvizError('Delete failed: ' + (err.message || 'network error'));
-      if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
-    })
-    .finally(() => {
-      if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.disabled = false;
-    });
-  }
-
   function downloadGraphvizSvg() {
     if (!mdGraphvizCurrentSvg) {
       setGraphvizError('No diagram to download. Render your DOT source first.');
@@ -4341,6 +4894,7 @@
     mdGraphvizPanY = 0;
     setGraphvizPreview(null);
     setGraphvizActiveTab('source');
+    if (mdGraphvizOpenMenu) mdGraphvizOpenMenu.style.display = 'none';
     if (mdGraphvizBlocksMenu) mdGraphvizBlocksMenu.style.display = 'none';
     if (mdGraphvizEmojiMenu) mdGraphvizEmojiMenu.style.display = 'none';
     if (mdGraphvizSettingsMenu) mdGraphvizSettingsMenu.style.display = 'none';
@@ -4349,25 +4903,12 @@
     if (initialBase) {
       if (mdGraphvizName) mdGraphvizName.value = initialBase;
       if (mdGraphvizExisting) mdGraphvizExisting.value = initialBase;
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `Editing: ${initialBase}`;
-      if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'inline-flex';
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
+      setGraphvizEditorMode('saved', initialBase);
     } else {
-      const newName = suggestNewDiagramName();
-      if (!getGraphvizEditorValue().trim()) {
-        setGraphvizEditorValue(makeGraphvizDefaultSource(newName));
-      }
-      if (mdGraphvizName) mdGraphvizName.value = newName;
-      if (mdGraphvizExisting) {
-        let blank = mdGraphvizExisting.querySelector('option[value=""]');
-        if (blank) blank.textContent = `${newName} (unsaved)`;
-        mdGraphvizExisting.value = '';
-      }
-      if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${newName}`;
-      if (mdGraphvizDeleteBtn) mdGraphvizDeleteBtn.style.display = 'none';
-      if (mdGraphvizRenameBtn) mdGraphvizRenameBtn.style.display = 'inline-flex';
-      if (mdGraphvizInsertText) mdGraphvizInsertText.textContent = 'Save & Insert';
-      if (mdGraphvizInsertIcon) mdGraphvizInsertIcon.className = 'fas fa-plus';
+      setGraphvizEditorValue('');
+      if (mdGraphvizName) mdGraphvizName.value = '';
+      if (mdGraphvizExisting) mdGraphvizExisting.value = '';
+      setGraphvizEditorMode('new', '');
     }
 
     if (mdGraphvizStatus) mdGraphvizStatus.textContent = '';
@@ -4381,23 +4922,22 @@
     initGraphvizCodeEditor();
     applyGraphvizEditorFont();
 
+    if (!initialBase) {
+      openNewDiagramModal();
+    }
+
     setTimeout(() => {
       if (mdGraphvizCodeEditor) {
         mdGraphvizCodeEditor.refresh();
-        mdGraphvizCodeEditor.focus();
+        if (initialBase) mdGraphvizCodeEditor.focus();
       } else if (mdGraphvizSource) {
-        mdGraphvizSource.focus();
+        if (initialBase) mdGraphvizSource.focus();
       }
     }, 40);
 
     loadGraphvizSources(initialBase).then(() => {
       if (initialBase) {
         loadGraphvizSource(initialBase);
-      } else {
-        const val = getGraphvizEditorValue();
-        if (val.trim()) {
-          renderGraphviz({ silent: true });
-        }
       }
     });
   }
@@ -4715,11 +5255,9 @@
 
                 setGraphvizEditorValue(templateSource);
                 if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
-                  if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${currentName}`;
-                  if (mdGraphvizExisting) {
-                    let blank = mdGraphvizExisting.querySelector('option[value=""]');
-                    if (blank) blank.textContent = `${currentName} (unsaved)`;
-                  }
+                  setGraphvizEditorMode('new', currentName);
+                } else {
+                  setGraphvizEditorMode('modified', mdGraphvizName ? mdGraphvizName.value : '');
                 }
                 mdGraphvizTemplate.value = '';
                 renderGraphviz();
@@ -4754,18 +5292,115 @@
 
         setGraphvizEditorValue(templateSource);
         if (!mdGraphvizExisting || !mdGraphvizExisting.value) {
-          if (mdGraphvizCurrentLabel) mdGraphvizCurrentLabel.textContent = `New: ${currentName}`;
-          if (mdGraphvizExisting) {
-            let blank = mdGraphvizExisting.querySelector('option[value=""]');
-            if (blank) blank.textContent = `${currentName} (unsaved)`;
-          }
+          setGraphvizEditorMode('new', currentName);
+        } else {
+          setGraphvizEditorMode('modified', mdGraphvizName ? mdGraphvizName.value : '');
         }
         mdGraphvizTemplate.value = '';
         renderGraphviz();
       });
     }
+    if (mdGraphvizName) {
+      mdGraphvizName.addEventListener('input', () => {
+        let clean = mdGraphvizName.value.replace(/[^a-zA-Z0-9_.-]+/g, '_').substring(0, 60);
+        if (clean !== mdGraphvizName.value) {
+          const curPos = mdGraphvizName.selectionStart;
+          mdGraphvizName.value = clean;
+          mdGraphvizName.setSelectionRange(curPos, curPos);
+        }
+        if (mdGraphvizCurrentMode === 'saved') {
+          const curSaved = mdGraphvizExisting ? mdGraphvizExisting.value : '';
+          if (clean && clean !== curSaved) {
+            if (mdGraphvizRenameBtn) {
+              mdGraphvizRenameBtn.style.background = '#0284c7';
+              mdGraphvizRenameBtn.style.color = '#ffffff';
+              mdGraphvizRenameBtn.title = `Click to rename from "${curSaved}" to "${clean}" on disk`;
+            }
+          } else {
+            if (mdGraphvizRenameBtn) {
+              mdGraphvizRenameBtn.style.background = '#1e293b';
+              mdGraphvizRenameBtn.style.color = '#cbd5e1';
+              mdGraphvizRenameBtn.title = 'Rename this diagram file on disk';
+            }
+          }
+        }
+      });
+      mdGraphvizName.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (mdGraphvizCurrentMode === 'saved') {
+            renameCurrentDiagram();
+          } else {
+            if (mdGraphvizCodeEditor) {
+              mdGraphvizCodeEditor.focus();
+            } else if (mdGraphvizSource) {
+              mdGraphvizSource.focus();
+            }
+          }
+        }
+      });
+    }
+    if (mdGraphvizOpenBtn) {
+      mdGraphvizOpenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (mdGraphvizSettingsMenu) mdGraphvizSettingsMenu.style.display = 'none';
+        if (mdGraphvizOpenMenu) {
+          const isOpen = mdGraphvizOpenMenu.style.display === 'block';
+          mdGraphvizOpenMenu.style.display = isOpen ? 'none' : 'block';
+          if (!isOpen) {
+            updateGraphvizOpenList();
+          }
+        }
+      });
+    }
+    document.addEventListener('click', (e) => {
+      if (mdGraphvizOpenMenu && mdGraphvizOpenMenu.style.display === 'block') {
+        if (!mdGraphvizOpenMenu.contains(e.target) && e.target !== mdGraphvizOpenBtn && !mdGraphvizOpenBtn.contains(e.target)) {
+          mdGraphvizOpenMenu.style.display = 'none';
+        }
+      }
+    });
     if (mdGraphvizNewBtn) {
       mdGraphvizNewBtn.addEventListener('click', startNewGraphvizDiagram);
+    }
+    if (mdGraphvizNewModalCreate) {
+      mdGraphvizNewModalCreate.addEventListener('click', createNewDiagramFromModal);
+    }
+    const dismissNewDiagramModal = () => {
+      if (mdGraphvizNewModal) mdGraphvizNewModal.style.display = 'none';
+      if (!getGraphvizEditorValue().trim() && (!mdGraphvizExisting || !mdGraphvizExisting.value)) {
+        if (mdGraphvizModal) mdGraphvizModal.style.display = 'none';
+      }
+    };
+    if (mdGraphvizNewModalCancel) {
+      mdGraphvizNewModalCancel.addEventListener('click', dismissNewDiagramModal);
+    }
+    if (mdGraphvizNewModalClose) {
+      mdGraphvizNewModalClose.addEventListener('click', dismissNewDiagramModal);
+    }
+    if (mdGraphvizNewNameInput) {
+      mdGraphvizNewNameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          createNewDiagramFromModal();
+        } else if (e.key === 'Escape') {
+          dismissNewDiagramModal();
+        }
+      });
+    }
+    if (mdGraphvizNewTemplateSelect) {
+      mdGraphvizNewTemplateSelect.addEventListener('change', updateNewDiagramTemplatePreview);
+    }
+    if (mdGraphvizNewThemeSelect) {
+      mdGraphvizNewThemeSelect.addEventListener('change', updateNewDiagramTemplatePreview);
+    }
+    if (mdGraphvizNewEngineSelect) {
+      mdGraphvizNewEngineSelect.addEventListener('change', updateNewDiagramTemplatePreview);
+    }
+    if (mdGraphvizEngine) {
+      mdGraphvizEngine.addEventListener('change', () => {
+        renderGraphviz({ silent: false });
+      });
     }
     if (mdGraphvizSaveAsNewBtn) {
       mdGraphvizSaveAsNewBtn.addEventListener('click', saveCurrentDiagramAsNew);
@@ -4778,9 +5413,6 @@
     }
     if (mdGraphvizDownloadBtn) {
       mdGraphvizDownloadBtn.addEventListener('click', downloadGraphvizSvg);
-    }
-    if (mdGraphvizDeleteBtn) {
-      mdGraphvizDeleteBtn.addEventListener('click', deleteGraphvizDiagram);
     }
     if (mdGraphvizSaveNewBtn) {
       mdGraphvizSaveNewBtn.addEventListener('click', saveCurrentDiagramAsNew);
@@ -6020,6 +6652,7 @@
   window.insertMarkdownInline = insertMarkdownInline;
   window.uploadAndInsertImage = uploadAndInsertImage;
   window.openGraphvizModal = openGraphvizModal;
+  window.downloadGraphvizSvg = downloadGraphvizSvg;
   window.saveAndInsertGraphviz = saveAndInsertGraphviz;
   window.openGitHistoryModal = openGitHistoryModal;
   window.loadGitHistory = loadGitHistory;

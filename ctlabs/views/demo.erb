@@ -1567,6 +1567,25 @@
       </button>
     </div>
 
+    <!-- Picture / Diagram Context Menu (right-click an image or diagram) -->
+    <div id="md-img-context-menu" style="display: none; position: fixed; z-index: 10002; min-width: 220px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); padding: 4px 0; user-select: none;">
+      <div id="md-img-context-title" style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 700; border-bottom: 1px solid #334155; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        Image
+      </div>
+      <button type="button" id="md-img-context-download" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-download" style="color: #38bdf8; width: 14px; text-align: center;"></i> Download / Export
+      </button>
+      <button type="button" id="md-img-context-edit-diagram" style="width: 100%; display: none; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-project-diagram" style="color: #38bdf8; width: 14px; text-align: center;"></i> Edit diagram
+      </button>
+      <button type="button" id="md-img-context-copy-link" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-link" style="color: #94a3b8; width: 14px; text-align: center;"></i> Copy image link
+      </button>
+      <a id="md-img-context-open-tab" href="#" target="_blank" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #cbd5e1; font-size: 0.84em; text-align: left; text-decoration: none; box-sizing: border-box; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-external-link-alt" style="color: #94a3b8; width: 14px; text-align: center;"></i> Open in new tab
+      </a>
+    </div>
+
     <%= erb :'modals/screenshot_editor' %>
 
     <script src="/js/marked.min.js"></script>
