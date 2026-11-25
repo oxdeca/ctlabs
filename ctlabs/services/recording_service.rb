@@ -1124,15 +1124,16 @@ class RecordingService
       status = nil if status.empty? || status == 'none'
 
       return {
-        id:         id,
-        path:       path,
-        node:       'Screen',
-        title:      title,
-        type:       :video,
-        created_at: created_at,
-        duration:   duration,
-        size:       size,
-        status:     status
+        id:          id,
+        path:        path,
+        node:        'Screen',
+        title:       title,
+        type:        :video,
+        created_at:  created_at,
+        duration:    duration,
+        size:        size,
+        status:      status,
+        annotations: (meta_data['annotations'].is_a?(Array) ? meta_data['annotations'] : [])
       }
     end
 
@@ -1843,6 +1844,52 @@ class RecordingService
 
     File.write(path, lines.join)
     RecordingGitService.commit("Update recording '#{id}' status to '#{clean_status}'", files: [path]) rescue nil
+    true
+  rescue StandardError
+    false
+  end
+
+  def self.get_annotations(id)
+    path = path_for(id)
+    return [] unless path
+
+    ext = File.extname(path)
+    id_clean = File.basename(path, ext)
+    dir = File.dirname(path)
+    meta_file = File.join(dir, "#{id_clean}.json")
+    meta_file = File.join(self.dir, "#{id_clean}.json") unless File.file?(meta_file)
+    return [] unless File.file?(meta_file)
+
+    meta_data = begin
+      JSON.parse(File.read(meta_file))
+    rescue StandardError
+      {}
+    end
+    meta_data.is_a?(Hash) && meta_data['annotations'].is_a?(Array) ? meta_data['annotations'] : []
+  end
+
+  def self.save_annotations(id, annotations)
+    path = path_for(id)
+    return false unless path
+
+    ext = File.extname(path)
+    id_clean = File.basename(path, ext)
+    dir = File.dirname(path)
+    meta_file = File.join(dir, "#{id_clean}.json")
+    meta_data = {}
+    if File.file?(meta_file)
+      begin
+        meta_data = JSON.parse(File.read(meta_file))
+      rescue StandardError
+        meta_data = {}
+      end
+    end
+    meta_data = {} unless meta_data.is_a?(Hash)
+    meta_data['annotations'] = annotations.is_a?(Array) ? annotations : []
+    meta_data['type'] ||= 'video' if VIDEO_EXTS.any? { |e| path.end_with?(e) }
+    meta_data['created_at'] ||= File.mtime(path).to_i
+    File.write(meta_file, JSON.pretty_generate(meta_data))
+    RecordingGitService.commit("Update annotations for '#{id}'", files: [meta_file]) rescue nil
     true
   rescue StandardError
     false

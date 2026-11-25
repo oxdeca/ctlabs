@@ -1400,6 +1400,29 @@ class RecordingsController < BaseController
     { ok: updated, id: params[:id], duration: dur, label: RecordingService.duration_label(dur) }.to_json
   end
 
+  get '/recordings/:id/annotations' do
+    halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
+    content_type :json
+    annotations = RecordingService.get_annotations(params[:id])
+    { ok: true, id: params[:id], annotations: annotations }.to_json
+  end
+
+  post '/recordings/:id/annotations' do
+    halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
+    content_type :json
+    data = json_or_form_params
+    raw = data['annotations'] || data[:annotations]
+    if raw.nil? && params[:annotations]
+      raw = (JSON.parse(params[:annotations]) rescue [])
+    end
+    annotations = raw.is_a?(Array) ? raw : []
+    if RecordingService.save_annotations(params[:id], annotations)
+      { ok: true, id: params[:id], count: annotations.size }.to_json
+    else
+      halt 404, { ok: false, error: 'Recording not found' }.to_json
+    end
+  end
+
   post '/recordings/:id/delete' do
     halt 403, 'Invalid recording id' unless RecordingService.valid_id?(params[:id])
 

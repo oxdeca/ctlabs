@@ -238,6 +238,7 @@
                         data-step="<%= r[:step] || (idx + 1) %>"
                         data-duration="<%= (r[:duration] || 0).to_f %>"
                         data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
+                        data-annotations="<%= ERB::Util.html_escape((r[:annotations] || []).to_json) %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 10px 14px 10px 10px; color: #e2e8f0; cursor: pointer; display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -349,6 +350,7 @@
                         data-step=""
                         data-duration="<%= (r[:duration] || 0).to_f %>"
                         data-status="<%= ERB::Util.html_escape(r[:status] || 'none') %>"
+                        data-annotations="<%= ERB::Util.html_escape((r[:annotations] || []).to_json) %>"
                         style="width: 100%; text-align: left; background: transparent; border: none; padding: 8px 14px 8px 10px; color: #cbd5e1; cursor: pointer; display: flex; flex-direction: column; gap: 3px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                       <div style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -446,6 +448,11 @@
             <!-- Right Zone: Actions -->
             <div style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end;">
               <div id="rec-actions" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
+                <!-- 0. Video Annotations (shown when video step is active) -->
+                <button type="button" id="video-annotate-toggle-btn" title="Annotate video" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; width: 34px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-pencil-alt" style="color: #10b981;"></i>
+                </button>
+
                 <!-- 1. Edit (Markdown document in view mode) -->
                 <button type="button" id="md-tab-edit" title="Edit document" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-edit" style="color: #38bdf8;"></i>
@@ -479,8 +486,137 @@
           </div>
 
           <!-- Video Step Container -->
-          <div id="video-container" style="flex: 1; min-height: 0; display: none; align-items: center; justify-content: center; background: #000; position: relative;">
-            <video id="video-player" controls playsinline style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; outline: none; background: #000;"></video>
+          <div id="video-container" style="flex: 1; min-height: 0; display: none; flex-direction: column; background: #000; position: relative; overflow: hidden;">
+            <!-- Video Annotation Toolbar (styled matching screenshot editor toolbar) -->
+            <style>
+              #video-ann-font-size-input::-webkit-outer-spin-button,
+              #video-ann-font-size-input::-webkit-inner-spin-button,
+              #video-ann-badge-num::-webkit-outer-spin-button,
+              #video-ann-badge-num::-webkit-inner-spin-button {
+                -webkit-appearance: none !important;
+                margin: 0 !important;
+              }
+              #video-ann-font-size-input,
+              #video-ann-badge-num {
+                -moz-appearance: textfield !important;
+                appearance: textfield !important;
+              }
+            </style>
+            <div id="video-annotation-toolbar" class="annotator-toolbar" style="display: none; align-items: center; justify-content: space-between; padding: 6px 12px; background: #1e293b; border-bottom: 1px solid #334155; min-height: 40px; gap: 8px; flex-wrap: wrap; z-index: 10;">
+              
+              <!-- Left side: Tools & Styling -->
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <!-- Tool selector button group -->
+                <div class="annotator-btn-group" style="display: inline-flex; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px;">
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn active" data-tool="select" title="Select / Move elements (V)">
+                    <i class="fas fa-mouse-pointer"></i><span>Select</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="callout" title="Callout Note with Tail (C)">
+                    <i class="fas fa-comment-dots"></i><span>Callout</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="arrow" title="Pointer Arrow (A)">
+                    <i class="fas fa-long-arrow-alt-right"></i><span>Arrow</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="rect" title="Rectangle Box (R)">
+                    <i class="far fa-square"></i><span>Box</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="highlight" title="Translucent Highlight (H)">
+                    <i class="fas fa-highlighter"></i><span>Highlight</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="badge" title="Numbered Step Badge (S)">
+                    <i class="fas fa-list-ol"></i><span>Badge</span>
+                  </button>
+                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="text" title="Text Label (T)">
+                    <i class="fas fa-font"></i><span>Text</span>
+                  </button>
+                </div>
+
+                <div class="annotator-divider"></div>
+
+                <!-- Color Palette -->
+                <div id="video-ann-palette" style="display: inline-flex; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 3px 6px;">
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn active" data-color="#38bdf8" style="background-color: #38bdf8;" title="Blue"></button>
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#10b981" style="background-color: #10b981;" title="Green"></button>
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></button>
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#a855f7" style="background-color: #a855f7;" title="Purple"></button>
+                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+                </div>
+
+                <!-- Font Size Selector (- <input> +) -->
+                <div id="video-ann-font-size-group" style="display: inline-flex; align-items: center; gap: 2px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 4px;">
+                  <span style="font-size: 0.72em; color: #94a3b8; font-weight: 600; padding: 0 3px;" title="Font Size"><i class="fas fa-text-height"></i></span>
+                  <button type="button" id="video-ann-font-dec" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Decrease font size (&minus;)">&minus;</button>
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-font-size-input" value="13" style="width: 32px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #38bdf8; font-weight: 700; text-align: center; font-size: 0.82em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Font size (px)">
+                  <button type="button" id="video-ann-font-inc" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Increase font size (+)">+</button>
+                </div>
+
+                <!-- Step Badge Counter Controller (shows when Badge tool or Badge is active) -->
+                <div id="video-ann-badge-group" style="display: none; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 6px;">
+                  <span style="font-size: 0.74em; color: #94a3b8; font-weight: 600;" title="Badge Number">Step #:</span>
+                  <button type="button" id="video-ann-badge-dec" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Decrement step number">&minus;</button>
+                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-badge-num" value="1" style="width: 34px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #10b981; font-weight: 700; text-align: center; font-size: 0.8em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Current step badge number">
+                  <button type="button" id="video-ann-badge-inc" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Increment step number">+</button>
+                </div>
+
+                <!-- Delete Selected Annotation -->
+                <button type="button" id="video-ann-delete-btn" class="annotator-action-btn" title="Delete selected annotation (Delete / Backspace)" style="color: #ef4444; display: none;">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </div>
+
+              <!-- Center/Right: Selected Annotation Properties (shown when an annotation is selected) -->
+              <div id="video-ann-props" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <div class="annotator-divider"></div>
+
+                <!-- Time Range -->
+                <div style="display: flex; align-items: center; gap: 4px; font-size: 0.8em; color: #cbd5e1;">
+                  <span style="color: #94a3b8; font-size: 0.85em;">Time:</span>
+                  <input type="text" id="video-ann-start" style="width: 52px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 4px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 0.85em;" placeholder="00:00" />
+                  <button type="button" id="video-ann-set-start-btn" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.75em;" title="Set start time to current playback time">⏱️</button>
+                  <span style="color: #64748b;">&ndash;</span>
+                  <input type="text" id="video-ann-end" style="width: 52px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 4px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 0.85em;" placeholder="00:05" />
+                  <button type="button" id="video-ann-set-end-btn" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.75em;" title="Set end time to current playback time">⏱️</button>
+                </div>
+
+                <!-- Link to Walkthrough Step (optional) -->
+                <div id="video-ann-link-wrap" style="display: flex; align-items: center; gap: 4px;">
+                  <span style="color: #94a3b8; font-size: 0.8em;" title="Link annotation to a walkthrough step"><i class="fas fa-link" style="color: #38bdf8;"></i> Step:</span>
+                  <select id="video-ann-step-link" style="max-width: 140px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">
+                    <option value="">(None - Note only)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Right: Save & Close actions -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" id="video-ann-save-btn" class="w3-button w3-round" style="background: #10b981; color: #0f172a; font-size: 0.82em; font-weight: 700; padding: 4px 12px; display: inline-flex; align-items: center; gap: 5px; height: 28px;" title="Save annotations to video sidecar">
+                  <i class="fas fa-save"></i> <span>Save</span>
+                </button>
+                <button type="button" id="video-ann-close-btn" class="annotator-action-btn" style="width: 28px; height: 28px;" title="Close annotation toolbar (Esc)">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Video & Overlays Stage -->
+            <div id="video-stage" style="flex: 1; min-height: 0; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000;">
+              <video id="video-player" controls playsinline style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; outline: none; background: #000;"></video>
+              
+              <!-- Video Annotations Interactive Overlay Container -->
+              <div id="video-annotations-overlay" style="position: absolute; pointer-events: none; overflow: visible; box-sizing: border-box; z-index: 25;">
+                <svg id="video-annotations-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible;"></svg>
+                <div id="video-annotations-dom" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>
+              </div>
+            </div>
+
+            <!-- Timeline Annotations Tray (chips of annotations along the timeline) -->
+            <div id="video-annotations-tray" style="display: none; padding: 6px 12px; background: #0f172a; border-top: 1px solid #1e293b; align-items: center; gap: 8px; overflow-x: auto; flex-shrink: 0; min-height: 38px;">
+              <div style="font-size: 0.78em; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <i class="fas fa-stream" style="color: #38bdf8;"></i> Annotations:
+              </div>
+              <div id="video-annotations-chips" style="display: flex; align-items: center; gap: 6px; flex: 1; overflow-x: auto;"></div>
+            </div>
           </div>
 
           <!-- Markdown Step Container -->
@@ -1286,9 +1422,10 @@
                 </span>
               </div>
               <select id="rec-screen-quality" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
-                <option value="compact" selected>High Compression (~1.0 Mbps) - Recommended</option>
-                <option value="balanced">Balanced (~1.8 Mbps)</option>
-                <option value="hq">High Bitrate (~3.5 Mbps)</option>
+                <option value="ultra_compact" selected>Ultra-Compact (~250 Kbps, ~1.8 MB/min) - Recommended</option>
+                <option value="compact">High Compression (~600 Kbps, ~4.5 MB/min)</option>
+                <option value="balanced">Balanced (~1.2 Mbps, ~9.0 MB/min)</option>
+                <option value="hq">High Bitrate (~2.5 Mbps, ~18 MB/min)</option>
               </select>
             </div>
 
@@ -1619,4 +1756,5 @@
         walkthroughName: <%= (@walkthrough_name || @active_walkthrough || 'walkthrough').to_s.to_json %>
       };
     </script>
+    <script src="/js/video_annotations.js"></script>
     <script src="/js/walkthrough_player.js"></script>

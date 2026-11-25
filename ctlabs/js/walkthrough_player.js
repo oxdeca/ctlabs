@@ -2372,13 +2372,17 @@ if (metaForm) {
 
       // Bitrate based on compression quality choice
       const qualitySelect = document.getElementById('rec-screen-quality');
-      const quality = qualitySelect ? qualitySelect.value : 'compact';
-      let videoBps = 1000000; // 1.0 Mbps default: high compression (~7.5 MB/min, crisp UI text in VP9/AV1)
-      let audioBps = 96000;
-      if (quality === 'balanced') {
-        videoBps = 1800000; // 1.8 Mbps (~13.5 MB/min)
+      const quality = qualitySelect ? qualitySelect.value : 'ultra_compact';
+      let videoBps = 250000; // 250 Kbps default: Ultra-Compact (~1.8 MB/min, crisp text in VP9/AV1)
+      let audioBps = 64000;  // 64 Kbps voice-optimized Opus
+      if (quality === 'compact') {
+        videoBps = 600000;  // 600 Kbps (~4.5 MB/min)
+        audioBps = 80000;
+      } else if (quality === 'balanced') {
+        videoBps = 1200000; // 1.2 Mbps (~9.0 MB/min)
+        audioBps = 96000;
       } else if (quality === 'hq') {
-        videoBps = 3500000; // 3.5 Mbps (~26 MB/min)
+        videoBps = 2500000; // 2.5 Mbps (~18 MB/min)
         audioBps = 128000;
       }
 
@@ -3349,6 +3353,9 @@ if (metaForm) {
     }
 
     if (activeDataType === 'markdown') {
+      const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
+      if (videoAnnBtn) videoAnnBtn.style.display = 'none';
+      if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') window.VideoAnnotations.clear();
       if (demoContainer) demoContainer.style.display = 'none';
       if (videoContainer) videoContainer.style.display = 'none';
       if (videoPlayer) { videoPlayer.pause(); videoPlayer.src = ''; }
@@ -3396,6 +3403,11 @@ if (metaForm) {
       if (mdGitWrapper) mdGitWrapper.style.display = 'none';
       const mdTabEditVideo = document.getElementById('md-tab-edit');
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
+      const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
+      if (videoAnnBtn) videoAnnBtn.style.display = 'inline-flex';
+      if (window.VideoAnnotations && typeof window.VideoAnnotations.loadForRecording === 'function') {
+        window.VideoAnnotations.loadForRecording(id);
+      }
       if (titleIcon) {
         titleIcon.className = 'fas fa-video';
         titleIcon.style.color = '#f43f5e';
@@ -3459,6 +3471,11 @@ if (metaForm) {
       if (mdGitWrapper) mdGitWrapper.style.display = 'none';
       const mdTabEditVideo = document.getElementById('md-tab-edit');
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
+      const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
+      if (videoAnnBtn) videoAnnBtn.style.display = 'none';
+      if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') {
+        window.VideoAnnotations.clear();
+      }
       if (titleIcon) {
         titleIcon.className = 'fas fa-play-circle w3-text-green';
         titleIcon.style.color = '';
