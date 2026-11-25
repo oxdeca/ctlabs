@@ -989,14 +989,16 @@ class TerminalService
       sess[:io] = io
       sess[:ssl_mutex] = ssl_mutex
 
-      # Update terminal size if provided
+      # Update terminal size if provided and changed
       cols = (initial_cols || sess[:cur_cols] || 120).to_i
       rows = (initial_rows || sess[:cur_rows] || 40).to_i
-      sess[:cur_cols] = cols if cols.positive?
-      sess[:cur_rows] = rows if rows.positive?
-      if sess[:pty_write]
-        winsize = [sess[:cur_rows], sess[:cur_cols], 0, 0].pack('SSSS')
-        sess[:pty_write].ioctl(0x5414, winsize) rescue nil
+      if cols.positive? && rows.positive?
+        if (cols != sess[:cur_cols] || rows != sess[:cur_rows]) && sess[:pty_write]
+          winsize = [rows, cols, 0, 0].pack('SSSS')
+          sess[:pty_write].ioctl(0x5414, winsize) rescue nil
+        end
+        sess[:cur_cols] = cols
+        sess[:cur_rows] = rows
       end
 
       driver.on(:open) do |_|
@@ -1105,9 +1107,13 @@ class TerminalService
         sess[:pty_write] = pty_write
         sess[:pty_pid]   = pty_pid
 
-        if initial_cols && initial_rows && pty_write
-          winsize = [initial_rows.to_i, initial_cols.to_i, 0, 0].pack('SSSS')
+        init_cols = (initial_cols || 120).to_i
+        init_rows = (initial_rows || 40).to_i
+        if init_cols.positive? && init_rows.positive? && pty_write
+          winsize = [init_rows, init_cols, 0, 0].pack('SSSS')
           pty_write.ioctl(0x5414, winsize) rescue nil
+          sess[:cur_cols] = init_cols
+          sess[:cur_rows] = init_rows
         end
 
         @@pty_mutex.synchronize do
@@ -1220,13 +1226,17 @@ class TerminalService
       when 'resize'
         cols = payload['cols'].to_i
         rows = payload['rows'].to_i
-        if sess[:pty_write]
-          winsize = [rows, cols, 0, 0].pack('SSSS')
-          sess[:pty_write].ioctl(0x5414, winsize) rescue nil
+        if cols.positive? && rows.positive?
+          if cols != sess[:cur_cols] || rows != sess[:cur_rows]
+            if sess[:pty_write]
+              winsize = [rows, cols, 0, 0].pack('SSSS')
+              sess[:pty_write].ioctl(0x5414, winsize) rescue nil
+            end
+            sess[:cur_cols] = cols
+            sess[:cur_rows] = rows
+            sess[:rec_event]&.call('r', "#{cols}x#{rows}")
+          end
         end
-        sess[:cur_cols] = cols if cols.positive?
-        sess[:cur_rows] = rows if rows.positive?
-        sess[:rec_event]&.call('r', "#{sess[:cur_cols]}x#{sess[:cur_rows]}")
 
       when 'record_start'
         begin

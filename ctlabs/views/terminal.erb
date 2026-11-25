@@ -3790,6 +3790,21 @@
         }
       });
 
+      // Focus management: ensure clicking or focusing terminal restores focus to xterm textarea
+      window.addEventListener('focus', () => {
+        if (term) term.focus();
+      });
+
+      container.addEventListener('click', () => {
+        if (term) term.focus();
+      });
+
+      container.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && term) {
+          term.focus();
+        }
+      });
+
       // Native browser copy event hook (browser Edit > Copy, system shortcuts)
       document.addEventListener('copy', (e) => {
         const text = (term && term.hasSelection()) ? term.getSelection() : (term && term.textarea ? term.textarea.value : '');
@@ -4014,6 +4029,7 @@
           if (term.hasSelection()) {
             if (e.type === 'keydown') {
               copyTerminalSelection(true);
+              term.clearSelection();
             }
             return false; // Tells xterm not to handle it as terminal typing
           }
@@ -4021,11 +4037,13 @@
         }
 
         // Ctrl+C (Linux/Windows copy when selected, or Mac user using Ctrl+C):
-        // If text is selected, COPY and NEVER send \x03 (SIGINT) to the app!
+        // If text is selected, COPY on first keydown and immediately clear selection.
+        // This ensures the next Ctrl+C immediately sends SIGINT (\x03) to interrupt running commands.
         if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'c') {
           if (!e.shiftKey && term.hasSelection()) {
             if (e.type === 'keydown') {
               copyTerminalSelection(true);
+              term.clearSelection();
             }
             e.preventDefault();
             return false;
@@ -4034,13 +4052,21 @@
           return true;
         }
 
-        // Ctrl+Shift+C = copy selection (standard terminal shortcut). Never sent to the app.
+        // Ctrl+Shift+C = copy selection (standard terminal shortcut) and clear selection.
         if (e.ctrlKey && e.shiftKey && !e.metaKey && e.key.toLowerCase() === 'c') {
           if (e.type === 'keydown') {
             e.preventDefault();
             copyTerminalSelection(true);
+            term.clearSelection();
           }
           return false;
+        }
+
+        // Escape key clears any active selection in the terminal
+        if (e.key === 'Escape') {
+          if (term.hasSelection()) {
+            term.clearSelection();
+          }
         }
 
         // Prevent accidental browser reload shortcuts (F5, Cmd+R on macOS)
@@ -4082,19 +4108,38 @@
         }
       });
 
+      let lastSentCols = 0;
+      let lastSentRows = 0;
+
       term.onResize(size => {
+        if (!size || size.cols <= 0 || size.rows <= 0) return;
         if (recording) {
           recLines.push(JSON.stringify([recNow(), 'r', size.cols + 'x' + size.rows]));
           recCols = size.cols;
           recRows = size.rows;
           resetIdleTimer();
         }
+        if (size.cols === lastSentCols && size.rows === lastSentRows) return;
+        lastSentCols = size.cols;
+        lastSentRows = size.rows;
         if (activeWs && activeWs.readyState === WebSocket.OPEN) {
           activeWs.send(JSON.stringify({ type: 'resize', cols: size.cols, rows: size.rows }));
         }
       });
 
-      window.addEventListener('resize', () => fitAddon.fit());
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          if (!term || !fitAddon) return;
+          try {
+            fitAddon.fit();
+            term.focus();
+          } catch (err) {
+            console.warn('Resize fit error:', err);
+          }
+        }, 60);
+      });
 
       const connectBtn = document.getElementById('connect-btn');
       const statusEl = document.getElementById('status');
@@ -4359,7 +4404,10 @@
           sessionUptimeInterval = setInterval(updateSessionUptime, 1000);
           updateSessionUptime();
           setConnectedState();
-          term.focus();
+          if (term) {
+            term.clearSelection();
+            term.focus();
+          }
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
           updateSessionCount();
           updateSessionMenu();
@@ -4389,6 +4437,7 @@
         };
 
         ws.onclose = () => {
+          if (term) term.clearSelection();
           if (intentionalReconnect) return;
           sessionStartTime = null;
           if (sessionUptimeInterval) clearInterval(sessionUptimeInterval);
@@ -4531,10 +4580,27 @@
         }
       });
 
-      // Prevent accidental reload shortcuts when window has focus outside terminal
+      // Fallback keydown handler when window/document has focus outside terminal (e.g. after window border resize)
       window.addEventListener('keydown', (e) => {
         if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
           e.preventDefault();
+          return;
+        }
+
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        const inInput = activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select';
+        
+        // If focus is outside terminal and no modal/input is active, refocus terminal
+        if (!inInput && term && document.activeElement !== term.textarea) {
+          term.focus();
+          // If user pressed Ctrl+C while window was focused outside textarea, dispatch SIGINT
+          if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            if (term.hasSelection()) term.clearSelection();
+            if (activeWs && activeWs.readyState === WebSocket.OPEN) {
+              activeWs.send(JSON.stringify({ type: 'input', data: '\x03' }));
+            }
+          }
         }
       });
 
