@@ -1998,10 +1998,41 @@ if (metaForm) {
   function normalizeRecUrl(raw) {
     let s = (raw || '').trim();
     if (!s) return '/labs';
+
+    // Protocol schemes (http://, https://, etc.)
     if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(s)) return s;
+
+    // Root paths or relative paths
     if (s.startsWith('/') || s.startsWith('./') || s.startsWith('../')) return s;
-    if (s.startsWith('localhost') || s.startsWith('127.0.0.1')) return 'http://' + s;
-    return 'https://' + s;
+
+    const locProto = (window.location && window.location.protocol) ? window.location.protocol : 'https:';
+    const locHost = (window.location && window.location.host) ? window.location.host : '';
+
+    // Localhost or loopback IP (match port and path)
+    if (s.startsWith('localhost') || s.startsWith('127.0.0.1')) {
+      return locProto + '//' + s;
+    }
+
+    // Matches current host/origin (e.g. "127.0.0.1:4567/labs" or "h3.ctlabs.internal:4567/demo")
+    if (locHost && (s === locHost || s.startsWith(locHost + '/'))) {
+      return locProto + '//' + s;
+    }
+
+    // Known internal application routes without leading slash
+    const internalPrefixes = ['labs', 'demo', 'terminal', 'config', 'inventory', 'recordings', 'walkthroughs', 'status'];
+    const cleanPath = s.replace(/^\/+/, '');
+    const firstPart = cleanPath.split('/')[0].split('?')[0].split('#')[0].toLowerCase();
+    if (internalPrefixes.includes(firstPart)) {
+      return '/' + cleanPath;
+    }
+
+    // If it contains a domain dot or port colon (e.g. "google.com", "example.org/path", "host:8080")
+    if (/^[a-zA-Z0-9_-]+\.[a-zA-Z]{2,}/.test(s) || s.includes(':')) {
+      return 'https://' + s;
+    }
+
+    // Default fallback: internal application path
+    return '/' + cleanPath;
   }
 
   function isRecWindowOpen() {
@@ -3144,7 +3175,7 @@ if (metaForm) {
       const rawUrl = (recWinUrlInput ? recWinUrlInput.value.trim() : '') || '/labs';
       const url = normalizeRecUrl(rawUrl);
       if (recWinUrlInput) recWinUrlInput.value = url;
-      const mode = (recWinResSelect ? recWinResSelect.value : '') || 'tab';
+      const mode = (recWinResSelect ? recWinResSelect.value : '') || '1280x720';
 
       recWindowLaunched = true;
       recWindowUrl = url;
@@ -3155,10 +3186,6 @@ if (metaForm) {
           activeRecWindow.location.href = url;
           focusTargetWindow();
         } else if (mode === 'tab' || mode === 'standard') {
-          // To keep the browser's tab strip, navigation controls, bookmarks, and split-screen mode,
-          // window.open() must be called without dimension/feature parameters.
-          // In modern Chromium/Firefox, passing any width/height parameter automatically forces
-          // the browser into "popup mode", which intentionally strips the tab bar.
           activeRecWindow = window.open(url, 'ctlabs_recorder_window');
           if (activeRecWindow) focusTargetWindow();
         } else {
@@ -3181,10 +3208,6 @@ if (metaForm) {
       updateRecWindowUI();
       if (activeRecWindow) {
         const checkLoadedInterval = setInterval(() => {
-          // If it's a cross-origin URL (e.g. https://www.suse.de), Cross-Origin-Opener-Policy (COOP)
-          // or browsing context isolation severs the opener window reference once the remote
-          // page finishes loading (activeRecWindow.closed evaluates to true).
-          // Do NOT mark it closed or clear interval if it's cross-origin!
           if (!recWindowIsCross && (!activeRecWindow || activeRecWindow.closed)) {
             clearInterval(checkLoadedInterval);
             recWindowLaunched = false;
@@ -4260,9 +4283,8 @@ if (metaForm) {
     if (e.target === exportModal) {
       exportModal.style.display = 'none';
     }
-    if (e.target === recordScreenModal) {
-      recordScreenModal.style.display = 'none';
-    }
+    // Note: recordScreenModal intentionally does NOT close on backdrop click,
+    // preventing accidental dismissal when dragging mouse selections or copying text.
   });
 
   // --- Bridge for Screenshot & Diagram External Modules ---
