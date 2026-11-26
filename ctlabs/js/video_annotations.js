@@ -270,7 +270,7 @@
     });
 
     const activeKey = `${isEditMode ? '1' : '0'}|${selectedId || ''}|` + 
-      activeAnns.map(a => `${a.id}:${a.x}:${a.y}:${a.x2 !== undefined ? a.x2 : ''}:${a.y2 !== undefined ? a.y2 : ''}:${a.w}:${a.h}:${a.color}:${a.text}:${a.fontSize || 13}:${a.badge || ''}:${a.targetStepId || ''}:${a.startTime}:${a.endTime}`).join(';');
+      activeAnns.map(a => `${a.id}:${a.x}:${a.y}:${a.x2 !== undefined ? a.x2 : ''}:${a.y2 !== undefined ? a.y2 : ''}:${a.w}:${a.h}:${a.color}:${a.title || ''}:${a.text}:${a.fontSize || 13}:${a.badge || ''}:${a.targetStepId || ''}:${a.startTime}:${a.endTime}`).join(';');
 
     if (!force && activeKey === lastActiveKey) {
       return; // DOM already matches current state, avoid destroying nodes mid-click!
@@ -315,6 +315,71 @@
     }
   }
 
+  function buildStepLinkSelect(ann, isSelected, maxWidth = 'none') {
+    const linkRow = document.createElement('div');
+    linkRow.style.cssText = 'display: inline-flex; align-items: center; gap: 5px; max-width: 100%;';
+    const linkIcon = document.createElement('i');
+    linkIcon.className = 'fas fa-link';
+    linkIcon.style.cssText = 'color: #38bdf8; font-size: 10px; flex-shrink: 0;';
+    linkRow.appendChild(linkIcon);
+
+    const stepSel = document.createElement('select');
+    stepSel.style.cssText = `flex: 1; min-width: 0; max-width: ${maxWidth}; background: #0f172a; border: 1px solid #334155; color: #cbd5e1; padding: 2px 5px; border-radius: 4px; font-size: 11px; outline: none; cursor: pointer;`;
+    stepSel.innerHTML = '<option value="">(No linked step)</option>';
+    document.querySelectorAll('.rec-item-wrapper .rec-item').forEach((btn) => {
+      const sid = btn.getAttribute('data-id');
+      if (!sid || sid === currentRecordingId) return;
+      const sNum = btn.getAttribute('data-step') || '';
+      const sTitle = btn.getAttribute('data-title') || sid;
+      const opt = document.createElement('option');
+      opt.value = sid;
+      opt.textContent = sNum ? `#${sNum}: ${sTitle}` : sTitle;
+      if (sid === ann.targetStepId) opt.selected = true;
+      stepSel.appendChild(opt);
+    });
+    stepSel.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      if (!isSelected) selectAnnotation(ann.id);
+    });
+    stepSel.addEventListener('click', (e) => e.stopPropagation());
+    stepSel.addEventListener('change', (e) => {
+      e.stopPropagation();
+      ann.targetStepId = stepSel.value || null;
+      render(true);
+      scheduleAutosave();
+    });
+    linkRow.appendChild(stepSel);
+    return linkRow;
+  }
+
+  function renderRichTextWithLinks(containerEl, rawText, linkColor = '#38bdf8') {
+    const str = String(rawText || '');
+    // Match [label](https://...) or bare https://... URLs
+    const tokenRe = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+)/g;
+    let lastIdx = 0;
+    let m;
+    while ((m = tokenRe.exec(str)) !== null) {
+      if (m.index > lastIdx) {
+        containerEl.appendChild(document.createTextNode(str.slice(lastIdx, m.index)));
+      }
+      const label = m[1] || m[3];
+      const href = m[2] || m[3];
+      const a = document.createElement('a');
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = label;
+      a.style.cssText = `color: ${linkColor}; text-decoration: underline; cursor: pointer; pointer-events: auto;`;
+      a.addEventListener('mousedown', (e) => e.stopPropagation());
+      a.addEventListener('click', (e) => e.stopPropagation());
+      containerEl.appendChild(a);
+      lastIdx = tokenRe.lastIndex;
+    }
+    if (lastIdx < str.length) {
+      containerEl.appendChild(document.createTextNode(str.slice(lastIdx)));
+    }
+  }
+
   // 1. Callout Note
   function renderCallout(ann, color, isSelected, isEditing) {
     const card = document.createElement('div');
@@ -353,15 +418,53 @@
       card.style.outlineOffset = '3px';
     }
 
-    // Callout Header (Drag Handle)
+    // Callout Header (Drag Handle + Editable Title)
     const headerEl = document.createElement('div');
     headerEl.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.12); padding-bottom: 3px; cursor: move;';
-    headerEl.innerHTML = `
-      <span style="font-weight: 700; color: ${color}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px;">
-        <i class="fas fa-comment-dots"></i> Step Note
-      </span>
-      <span style="font-size: 10px; color: #94a3b8; font-family: monospace;">${formatTime(ann.startTime)} - ${formatTime(ann.endTime)}</span>
-    `;
+
+    const titleWrap = document.createElement('span');
+    titleWrap.style.cssText = `font-weight: 700; color: ${color}; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1;`;
+    const iconEl = document.createElement('i');
+    iconEl.className = 'fas fa-comment-dots';
+    iconEl.style.flexShrink = '0';
+    titleWrap.appendChild(iconEl);
+
+    const titleSpan = document.createElement('span');
+    titleSpan.innerText = ann.title || 'Step Note';
+    titleSpan.style.cssText = 'outline: none; border-radius: 3px; padding: 0 3px; min-width: 40px;';
+    if (isEditing) {
+      titleSpan.contentEditable = 'true';
+      titleSpan.style.cursor = 'text';
+      titleSpan.style.userSelect = 'text';
+      if (isSelected) {
+        titleSpan.style.background = 'rgba(15, 23, 42, 0.6)';
+      }
+      titleSpan.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        if (!isSelected) selectAnnotation(ann.id);
+      });
+      titleSpan.addEventListener('click', (e) => e.stopPropagation());
+      titleSpan.addEventListener('input', () => {
+        ann.title = titleSpan.innerText.trim();
+        const titleInput = document.getElementById('video-ann-title');
+        if (titleInput && selectedId === ann.id) titleInput.value = ann.title;
+        scheduleAutosave();
+      });
+      titleSpan.addEventListener('blur', () => {
+        ann.title = titleSpan.innerText.trim() || 'Step Note';
+        render();
+        scheduleAutosave();
+      });
+      titleSpan.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault();
+          titleSpan.blur();
+        }
+      });
+    }
+    titleWrap.appendChild(titleSpan);
+    headerEl.appendChild(titleWrap);
     card.appendChild(headerEl);
 
     // Callout Note Body (inline editable directly on the video)
@@ -394,7 +497,8 @@
         if (e.key === 'Escape') noteBody.blur();
       });
     } else {
-      noteBody.innerText = ann.text || '';
+      noteBody.innerHTML = '';
+      renderRichTextWithLinks(noteBody, ann.text || '', color);
     }
     card.appendChild(noteBody);
 
@@ -413,8 +517,15 @@
       }
     });
 
-    // Optional Link to Walkthrough Step
-    if (ann.targetStepId) {
+    // Optional Link to Walkthrough Step (inline selector in edit mode, clickable link in view mode)
+    if (isEditing) {
+      const linkRow = buildStepLinkSelect(ann, isSelected);
+      linkRow.style.display = 'flex';
+      linkRow.style.marginTop = '8px';
+      linkRow.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+      linkRow.style.paddingTop = '6px';
+      card.appendChild(linkRow);
+    } else if (ann.targetStepId) {
       const stepInfo = getStepInfo(ann.targetStepId);
       const linkBtn = document.createElement('div');
       linkBtn.className = 'video-ann-step-link-btn';
@@ -1093,9 +1204,26 @@
         }
       });
     } else {
-      textEl.textContent = ann.text || 'Text note';
+      textEl.innerHTML = '';
+      renderRichTextWithLinks(textEl, ann.text || 'Text note', '#38bdf8');
     }
     box.appendChild(textEl);
+
+    // Inline step link inside text block (selector when selected/linked in edit mode; pill in view mode)
+    if (isEditing && (isSelected || ann.targetStepId)) {
+      const linkRow = buildStepLinkSelect(ann, isSelected, '140px');
+      linkRow.style.marginLeft = '4px';
+      linkRow.style.paddingLeft = '6px';
+      linkRow.style.borderLeft = '1px solid rgba(255,255,255,0.15)';
+      box.appendChild(linkRow);
+    } else if (!isEditing && ann.targetStepId) {
+      const stepInfo = getStepInfo(ann.targetStepId);
+      const pill = document.createElement('span');
+      pill.style.cssText = 'margin-left: 4px; padding: 1px 6px; background: rgba(56, 189, 248, 0.22); border: 1px solid #38bdf8; border-radius: 4px; color: #38bdf8; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;';
+      pill.title = `Jump to ${stepInfo.label}`;
+      pill.innerHTML = `<i class="fas fa-external-link-alt" style="font-size: 9px;"></i> ${escapeHtml(stepInfo.shortLabel)}`;
+      box.appendChild(pill);
+    }
 
     // Mousedown on box outside textEl (border, padding, background) drags to move
     box.addEventListener('mousedown', (e) => {
@@ -1946,6 +2074,17 @@
     }
 
     propsEl.style.display = 'flex';
+
+    const titleWrapEl = document.getElementById('video-ann-title-wrap');
+    const titleInputEl = document.getElementById('video-ann-title');
+    if (titleWrapEl && titleInputEl) {
+      if (ann.type === 'callout') {
+        titleWrapEl.style.display = 'flex';
+        titleInputEl.value = ann.title || 'Step Note';
+      } else {
+        titleWrapEl.style.display = 'none';
+      }
+    }
 
     if (startInputEl) startInputEl.value = formatTime(ann.startTime, true);
     if (endInputEl) endInputEl.value = formatTime(ann.endTime, true);
@@ -2895,25 +3034,12 @@
       });
     }
 
-    // Set start/end to current time buttons
-    const setStartBtn = document.getElementById('video-ann-set-start-btn');
-    if (setStartBtn) {
-      setStartBtn.addEventListener('click', () => {
+    const titleInputEl = document.getElementById('video-ann-title');
+    if (titleInputEl) {
+      titleInputEl.addEventListener('input', () => {
         const ann = annotations.find(a => a.id === selectedId);
-        if (ann && videoEl) {
-          ann.startTime = Math.max(0, Math.floor(videoEl.currentTime * 10) / 10);
-          render();
-          scheduleAutosave();
-        }
-      });
-    }
-
-    const setEndBtn = document.getElementById('video-ann-set-end-btn');
-    if (setEndBtn) {
-      setEndBtn.addEventListener('click', () => {
-        const ann = annotations.find(a => a.id === selectedId);
-        if (ann && videoEl) {
-          ann.endTime = Math.max(ann.startTime + 0.5, Math.floor(videoEl.currentTime * 10) / 10);
+        if (ann && ann.type === 'callout') {
+          ann.title = titleInputEl.value;
           render();
           scheduleAutosave();
         }

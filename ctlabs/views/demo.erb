@@ -502,121 +502,101 @@
                 appearance: textfield !important;
               }
             </style>
-            <div id="video-annotation-toolbar" class="annotator-toolbar" style="display: none; align-items: center; justify-content: space-between; padding: 6px 14px; background: #131d31; border-bottom: 1px solid #334155; min-height: 38px; gap: 8px; flex-wrap: wrap; z-index: 10;">
-              
-              <!-- Left side: Tools & Styling -->
-              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                <!-- Tool selector button group -->
-                <div class="annotator-btn-group" style="display: inline-flex; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px;">
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn active" data-tool="select" title="Select / Move elements (V)">
-                    <i class="fas fa-mouse-pointer"></i><span>Select</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="callout" title="Callout Note with Tail (C)">
-                    <i class="fas fa-comment-dots"></i><span>Callout</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="arrow" title="Pointer Arrow (A)">
-                    <i class="fas fa-long-arrow-alt-right"></i><span>Arrow</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="rect" title="Rectangle Box (R)">
-                    <i class="far fa-square"></i><span>Box</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="highlight" title="Translucent Highlight (H)">
-                    <i class="fas fa-highlighter"></i><span>Highlight</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="badge" title="Numbered Step Badge (S)">
-                    <i class="fas fa-list-ol"></i><span>Badge</span>
-                  </button>
-                  <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="text" title="Text Label (T)">
-                    <i class="fas fa-font"></i><span>Text</span>
+            <div id="video-annotation-toolbar" class="annotator-toolbar" style="display: none; flex-direction: column; padding: 0; background: #131d31; border-bottom: 1px solid #334155; z-index: 10;">
+              <!-- Row 1: Tools, Styling & Save/Settings pinned top-right -->
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; min-height: 38px; gap: 8px; width: 100%; box-sizing: border-box;">
+                <!-- Left side: Tools & Styling -->
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;">
+                  <!-- Tool selector button group -->
+                  <div class="annotator-btn-group" style="display: inline-flex; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px;">
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn active" data-tool="select" title="Select / Move elements (V)">
+                      <i class="fas fa-mouse-pointer"></i><span>Select</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="callout" title="Callout Note with Tail (C)">
+                      <i class="fas fa-comment-dots"></i><span>Callout</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="arrow" title="Pointer Arrow (A)">
+                      <i class="fas fa-long-arrow-alt-right"></i><span>Arrow</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="rect" title="Rectangle Box (R)">
+                      <i class="far fa-square"></i><span>Box</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="highlight" title="Translucent Highlight (H)">
+                      <i class="fas fa-highlighter"></i><span>Highlight</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="badge" title="Numbered Step Badge (S)">
+                      <i class="fas fa-list-ol"></i><span>Badge</span>
+                    </button>
+                    <button type="button" class="annotator-tool-btn video-ann-tool-btn" data-tool="text" title="Text Label (T)">
+                      <i class="fas fa-font"></i><span>Text</span>
+                    </button>
+                  </div>
+
+                  <div class="annotator-divider"></div>
+
+                  <!-- Color Palette -->
+                  <div id="video-ann-palette" style="display: inline-flex; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 3px 6px;">
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn active" data-color="#38bdf8" style="background-color: #38bdf8;" title="Blue"></button>
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#10b981" style="background-color: #10b981;" title="Green"></button>
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></button>
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#a855f7" style="background-color: #a855f7;" title="Purple"></button>
+                    <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
+                  </div>
+
+                  <!-- Font Size Selector (- <input> +) -->
+                  <div id="video-ann-font-size-group" style="display: inline-flex; align-items: center; gap: 2px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 4px;">
+                    <span style="font-size: 0.72em; color: #94a3b8; font-weight: 600; padding: 0 3px;" title="Font Size"><i class="fas fa-text-height"></i></span>
+                    <button type="button" id="video-ann-font-dec" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Decrease font size (&minus;)">&minus;</button>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-font-size-input" value="13" style="width: 32px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #38bdf8; font-weight: 700; text-align: center; font-size: 0.82em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Font size (px)">
+                    <button type="button" id="video-ann-font-inc" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Increase font size (+)">+</button>
+                  </div>
+
+                  <!-- Step Badge Counter Controller (shows when Badge tool or Badge is active) -->
+                  <div id="video-ann-badge-group" style="display: none; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 6px;">
+                    <span style="font-size: 0.74em; color: #94a3b8; font-weight: 600;" title="Badge Number">Step #:</span>
+                    <button type="button" id="video-ann-badge-dec" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Decrement step number">&minus;</button>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-badge-num" value="1" style="width: 34px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #10b981; font-weight: 700; text-align: center; font-size: 0.8em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Current step badge number">
+                    <button type="button" id="video-ann-badge-inc" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Increment step number">+</button>
+                  </div>
+
+                  <!-- Delete Selected Annotation -->
+                  <button type="button" id="video-ann-delete-btn" class="annotator-action-btn" title="Delete selected annotation (Delete / Backspace)" style="color: #ef4444; display: none;">
+                    <i class="fas fa-trash-alt"></i>
                   </button>
                 </div>
 
-                <div class="annotator-divider"></div>
-
-                <!-- Color Palette -->
-                <div id="video-ann-palette" style="display: inline-flex; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 3px 6px;">
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn active" data-color="#38bdf8" style="background-color: #38bdf8;" title="Blue"></button>
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#10b981" style="background-color: #10b981;" title="Green"></button>
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#eab308" style="background-color: #eab308;" title="Yellow"></button>
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ef4444" style="background-color: #ef4444;" title="Red"></button>
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#a855f7" style="background-color: #a855f7;" title="Purple"></button>
-                  <button type="button" class="annotator-color-swatch video-ann-color-btn" data-color="#ffffff" style="background-color: #ffffff;" title="White"></button>
-                </div>
-
-                <!-- Font Size Selector (- <input> +) -->
-                <div id="video-ann-font-size-group" style="display: inline-flex; align-items: center; gap: 2px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 4px;">
-                  <span style="font-size: 0.72em; color: #94a3b8; font-weight: 600; padding: 0 3px;" title="Font Size"><i class="fas fa-text-height"></i></span>
-                  <button type="button" id="video-ann-font-dec" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Decrease font size (&minus;)">&minus;</button>
-                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-font-size-input" value="13" style="width: 32px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #38bdf8; font-weight: 700; text-align: center; font-size: 0.82em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Font size (px)">
-                  <button type="button" id="video-ann-font-inc" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.85em; font-weight: 700; padding: 0;" title="Increase font size (+)">+</button>
-                </div>
-
-                <!-- Step Badge Counter Controller (shows when Badge tool or Badge is active) -->
-                <div id="video-ann-badge-group" style="display: none; align-items: center; gap: 4px; background: #0f172a; border: 1px solid #475569; border-radius: 6px; padding: 2px 6px;">
-                  <span style="font-size: 0.74em; color: #94a3b8; font-weight: 600;" title="Badge Number">Step #:</span>
-                  <button type="button" id="video-ann-badge-dec" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Decrement step number">&minus;</button>
-                  <input type="text" inputmode="numeric" pattern="[0-9]*" id="video-ann-badge-num" value="1" style="width: 34px; background: #1e293b; border: 1px solid #475569; border-radius: 4px; color: #10b981; font-weight: 700; text-align: center; font-size: 0.8em; padding: 1px 2px; outline: none; -moz-appearance: textfield; appearance: textfield;" title="Current step badge number">
-                  <button type="button" id="video-ann-badge-inc" class="annotator-action-btn" style="width: 20px; height: 22px; font-size: 0.72em; padding: 0;" title="Increment step number">+</button>
-                </div>
-
-                <!-- Delete Selected Annotation -->
-                <button type="button" id="video-ann-delete-btn" class="annotator-action-btn" title="Delete selected annotation (Delete / Backspace)" style="color: #ef4444; display: none;">
-                  <i class="fas fa-trash-alt"></i>
-                </button>
-              </div>
-
-              <!-- Center/Right: Selected Annotation Properties (shown when an annotation is selected) -->
-              <div id="video-ann-props" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <div class="annotator-divider"></div>
-
-                <!-- Time Range -->
-                <div style="display: flex; align-items: center; gap: 4px; font-size: 0.8em; color: #cbd5e1;">
-                  <span style="color: #94a3b8; font-size: 0.85em;">Time:</span>
-                  <input type="text" id="video-ann-start" style="width: 52px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 4px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 0.85em;" placeholder="00:00" />
-                  <button type="button" id="video-ann-set-start-btn" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.75em;" title="Set start time to current playback time">⏱️</button>
-                  <span style="color: #64748b;">&ndash;</span>
-                  <input type="text" id="video-ann-end" style="width: 52px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 4px; border-radius: 4px; text-align: center; font-family: monospace; font-size: 0.85em;" placeholder="00:05" />
-                  <button type="button" id="video-ann-set-end-btn" class="annotator-action-btn" style="width: 22px; height: 22px; font-size: 0.75em;" title="Set end time to current playback time">⏱️</button>
-                </div>
-
-                <!-- Link to Walkthrough Step (optional) -->
-                <div id="video-ann-link-wrap" style="display: flex; align-items: center; gap: 4px;">
-                  <span style="color: #94a3b8; font-size: 0.8em;" title="Link annotation to a walkthrough step"><i class="fas fa-link" style="color: #38bdf8;"></i> Step:</span>
-                  <select id="video-ann-step-link" style="max-width: 140px; background: #0f172a; border: 1px solid #475569; color: #f8fafc; padding: 2px 6px; border-radius: 4px; font-size: 0.8em;">
-                    <option value="">(None - Note only)</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Right: Save & Settings actions -->
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <button type="button" id="video-ann-save-btn" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'" title="Save annotations to video sidecar">
-                  <i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i>
-                  <span style="font-weight: 500;">Save</span>
-                </button>
-                <div id="video-settings-wrapper" style="position: relative; display: inline-block; flex-shrink: 0;">
-                  <button type="button" id="video-settings-btn" title="Video annotation &amp; timeline settings" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                    <i class="fas fa-cog" style="color: #94a3b8;"></i>
+                <!-- Right: Save & Settings pinned top-right at all times -->
+                <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                  <button type="button" id="video-ann-save-btn" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; height: 26px; transition: all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'" title="Save annotations to video sidecar">
+                    <i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i>
+                    <span style="font-weight: 500;">Save</span>
                   </button>
-                  <div id="video-settings-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 210px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
-                    <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
-                      Video Settings
+                  <div id="video-settings-wrapper" style="position: relative; display: inline-block; flex-shrink: 0;">
+                    <button type="button" id="video-settings-btn" title="Video annotation &amp; timeline settings" style="padding: 3px 9px; font-size: 0.82em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 26px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                      <i class="fas fa-cog" style="color: #94a3b8;"></i>
+                    </button>
+                    <div id="video-settings-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 210px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                      <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                        Video Settings
+                      </div>
+                      <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-stream" style="color: #38bdf8; width: 14px; text-align: center;"></i> Show Timeline
+                        </span>
+                        <input type="checkbox" id="video-setting-timeline-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+                      </label>
+                      <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                          <i class="fas fa-wave-square" style="color: #10b981; width: 14px; text-align: center;"></i> Show Audio Lane
+                        </span>
+                        <input type="checkbox" id="video-setting-audio-lane-checkbox" style="cursor: pointer; accent-color: #10b981; width: 15px; height: 15px;" />
+                      </label>
                     </div>
-                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                      <span style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-stream" style="color: #38bdf8; width: 14px; text-align: center;"></i> Show Timeline
-                      </span>
-                      <input type="checkbox" id="video-setting-timeline-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
-                    </label>
-                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
-                      <span style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fas fa-wave-square" style="color: #10b981; width: 14px; text-align: center;"></i> Show Audio Lane
-                      </span>
-                      <input type="checkbox" id="video-setting-audio-lane-checkbox" style="cursor: pointer; accent-color: #10b981; width: 15px; height: 15px;" />
-                    </label>
                   </div>
                 </div>
               </div>
+
             </div>
 
             <!-- Video & Overlays Stage -->
