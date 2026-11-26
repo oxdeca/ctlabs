@@ -403,9 +403,7 @@
       left: ${left}%;
       top: ${top}%;
       transform: translate(-10%, -10%);
-      background: rgba(15, 23, 42, 0.94);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      background: rgba(15, 23, 42, 0.95);
       border: 2px solid ${color};
       border-radius: 8px;
       box-shadow: 0 8px 26px rgba(0,0,0,0.7), 0 0 15px ${hexToRgba(color, 0.35)};
@@ -1127,9 +1125,7 @@
       left: ${x}%;
       top: ${y}%;
       transform: translate(-10%, -50%);
-      background: rgba(15, 23, 42, 0.92);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      background: rgba(15, 23, 42, 0.95);
       border-left: 4px solid ${color};
       border-radius: 4px;
       color: ${color};
@@ -1496,9 +1492,48 @@
     }
   }
 
-  // Seeking state & playback position updates
+  // Seeking state & playback position updates (single-flight + throttled to avoid saturating software decoders on Linux)
   let pendingSeekTarget = null;
   let seekThrottleTimer = null;
+  let seekIdleTimer = null;
+  let seekStallTimer = null;
+  let lastSeekDispatchedAt = 0;
+
+  function flushPendingSeek(immediate = false) {
+    if (!videoEl || pendingSeekTarget === null) return;
+    if (!immediate && videoEl.seeking) return;
+
+    const now = performance.now();
+    const elapsed = now - lastSeekDispatchedAt;
+    const minInterval = 240;
+    if (!immediate && elapsed < minInterval) {
+      if (!seekThrottleTimer) {
+        seekThrottleTimer = setTimeout(() => {
+          seekThrottleTimer = null;
+          flushPendingSeek(false);
+        }, minInterval - elapsed);
+      }
+      return;
+    }
+
+    if (seekThrottleTimer) {
+      clearTimeout(seekThrottleTimer);
+      seekThrottleTimer = null;
+    }
+
+    const target = pendingSeekTarget;
+    pendingSeekTarget = null;
+
+    if (Math.abs(videoEl.currentTime - target) > 0.02) {
+      lastSeekDispatchedAt = now;
+      videoEl.currentTime = target;
+      if (seekStallTimer) clearTimeout(seekStallTimer);
+      seekStallTimer = setTimeout(() => {
+        seekStallTimer = null;
+        if (pendingSeekTarget !== null) flushPendingSeek(true);
+      }, 450);
+    }
+  }
 
   function safeSeek(targetTime) {
     if (!videoEl) return;
@@ -1509,17 +1544,15 @@
     updatePlayheadUI(clampedTime, dur);
     render();
 
-    if (seekThrottleTimer) clearTimeout(seekThrottleTimer);
-    seekThrottleTimer = setTimeout(() => {
-      seekThrottleTimer = null;
-      if (!videoEl || pendingSeekTarget === null) return;
-      const target = pendingSeekTarget;
-      pendingSeekTarget = null;
-
-      if (Math.abs(videoEl.currentTime - target) > 0.02) {
-        videoEl.currentTime = target;
+    if (seekIdleTimer) clearTimeout(seekIdleTimer);
+    seekIdleTimer = setTimeout(() => {
+      seekIdleTimer = null;
+      if (pendingSeekTarget !== null && !videoEl.seeking) {
+        flushPendingSeek(true);
       }
-    }, videoEl.seeking ? 50 : 25);
+    }, 140);
+
+    flushPendingSeek(false);
   }
 
   function togglePlayPause() {
@@ -3422,6 +3455,7 @@
         const onUp = () => {
           window.removeEventListener('mousemove', onMove);
           window.removeEventListener('mouseup', onUp);
+          flushPendingSeek(true);
         };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
@@ -3451,6 +3485,14 @@
       render();
     });
     videoEl.addEventListener('seeked', () => {
+      if (seekStallTimer) {
+        clearTimeout(seekStallTimer);
+        seekStallTimer = null;
+      }
+      if (pendingSeekTarget !== null) {
+        flushPendingSeek(false);
+        return;
+      }
       updatePlayheadUI(videoEl.currentTime, getVideoDuration());
       render();
     });
