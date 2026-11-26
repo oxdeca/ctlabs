@@ -3355,8 +3355,10 @@ if (metaForm) {
     if (activeDataType === 'markdown') {
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
-      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
-      if (videoTlBtn) videoTlBtn.style.display = 'none';
+      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
+      if (videoSettingsWrap) videoSettingsWrap.style.display = 'none';
+      const videoSettingsMenu = document.getElementById('video-settings-menu');
+      if (videoSettingsMenu) videoSettingsMenu.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') window.VideoAnnotations.clear();
       if (demoContainer) demoContainer.style.display = 'none';
       if (videoContainer) videoContainer.style.display = 'none';
@@ -3407,8 +3409,8 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'inline-flex';
-      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
-      if (videoTlBtn) videoTlBtn.style.display = 'inline-flex';
+      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
+      if (videoSettingsWrap) videoSettingsWrap.style.display = 'inline-block';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.loadForRecording === 'function') {
         window.VideoAnnotations.loadForRecording(id);
       }
@@ -3502,8 +3504,10 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
-      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
-      if (videoTlBtn) videoTlBtn.style.display = 'none';
+      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
+      if (videoSettingsWrap) videoSettingsWrap.style.display = 'none';
+      const videoSettingsMenu = document.getElementById('video-settings-menu');
+      if (videoSettingsMenu) videoSettingsMenu.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') {
         window.VideoAnnotations.clear();
       }

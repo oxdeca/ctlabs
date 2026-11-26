@@ -65,6 +65,10 @@
   let tlAutoArrangeBtnEl = null;
   let tlToggleBtnEl = null;
   let tlCollapseBtnEl = null;
+  let tlCollapseIconEl = null;
+  let tlSettingsBtnEl = null;
+  let tlSettingsMenuEl = null;
+  let tlSettingTimelineCheckboxEl = null;
   let tlScrollEl = null;
   let tlZoomInnerEl = null;
   let tlZoomOutBtnEl = null;
@@ -1464,9 +1468,13 @@
     scheduleAutosave();
   }
 
-  // Timeline track visibility helpers
+  // Timeline track visibility & collapse helpers
   function isTimelineVisible() {
     return localStorage.getItem('ctlabs_video_timeline_visible') !== 'false';
+  }
+
+  function isTimelineCollapsed() {
+    return localStorage.getItem('ctlabs_video_timeline_collapsed') === 'true';
   }
 
   function updateTimelineToggleBtnUI(visible) {
@@ -1476,6 +1484,30 @@
       tlToggleBtnEl.style.color = visible ? '#38bdf8' : '#94a3b8';
       tlToggleBtnEl.title = visible ? 'Hide timeline track' : 'Show timeline track';
     }
+    if (tlSettingTimelineCheckboxEl) {
+      tlSettingTimelineCheckboxEl.checked = !!visible;
+    }
+  }
+
+  function updateTimelineCollapsedUI(collapsed) {
+    if (tlScrollEl) {
+      tlScrollEl.style.display = collapsed ? 'none' : 'block';
+    }
+    if (tlCollapseIconEl) {
+      tlCollapseIconEl.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    }
+    if (tlCollapseBtnEl) {
+      tlCollapseBtnEl.title = collapsed ? 'Expand timeline lanes' : 'Collapse timeline lanes';
+    }
+  }
+
+  function toggleTimelineCollapsed(explicitState) {
+    const cur = isTimelineCollapsed();
+    const next = (explicitState !== undefined) ? explicitState : !cur;
+    localStorage.setItem('ctlabs_video_timeline_collapsed', next ? 'true' : 'false');
+    updateTimelineCollapsedUI(next);
+    updateOverlayBounds();
+    render();
   }
 
   function toggleTimeline(explicitState) {
@@ -1490,6 +1522,8 @@
       const curTime = videoEl ? videoEl.currentTime : 0;
       renderTimeline(curTime);
     }
+    updateOverlayBounds();
+    render();
   }
 
   // Render video annotations timeline track
@@ -1499,6 +1533,8 @@
     trayEl.style.display = isVisible ? 'flex' : 'none';
     updateTimelineToggleBtnUI(isVisible);
     if (!isVisible) return;
+
+    updateTimelineCollapsedUI(isTimelineCollapsed());
 
     const duration = getVideoDuration();
     renderTimelineRuler(duration);
@@ -2459,6 +2495,10 @@
 
     tlToggleBtnEl = document.getElementById('video-timeline-toggle-btn');
     tlCollapseBtnEl = document.getElementById('video-tl-collapse-btn');
+    tlCollapseIconEl = document.getElementById('video-tl-collapse-icon');
+    tlSettingsBtnEl = document.getElementById('video-settings-btn');
+    tlSettingsMenuEl = document.getElementById('video-settings-menu');
+    tlSettingTimelineCheckboxEl = document.getElementById('video-setting-timeline-checkbox');
     tlScrollEl = document.getElementById('video-tl-scroll');
     tlZoomInnerEl = document.getElementById('video-tl-zoom-inner');
     tlZoomOutBtnEl = document.getElementById('video-tl-zoom-out-btn');
@@ -2629,10 +2669,35 @@
       updateTimelineToggleBtnUI(isTimelineVisible());
     }
 
+    if (tlSettingsBtnEl && tlSettingsMenuEl) {
+      tlSettingsBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = tlSettingsMenuEl.style.display === 'block';
+        tlSettingsMenuEl.style.display = isOpen ? 'none' : 'block';
+        if (tlSettingTimelineCheckboxEl) {
+          tlSettingTimelineCheckboxEl.checked = isTimelineVisible();
+        }
+      });
+      document.addEventListener('click', (e) => {
+        if (tlSettingsMenuEl.style.display === 'block' && !tlSettingsMenuEl.contains(e.target) && e.target !== tlSettingsBtnEl) {
+          tlSettingsMenuEl.style.display = 'none';
+        }
+      });
+    }
+
+    if (tlSettingTimelineCheckboxEl) {
+      tlSettingTimelineCheckboxEl.checked = isTimelineVisible();
+      tlSettingTimelineCheckboxEl.addEventListener('change', (e) => {
+        e.stopPropagation();
+        toggleTimeline(!!tlSettingTimelineCheckboxEl.checked);
+      });
+    }
+
     if (tlCollapseBtnEl) {
+      updateTimelineCollapsedUI(isTimelineCollapsed());
       tlCollapseBtnEl.addEventListener('click', (e) => {
         e.stopPropagation();
-        toggleTimeline(false);
+        toggleTimelineCollapsed();
       });
     }
     propsEl = document.getElementById('video-ann-props');

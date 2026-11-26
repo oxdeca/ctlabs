@@ -448,13 +448,26 @@
             <!-- Right Zone: Actions -->
             <div style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end;">
               <div id="rec-actions" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
-                <!-- 0. Video Annotations & Timeline (shown when video step is active) -->
+                <!-- 0. Video Annotations & Settings (shown when video step is active) -->
                 <button type="button" id="video-annotate-toggle-btn" title="Annotate video" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; width: 34px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-pencil-alt" style="color: #10b981;"></i>
                 </button>
-                <button type="button" id="video-timeline-toggle-btn" title="Toggle timeline track" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; width: 34px; transition: all 0.15s ease; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
-                  <i class="fas fa-stream" id="video-timeline-toggle-icon" style="color: #38bdf8;"></i>
-                </button>
+                <div id="video-settings-wrapper" style="position: relative; display: none; flex-shrink: 0;">
+                  <button type="button" id="video-settings-btn" title="Video player settings" style="padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 28px; width: 34px; transition: background 0.15s, border-color 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                    <i class="fas fa-cog" style="color: #94a3b8;"></i>
+                  </button>
+                  <div id="video-settings-menu" style="display: none; position: absolute; top: calc(100% + 6px); right: 0; min-width: 210px; background: #1e293b; border: 1px solid #475569; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6); z-index: 1000; overflow: hidden; padding: 4px 0;">
+                    <div style="padding: 6px 12px; font-size: 0.72em; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px; border-bottom: 1px solid #334155; margin-bottom: 4px;">
+                      Video Settings
+                    </div>
+                    <label style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; color: #f8fafc; font-size: 0.84em; user-select: none; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+                      <span style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-stream" style="color: #38bdf8; width: 14px; text-align: center;"></i> Show Timeline
+                      </span>
+                      <input type="checkbox" id="video-setting-timeline-checkbox" style="cursor: pointer; accent-color: #38bdf8; width: 15px; height: 15px;" />
+                    </label>
+                  </div>
+                </div>
 
                 <!-- 1. Edit (Markdown document in view mode) -->
                 <button type="button" id="md-tab-edit" title="Edit document" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
@@ -691,8 +704,8 @@
                   <button type="button" id="video-tl-fs-btn" title="Toggle Fullscreen (F)" style="background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 7px; cursor: pointer; height: 22px; font-size: 0.75em; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; transition: all 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.color='#f1f5f9';" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8';">
                     <i class="fas fa-expand" id="video-tl-fs-icon"></i>
                   </button>
-                  <button type="button" id="video-tl-collapse-btn" title="Hide timeline track" style="background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 6px; cursor: pointer; height: 22px; font-size: 0.75em; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; transition: all 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.color='#f1f5f9';" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8';">
-                    <i class="fas fa-chevron-down"></i>
+                  <button type="button" id="video-tl-collapse-btn" title="Collapse timeline lanes" style="background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 6px; cursor: pointer; height: 22px; font-size: 0.75em; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; transition: all 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.color='#f1f5f9';" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8';">
+                    <i class="fas fa-chevron-down" id="video-tl-collapse-icon"></i>
                   </button>
                 </div>
               </div>
