@@ -174,6 +174,7 @@
   }
 
   // Calculate and align overlay bounds with the video's active content rectangle
+  let lastOverlayRectKey = '';
   function updateOverlayBounds() {
     if (!stageEl || !videoEl || !overlayEl) return;
     const sw = stageEl.clientWidth;
@@ -200,10 +201,18 @@
       ry = (sh - rh) / 2;
     }
 
-    overlayEl.style.left = `${Math.round(rx)}px`;
-    overlayEl.style.top = `${Math.round(ry)}px`;
-    overlayEl.style.width = `${Math.round(rw)}px`;
-    overlayEl.style.height = `${Math.round(rh)}px`;
+    const rLeft = Math.round(rx);
+    const rTop = Math.round(ry);
+    const rWidth = Math.round(rw);
+    const rHeight = Math.round(rh);
+    const key = `${rLeft}|${rTop}|${rWidth}|${rHeight}`;
+    if (key === lastOverlayRectKey) return;
+    lastOverlayRectKey = key;
+
+    overlayEl.style.left = `${rLeft}px`;
+    overlayEl.style.top = `${rTop}px`;
+    overlayEl.style.width = `${rWidth}px`;
+    overlayEl.style.height = `${rHeight}px`;
   }
 
   // Convert mouse client coordinates to percentage within the active video overlay
@@ -1425,6 +1434,9 @@
     }
 
     lastRulerDuration = -1;
+    lastTimelineKey = '';
+    lastWaveformKey = '';
+    lastOverlayRectKey = '';
     const dur = getVideoDuration();
     renderTimelineRuler(dur);
 
@@ -1507,7 +1519,7 @@
       if (Math.abs(videoEl.currentTime - target) > 0.02) {
         videoEl.currentTime = target;
       }
-    }, 30);
+    }, videoEl.seeking ? 50 : 25);
   }
 
   function togglePlayPause() {
@@ -1726,18 +1738,30 @@
       });
   }
 
+  let lastWaveformKey = '';
   function renderAudioWaveform(curTime, duration) {
     if (!tlAudioLaneEl || !tlAudioCanvasEl) return;
     const peaks = currentRecordingId ? audioWaveformCache.get(currentRecordingId) : null;
     const show = isAudioLaneVisible() && peaks && peaks.length > 0;
     tlAudioLaneEl.style.display = show ? 'block' : 'none';
-    if (!show) return;
+    if (!show) {
+      lastWaveformKey = '';
+      return;
+    }
 
     const dpr = window.devicePixelRatio || 1;
     const cssW = tlAudioCanvasEl.clientWidth || 1;
     const cssH = tlAudioCanvasEl.clientHeight || 28;
     const targetW = Math.max(1, Math.round(cssW * dpr));
     const targetH = Math.max(1, Math.round(cssH * dpr));
+
+    const dur = duration > 0 ? duration : 1;
+    const playPct = Math.max(0, Math.min(1, (curTime || 0) / dur));
+    const bucketIdx = Math.round(playPct * 200);
+    const wfKey = `${currentRecordingId}|${targetW}|${targetH}|${bucketIdx}`;
+    if (wfKey === lastWaveformKey) return;
+    lastWaveformKey = wfKey;
+
     if (tlAudioCanvasEl.width !== targetW || tlAudioCanvasEl.height !== targetH) {
       tlAudioCanvasEl.width = targetW;
       tlAudioCanvasEl.height = targetH;
@@ -1746,8 +1770,6 @@
     const ctx = tlAudioCanvasEl.getContext('2d');
     ctx.clearRect(0, 0, targetW, targetH);
 
-    const dur = duration > 0 ? duration : 1;
-    const playPct = Math.max(0, Math.min(1, (curTime || 0) / dur));
     const midY = targetH / 2;
     const step = targetW / peaks.length;
     const barW = Math.max(1 * dpr, step * 0.72);
@@ -1786,13 +1808,17 @@
     render();
   }
 
-  // Render video annotations timeline track
+  // Render video annotations timeline track (memoized to avoid DOM rebuilds on playhead moves)
+  let lastTimelineKey = '';
   function renderTimeline(curTime) {
     if (!trayEl) return;
     const isVisible = isTimelineVisible();
     trayEl.style.display = isVisible ? 'flex' : 'none';
     updateTimelineToggleBtnUI(isVisible);
-    if (!isVisible) return;
+    if (!isVisible) {
+      lastTimelineKey = '';
+      return;
+    }
 
     updateTimelineCollapsedUI(isTimelineCollapsed());
 
@@ -1800,14 +1826,25 @@
     renderTimelineRuler(duration);
     updatePlayheadUI(curTime, duration);
 
+    // Ensure all annotations have stable assigned lanes
+    ensureLanes();
+    const totalLanes = getTotalLanes();
+
+    const tlKey = `${isEditMode ? '1' : '0'}|${selectedId || ''}|${totalLanes}|${duration.toFixed(2)}|` +
+      annotations.map(a => {
+        const isActive = (curTime >= a.startTime && curTime <= a.endTime) ? '1' : '0';
+        return `${a.id}:${a.type}:${a.startTime}:${a.endTime}:${a.lane || 0}:${a.color || ''}:${a.text || ''}:${a.badge || ''}:${a.targetStepId || ''}:${isActive}`;
+      }).join(';');
+
+    if (tlKey === lastTimelineKey) {
+      return;
+    }
+    lastTimelineKey = tlKey;
+
     // Update annotation count
     if (tlCountNumEl) {
       tlCountNumEl.textContent = annotations.length;
     }
-
-    // Ensure all annotations have stable assigned lanes
-    ensureLanes();
-    const totalLanes = getTotalLanes();
 
     // Update lanes badge in timeline header
     if (tlLanesBadgeEl) {
@@ -2683,6 +2720,9 @@
     annotations = [];
     selectedId = null;
     lastRulerDuration = -1;
+    lastTimelineKey = '';
+    lastWaveformKey = '';
+    lastOverlayRectKey = '';
     setTimelineZoom(1);
     if (isEditMode) toggleEditMode(false);
     if (overlayEl) {
