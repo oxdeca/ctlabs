@@ -3355,6 +3355,8 @@ if (metaForm) {
     if (activeDataType === 'markdown') {
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
+      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
+      if (videoTlBtn) videoTlBtn.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') window.VideoAnnotations.clear();
       if (demoContainer) demoContainer.style.display = 'none';
       if (videoContainer) videoContainer.style.display = 'none';
@@ -3405,6 +3407,8 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'inline-flex';
+      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
+      if (videoTlBtn) videoTlBtn.style.display = 'inline-flex';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.loadForRecording === 'function') {
         window.VideoAnnotations.loadForRecording(id);
       }
@@ -3437,7 +3441,32 @@ if (metaForm) {
           };
 
           if (!isFinite(dur) || dur === Infinity) {
-            // Chrome WebM Infinity duration workaround: seek to 1e101 to force demuxer to resolve EOF cluster timestamp
+            // WebM recorded in browsers without a Cues element reports duration as Infinity.
+            // On Chromium, seeking to 1e101 forces the demuxer to seek to the end and discover the duration.
+            // However, on Firefox (Gecko), setting currentTime to 1e101 freezes the media decoder completely.
+            const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+            
+            // Check if we have duration cached on the sidebar recording button
+            let knownDur = 0;
+            if (activeId) {
+              const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+              if (activeBtn) {
+                const parsed = parseFloat(activeBtn.getAttribute('data-duration'));
+                if (parsed && !isNaN(parsed) && isFinite(parsed) && parsed > 0) knownDur = parsed;
+              }
+            }
+
+            if (isFirefox || knownDur > 0) {
+              if (knownDur > 0) {
+                syncDurationUI(knownDur);
+              }
+              if (autoPlay) {
+                videoPlayer.play().catch(() => {});
+              }
+              return;
+            }
+
+            // Chrome/Chromium workaround: seek to a finite large boundary instead of 1e101
             const onSeekDiscovered = () => {
               videoPlayer.removeEventListener('timeupdate', onSeekDiscovered);
               videoPlayer.currentTime = 0;
@@ -3473,6 +3502,8 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
+      const videoTlBtn = document.getElementById('video-timeline-toggle-btn');
+      if (videoTlBtn) videoTlBtn.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') {
         window.VideoAnnotations.clear();
       }

@@ -46,6 +46,7 @@ require_relative 'services/graphviz_template_engine'
 require_relative 'services/graphviz_service'
 require_relative 'services/recording_git_service'
 require_relative 'services/walkthrough_git_service'
+require_relative 'services/webm_fixer'
 require_relative 'services/terminal_service'
 
 # --- Load Controllers ---

@@ -97,7 +97,10 @@ class RecordingsController < BaseController
     }
     File.write(File.join(target_dir, "#{id}.json"), JSON.pretty_generate(meta))
 
-    RecordingService.inject_webm_duration!(path, duration) if ext == '.webm'
+    if ext == '.webm'
+      WebmFixer.ensure_seekable(path)
+      RecordingService.inject_webm_duration!(path, duration) if duration > 0
+    end
 
     RecordingService.add_to_walkthrough(target_slug, [id])
 
@@ -1145,6 +1148,8 @@ class RecordingsController < BaseController
           end
         end
       end
+
+      WebmFixer.ensure_seekable(path) if ext == '.webm'
 
       headers['Accept-Ranges'] = 'bytes'
       return send_file path,

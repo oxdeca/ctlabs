@@ -448,9 +448,12 @@
             <!-- Right Zone: Actions -->
             <div style="flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: flex-end;">
               <div id="rec-actions" style="display: none; align-items: center; gap: 6px; flex-shrink: 0;">
-                <!-- 0. Video Annotations (shown when video step is active) -->
+                <!-- 0. Video Annotations & Timeline (shown when video step is active) -->
                 <button type="button" id="video-annotate-toggle-btn" title="Annotate video" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; width: 34px; transition: background 0.15s, border-color 0.15s; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
                   <i class="fas fa-pencil-alt" style="color: #10b981;"></i>
+                </button>
+                <button type="button" id="video-timeline-toggle-btn" title="Toggle timeline track" style="display: none; padding: 4px 10px; font-size: 0.85em; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: #cbd5e1; cursor: pointer; align-items: center; justify-content: center; height: 28px; width: 34px; transition: all 0.15s ease; flex-shrink: 0;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                  <i class="fas fa-stream" id="video-timeline-toggle-icon" style="color: #38bdf8;"></i>
                 </button>
 
                 <!-- 1. Edit (Markdown document in view mode) -->
@@ -600,8 +603,8 @@
             </div>
 
             <!-- Video & Overlays Stage -->
-            <div id="video-stage" style="flex: 1; min-height: 0; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000;">
-              <video id="video-player" controls playsinline style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; outline: none; background: #000;"></video>
+            <div id="video-stage" style="flex: 1; min-height: 0; position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; cursor: pointer;">
+              <video id="video-player" playsinline preload="auto" style="max-width: 100%; max-height: 100%; width: 100%; height: 100%; object-fit: contain; outline: none; background: #000;"></video>
               
               <!-- Video Annotations Interactive Overlay Container -->
               <div id="video-annotations-overlay" style="position: absolute; pointer-events: none; overflow: visible; box-sizing: border-box; z-index: 25;">
@@ -610,12 +613,99 @@
               </div>
             </div>
 
-            <!-- Timeline Annotations Tray (chips of annotations along the timeline) -->
-            <div id="video-annotations-tray" style="display: none; padding: 6px 12px; background: #0f172a; border-top: 1px solid #1e293b; align-items: center; gap: 8px; overflow-x: auto; flex-shrink: 0; min-height: 38px;">
-              <div style="font-size: 0.78em; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                <i class="fas fa-stream" style="color: #38bdf8;"></i> Annotations:
+            <!-- Video Annotations Timeline Tray -->
+            <div id="video-annotations-tray" style="display: none; flex-direction: column; background: #0b1120; border-top: 1px solid #1e293b; flex-shrink: 0; user-select: none; z-index: 20;">
+              <!-- Timeline Control & Info Bar -->
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 12px; background: #0f172a; border-bottom: 1px solid #1e293b; min-height: 32px; gap: 10px; font-size: 0.78em;">
+                <!-- Left: Play/Pause, Skip, Time Display, Volume -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 5px;">
+                    <i class="fas fa-stream"></i> Timeline
+                  </span>
+                  
+                  <div style="display: flex; align-items: center; gap: 3px; margin-left: 6px;">
+                    <button type="button" id="video-tl-play-btn" title="Play/Pause (Space)" style="background: #1e293b; border: 1px solid #334155; color: #f1f5f9; border-radius: 4px; padding: 2px 7px; cursor: pointer; height: 24px; font-size: 0.8em; display: flex; align-items: center; justify-content: center; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#1e293b'">
+                      <i class="fas fa-play" id="video-tl-play-icon"></i>
+                    </button>
+                    <button type="button" id="video-tl-back-btn" title="Back 5s (Left Arrow: 1s, Shift+Left: 5s, Alt+Left: 0.1s, Ctrl+Left: Prev Ann)" style="background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 6px; cursor: pointer; height: 24px; font-size: 0.75em; display: flex; align-items: center; gap: 2px; transition: background 0.15s;" onmouseover="this.style.background='#334155'; this.style.color='#f1f5f9';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';">
+                      <i class="fas fa-undo-alt"></i> 5s
+                    </button>
+                    <button type="button" id="video-tl-fwd-btn" title="Forward 5s (Right Arrow: 1s, Shift+Right: 5s, Alt+Right: 0.1s, Ctrl+Right: Next Ann)" style="background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 6px; cursor: pointer; height: 24px; font-size: 0.75em; display: flex; align-items: center; gap: 2px; transition: background 0.15s;" onmouseover="this.style.background='#334155'; this.style.color='#f1f5f9';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';">
+                      5s <i class="fas fa-redo-alt"></i>
+                    </button>
+                    <button type="button" id="video-tl-vol-btn" title="Mute/Unmute (M)" style="background: #1e293b; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 7px; cursor: pointer; height: 24px; font-size: 0.8em; display: flex; align-items: center; justify-content: center; transition: background 0.15s; margin-left: 2px;" onmouseover="this.style.background='#334155'; this.style.color='#f1f5f9';" onmouseout="this.style.background='#1e293b'; this.style.color='#94a3b8';">
+                      <i class="fas fa-volume-up" id="video-tl-vol-icon"></i>
+                    </button>
+                  </div>
+
+                  <!-- Time indicator -->
+                  <div style="font-family: monospace; font-size: 0.9em; color: #cbd5e1; background: #1e293b; padding: 2px 8px; border-radius: 4px; border: 1px solid #334155; margin-left: 4px;">
+                    <span id="video-tl-cur-time" style="color: #38bdf8; font-weight: 600;">00:00</span>
+                    <span style="color: #64748b;"> / </span>
+                    <span id="video-tl-dur-time" style="color: #94a3b8;">00:00</span>
+                  </div>
+                </div>
+
+                <!-- Right: Selected info, Annotation counter, Fullscreen, Collapse -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <div id="video-tl-sel-info" style="display: none; align-items: center; gap: 6px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 4px; color: #38bdf8; font-size: 0.85em;">
+                    <span id="video-tl-sel-label" style="max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                    <span id="video-tl-sel-time" style="font-family: monospace; font-size: 0.85em; color: #94a3b8;"></span>
+                    <span style="color: #475569;">|</span>
+                    <span style="font-size: 0.82em; color: #94a3b8;">Lane</span>
+                    <div style="display: inline-flex; align-items: center; background: #0f172a; border: 1px solid #334155; border-radius: 3px; overflow: hidden;">
+                      <button type="button" id="video-tl-lane-down-btn" title="Move to upper lane" style="background: transparent; border: none; color: #cbd5e1; cursor: pointer; padding: 0 4px; height: 18px; font-size: 0.75em; display: flex; align-items: center;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#cbd5e1'">&minus;</button>
+                      <span id="video-tl-sel-lane-num" style="font-family: monospace; font-weight: 700; color: #f1f5f9; font-size: 0.82em; min-width: 14px; text-align: center; padding: 0 1px;">1</span>
+                      <button type="button" id="video-tl-lane-up-btn" title="Move to lower lane" style="background: transparent; border: none; color: #cbd5e1; cursor: pointer; padding: 0 4px; height: 18px; font-size: 0.75em; display: flex; align-items: center;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#cbd5e1'">+</button>
+                    </div>
+                  </div>
+                  <div id="video-tl-lanes-badge" style="display: none; align-items: center; gap: 4px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.85em; font-weight: 600; padding: 1px 7px; border-radius: 10px;">
+                    <i class="fas fa-layer-group" style="font-size: 0.85em;"></i>
+                    <span id="video-tl-lanes-num">1</span>
+                    <span>lanes</span>
+                    <button type="button" id="video-tl-auto-arrange-btn" title="Auto-pack overlapping annotations into non-colliding lanes" style="background: transparent; border: none; color: #7dd3fc; cursor: pointer; padding: 0 0 0 4px; font-size: 0.8em; display: inline-flex; align-items: center; opacity: 0.8;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">
+                      <i class="fas fa-magic"></i>
+                    </button>
+                  </div>
+                  <div id="video-tl-count" style="display: flex; align-items: center; gap: 4px; color: #64748b; font-size: 0.85em;">
+                    <span id="video-tl-count-num" style="background: #1e293b; color: #94a3b8; font-weight: 600; padding: 1px 6px; border-radius: 10px; border: 1px solid #334155;">0</span>
+                    <span>annotations</span>
+                  </div>
+                  <button type="button" id="video-tl-fs-btn" title="Toggle Fullscreen (F)" style="background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 7px; cursor: pointer; height: 22px; font-size: 0.75em; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; transition: all 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.color='#f1f5f9';" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8';">
+                    <i class="fas fa-expand" id="video-tl-fs-icon"></i>
+                  </button>
+                  <button type="button" id="video-tl-collapse-btn" title="Hide timeline track" style="background: transparent; border: 1px solid #334155; color: #94a3b8; border-radius: 4px; padding: 2px 6px; cursor: pointer; height: 22px; font-size: 0.75em; display: inline-flex; align-items: center; justify-content: center; margin-left: 2px; transition: all 0.15s;" onmouseover="this.style.background='#1e293b'; this.style.color='#f1f5f9';" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8';">
+                    <i class="fas fa-chevron-down"></i>
+                  </button>
+                </div>
               </div>
-              <div id="video-annotations-chips" style="display: flex; align-items: center; gap: 6px; flex: 1; overflow-x: auto;"></div>
+
+              <!-- Interactive Timeline Track Area -->
+              <div style="padding: 6px 14px 10px 14px; position: relative;">
+                <!-- Time Ruler with tick marks (inset by 8px left and 14px right to align with inner segments track) -->
+                <div id="video-tl-ruler" style="position: relative; height: 16px; margin-left: 8px; margin-right: 14px; font-family: monospace; font-size: 9px; color: #64748b; margin-bottom: 3px; pointer-events: none;"></div>
+
+                <!-- Main Track Rail (dynamic height expands with multiple lanes) -->
+                <div id="video-tl-track" style="position: relative; min-height: 34px; background: #131d31; border: 1px solid #283548; border-radius: 6px; cursor: pointer; overflow: visible; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); transition: height 0.2s cubic-bezier(0.4, 0, 0.2, 1);">
+                  <!-- Background Lane Guide Rails -->
+                  <div id="video-tl-lane-guides" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; border-radius: 5px;"></div>
+
+                  <!-- Inner Playhead & Segments Arena (inset by 8px left and 14px right to prevent any clipping at 0s or clip end) -->
+                  <div id="video-tl-inner" style="position: absolute; top: 0; left: 8px; right: 14px; bottom: 0; pointer-events: none;">
+                    <!-- Played Video Progress bar -->
+                    <div id="video-tl-progress" style="position: absolute; top: 0; left: -8px; height: 100%; width: 0%; background: linear-gradient(90deg, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0.22)); border-radius: 5px 0 0 5px; pointer-events: none;"></div>
+
+                    <!-- Annotation Segments Lane -->
+                    <div id="video-tl-segments" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: auto;"></div>
+
+                    <!-- Playhead Needle -->
+                    <div id="video-tl-playhead" style="position: absolute; top: -15px; bottom: 0; width: 2px; background: #38bdf8; z-index: 20; pointer-events: none; transform: translateX(-50%); transition: none; box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);">
+                      <!-- Triangle marker on top of needle -->
+                      <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #38bdf8;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

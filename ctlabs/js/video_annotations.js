@@ -40,6 +40,35 @@
   let toggleBtnEl = null;
   let trayEl = null;
   let chipsEl = null;
+  let tlPlayBtnEl = null;
+  let tlPlayIconEl = null;
+  let tlBackBtnEl = null;
+  let tlFwdBtnEl = null;
+  let tlCurTimeEl = null;
+  let tlDurTimeEl = null;
+  let tlCountNumEl = null;
+  let tlSelInfoEl = null;
+  let tlSelLabelEl = null;
+  let tlSelTimeEl = null;
+  let tlRulerEl = null;
+  let tlTrackEl = null;
+  let tlLaneGuidesEl = null;
+  let tlInnerEl = null;
+  let tlProgressEl = null;
+  let tlSegmentsEl = null;
+  let tlPlayheadEl = null;
+  let tlLanesBadgeEl = null;
+  let tlLanesNumEl = null;
+  let tlLaneUpBtnEl = null;
+  let tlLaneDownBtnEl = null;
+  let tlSelLaneNumEl = null;
+  let tlAutoArrangeBtnEl = null;
+  let tlToggleBtnEl = null;
+  let tlCollapseBtnEl = null;
+  let tlVolBtnEl = null;
+  let tlVolIconEl = null;
+  let tlFsBtnEl = null;
+  let tlFsIconEl = null;
   let propsEl = null;
   let startInputEl = null;
   let endInputEl = null;
@@ -198,11 +227,8 @@
     const curTime = videoEl ? videoEl.currentTime : 0;
     const hasAnnotations = annotations.length > 0;
 
-    // Show/hide timeline chips tray
-    if (trayEl) {
-      trayEl.style.display = (hasAnnotations || isEditMode) ? 'flex' : 'none';
-    }
-    renderTimelineChips(curTime);
+    // Update video timeline track
+    renderTimeline(curTime);
 
     // Identify which annotations are active at current timestamp
     const activeAnns = annotations.filter((ann) => {
@@ -954,7 +980,7 @@
       -webkit-backdrop-filter: blur(6px);
       border-left: 4px solid ${color};
       border-radius: 4px;
-      color: #f8fafc;
+      color: ${color};
       font-weight: 700;
       font-size: ${ann.fontSize || 16}px;
       padding: 5px 10px;
@@ -1001,6 +1027,7 @@
     const textEl = document.createElement('span');
     textEl.className = 'video-ann-text-body';
     textEl.style.cssText = `
+      color: ${color};
       outline: none;
       min-width: 24px;
       cursor: ${isEditing ? 'text' : (ann.targetStepId ? 'pointer' : 'default')};
@@ -1090,64 +1117,523 @@
     domEl.appendChild(box);
   }
 
-  // Render timeline chips tray
-  function renderTimelineChips(curTime) {
-    if (!chipsEl) return;
-    chipsEl.innerHTML = '';
+  // Get active video duration reliably (accommodates video duration and all annotations)
+  function getVideoDuration() {
+    let vDur = 0;
+    if (videoEl && !isNaN(videoEl.duration) && isFinite(videoEl.duration) && videoEl.duration > 0) {
+      vDur = videoEl.duration;
+    }
+    if (!vDur && currentRecordingId) {
+      const btn = document.querySelector(`.rec-item[data-id="${CSS.escape(currentRecordingId)}"]`);
+      if (btn) {
+        const dur = parseFloat(btn.getAttribute('data-duration'));
+        if (dur && !isNaN(dur) && dur > 0) vDur = dur;
+      }
+    }
+    let maxEnd = 0;
+    for (const a of annotations) {
+      if (a.endTime > maxEnd) maxEnd = a.endTime;
+    }
+    const effectiveDur = Math.max(vDur, maxEnd);
+    return effectiveDur > 0 ? effectiveDur : 10;
+  }
 
-    // Sort by startTime
+  // Stable multi-lane allocation (preserves assigned lanes so moving objects does not cause them to jump)
+  function ensureLanes() {
+    let unassigned = annotations.filter(a => typeof a.lane !== 'number');
+    if (unassigned.length === 0) return;
+
+    // Build timeline occupancy for existing assigned lanes
+    const laneIntervals = [];
+    annotations.forEach(a => {
+      if (typeof a.lane === 'number') {
+        if (!laneIntervals[a.lane]) laneIntervals[a.lane] = [];
+        laneIntervals[a.lane].push({ start: a.startTime, end: a.endTime });
+      }
+    });
+
+    unassigned.forEach(a => {
+      let targetLane = 0;
+      while (true) {
+        const intervals = laneIntervals[targetLane] || [];
+        const hasCollision = intervals.some(iv => !(a.endTime <= iv.start + 0.05 || a.startTime >= iv.end - 0.05));
+        if (!hasCollision) {
+          a.lane = targetLane;
+          if (!laneIntervals[targetLane]) laneIntervals[targetLane] = [];
+          laneIntervals[targetLane].push({ start: a.startTime, end: a.endTime });
+          break;
+        }
+        targetLane++;
+      }
+    });
+  }
+
+  function getTotalLanes() {
+    ensureLanes();
+    let max = 0;
+    for (const a of annotations) {
+      const l = typeof a.lane === 'number' ? a.lane : 0;
+      if (l > max) max = l;
+    }
+    return max + 1;
+  }
+
+  function autoArrangeLanes() {
     const sorted = [...annotations].sort((a, b) => a.startTime - b.startTime);
-
+    const laneEndTimes = [];
     sorted.forEach((ann) => {
-      const chip = document.createElement('div');
-      chip.className = 'video-ann-chip';
-      chip.setAttribute('data-id', ann.id);
+      let assignedLane = -1;
+      for (let i = 0; i < laneEndTimes.length; i++) {
+        if (laneEndTimes[i] <= ann.startTime + 0.05) {
+          assignedLane = i;
+          laneEndTimes[i] = ann.endTime;
+          break;
+        }
+      }
+      if (assignedLane === -1) {
+        assignedLane = laneEndTimes.length;
+        laneEndTimes.push(ann.endTime);
+      }
+      ann.lane = assignedLane;
+    });
+  }
+
+  // Render proportional tick marks along the timeline ruler
+  let lastRulerDuration = -1;
+  function renderTimelineRuler(duration) {
+    if (!tlRulerEl) return;
+    const durRound = Math.round(duration);
+    if (durRound === lastRulerDuration) return;
+    lastRulerDuration = durRound;
+
+    tlRulerEl.innerHTML = '';
+    if (duration <= 0) return;
+
+    let step = 5;
+    if (duration <= 10) step = 2;
+    else if (duration <= 25) step = 5;
+    else if (duration <= 60) step = 10;
+    else if (duration <= 150) step = 15;
+    else if (duration <= 300) step = 30;
+    else if (duration <= 900) step = 60;
+    else step = 120;
+
+    for (let t = 0; t <= duration; t += step) {
+      const pct = (t / duration) * 100;
+      const mark = document.createElement('div');
+      mark.style.cssText = `
+        position: absolute;
+        left: ${pct}%;
+        top: 0;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        pointer-events: none;
+        user-select: none;
+      `;
+      mark.innerHTML = `
+        <span style="font-size: 8.5px; line-height: 10px; color: #64748b;">${formatTime(t)}</span>
+        <div style="width: 1px; height: 4px; background: #334155; margin-top: 1px;"></div>
+      `;
+      tlRulerEl.appendChild(mark);
+    }
+  }
+
+  // Update playhead needle, progress fill, and time readouts
+  function updatePlayheadUI(curTime, duration) {
+    if (!tlPlayheadEl || !tlProgressEl) return;
+    const dur = duration > 0 ? duration : 1;
+    const clampedCur = Math.max(0, Math.min(dur, curTime));
+    const pct = (clampedCur / dur) * 100;
+
+    tlPlayheadEl.style.left = `${pct}%`;
+    tlProgressEl.style.width = `${pct}%`;
+
+    if (tlCurTimeEl) tlCurTimeEl.textContent = formatTime(clampedCur);
+    if (tlDurTimeEl) tlDurTimeEl.textContent = formatTime(dur);
+    if (tlPlayIconEl) {
+      tlPlayIconEl.className = (videoEl && !videoEl.paused) ? 'fas fa-pause' : 'fas fa-play';
+    }
+  }
+
+  // Seeking state & playback position updates
+  let pendingSeekTarget = null;
+  let seekThrottleTimer = null;
+
+  function safeSeek(targetTime) {
+    if (!videoEl) return;
+    const dur = getVideoDuration();
+    const clampedTime = Math.max(0, Math.min(dur, targetTime));
+
+    pendingSeekTarget = clampedTime;
+    updatePlayheadUI(clampedTime, dur);
+    render();
+
+    if (seekThrottleTimer) clearTimeout(seekThrottleTimer);
+    seekThrottleTimer = setTimeout(() => {
+      seekThrottleTimer = null;
+      if (!videoEl || pendingSeekTarget === null) return;
+      const target = pendingSeekTarget;
+      pendingSeekTarget = null;
+
+      if (Math.abs(videoEl.currentTime - target) > 0.02) {
+        videoEl.currentTime = target;
+      }
+    }, 30);
+  }
+
+  function togglePlayPause() {
+    if (!videoEl) return;
+    if (videoEl.paused) {
+      const p = videoEl.play();
+      if (p !== undefined) p.catch(() => {});
+    } else {
+      videoEl.pause();
+    }
+    updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+  }
+
+  // Dragging state for timeline segments (trimming start/end, moving entire time span)
+  let isTlDragging = false;
+  let tlDragState = null;
+
+  function startTimelineDrag(e, annId, dragType) {
+    const ann = annotations.find(a => a.id === annId);
+    if (!ann || !tlTrackEl) return;
+
+    selectAnnotation(annId);
+
+    const trackRect = tlTrackEl.getBoundingClientRect();
+    const duration = getVideoDuration();
+
+    isTlDragging = true;
+    tlDragState = {
+      annId,
+      type: dragType,
+      startX: e.clientX,
+      startY: e.clientY,
+      origStart: ann.startTime,
+      origEnd: ann.endTime,
+      origLane: typeof ann.lane === 'number' ? ann.lane : 0,
+      duration: duration,
+      trackWidth: tlInnerEl ? (tlInnerEl.clientWidth || 1) : Math.max(1, trackRect.width - 22)
+    };
+
+    window.addEventListener('mousemove', onTimelineDragMove, true);
+    window.addEventListener('mouseup', onTimelineDragEnd, true);
+  }
+
+  function onTimelineDragMove(e) {
+    if (!isTlDragging || !tlDragState) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const { annId, type, startX, startY, origStart, origEnd, origLane, duration, trackWidth } = tlDragState;
+    const ann = annotations.find(a => a.id === annId);
+    if (!ann) return;
+
+    const deltaPx = e.clientX - startX;
+    const deltaSec = (deltaPx / trackWidth) * duration;
+
+    if (type === 'trim-start') {
+      let newStart = origStart + deltaSec;
+      newStart = Math.max(0, Math.min(ann.endTime - 0.2, newStart));
+      newStart = Math.round(newStart * 10) / 10;
+      ann.startTime = newStart;
+      if (videoEl) safeSeek(newStart);
+    } else if (type === 'trim-end') {
+      let newEnd = origEnd + deltaSec;
+      newEnd = Math.max(ann.startTime + 0.2, Math.min(duration, newEnd));
+      newEnd = Math.round(newEnd * 10) / 10;
+      ann.endTime = newEnd;
+      if (videoEl) safeSeek(newEnd);
+    } else if (type === 'move-span') {
+      const span = origEnd - origStart;
+      let newStart = origStart + deltaSec;
+      newStart = Math.max(0, Math.min(duration - span, newStart));
+      newStart = Math.round(newStart * 10) / 10;
+      ann.startTime = newStart;
+      ann.endTime = Math.round((newStart + span) * 10) / 10;
+      if (videoEl) safeSeek(newStart);
+
+      // Allow intentional vertical dragging between lanes without sudden jumping
+      const deltaY = e.clientY - startY;
+      const laneStep = 29; // laneHeight (24) + laneGap (5)
+      const laneShift = Math.round(deltaY / laneStep);
+      const maxAvailableLanes = getTotalLanes();
+      const targetLane = Math.max(0, Math.min(maxAvailableLanes, origLane + laneShift));
+      ann.lane = targetLane;
+    }
+
+    if (videoEl) updatePlayheadUI(videoEl.currentTime, duration);
+    render(true);
+  }
+
+  function onTimelineDragEnd(e) {
+    if (!isTlDragging) return;
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    isTlDragging = false;
+    tlDragState = null;
+    window.removeEventListener('mousemove', onTimelineDragMove, true);
+    window.removeEventListener('mouseup', onTimelineDragEnd, true);
+    scheduleAutosave();
+  }
+
+  // Timeline track visibility helpers
+  function isTimelineVisible() {
+    return localStorage.getItem('ctlabs_video_timeline_visible') !== 'false';
+  }
+
+  function updateTimelineToggleBtnUI(visible) {
+    if (tlToggleBtnEl) {
+      tlToggleBtnEl.style.borderColor = visible ? '#38bdf8' : '#475569';
+      tlToggleBtnEl.style.background = visible ? 'rgba(56, 189, 248, 0.16)' : '#1e293b';
+      tlToggleBtnEl.style.color = visible ? '#38bdf8' : '#94a3b8';
+      tlToggleBtnEl.title = visible ? 'Hide timeline track' : 'Show timeline track';
+    }
+  }
+
+  function toggleTimeline(explicitState) {
+    const cur = isTimelineVisible();
+    const next = (explicitState !== undefined) ? explicitState : !cur;
+    localStorage.setItem('ctlabs_video_timeline_visible', next ? 'true' : 'false');
+    if (trayEl) {
+      trayEl.style.display = next ? 'flex' : 'none';
+    }
+    updateTimelineToggleBtnUI(next);
+    if (next) {
+      const curTime = videoEl ? videoEl.currentTime : 0;
+      renderTimeline(curTime);
+    }
+  }
+
+  // Render video annotations timeline track
+  function renderTimeline(curTime) {
+    if (!trayEl) return;
+    const isVisible = isEditMode || isTimelineVisible();
+    trayEl.style.display = isVisible ? 'flex' : 'none';
+    updateTimelineToggleBtnUI(isVisible);
+    if (!isVisible) return;
+
+    const duration = getVideoDuration();
+    renderTimelineRuler(duration);
+    updatePlayheadUI(curTime, duration);
+
+    // Update annotation count
+    if (tlCountNumEl) {
+      tlCountNumEl.textContent = annotations.length;
+    }
+
+    // Ensure all annotations have stable assigned lanes
+    ensureLanes();
+    const totalLanes = getTotalLanes();
+
+    // Update lanes badge in timeline header
+    if (tlLanesBadgeEl) {
+      if (totalLanes > 1) {
+        tlLanesBadgeEl.style.display = 'inline-flex';
+        if (tlLanesNumEl) tlLanesNumEl.textContent = totalLanes;
+      } else {
+        tlLanesBadgeEl.style.display = 'none';
+      }
+    }
+
+    // Dynamic track rail height calculation
+    const laneHeight = 24;
+    const laneGap = 5;
+    const trackPadY = 5;
+    const totalTrackHeight = trackPadY * 2 + totalLanes * laneHeight + (totalLanes - 1) * laneGap;
+    if (tlTrackEl) {
+      tlTrackEl.style.height = `${totalTrackHeight}px`;
+    }
+
+    // Render subtle background lane guide rails if multiple lanes exist
+    if (tlLaneGuidesEl) {
+      tlLaneGuidesEl.innerHTML = '';
+      if (totalLanes > 1) {
+        for (let l = 0; l < totalLanes; l++) {
+          const guide = document.createElement('div');
+          const guideTop = trackPadY + l * (laneHeight + laneGap);
+          guide.style.cssText = `
+            position: absolute;
+            top: ${guideTop}px;
+            left: 4px;
+            right: 4px;
+            height: ${laneHeight}px;
+            border-radius: 4px;
+            background: ${l % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)'};
+            border: 1px dashed rgba(255,255,255,0.06);
+            pointer-events: none;
+          `;
+          tlLaneGuidesEl.appendChild(guide);
+        }
+      }
+    }
+
+    // Update selected info in timeline header
+    if (tlSelInfoEl) {
+      const selAnn = annotations.find(a => a.id === selectedId);
+      if (selAnn) {
+        tlSelInfoEl.style.display = 'flex';
+        let icon = 'fas fa-comment-dots';
+        if (selAnn.type === 'arrow') icon = 'fas fa-location-arrow';
+        if (selAnn.type === 'rect') icon = 'far fa-square';
+        if (selAnn.type === 'highlight') icon = 'fas fa-highlighter';
+        if (selAnn.type === 'badge') icon = 'fas fa-certificate';
+        if (selAnn.type === 'text') icon = 'fas fa-font';
+
+        if (tlSelLabelEl) {
+          const title = selAnn.text || selAnn.type;
+          tlSelLabelEl.innerHTML = `<i class="${icon}" style="color: ${selAnn.color || '#38bdf8'}; margin-right: 4px;"></i>${escapeHtml(title)}`;
+        }
+        if (tlSelTimeEl) {
+          tlSelTimeEl.textContent = `${formatTime(selAnn.startTime)} - ${formatTime(selAnn.endTime)}`;
+        }
+        if (tlSelLaneNumEl) {
+          tlSelLaneNumEl.textContent = (typeof selAnn.lane === 'number' ? selAnn.lane : 0) + 1;
+        }
+      } else {
+        tlSelInfoEl.style.display = 'none';
+      }
+    }
+
+    if (!tlSegmentsEl) return;
+    tlSegmentsEl.innerHTML = '';
+
+    const sorted = [...annotations].sort((a, b) => a.startTime - b.startTime);
+    sorted.forEach((ann) => {
+      const seg = document.createElement('div');
+      seg.className = 'video-tl-segment';
+      seg.setAttribute('data-id', ann.id);
 
       const isActive = curTime >= ann.startTime && curTime <= ann.endTime;
       const isSelected = ann.id === selectedId;
       const color = ann.color || '#38bdf8';
 
-      chip.style.cssText = `
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 8px;
-        background: ${isActive ? hexToRgba(color, 0.25) : '#1e293b'};
-        border: 1px solid ${isSelected ? '#ffffff' : (isActive ? color : '#334155')};
-        border-radius: 4px;
-        color: #f1f5f9;
-        font-size: 0.78em;
-        cursor: pointer;
-        flex-shrink: 0;
-        transition: all 0.15s ease;
-      `;
+      const lane = typeof ann.lane === 'number' ? ann.lane : 0;
+      const segTop = trackPadY + lane * (laneHeight + laneGap);
+
+      const leftPct = Math.max(0, Math.min(100, (ann.startTime / duration) * 100));
+      const rightPct = Math.max(0, Math.min(100, (ann.endTime / duration) * 100));
+      const rawWidthPct = Math.max(1.8, rightPct - leftPct);
+      const isAtClipEnd = rightPct >= 99.2;
 
       let icon = 'fas fa-comment-dots';
       if (ann.type === 'arrow') icon = 'fas fa-location-arrow';
       if (ann.type === 'rect') icon = 'far fa-square';
+      if (ann.type === 'highlight') icon = 'fas fa-highlighter';
       if (ann.type === 'badge') icon = 'fas fa-certificate';
       if (ann.type === 'text') icon = 'fas fa-font';
 
-      const labelText = ann.text ? (ann.text.length > 20 ? ann.text.substring(0, 18) + '...' : ann.text) : ann.type;
+      const labelText = ann.text ? (ann.text.length > 18 ? ann.text.substring(0, 16) + '..' : ann.text) : (ann.type === 'badge' ? `#${ann.badge || 1}` : ann.type);
 
-      chip.innerHTML = `
-        <span style="color: ${color};"><i class="${icon}"></i></span>
-        <span style="font-weight: 600; font-family: monospace; color: #94a3b8;">${formatTime(ann.startTime)}</span>
-        <span style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(labelText)}</span>
+      seg.style.cssText = `
+        position: absolute;
+        ${isAtClipEnd ? `right: 0px; width: ${rawWidthPct}%; min-width: 45px; max-width: 100%;` : `left: ${leftPct}%; width: ${rawWidthPct}%; min-width: 45px;`}
+        top: ${segTop}px;
+        height: ${laneHeight}px;
+        background: ${hexToRgba(color, isActive ? 0.45 : 0.22)};
+        border: ${isSelected ? '2px solid #ffffff' : `1.5px solid ${color}`};
+        border-radius: 4px;
+        box-shadow: ${isSelected ? `0 0 10px ${color}, inset 0 0 4px ${color}` : (isActive ? `0 0 6px ${color}` : 'none')};
+        display: flex;
+        align-items: center;
+        padding: 0 4px;
+        gap: 4px;
+        box-sizing: border-box;
+        overflow: hidden;
+        cursor: pointer;
+        z-index: ${isSelected ? 15 : (isActive ? 12 : 5)};
+        transition: border 0.15s, box-shadow 0.15s;
+        white-space: nowrap;
       `;
 
-      // Optional Step Link Badge on Chip
+      seg.title = `${ann.type.toUpperCase()}: ${ann.text || ''} (${formatTime(ann.startTime)} - ${formatTime(ann.endTime)})`;
+
+      // Inner label
+      const content = document.createElement('div');
+      content.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 11px;
+        color: #f8fafc;
+        flex: 1;
+        overflow: hidden;
+        pointer-events: none;
+      `;
+
+      let stepBadgeHtml = '';
       if (ann.targetStepId) {
         const stepInfo = getStepInfo(ann.targetStepId);
-        const linkTag = document.createElement('span');
-        linkTag.style.cssText = 'background: rgba(56,189,248,0.2); border: 1px solid #38bdf8; border-radius: 3px; padding: 1px 4px; font-size: 0.72em; color: #38bdf8; margin-left: 2px;';
-        linkTag.textContent = `➜ ${stepInfo.shortLabel}`;
-        linkTag.title = `Links to ${stepInfo.label}`;
-        chip.appendChild(linkTag);
+        stepBadgeHtml = `<span style="background: rgba(56,189,248,0.3); border: 1px solid #38bdf8; border-radius: 3px; padding: 0 3px; font-size: 9px; color: #38bdf8; flex-shrink: 0;">➜ ${stepInfo.shortLabel}</span>`;
       }
 
-      // Click seeking
-      chip.addEventListener('click', (e) => {
+      content.innerHTML = `
+        <i class="${icon}" style="color: ${color}; font-size: 10px; flex-shrink: 0;"></i>
+        <span style="overflow: hidden; text-overflow: ellipsis; font-weight: 500;">${escapeHtml(labelText)}</span>
+        ${stepBadgeHtml}
+      `;
+      seg.appendChild(content);
+
+      // Left & right trim handles in edit mode
+      if (isEditMode) {
+        const leftHandle = document.createElement('div');
+        leftHandle.className = 'video-tl-handle-left';
+        leftHandle.title = 'Drag to adjust start time';
+        leftHandle.style.cssText = `
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 6px;
+          cursor: ew-resize;
+          background: rgba(255,255,255,0.25);
+          border-right: 1px solid rgba(255,255,255,0.4);
+          z-index: 2;
+        `;
+        leftHandle.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          startTimelineDrag(e, ann.id, 'trim-start');
+        });
+        seg.appendChild(leftHandle);
+
+        const rightHandle = document.createElement('div');
+        rightHandle.className = 'video-tl-handle-right';
+        rightHandle.title = 'Drag to adjust end time';
+        rightHandle.style.cssText = `
+          position: absolute;
+          right: 0;
+          top: 0;
+          bottom: 0;
+          width: 6px;
+          cursor: ew-resize;
+          background: rgba(255,255,255,0.25);
+          border-left: 1px solid rgba(255,255,255,0.4);
+          z-index: 2;
+        `;
+        rightHandle.addEventListener('mousedown', (e) => {
+          e.stopPropagation();
+          startTimelineDrag(e, ann.id, 'trim-end');
+        });
+        seg.appendChild(rightHandle);
+      }
+
+      // Drag segment body to shift start & end times together in edit mode
+      seg.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('video-tl-handle-left') || e.target.classList.contains('video-tl-handle-right')) return;
+        if (isEditMode) {
+          e.stopPropagation();
+          startTimelineDrag(e, ann.id, 'move-span');
+        }
+      });
+
+      // Click to seek and select
+      seg.addEventListener('click', (e) => {
         e.stopPropagation();
         if (videoEl) {
           videoEl.currentTime = ann.startTime;
@@ -1156,21 +1642,13 @@
         selectAnnotation(ann.id);
       });
 
-      // Quick delete in edit mode
-      if (isEditMode) {
-        const delBtn = document.createElement('span');
-        delBtn.innerHTML = '&times;';
-        delBtn.style.cssText = 'color: #ef4444; font-weight: bold; font-size: 1.1em; cursor: pointer; padding-left: 2px;';
-        delBtn.title = 'Delete annotation';
-        delBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          deleteAnnotation(ann.id);
-        });
-        chip.appendChild(delBtn);
-      }
-
-      chipsEl.appendChild(chip);
+      tlSegmentsEl.appendChild(seg);
     });
+  }
+
+  // Alias for backward compatibility
+  function renderTimelineChips(curTime) {
+    renderTimeline(curTime);
   }
 
   // Update properties inputs in toolbar
@@ -1359,8 +1837,13 @@
   function addAnnotation(type = activeTool, posX = 35, posY = 35, customProps = {}) {
     if (!currentRecordingId) return;
     const cur = videoEl ? videoEl.currentTime : 0;
+    const vDur = (videoEl && !isNaN(videoEl.duration) && videoEl.duration > 0) ? videoEl.duration : 0;
     const startTime = Math.max(0, Math.floor(cur * 10) / 10);
-    const endTime = Math.max(startTime + 1, Math.floor((cur + 4) * 10) / 10);
+    let defaultEnd = Math.floor((cur + 4) * 10) / 10;
+    if (vDur > 0 && defaultEnd > vDur) {
+      defaultEnd = Math.max(startTime + 0.5, Math.floor(vDur * 10) / 10);
+    }
+    const endTime = Math.max(startTime + 0.5, defaultEnd);
 
     const actualType = (!type || type === 'select') ? 'callout' : type;
 
@@ -1379,6 +1862,14 @@
       }
     }
 
+    // Assign lowest non-colliding lane for the new annotation
+    let newLane = 0;
+    while (true) {
+      const colliding = annotations.some(a => (a.lane || 0) === newLane && !(endTime <= a.startTime + 0.05 || startTime >= a.endTime - 0.05));
+      if (!colliding) break;
+      newLane++;
+    }
+
     const newAnn = {
       id: `ann_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       type: actualType,
@@ -1386,6 +1877,7 @@
       fontSize: activeFontSize,
       startTime: startTime,
       endTime: endTime,
+      lane: newLane,
       text: actualType === 'callout' ? 'Add note here' : (actualType === 'text' ? 'Important step' : ''),
       x: posX,
       y: posY,
@@ -1804,11 +2296,13 @@
     currentRecordingId = null;
     annotations = [];
     selectedId = null;
+    lastRulerDuration = -1;
     if (isEditMode) toggleEditMode(false);
     if (overlayEl) {
       if (svgEl) svgEl.innerHTML = '';
       if (domEl) domEl.innerHTML = '';
     }
+    if (tlSegmentsEl) tlSegmentsEl.innerHTML = '';
     if (trayEl) trayEl.style.display = 'none';
   }
 
@@ -1824,6 +2318,143 @@
     toggleBtnEl = document.getElementById('video-annotate-toggle-btn');
     trayEl = document.getElementById('video-annotations-tray');
     chipsEl = document.getElementById('video-annotations-chips');
+    tlPlayBtnEl = document.getElementById('video-tl-play-btn');
+    tlPlayIconEl = document.getElementById('video-tl-play-icon');
+    tlBackBtnEl = document.getElementById('video-tl-back-btn');
+    tlFwdBtnEl = document.getElementById('video-tl-fwd-btn');
+    tlCurTimeEl = document.getElementById('video-tl-cur-time');
+    tlDurTimeEl = document.getElementById('video-tl-dur-time');
+    tlCountNumEl = document.getElementById('video-tl-count-num');
+    tlSelInfoEl = document.getElementById('video-tl-sel-info');
+    tlSelLabelEl = document.getElementById('video-tl-sel-label');
+    tlSelTimeEl = document.getElementById('video-tl-sel-time');
+    tlRulerEl = document.getElementById('video-tl-ruler');
+    tlTrackEl = document.getElementById('video-tl-track');
+    tlLaneGuidesEl = document.getElementById('video-tl-lane-guides');
+    tlInnerEl = document.getElementById('video-tl-inner');
+    tlProgressEl = document.getElementById('video-tl-progress');
+    tlSegmentsEl = document.getElementById('video-tl-segments');
+    tlPlayheadEl = document.getElementById('video-tl-playhead');
+    tlLanesBadgeEl = document.getElementById('video-tl-lanes-badge');
+    tlLanesNumEl = document.getElementById('video-tl-lanes-num');
+    tlLaneDownBtnEl = document.getElementById('video-tl-lane-down-btn');
+    tlLaneUpBtnEl = document.getElementById('video-tl-lane-up-btn');
+    tlSelLaneNumEl = document.getElementById('video-tl-sel-lane-num');
+    tlAutoArrangeBtnEl = document.getElementById('video-tl-auto-arrange-btn');
+
+    if (tlLaneDownBtnEl) {
+      tlLaneDownBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ann = annotations.find(a => a.id === selectedId);
+        if (ann) {
+          const curLane = typeof ann.lane === 'number' ? ann.lane : 0;
+          ann.lane = Math.max(0, curLane - 1);
+          render(true);
+          scheduleAutosave();
+        }
+      });
+    }
+
+    if (tlLaneUpBtnEl) {
+      tlLaneUpBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const ann = annotations.find(a => a.id === selectedId);
+        if (ann) {
+          const curLane = typeof ann.lane === 'number' ? ann.lane : 0;
+          ann.lane = curLane + 1;
+          render(true);
+          scheduleAutosave();
+        }
+      });
+    }
+
+    if (tlAutoArrangeBtnEl) {
+      tlAutoArrangeBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        autoArrangeLanes();
+        render(true);
+        scheduleAutosave();
+      });
+    }
+
+    tlToggleBtnEl = document.getElementById('video-timeline-toggle-btn');
+    tlCollapseBtnEl = document.getElementById('video-tl-collapse-btn');
+    tlVolBtnEl = document.getElementById('video-tl-vol-btn');
+    tlVolIconEl = document.getElementById('video-tl-vol-icon');
+    tlFsBtnEl = document.getElementById('video-tl-fs-btn');
+    tlFsIconEl = document.getElementById('video-tl-fs-icon');
+
+    const updateVolumeUI = () => {
+      if (!videoEl || !tlVolIconEl) return;
+      if (videoEl.muted || videoEl.volume === 0) {
+        tlVolIconEl.className = 'fas fa-volume-mute';
+        if (tlVolBtnEl) tlVolBtnEl.style.color = '#ef4444';
+      } else {
+        tlVolIconEl.className = 'fas fa-volume-up';
+        if (tlVolBtnEl) tlVolBtnEl.style.color = '#94a3b8';
+      }
+    };
+
+    if (tlVolBtnEl) {
+      tlVolBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!videoEl) return;
+        videoEl.muted = !videoEl.muted;
+        updateVolumeUI();
+      });
+    }
+
+    const toggleFullscreen = () => {
+      const fsTarget = containerEl || stageEl || videoEl;
+      if (!fsTarget) return;
+      if (!document.fullscreenElement) {
+        if (fsTarget.requestFullscreen) {
+          fsTarget.requestFullscreen().catch(() => {});
+        } else if (fsTarget.webkitRequestFullscreen) {
+          fsTarget.webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else if (document.webkitExitFullscreen) {
+          document.webkitExitFullscreen();
+        }
+      }
+    };
+
+    if (tlFsBtnEl) {
+      tlFsBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+      });
+    }
+
+    const updateFullscreenUI = () => {
+      if (!tlFsIconEl) return;
+      if (document.fullscreenElement) {
+        tlFsIconEl.className = 'fas fa-compress';
+        if (tlFsBtnEl) tlFsBtnEl.title = 'Exit Fullscreen (F)';
+      } else {
+        tlFsIconEl.className = 'fas fa-expand';
+        if (tlFsBtnEl) tlFsBtnEl.title = 'Toggle Fullscreen (F)';
+      }
+    };
+    document.addEventListener('fullscreenchange', updateFullscreenUI);
+
+    if (tlToggleBtnEl) {
+      tlToggleBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTimeline();
+      });
+      updateTimelineToggleBtnUI(isTimelineVisible());
+    }
+
+    if (tlCollapseBtnEl) {
+      tlCollapseBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTimeline(false);
+      });
+    }
     propsEl = document.getElementById('video-ann-props');
     startInputEl = document.getElementById('video-ann-start');
     endInputEl = document.getElementById('video-ann-end');
@@ -2054,53 +2685,214 @@
       closeBtn.addEventListener('click', () => toggleEditMode(false));
     }
 
-    // Keyboard shortcuts (V, C, A, B, N, T, Delete, Escape)
-    document.addEventListener('keydown', (e) => {
-      if (!isEditMode) return;
-      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) return;
+    // Keyboard shortcuts & Play-selector position controls (Capturing phase on window to avoid browser/shadow DOM capture)
+    window.addEventListener('keydown', (e) => {
+      // Ignore if typing in text inputs, textareas, selects, or contenteditable bodies
+      const isTyping = (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT' || e.target.isContentEditable)) ||
+                       (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT' || document.activeElement.isContentEditable));
+      if (isTyping) return;
 
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedId) {
-          e.preventDefault();
-          deleteAnnotation(selectedId);
+      // Ignore if video player is not currently active/visible
+      if (!videoEl || !containerEl || containerEl.style.display === 'none') return;
+
+      // Ignore if any actual modal dialog is open
+      const openW3Modal = document.querySelector('.w3-modal[style*="display: block"]');
+      const imgModal = document.getElementById('image-modal');
+      const isImgModalOpen = imgModal && imgModal.style.display !== 'none' && imgModal.style.display !== '';
+      if (openW3Modal || isImgModalOpen) return;
+
+      const dur = getVideoDuration();
+
+      // Play-selector Position Controls (Arrow Keys, Home, End, Space)
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetTime = 0;
+        if (e.ctrlKey || e.metaKey) {
+          // Jump to start of previous annotation
+          const prevAnns = annotations.filter(a => a.startTime < videoEl.currentTime - 0.2).sort((a, b) => b.startTime - a.startTime);
+          targetTime = prevAnns.length > 0 ? prevAnns[0].startTime : 0;
+        } else {
+          const step = e.shiftKey ? 5 : (e.altKey ? 0.1 : 1);
+          targetTime = Math.max(0, videoEl.currentTime - step);
         }
-      } else if (e.key === 'Escape') {
-        selectedId = null;
-        selectTool('select');
-        render();
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        safeSeek(targetTime);
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        let targetTime = dur;
+        if (e.ctrlKey || e.metaKey) {
+          // Jump to start of next annotation
+          const nextAnns = annotations.filter(a => a.startTime > videoEl.currentTime + 0.2).sort((a, b) => a.startTime - b.startTime);
+          targetTime = nextAnns.length > 0 ? nextAnns[0].startTime : dur;
+        } else {
+          const step = e.shiftKey ? 5 : (e.altKey ? 0.1 : 1);
+          targetTime = Math.min(dur, videoEl.currentTime + step);
+        }
+        safeSeek(targetTime);
+        return;
+      }
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        e.stopPropagation();
+        togglePlayPause();
+        return;
+      }
+
+      if (e.key === 'Home') {
+        e.preventDefault();
+        e.stopPropagation();
+        safeSeek(0);
+        return;
+      }
+
+      if (e.key === 'End') {
+        e.preventDefault();
+        e.stopPropagation();
+        safeSeek(dur);
+        return;
+      }
+
+      // Quick keyboard controls for Mute (M) and Fullscreen (F)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !isEditMode) {
         const k = e.key.toLowerCase();
-        if (k === 'v') {
+        if (k === 'm') {
           e.preventDefault();
-          selectTool('select');
-        } else if (k === 'c') {
+          e.stopPropagation();
+          videoEl.muted = !videoEl.muted;
+          updateVolumeUI();
+          return;
+        }
+        if (k === 'f') {
           e.preventDefault();
-          selectTool('callout');
-        } else if (k === 'a') {
-          e.preventDefault();
-          selectTool('arrow');
-        } else if (k === 'b') {
-          e.preventDefault();
-          selectTool('rect');
-        } else if (k === 'n') {
-          e.preventDefault();
-          selectTool('badge');
-        } else if (k === 't') {
-          e.preventDefault();
-          selectTool('text');
+          e.stopPropagation();
+          toggleFullscreen();
+          return;
         }
       }
-    });
+
+      // Edit-mode specific annotation editing keys (V, C, A, B, N, T, Delete, Escape)
+      if (isEditMode) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (selectedId) {
+            e.preventDefault();
+            e.stopPropagation();
+            deleteAnnotation(selectedId);
+          }
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          selectedId = null;
+          selectTool('select');
+          render();
+        } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          const k = e.key.toLowerCase();
+          if (k === 'v') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('select');
+          } else if (k === 'c') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('callout');
+          } else if (k === 'a') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('arrow');
+          } else if (k === 'b') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('rect');
+          } else if (k === 'n') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('badge');
+          } else if (k === 't') {
+            e.preventDefault();
+            e.stopPropagation();
+            selectTool('text');
+          }
+        }
+      }
+    }, true);
+
+    // Timeline transport buttons
+    if (tlPlayBtnEl) {
+      tlPlayBtnEl.addEventListener('click', () => {
+        togglePlayPause();
+      });
+    }
+
+    if (tlBackBtnEl) {
+      tlBackBtnEl.addEventListener('click', () => {
+        if (!videoEl) return;
+        safeSeek(videoEl.currentTime - 5);
+      });
+    }
+
+    if (tlFwdBtnEl) {
+      tlFwdBtnEl.addEventListener('click', () => {
+        if (!videoEl) return;
+        safeSeek(videoEl.currentTime + 5);
+      });
+    }
+
+    // Timeline track click & scrubbing
+    if (tlTrackEl) {
+      const handleScrub = (e) => {
+        if (!videoEl || !tlTrackEl) return;
+        const rect = tlTrackEl.getBoundingClientRect();
+        if (rect.width <= 0) return;
+        const innerWidth = Math.max(1, rect.width - 22);
+        const offsetX = Math.max(0, Math.min(innerWidth, e.clientX - rect.left - 8));
+        const pct = offsetX / innerWidth;
+        const duration = getVideoDuration();
+        const newTime = pct * duration;
+        safeSeek(newTime);
+      };
+
+      tlTrackEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('.video-tl-segment')) return;
+        handleScrub(e);
+
+        const onMove = (ev) => {
+          ev.preventDefault();
+          handleScrub(ev);
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+    }
 
     // Video Player events
-    videoEl.addEventListener('timeupdate', () => render());
-    videoEl.addEventListener('seeked', () => render());
+    videoEl.addEventListener('timeupdate', () => {
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      render();
+    });
+    videoEl.addEventListener('seeked', () => {
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      render();
+    });
     videoEl.addEventListener('loadedmetadata', () => {
       updateOverlayBounds();
       render();
     });
-    videoEl.addEventListener('play', () => render());
-    videoEl.addEventListener('pause', () => render());
+    videoEl.addEventListener('play', () => {
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      render();
+    });
+    videoEl.addEventListener('pause', () => {
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      render();
+    });
 
     // Resize handling
     if (window.ResizeObserver) {
@@ -2126,6 +2918,19 @@
     overlayEl.addEventListener('mousedown', startDrawingNew);
     stageEl.addEventListener('mousedown', startDrawingNew);
 
+    // Clicking stage toggles play/pause in view mode, or deselects in edit mode
+    stageEl.addEventListener('click', (e) => {
+      // Don't act if user was dragging or clicked a modal/toolbar
+      if (isDrawingNew || isDragging || isTlDragging) return;
+      if (isEditMode) return;
+      togglePlayPause();
+    });
+
+    stageEl.addEventListener('dblclick', (e) => {
+      if (isEditMode) return;
+      toggleFullscreen();
+    });
+
     // Clicking stage deselects when in select mode and clicking blank space
     stageEl.addEventListener('mousedown', (e) => {
       if (!isEditMode) return;
@@ -2149,6 +2954,8 @@
     loadForRecording,
     clear,
     toggleEditMode,
+    toggleTimeline,
+    isTimelineVisible,
     selectTool,
     addAnnotation,
     deleteAnnotation,
