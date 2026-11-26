@@ -1694,6 +1694,152 @@ if (metaForm) {
       if (activeDataType === 'markdown') {
         e.preventDefault();
         openExportNoteModal();
+      } else if (activeDataType === 'video') {
+        e.preventDefault();
+        openExportVideoModal();
+      }
+    });
+  }
+
+  // --- Export Video Modal ---
+  const exportVideoModal = document.getElementById('export-video-modal');
+  const exportVideoTitleSpan = document.getElementById('export-video-title-span');
+  const exportVideoFilename = document.getElementById('export-video-filename');
+  const exportVideoFilenameHint = document.getElementById('export-video-filename-hint');
+  const exportVideoPkgHint = document.getElementById('export-video-pkg-hint');
+  const exportVideoAnnHint = document.getElementById('export-video-ann-hint');
+  const exportVideoProgressWrap = document.getElementById('export-video-progress-wrap');
+  const exportVideoProgressText = document.getElementById('export-video-progress-text');
+  const exportVideoProgressPct = document.getElementById('export-video-progress-pct');
+  const exportVideoProgressBar = document.getElementById('export-video-progress-bar');
+  const confirmExportVideoBtn = document.getElementById('confirm-export-video-btn');
+  const cancelExportVideoBtn = document.getElementById('cancel-export-video-btn');
+  const closeExportVideoX = document.getElementById('close-export-video-x');
+  let videoExportAbortCtrl = null;
+
+  function syncExportVideoFilenameExt() {
+    if (!exportVideoFilename) return;
+    const sel = document.querySelector('input[name="export-video-format"]:checked');
+    const fmt = sel ? sel.value : 'package';
+    const ext = fmt === 'package' ? '.zip' : '.webm';
+    const cur = exportVideoFilename.value.trim().replace(/\.(zip|webm|mp4)$/i, '');
+    if (cur) exportVideoFilename.value = cur + ext;
+    if (exportVideoFilenameHint) {
+      exportVideoFilenameHint.innerHTML = `The <code>${ext}</code> extension will be added automatically if omitted.`;
+    }
+  }
+
+  document.querySelectorAll('input[name="export-video-format"]').forEach(r => {
+    r.addEventListener('change', syncExportVideoFilenameExt);
+  });
+
+  function openExportVideoModal() {
+    if (!exportVideoModal || !activeId) return;
+    const activeBtn = document.querySelector(`.rec-item[data-id="${CSS.escape(activeId)}"]`);
+    const title = activeBtn ? (activeBtn.getAttribute('data-title') || activeId) : activeId;
+    if (exportVideoTitleSpan) exportVideoTitleSpan.textContent = title;
+
+    let defaultName = title.toLowerCase().replace(/[^a-z0-9_.-]+/g, '_').replace(/^_+|_+$/g, '');
+    if (!defaultName) defaultName = activeId;
+
+    const anns = (window.VideoAnnotations && typeof window.VideoAnnotations.getAnnotations === 'function')
+      ? window.VideoAnnotations.getAnnotations()
+      : [];
+    const annCount = anns.length;
+
+    const pkgRadio = document.querySelector('input[name="export-video-format"][value="package"]');
+    const burninRadio = document.querySelector('input[name="export-video-format"][value="burnin"]');
+    const rawRadio = document.querySelector('input[name="export-video-format"][value="raw"]');
+
+    if (annCount > 0) {
+      if (pkgRadio) pkgRadio.checked = true;
+      if (burninRadio) burninRadio.disabled = false;
+    } else {
+      if (rawRadio) rawRadio.checked = true;
+      if (burninRadio) burninRadio.disabled = true;
+    }
+
+    if (exportVideoFilename) exportVideoFilename.value = defaultName;
+    syncExportVideoFilenameExt();
+
+    if (exportVideoPkgHint) {
+      exportVideoPkgHint.textContent = annCount > 0
+        ? `Bundles the video and ${annCount} editable annotation${annCount === 1 ? '' : 's'} (.json) for importing into another walkthrough.`
+        : 'Bundles the video and its metadata sidecar (.json) into a portable .zip.';
+    }
+    if (exportVideoAnnHint) {
+      exportVideoAnnHint.textContent = annCount > 0
+        ? `Renders ${annCount} annotation${annCount === 1 ? '' : 's'} (callouts, arrows, boxes, highlights, badges, text) directly into the .webm video frames.`
+        : 'No annotations added to this video yet.';
+    }
+    if (exportVideoProgressWrap) exportVideoProgressWrap.style.display = 'none';
+    if (confirmExportVideoBtn) confirmExportVideoBtn.disabled = false;
+
+    exportVideoModal.style.display = 'block';
+  }
+
+  function closeExportVideoModal() {
+    if (videoExportAbortCtrl) {
+      videoExportAbortCtrl.abort();
+      videoExportAbortCtrl = null;
+    }
+    if (exportVideoModal) exportVideoModal.style.display = 'none';
+  }
+
+  if (cancelExportVideoBtn) cancelExportVideoBtn.addEventListener('click', closeExportVideoModal);
+  if (closeExportVideoX) closeExportVideoX.addEventListener('click', closeExportVideoModal);
+
+  if (confirmExportVideoBtn) {
+    confirmExportVideoBtn.addEventListener('click', async () => {
+      if (!activeId) return;
+      const filename = exportVideoFilename ? exportVideoFilename.value.trim() : '';
+      const sel = document.querySelector('input[name="export-video-format"]:checked');
+      const fmt = sel ? sel.value : 'raw';
+
+      if (fmt === 'package') {
+        let url = `/recordings/${encodeURIComponent(activeId)}?download=1&format=zip`;
+        if (filename) url += `&filename=${encodeURIComponent(filename.replace(/\.(zip|webm|mp4)$/i, ''))}`;
+        window.location.href = url;
+        closeExportVideoModal();
+        return;
+      }
+
+      if (fmt === 'raw' || !window.VideoAnnotations || typeof window.VideoAnnotations.exportAnnotatedVideo !== 'function') {
+        let url = `/recordings/${encodeURIComponent(activeId)}?download=1`;
+        if (filename) url += `&filename=${encodeURIComponent(filename)}`;
+        window.location.href = url;
+        closeExportVideoModal();
+        return;
+      }
+
+      confirmExportVideoBtn.disabled = true;
+      if (exportVideoProgressWrap) exportVideoProgressWrap.style.display = 'block';
+      if (exportVideoProgressBar) exportVideoProgressBar.style.width = '0%';
+      if (exportVideoProgressPct) exportVideoProgressPct.textContent = '0%';
+      if (exportVideoProgressText) exportVideoProgressText.textContent = 'Rendering annotated video...';
+
+      videoExportAbortCtrl = new AbortController();
+      try {
+        await window.VideoAnnotations.exportAnnotatedVideo({
+          filename: filename || activeId,
+          signal: videoExportAbortCtrl.signal,
+          onProgress: (pct, cur, dur) => {
+            if (exportVideoProgressBar) exportVideoProgressBar.style.width = `${pct}%`;
+            if (exportVideoProgressPct) exportVideoProgressPct.textContent = `${pct}%`;
+            if (exportVideoProgressText) {
+              const fmtTime = window.VideoAnnotations.formatTime;
+              exportVideoProgressText.textContent = `Rendering annotated video (${fmtTime(cur)} / ${fmtTime(dur)})...`;
+            }
+          }
+        });
+        videoExportAbortCtrl = null;
+        closeExportVideoModal();
+      } catch (err) {
+        videoExportAbortCtrl = null;
+        confirmExportVideoBtn.disabled = false;
+        if (err && err.message !== 'Export cancelled') {
+          alert('Video export failed: ' + err.message);
+        }
       }
     });
   }
@@ -3355,8 +3501,6 @@ if (metaForm) {
     if (activeDataType === 'markdown') {
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
-      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
-      if (videoSettingsWrap) videoSettingsWrap.style.display = 'none';
       const videoSettingsMenu = document.getElementById('video-settings-menu');
       if (videoSettingsMenu) videoSettingsMenu.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') window.VideoAnnotations.clear();
@@ -3409,8 +3553,6 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'inline-flex';
-      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
-      if (videoSettingsWrap) videoSettingsWrap.style.display = 'inline-block';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.loadForRecording === 'function') {
         window.VideoAnnotations.loadForRecording(id);
       }
@@ -3504,8 +3646,6 @@ if (metaForm) {
       if (mdTabEditVideo) mdTabEditVideo.style.display = 'none';
       const videoAnnBtn = document.getElementById('video-annotate-toggle-btn');
       if (videoAnnBtn) videoAnnBtn.style.display = 'none';
-      const videoSettingsWrap = document.getElementById('video-settings-wrapper');
-      if (videoSettingsWrap) videoSettingsWrap.style.display = 'none';
       const videoSettingsMenu = document.getElementById('video-settings-menu');
       if (videoSettingsMenu) videoSettingsMenu.style.display = 'none';
       if (window.VideoAnnotations && typeof window.VideoAnnotations.clear === 'function') {

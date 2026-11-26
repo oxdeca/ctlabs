@@ -1529,7 +1529,7 @@
   // Render video annotations timeline track
   function renderTimeline(curTime) {
     if (!trayEl) return;
-    const isVisible = isEditMode || isTimelineVisible();
+    const isVisible = isTimelineVisible();
     trayEl.style.display = isVisible ? 'flex' : 'none';
     updateTimelineToggleBtnUI(isVisible);
     if (!isVisible) return;
@@ -2337,7 +2337,7 @@
     if (!currentRecordingId) return;
 
     if (saveBtnEl && !silent) {
-      saveBtnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Saving...</span>';
+      saveBtnEl.innerHTML = '<i class="fas fa-spinner fa-spin" style="color: #38bdf8; font-size: 0.9em;"></i> <span style="font-weight: 500;">Saving...</span>';
     }
 
     fetch(`/recordings/${encodeURIComponent(currentRecordingId)}/annotations`, {
@@ -2363,7 +2363,7 @@
       })
       .finally(() => {
         if (saveBtnEl) {
-          saveBtnEl.innerHTML = '<i class="fas fa-save"></i> <span>Save</span>';
+          saveBtnEl.innerHTML = '<i class="fas fa-save" style="color: #38bdf8; font-size: 0.9em;"></i> <span style="font-weight: 500;">Save</span>';
         }
       });
   }
@@ -3201,6 +3201,272 @@
     init();
   }
 
+  // Canvas renderer for exporting video with burned-in annotations
+  function drawAnnotationsOnCanvas(ctx, w, h, curTime) {
+    const active = annotations.filter(a => curTime >= a.startTime && curTime <= a.endTime);
+    if (active.length === 0) return;
+
+    const scale = Math.max(0.6, w / 960);
+
+    active.forEach(ann => {
+      const color = ann.color || '#38bdf8';
+      const x = ((ann.x || 0) / 100) * w;
+      const y = ((ann.y || 0) / 100) * h;
+      const bw = ((ann.w || 18) / 100) * w;
+      const bh = ((ann.h || 10) / 100) * h;
+
+      ctx.save();
+      if (ann.type === 'rect') {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(2, 3 * scale);
+        ctx.strokeRect(x, y, bw, bh);
+      } else if (ann.type === 'highlight') {
+        ctx.fillStyle = hexToRgba(color, 0.35);
+        ctx.fillRect(x, y, bw, bh);
+      } else if (ann.type === 'arrow') {
+        const x2 = ((ann.x2 !== undefined ? ann.x2 : (ann.x || 0) + 15) / 100) * w;
+        const y2 = ((ann.y2 !== undefined ? ann.y2 : (ann.y || 0) + 15) / 100) * h;
+        const lw = Math.max(2, 3.5 * scale);
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.lineWidth = lw;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        const angle = Math.atan2(y2 - y, x2 - x);
+        const headLen = Math.max(10, 14 * scale);
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+      } else if (ann.type === 'badge') {
+        const fSize = Math.max(12, (ann.fontSize || 14) * scale);
+        const r = Math.max(11, fSize * 0.9);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = Math.max(1.5, 2 * scale);
+        ctx.stroke();
+
+        ctx.fillStyle = '#0f172a';
+        ctx.font = `700 ${Math.round(fSize)}px system-ui, -apple-system, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(ann.badge || 1), x, y + 1);
+      } else if (ann.type === 'text') {
+        const fSize = Math.max(12, (ann.fontSize || 14) * scale);
+        ctx.font = `600 ${Math.round(fSize)}px system-ui, -apple-system, sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 4 * scale;
+        ctx.fillStyle = color;
+        const lines = String(ann.text || '').split('\n');
+        lines.forEach((line, idx) => {
+          ctx.fillText(line, x, y + idx * (fSize * 1.3));
+        });
+      } else if (ann.type === 'callout') {
+        const fSize = Math.max(11, (ann.fontSize || 13) * scale);
+        const padX = 10 * scale;
+        const padY = 7 * scale;
+        ctx.font = `500 ${Math.round(fSize)}px system-ui, -apple-system, sans-serif`;
+        const textStr = String(ann.text || 'Note');
+        const lines = textStr.split('\n');
+        let maxTextW = 0;
+        lines.forEach(l => {
+          const m = ctx.measureText(l).width;
+          if (m > maxTextW) maxTextW = m;
+        });
+        const cardW = Math.max(bw, maxTextW + padX * 2);
+        const cardH = Math.max(28 * scale, lines.length * (fSize * 1.35) + padY * 2);
+
+        if (ann.x2 !== undefined && ann.y2 !== undefined) {
+          const ax = (ann.x2 / 100) * w;
+          const ay = (ann.y2 / 100) * h;
+          ctx.strokeStyle = color;
+          ctx.lineWidth = Math.max(1.5, 2 * scale);
+          ctx.beginPath();
+          ctx.moveTo(x + cardW / 2, y + cardH / 2);
+          ctx.lineTo(ax, ay);
+          ctx.stroke();
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(ax, ay, 4 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1.5, 2 * scale);
+        const rad = 6 * scale;
+        ctx.beginPath();
+        ctx.moveTo(x + rad, y);
+        ctx.lineTo(x + cardW - rad, y);
+        ctx.quadraticCurveTo(x + cardW, y, x + cardW, y + rad);
+        ctx.lineTo(x + cardW, y + cardH - rad);
+        ctx.quadraticCurveTo(x + cardW, y + cardH, x + cardW - rad, y + cardH);
+        ctx.lineTo(x + rad, y + cardH);
+        ctx.quadraticCurveTo(x, y + cardH, x, y + cardH - rad);
+        ctx.lineTo(x, y + rad);
+        ctx.quadraticCurveTo(x, y, x + rad, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        lines.forEach((line, idx) => {
+          ctx.fillText(line, x + padX, y + padY + idx * (fSize * 1.35));
+        });
+      }
+      ctx.restore();
+    });
+  }
+
+  function exportAnnotatedVideo(opts = {}) {
+    return new Promise((resolve, reject) => {
+      if (!videoEl || !videoEl.src) {
+        return reject(new Error('No active video loaded.'));
+      }
+      const filename = (opts.filename || 'annotated_video').replace(/\.webm$/i, '') + '.webm';
+      const onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : () => {};
+      const signal = opts.signal || null;
+
+      const offVideo = document.createElement('video');
+      offVideo.crossOrigin = 'anonymous';
+      offVideo.playsInline = true;
+      offVideo.muted = true;
+      offVideo.src = videoEl.currentSrc || videoEl.src;
+
+      let recorder = null;
+      let rafId = null;
+      let aborted = false;
+
+      const cleanup = () => {
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        try { offVideo.pause(); } catch (_) {}
+        offVideo.src = '';
+      };
+
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          aborted = true;
+          if (recorder && recorder.state !== 'inactive') {
+            try { recorder.stop(); } catch (_) {}
+          }
+          cleanup();
+          reject(new Error('Export cancelled'));
+        }, { once: true });
+      }
+
+      offVideo.addEventListener('error', () => {
+        cleanup();
+        reject(new Error('Failed to load video for export.'));
+      }, { once: true });
+
+      offVideo.addEventListener('loadedmetadata', () => {
+        if (aborted) return;
+        const w = offVideo.videoWidth || 1280;
+        const h = offVideo.videoHeight || 720;
+        const dur = (isFinite(offVideo.duration) && offVideo.duration > 0) ? offVideo.duration : getVideoDuration();
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+
+        const canvasStream = canvas.captureStream(30);
+        const tracks = [...canvasStream.getVideoTracks()];
+
+        // Preserve audio track if supported by browser
+        try {
+          const cap = offVideo.captureStream ? offVideo.captureStream() : (offVideo.mozCaptureStream ? offVideo.mozCaptureStream() : null);
+          if (cap) {
+            cap.getAudioTracks().forEach(t => tracks.push(t));
+          }
+        } catch (_) {}
+
+        const combinedStream = new MediaStream(tracks);
+        const mimeCandidates = [
+          'video/webm;codecs=vp9,opus',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=vp9',
+          'video/webm;codecs=vp8',
+          'video/webm'
+        ];
+        const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported)
+          ? (mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm')
+          : 'video/webm';
+
+        const chunks = [];
+        try {
+          recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 4000000 });
+        } catch (_) {
+          recorder = new MediaRecorder(combinedStream);
+        }
+
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+        };
+
+        recorder.onstop = () => {
+          cleanup();
+          if (aborted) return;
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          onProgress(100, dur, dur);
+          resolve(filename);
+        };
+
+        const renderFrame = () => {
+          if (aborted) return;
+          ctx.drawImage(offVideo, 0, 0, w, h);
+          drawAnnotationsOnCanvas(ctx, w, h, offVideo.currentTime || 0);
+          const pct = Math.min(99, Math.round(((offVideo.currentTime || 0) / (dur > 0 ? dur : 1)) * 100));
+          onProgress(pct, offVideo.currentTime || 0, dur);
+          if (!offVideo.ended && !offVideo.paused) {
+            rafId = requestAnimationFrame(renderFrame);
+          }
+        };
+
+        offVideo.addEventListener('ended', () => {
+          if (aborted) return;
+          ctx.drawImage(offVideo, 0, 0, w, h);
+          drawAnnotationsOnCanvas(ctx, w, h, dur);
+          if (recorder && recorder.state !== 'inactive') {
+            recorder.stop();
+          }
+        }, { once: true });
+
+        recorder.start(250);
+        offVideo.play().then(() => {
+          renderFrame();
+        }).catch(err => {
+          cleanup();
+          reject(err);
+        });
+      }, { once: true });
+    });
+  }
+
   // Public API
   window.VideoAnnotations = {
     init,
@@ -3213,6 +3479,8 @@
     addAnnotation,
     deleteAnnotation,
     selectAnnotation,
+    getAnnotations: () => annotations.slice(),
+    exportAnnotatedVideo,
     save: saveAnnotations,
     formatTime,
     parseTime

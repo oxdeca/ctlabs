@@ -1151,6 +1151,30 @@ class RecordingsController < BaseController
 
       WebmFixer.ensure_seekable(path) if ext == '.webm'
 
+      if params[:format] == 'zip' || params[:package] == '1'
+        id_clean = File.basename(path, ext)
+        base_out = File.basename(download_filename, ext)
+        zip_filename = "#{base_out}.zip"
+
+        sidecar = File.join(File.dirname(path), "#{id_clean}.json")
+        sidecar = File.join(RecordingService.dir, "#{id_clean}.json") unless File.file?(sidecar)
+
+        tmp = Tempfile.new(['video_export', '.zip'])
+        tmp.close
+        begin
+          Zip::File.open(tmp.path, create: true) do |zipfile|
+            zipfile.add("#{id_clean}#{ext}", path)
+            zipfile.add("#{id_clean}.json", sidecar) if File.file?(sidecar)
+          end
+          zip_bytes = File.binread(tmp.path)
+          content_type 'application/zip'
+          attachment zip_filename
+          return zip_bytes
+        ensure
+          File.delete(tmp.path) if File.exist?(tmp.path)
+        end
+      end
+
       headers['Accept-Ranges'] = 'bytes'
       return send_file path,
                        filename:    download_filename,
