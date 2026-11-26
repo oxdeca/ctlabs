@@ -2397,6 +2397,9 @@ if (metaForm) {
       this.displayStream = null;
       this.micStream = null;
       this.audioCtx = null;
+      this.meterRafId = null;
+      this.meterAnalyser = null;
+      this.meterCtx = null;
       this.captureController = null;
       this.cropCancelLoop = null;
       this.timerInterval = null;
@@ -2584,6 +2587,7 @@ if (metaForm) {
 
       this.mediaRecorder.start(1000);
       this.startTime = Date.now();
+      this.startAudioMeter(combinedStream);
 
       this.updateBarUI();
       if (screenRecBar) screenRecBar.style.display = 'flex';
@@ -2791,7 +2795,68 @@ if (metaForm) {
       }
     }
 
+    startAudioMeter(stream) {
+      this.stopAudioMeter();
+      const meterWrap = document.getElementById('screen-rec-audio-meter');
+      const meterFill = document.getElementById('screen-rec-audio-level');
+      const audioTracks = stream ? stream.getAudioTracks() : [];
+      if (!audioTracks || audioTracks.length === 0) {
+        if (meterWrap) meterWrap.style.display = 'none';
+        return;
+      }
+
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+
+      try {
+        const ctx = new AudioContextClass();
+        this.meterCtx = ctx;
+        const src = ctx.createMediaStreamSource(new MediaStream(audioTracks));
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        this.meterAnalyser = analyser;
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        if (meterWrap) meterWrap.style.display = 'flex';
+
+        const tick = () => {
+          if (!this.meterAnalyser) return;
+          analyser.getByteTimeDomainData(data);
+          let sumSq = 0;
+          for (let i = 0; i < data.length; i++) {
+            const norm = (data[i] - 128) / 128;
+            sumSq += norm * norm;
+          }
+          const rms = Math.sqrt(sumSq / data.length);
+          const pct = Math.min(100, Math.round(rms * 280));
+          if (meterFill) meterFill.style.width = `${pct}%`;
+          this.meterRafId = requestAnimationFrame(tick);
+        };
+        this.meterRafId = requestAnimationFrame(tick);
+      } catch (e) {
+        if (meterWrap) meterWrap.style.display = 'none';
+      }
+    }
+
+    stopAudioMeter() {
+      if (this.meterRafId) {
+        cancelAnimationFrame(this.meterRafId);
+        this.meterRafId = null;
+      }
+      this.meterAnalyser = null;
+      if (this.meterCtx) {
+        try { this.meterCtx.close(); } catch (e) {}
+        this.meterCtx = null;
+      }
+      const meterWrap = document.getElementById('screen-rec-audio-meter');
+      const meterFill = document.getElementById('screen-rec-audio-level');
+      if (meterFill) meterFill.style.width = '0%';
+      if (meterWrap) meterWrap.style.display = 'none';
+    }
+
     cleanup() {
+      this.stopAudioMeter();
       if (activeRecWindow && !activeRecWindow.closed) {
         removeRecWindowHighlight(activeRecWindow);
       }
@@ -3283,8 +3348,86 @@ if (metaForm) {
   if (closeScreenCropModal) closeScreenCropModal.addEventListener('click', cancelCropSelection);
   if (cancelScreenCropBtn) cancelScreenCropBtn.addEventListener('click', cancelCropSelection);
 
+  // --- Mic Test Preview Meter in Record Screen Modal ---
+  let micPreviewStream = null;
+  let micPreviewCtx = null;
+  let micPreviewRaf = null;
+
+  function stopMicPreview() {
+    if (micPreviewRaf) {
+      cancelAnimationFrame(micPreviewRaf);
+      micPreviewRaf = null;
+    }
+    if (micPreviewCtx) {
+      try { micPreviewCtx.close(); } catch (e) {}
+      micPreviewCtx = null;
+    }
+    if (micPreviewStream) {
+      try { micPreviewStream.getTracks().forEach(t => t.stop()); } catch (e) {}
+      micPreviewStream = null;
+    }
+    const wrap = document.getElementById('rec-screen-mic-meter');
+    const fill = document.getElementById('rec-screen-mic-level');
+    if (fill) fill.style.width = '0%';
+    if (wrap) wrap.style.display = 'none';
+  }
+
+  async function startMicPreview() {
+    stopMicPreview();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!recordScreenModal || recordScreenModal.style.display === 'none' || !recScreenMic || !recScreenMic.checked) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+      micPreviewStream = stream;
+      const ctx = new AudioContextClass();
+      micPreviewCtx = ctx;
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      src.connect(analyser);
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      const wrap = document.getElementById('rec-screen-mic-meter');
+      const fill = document.getElementById('rec-screen-mic-level');
+      if (wrap) wrap.style.display = 'flex';
+
+      const tick = () => {
+        if (!micPreviewStream) return;
+        analyser.getByteTimeDomainData(data);
+        let sumSq = 0;
+        for (let i = 0; i < data.length; i++) {
+          const norm = (data[i] - 128) / 128;
+          sumSq += norm * norm;
+        }
+        const rms = Math.sqrt(sumSq / data.length);
+        const pct = Math.min(100, Math.round(rms * 280));
+        if (fill) fill.style.width = `${pct}%`;
+        micPreviewRaf = requestAnimationFrame(tick);
+      };
+      micPreviewRaf = requestAnimationFrame(tick);
+    } catch (_) {
+      stopMicPreview();
+    }
+  }
+
+  if (recScreenMic) {
+    recScreenMic.addEventListener('change', () => {
+      if (recScreenMic.checked) startMicPreview();
+      else stopMicPreview();
+    });
+  }
+  if (cancelRecordScreenBtn) cancelRecordScreenBtn.addEventListener('click', stopMicPreview);
+  if (closeRecordScreenModal) closeRecordScreenModal.addEventListener('click', stopMicPreview);
+
   if (confirmRecordScreenBtn) {
     confirmRecordScreenBtn.addEventListener('click', async () => {
+      stopMicPreview();
       if (recordScreenModal) recordScreenModal.style.display = 'none';
       try {
         if (recScreenQualitySelect) localStorage.setItem('ctlabs_screen_rec_quality', recScreenQualitySelect.value);

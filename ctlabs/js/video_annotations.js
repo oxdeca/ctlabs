@@ -69,6 +69,12 @@
   let tlSettingsBtnEl = null;
   let tlSettingsMenuEl = null;
   let tlSettingTimelineCheckboxEl = null;
+  let tlSettingAudioLaneCheckboxEl = null;
+  let tlAudioLaneEl = null;
+  let tlAudioCanvasEl = null;
+  let tlAudioPlayheadEl = null;
+  let audioWaveformCache = new Map();
+  let audioWaveformLoadingId = null;
   let tlScrollEl = null;
   let tlZoomInnerEl = null;
   let tlZoomOutBtnEl = null;
@@ -1302,6 +1308,8 @@
       tlScrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
     }
 
+    renderAudioWaveform(videoEl ? videoEl.currentTime : 0, dur);
+
     return ZOOM_STEPS;
   }
 
@@ -1319,6 +1327,12 @@
     if (tlDurTimeEl) tlDurTimeEl.textContent = formatTimeMs(dur);
     if (tlPlayIconEl) {
       tlPlayIconEl.className = (videoEl && !videoEl.paused) ? 'fas fa-pause' : 'fas fa-play';
+    }
+    if (tlAudioPlayheadEl) {
+      tlAudioPlayheadEl.style.left = `${pct}%`;
+    }
+    if (tlAudioLaneEl && tlAudioLaneEl.style.display !== 'none') {
+      renderAudioWaveform(clampedCur, dur);
     }
   }
 
@@ -1498,6 +1512,124 @@
     }
     if (tlCollapseBtnEl) {
       tlCollapseBtnEl.title = collapsed ? 'Expand timeline lanes' : 'Collapse timeline lanes';
+    }
+  }
+
+  function isAudioLaneVisible() {
+    return localStorage.getItem('ctlabs_video_audio_lane_visible') !== 'false';
+  }
+
+  function toggleAudioLane(explicitState) {
+    const cur = isAudioLaneVisible();
+    const next = (explicitState !== undefined) ? explicitState : !cur;
+    localStorage.setItem('ctlabs_video_audio_lane_visible', next ? 'true' : 'false');
+    if (tlSettingAudioLaneCheckboxEl) tlSettingAudioLaneCheckboxEl.checked = next;
+    renderAudioWaveform(videoEl ? videoEl.currentTime : 0, getVideoDuration());
+    updateOverlayBounds();
+    render();
+  }
+
+  function loadAudioWaveform(id, srcUrl) {
+    if (!id || !srcUrl) return;
+    if (audioWaveformCache.has(id)) {
+      renderAudioWaveform(videoEl ? videoEl.currentTime : 0, getVideoDuration());
+      return;
+    }
+    if (audioWaveformLoadingId === id) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    audioWaveformLoadingId = id;
+    fetch(srcUrl, { credentials: 'same-origin' })
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.arrayBuffer();
+      })
+      .then(buf => {
+        const ctx = new AudioContextClass();
+        return ctx.decodeAudioData(buf).then(audioBuf => {
+          try { ctx.close(); } catch (_) {}
+          return audioBuf;
+        }).catch(err => {
+          try { ctx.close(); } catch (_) {}
+          throw err;
+        });
+      })
+      .then(audioBuf => {
+        if (!audioBuf || audioBuf.numberOfChannels === 0 || audioBuf.length === 0) {
+          audioWaveformCache.set(id, null);
+          return;
+        }
+        const raw = audioBuf.getChannelData(0);
+        const buckets = 400;
+        const blockSize = Math.max(1, Math.floor(raw.length / buckets));
+        const peaks = new Float32Array(buckets);
+        let maxPeak = 0;
+        for (let i = 0; i < buckets; i++) {
+          const start = i * blockSize;
+          const end = Math.min(raw.length, start + blockSize);
+          let peak = 0;
+          for (let j = start; j < end; j++) {
+            const abs = Math.abs(raw[j]);
+            if (abs > peak) peak = abs;
+          }
+          peaks[i] = peak;
+          if (peak > maxPeak) maxPeak = peak;
+        }
+        if (maxPeak < 0.001) {
+          audioWaveformCache.set(id, null);
+        } else {
+          // Normalize peaks cleanly
+          for (let i = 0; i < buckets; i++) {
+            peaks[i] = Math.min(1, peaks[i] / maxPeak);
+          }
+          audioWaveformCache.set(id, peaks);
+        }
+      })
+      .catch(() => {
+        audioWaveformCache.set(id, null);
+      })
+      .finally(() => {
+        if (audioWaveformLoadingId === id) audioWaveformLoadingId = null;
+        if (currentRecordingId === id) {
+          renderAudioWaveform(videoEl ? videoEl.currentTime : 0, getVideoDuration());
+          updateOverlayBounds();
+        }
+      });
+  }
+
+  function renderAudioWaveform(curTime, duration) {
+    if (!tlAudioLaneEl || !tlAudioCanvasEl) return;
+    const peaks = currentRecordingId ? audioWaveformCache.get(currentRecordingId) : null;
+    const show = isAudioLaneVisible() && peaks && peaks.length > 0;
+    tlAudioLaneEl.style.display = show ? 'block' : 'none';
+    if (!show) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = tlAudioCanvasEl.clientWidth || 1;
+    const cssH = tlAudioCanvasEl.clientHeight || 28;
+    const targetW = Math.max(1, Math.round(cssW * dpr));
+    const targetH = Math.max(1, Math.round(cssH * dpr));
+    if (tlAudioCanvasEl.width !== targetW || tlAudioCanvasEl.height !== targetH) {
+      tlAudioCanvasEl.width = targetW;
+      tlAudioCanvasEl.height = targetH;
+    }
+
+    const ctx = tlAudioCanvasEl.getContext('2d');
+    ctx.clearRect(0, 0, targetW, targetH);
+
+    const dur = duration > 0 ? duration : 1;
+    const playPct = Math.max(0, Math.min(1, (curTime || 0) / dur));
+    const midY = targetH / 2;
+    const step = targetW / peaks.length;
+    const barW = Math.max(1 * dpr, step * 0.72);
+
+    for (let i = 0; i < peaks.length; i++) {
+      const barPct = i / peaks.length;
+      ctx.fillStyle = barPct <= playPct ? '#38bdf8' : '#475569';
+      const amp = Math.max(2 * dpr, peaks[i] * (targetH * 0.86));
+      const x = i * step;
+      ctx.fillRect(x, midY - amp / 2, barW, amp);
     }
   }
 
@@ -2419,6 +2551,7 @@
       if (domEl) domEl.innerHTML = '';
     }
     if (tlSegmentsEl) tlSegmentsEl.innerHTML = '';
+    if (tlAudioLaneEl) tlAudioLaneEl.style.display = 'none';
     if (trayEl) trayEl.style.display = 'none';
   }
 
@@ -2499,6 +2632,10 @@
     tlSettingsBtnEl = document.getElementById('video-settings-btn');
     tlSettingsMenuEl = document.getElementById('video-settings-menu');
     tlSettingTimelineCheckboxEl = document.getElementById('video-setting-timeline-checkbox');
+    tlSettingAudioLaneCheckboxEl = document.getElementById('video-setting-audio-lane-checkbox');
+    tlAudioLaneEl = document.getElementById('video-tl-audio-lane');
+    tlAudioCanvasEl = document.getElementById('video-tl-audio-canvas');
+    tlAudioPlayheadEl = document.getElementById('video-tl-audio-playhead');
     tlScrollEl = document.getElementById('video-tl-scroll');
     tlZoomInnerEl = document.getElementById('video-tl-zoom-inner');
     tlZoomOutBtnEl = document.getElementById('video-tl-zoom-out-btn');
@@ -2690,6 +2827,14 @@
       tlSettingTimelineCheckboxEl.addEventListener('change', (e) => {
         e.stopPropagation();
         toggleTimeline(!!tlSettingTimelineCheckboxEl.checked);
+      });
+    }
+
+    if (tlSettingAudioLaneCheckboxEl) {
+      tlSettingAudioLaneCheckboxEl.checked = isAudioLaneVisible();
+      tlSettingAudioLaneCheckboxEl.addEventListener('change', (e) => {
+        e.stopPropagation();
+        toggleAudioLane(!!tlSettingAudioLaneCheckboxEl.checked);
       });
     }
 
@@ -3115,6 +3260,23 @@
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp);
       });
+
+      if (tlAudioLaneEl) {
+        tlAudioLaneEl.addEventListener('mousedown', (e) => {
+          handleScrub(e);
+
+          const onMove = (ev) => {
+            ev.preventDefault();
+            handleScrub(ev);
+          };
+          const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        });
+      }
     }
 
     // Video Player events
@@ -3128,6 +3290,9 @@
     });
     videoEl.addEventListener('loadedmetadata', () => {
       if (playbackSpeed !== 1) videoEl.playbackRate = playbackSpeed;
+      if (currentRecordingId && (videoEl.currentSrc || videoEl.src)) {
+        loadAudioWaveform(currentRecordingId, videoEl.currentSrc || videoEl.src);
+      }
       updateOverlayBounds();
       render();
     });
