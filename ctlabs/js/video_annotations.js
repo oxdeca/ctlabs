@@ -3347,13 +3347,23 @@
       offVideo.src = videoEl.currentSrc || videoEl.src;
 
       let recorder = null;
+      let combinedStream = null;
       let rafId = null;
+      let stopFallbackTimer = null;
       let aborted = false;
+      let finished = false;
 
       const cleanup = () => {
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
+        }
+        if (stopFallbackTimer) {
+          clearTimeout(stopFallbackTimer);
+          stopFallbackTimer = null;
+        }
+        if (combinedStream) {
+          try { combinedStream.getTracks().forEach(t => t.stop()); } catch (_) {}
         }
         try { offVideo.pause(); } catch (_) {}
         offVideo.src = '';
@@ -3389,22 +3399,21 @@
         const canvasStream = canvas.captureStream(30);
         const tracks = [...canvasStream.getVideoTracks()];
 
-        // Preserve audio track if supported by browser
+        // Preserve audio track if supported and present
+        let hasAudio = false;
         try {
           const cap = offVideo.captureStream ? offVideo.captureStream() : (offVideo.mozCaptureStream ? offVideo.mozCaptureStream() : null);
           if (cap) {
-            cap.getAudioTracks().forEach(t => tracks.push(t));
+            const aTracks = cap.getAudioTracks().filter(t => t.readyState === 'live');
+            aTracks.forEach(t => tracks.push(t));
+            hasAudio = aTracks.length > 0;
           }
         } catch (_) {}
 
-        const combinedStream = new MediaStream(tracks);
-        const mimeCandidates = [
-          'video/webm;codecs=vp9,opus',
-          'video/webm;codecs=vp8,opus',
-          'video/webm;codecs=vp9',
-          'video/webm;codecs=vp8',
-          'video/webm'
-        ];
+        combinedStream = new MediaStream(tracks);
+        const mimeCandidates = hasAudio
+          ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+          : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
         const mimeType = (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported)
           ? (mimeCandidates.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm')
           : 'video/webm';
@@ -3416,13 +3425,10 @@
           recorder = new MediaRecorder(combinedStream);
         }
 
-        recorder.ondataavailable = (ev) => {
-          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
-        };
-
-        recorder.onstop = () => {
+        const completeDownload = () => {
+          if (finished || aborted) return;
+          finished = true;
           cleanup();
-          if (aborted) return;
           const blob = new Blob(chunks, { type: 'video/webm' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -3436,25 +3442,60 @@
           resolve(filename);
         };
 
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+        };
+
+        recorder.onerror = (ev) => {
+          cleanup();
+          if (!finished && !aborted) {
+            finished = true;
+            reject(new Error((ev && ev.error && ev.error.message) || 'MediaRecorder error'));
+          }
+        };
+
+        recorder.onstop = completeDownload;
+
+        let finalizing = false;
+        const finalizeExport = () => {
+          if (finalizing || finished || aborted) return;
+          finalizing = true;
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          try {
+            ctx.drawImage(offVideo, 0, 0, w, h);
+            drawAnnotationsOnCanvas(ctx, w, h, dur);
+          } catch (_) {}
+
+          if (recorder && recorder.state !== 'inactive') {
+            try { recorder.requestData(); } catch (_) {}
+            try { recorder.stop(); } catch (_) {}
+            // Stopping tracks forces MediaRecorder to flush & emit onstop reliably in Firefox/Chrome
+            if (combinedStream) {
+              try { combinedStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+            }
+            stopFallbackTimer = setTimeout(completeDownload, 1500);
+          } else {
+            completeDownload();
+          }
+        };
+
         const renderFrame = () => {
-          if (aborted) return;
+          if (aborted || finalizing || finished) return;
           ctx.drawImage(offVideo, 0, 0, w, h);
           drawAnnotationsOnCanvas(ctx, w, h, offVideo.currentTime || 0);
           const pct = Math.min(99, Math.round(((offVideo.currentTime || 0) / (dur > 0 ? dur : 1)) * 100));
           onProgress(pct, offVideo.currentTime || 0, dur);
-          if (!offVideo.ended && !offVideo.paused) {
-            rafId = requestAnimationFrame(renderFrame);
+          if (offVideo.ended) {
+            finalizeExport();
+            return;
           }
+          rafId = requestAnimationFrame(renderFrame);
         };
 
-        offVideo.addEventListener('ended', () => {
-          if (aborted) return;
-          ctx.drawImage(offVideo, 0, 0, w, h);
-          drawAnnotationsOnCanvas(ctx, w, h, dur);
-          if (recorder && recorder.state !== 'inactive') {
-            recorder.stop();
-          }
-        }, { once: true });
+        offVideo.addEventListener('ended', finalizeExport, { once: true });
 
         recorder.start(250);
         offVideo.play().then(() => {
