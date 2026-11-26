@@ -1615,15 +1615,31 @@
 
           <!-- TAB 3: Limits & Codec -->
           <div id="rec-tab-settings" class="rec-screen-tab-pane" style="display: none;">
+            <!-- Video Codec Selector -->
+            <div style="margin-bottom: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label for="rec-screen-codec" style="font-weight: 600; font-size: 0.84em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin: 0;">
+                  <i class="fas fa-film" style="color: #38bdf8;"></i> Video Codec
+                </label>
+                <span id="rec-codec-badge" style="font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; font-family: ui-monospace, monospace;">
+                  VP9
+                </span>
+              </div>
+              <select id="rec-screen-codec" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
+                <option value="auto" selected>Auto (VP9 Preferred — Best HW Decode)</option>
+                <option value="vp9">VP9 (WebM — Hardware Decode)</option>
+                <option value="vp8">VP8 (WebM — Universal Fallback)</option>
+                <option value="h264">H.264 (WebM/MP4 — Hardware Decode)</option>
+                <option value="av1">AV1 (Smallest File, Needs AV1 GPU)</option>
+              </select>
+            </div>
+
             <!-- Video Quality & Compression Selector -->
             <div style="margin-bottom: 14px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <label for="rec-screen-quality" style="font-weight: 600; font-size: 0.84em; color: #f8fafc; display: flex; align-items: center; gap: 6px; margin: 0;">
                   <i class="fas fa-compress-arrows-alt" style="color: #10b981;"></i> Compression &amp; Bitrate
                 </label>
-                <span id="rec-codec-badge" style="font-size: 0.72em; padding: 2px 7px; border-radius: 10px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; font-family: ui-monospace, monospace;">
-                  VP9
-                </span>
               </div>
               <select id="rec-screen-quality" class="w3-select" style="background: #0f172a; color: #f8fafc; border: 1px solid #475569; border-radius: 4px; padding: 6px 8px; font-size: 0.83em; width: 100%;">
                 <option value="ultra_compact" selected>Ultra-Compact (~250 Kbps, ~1.8 MB/min) - Recommended</option>
@@ -1891,6 +1907,9 @@
       <button type="button" id="step-context-edit" style="width: 100%; display: none; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-edit" style="color: #38bdf8; width: 14px; text-align: center;"></i> Edit markdown
       </button>
+      <button type="button" id="step-context-video-info" style="width: 100%; display: none; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
+        <i class="fas fa-film" style="color: #f43f5e; width: 14px; text-align: center;"></i> Video Inspector
+      </button>
       <button type="button" id="step-context-copy-link" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #f8fafc; font-size: 0.84em; text-align: left; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-link" style="color: #38bdf8; width: 14px; text-align: center;"></i> Copy step link
       </button>
@@ -1931,6 +1950,27 @@
       <a id="md-img-context-open-tab" href="#" target="_blank" style="width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: transparent; border: none; color: #cbd5e1; font-size: 0.84em; text-align: left; text-decoration: none; box-sizing: border-box; cursor: pointer; transition: background 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='transparent'">
         <i class="fas fa-external-link-alt" style="color: #94a3b8; width: 14px; text-align: center;"></i> Open in new tab
       </a>
+    </div>
+
+    <!-- Video Inspector Modal -->
+    <div id="video-inspector-modal" class="w3-modal" style="z-index: 10003;">
+      <div class="w3-modal-content w3-round-large w3-card-4" style="background-color: #1e293b; color: #f8fafc; max-width: 500px; overflow: hidden; border: 1px solid #334155;">
+        <header class="w3-container" style="background-color: #0f172a; border-top-left-radius: 8px; border-top-right-radius: 8px; padding: 12px 18px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0; font-size: 1.05em; font-weight: 600; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <i class="fas fa-film" style="color: #f43f5e;"></i>
+            <span>Video Inspector</span>
+          </h3>
+          <span id="close-video-inspector-modal" class="w3-button w3-display-topright w3-hover-red" style="cursor: pointer; background: transparent; color: #94a3b8; font-size: 1.2em; padding: 10px 16px; border-top-right-radius: 8px;">&times;</span>
+        </header>
+        <div id="video-inspector-body" style="padding: 16px 18px; font-size: 0.86em;">
+          <div style="color: #94a3b8; text-align: center; padding: 20px 0;">
+            <i class="fas fa-spinner fa-spin"></i> Inspecting video stream...
+          </div>
+        </div>
+        <footer style="padding: 10px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" id="close-video-inspector-btn" class="w3-button w3-round" style="background: #334155; color: #f8fafc; font-size: 0.84em; padding: 6px 14px;">Close</button>
+        </footer>
+      </div>
     </div>
 
     <%= erb :'modals/screenshot_editor' %>

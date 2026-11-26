@@ -35,6 +35,7 @@
   const stepContextTitle = document.getElementById('step-context-title');
   const stepContextEditTitle = document.getElementById('step-context-edit-title');
   const stepContextEdit = document.getElementById('step-context-edit');
+  const stepContextVideoInfo = document.getElementById('step-context-video-info');
   const stepContextCopyLink = document.getElementById('step-context-copy-link');
   let stepContextBtn = null;
   let pendingMdEditMode = false;
@@ -1089,6 +1090,9 @@
       if (stepContextEdit) {
         stepContextEdit.style.display = (dataType === 'markdown') ? 'flex' : 'none';
       }
+      if (stepContextVideoInfo) {
+        stepContextVideoInfo.style.display = (dataType === 'video') ? 'flex' : 'none';
+      }
 
       const currentStatus = (btn.getAttribute('data-status') || 'none').toLowerCase();
       stepContextMenu.querySelectorAll('.step-status-option').forEach(opt => {
@@ -1333,6 +1337,121 @@
         pendingMdEditMode = true;
         targetBtn.click();
       }
+    });
+  }
+
+  const videoInspectorModal = document.getElementById('video-inspector-modal');
+  const videoInspectorBody = document.getElementById('video-inspector-body');
+  const closeVideoInspectorModal = document.getElementById('close-video-inspector-modal');
+  const closeVideoInspectorBtn = document.getElementById('close-video-inspector-btn');
+
+  function hideVideoInspectorModal() {
+    if (videoInspectorModal) videoInspectorModal.style.display = 'none';
+  }
+  if (closeVideoInspectorModal) closeVideoInspectorModal.addEventListener('click', hideVideoInspectorModal);
+  if (closeVideoInspectorBtn) closeVideoInspectorBtn.addEventListener('click', hideVideoInspectorModal);
+  if (videoInspectorModal) {
+    videoInspectorModal.addEventListener('click', (e) => {
+      if (e.target === videoInspectorModal) hideVideoInspectorModal();
+    });
+  }
+
+  function escapeInspectorHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  async function openVideoInspector(targetBtn) {
+    if (!videoInspectorModal || !videoInspectorBody || !targetBtn) return;
+    const id = targetBtn.getAttribute('data-id') || '';
+    const titleNode = targetBtn.querySelector('.item-title');
+    const stepTitle = (targetBtn.getAttribute('data-title') || (titleNode ? titleNode.textContent : '') || id).trim();
+
+    videoInspectorBody.innerHTML = '<div style="color: #94a3b8; text-align: center; padding: 20px 0;"><i class="fas fa-spinner fa-spin"></i> Inspecting video stream...</div>';
+    videoInspectorModal.style.display = 'block';
+
+    try {
+      const resp = await fetch(`/recordings/${encodeURIComponent(id)}/info`, { credentials: 'same-origin' });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok || !data.info) {
+        throw new Error(data.error || 'Failed to read video metadata');
+      }
+      const info = data.info;
+
+      // Fallback resolution/duration from live <video> if currently loaded
+      let width = info.width;
+      let height = info.height;
+      let durLabel = info.duration_label || 'Unknown';
+      if (videoPlayer && activeId === id && videoPlayer.videoWidth > 0) {
+        if (!width) width = videoPlayer.videoWidth;
+        if (!height) height = videoPlayer.videoHeight;
+      }
+
+      const vcodec = info.video_codec || 'Unknown';
+      const isAv1 = vcodec === 'AV1';
+      const badgeBg = isAv1 ? 'rgba(245, 158, 11, 0.16)' : 'rgba(16, 185, 129, 0.16)';
+      const badgeColor = isAv1 ? '#fbbf24' : '#34d399';
+      const badgeBorder = isAv1 ? 'rgba(245, 158, 11, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+
+      const resText = (width && height) ? `${width} &times; ${height}` : 'Unknown';
+      const fpsText = info.fps ? `${info.fps} fps` : 'Variable / N/A';
+      const audioParts = [];
+      if (info.audio_codec) audioParts.push(info.audio_codec);
+      if (info.audio_channels) audioParts.push(`${info.audio_channels} ch`);
+      if (info.audio_sample_rate) audioParts.push(`${Math.round(info.audio_sample_rate / 1000 * 10) / 10} kHz`);
+      const audioText = audioParts.length > 0 ? audioParts.join(' \u00B7 ') : 'No audio track';
+      const bitrateText = info.bitrate_kbps ? `${info.bitrate_kbps} kbps` : 'N/A';
+      const cuesText = info.has_cues === true ? 'Yes (Cues present)' : (info.has_cues === false ? 'No' : 'N/A');
+      const modText = info.modified_at ? new Date(info.modified_at).toLocaleString() : 'N/A';
+
+      const row = (label, valHtml) => `
+        <div style="display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #1e293b;">
+          <span style="color: #94a3b8; font-size: 0.9em;">${label}</span>
+          <span style="color: #f8fafc; font-weight: 500; text-align: right;">${valHtml}</span>
+        </div>`;
+
+      videoInspectorBody.innerHTML = `
+        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+          <div style="min-width: 0;">
+            <div style="font-weight: 600; color: #f8fafc; font-size: 1.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeInspectorHtml(info.title || stepTitle)}</div>
+            <div style="color: #64748b; font-size: 0.8em; font-family: ui-monospace, monospace; margin-top: 2px;">${escapeInspectorHtml(info.filename || id)}</div>
+          </div>
+          <span style="flex-shrink: 0; padding: 4px 10px; border-radius: 12px; font-size: 0.82em; font-weight: 700; font-family: ui-monospace, monospace; background: ${badgeBg}; color: ${badgeColor}; border: 1px solid ${badgeBorder};">
+            ${escapeInspectorHtml(vcodec)}
+          </span>
+        </div>
+        <div style="background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 4px 12px;">
+          ${row('Video Codec', `${escapeInspectorHtml(vcodec)}${info.video_codec_id ? ` <span style="color:#64748b;font-family:ui-monospace,monospace;font-size:0.85em;">(${escapeInspectorHtml(info.video_codec_id)})</span>` : ''}`)}
+          ${row('Audio Track', escapeInspectorHtml(audioText))}
+          ${row('Resolution', resText)}
+          ${row('Frame Rate', escapeInspectorHtml(fpsText))}
+          ${row('Duration', escapeInspectorHtml(durLabel))}
+          ${row('Avg Bitrate', escapeInspectorHtml(bitrateText))}
+          ${row('File Size', escapeInspectorHtml(info.size_label || 'N/A'))}
+          ${row('Container', `${escapeInspectorHtml(info.container || 'N/A')} &middot; Seekable: ${escapeInspectorHtml(cuesText)}`)}
+          ${info.muxing_app || info.writing_app ? row('Muxer', `<span style="font-family:ui-monospace,monospace;font-size:0.85em;">${escapeInspectorHtml(info.writing_app || info.muxing_app)}</span>`) : ''}
+          ${row('Modified', escapeInspectorHtml(modText))}
+        </div>
+        ${info.hw_decode_note ? `
+          <div style="margin-top: 12px; padding: 9px 11px; border-radius: 6px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); color: #bae6fd; font-size: 0.83em; line-height: 1.4;">
+            <i class="fas fa-microchip" style="color: #38bdf8; margin-right: 6px;"></i>${escapeInspectorHtml(info.hw_decode_note)}
+          </div>` : ''}
+      `;
+    } catch (err) {
+      videoInspectorBody.innerHTML = `<div style="color: #fca5a5; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 12px; border-radius: 6px;"><i class="fas fa-exclamation-triangle"></i> ${escapeInspectorHtml(err.message)}</div>`;
+    }
+  }
+
+  if (stepContextVideoInfo) {
+    stepContextVideoInfo.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!stepContextBtn) return;
+      const targetBtn = stepContextBtn;
+      hideStepContextMenu();
+      openVideoInspector(targetBtn);
     });
   }
 
@@ -2340,12 +2459,65 @@ if (metaForm) {
     return `${mins}:${secs}`;
   }
 
-  function detectSupportedVideoCodec() {
+  const CODEC_CANDIDATES = {
+    vp9: {
+      label: 'VP9',
+      audio: ['video/webm;codecs=vp9,opus'],
+      video: ['video/webm;codecs=vp9']
+    },
+    vp8: {
+      label: 'VP8',
+      audio: ['video/webm;codecs=vp8,opus'],
+      video: ['video/webm;codecs=vp8']
+    },
+    h264: {
+      label: 'H.264',
+      audio: ['video/webm;codecs=h264,opus', 'video/mp4;codecs=avc1.42E01E,mp4a.40.2'],
+      video: ['video/webm;codecs=h264', 'video/mp4']
+    },
+    av1: {
+      label: 'AV1',
+      audio: ['video/webm;codecs=av01.0.08M.10,opus', 'video/webm;codecs=av1,opus'],
+      video: ['video/webm;codecs=av01.0.08M.10', 'video/webm;codecs=av1']
+    }
+  };
+  const DEFAULT_CODEC_ORDER = ['vp9', 'vp8', 'h264', 'av1'];
+
+  function getOrderedCodecKeys(preferredCodec) {
+    if (preferredCodec && preferredCodec !== 'auto' && CODEC_CANDIDATES[preferredCodec]) {
+      return [preferredCodec, ...DEFAULT_CODEC_ORDER.filter(k => k !== preferredCodec)];
+    }
+    return DEFAULT_CODEC_ORDER;
+  }
+
+  function isCodecSupported(codecKey) {
+    const spec = CODEC_CANDIDATES[codecKey];
+    if (!spec) return false;
+    if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return true;
+    return [...spec.audio, ...spec.video].some(m => MediaRecorder.isTypeSupported(m));
+  }
+
+  function getCodecCandidates(preferredCodec, hasAudio) {
+    const orderedKeys = getOrderedCodecKeys(preferredCodec);
+    const list = [];
+    for (const key of orderedKeys) {
+      const spec = CODEC_CANDIDATES[key];
+      list.push(...(hasAudio ? spec.audio : spec.video));
+    }
+    list.push('video/webm');
+    return list;
+  }
+
+  function detectSupportedVideoCodec(preferredCodec) {
     if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return 'WebM';
-    if (MediaRecorder.isTypeSupported('video/webm;codecs=av01.0.08M.10,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=av1')) return 'AV1';
-    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) return 'VP9';
-    if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) return 'VP8';
-    if (MediaRecorder.isTypeSupported('video/webm;codecs=h264,opus') || MediaRecorder.isTypeSupported('video/webm;codecs=h264')) return 'H.264';
+    let pref = preferredCodec;
+    if (!pref) {
+      const sel = document.getElementById('rec-screen-codec');
+      pref = (sel && sel.value) || 'auto';
+    }
+    for (const key of getOrderedCodecKeys(pref)) {
+      if (isCodecSupported(key)) return CODEC_CANDIDATES[key].label;
+    }
     return 'WebM';
   }
 
@@ -2489,25 +2661,14 @@ if (metaForm) {
     }
 
     initRecorder(combinedStream, displayStream) {
-      // Pick preferred mimeType based on available codecs: AV1 -> VP9 -> VP8 -> H.264
+      // Pick preferred mimeType based on user codec preference (default: VP9 -> VP8 -> H.264 -> AV1)
       const hasAudio = combinedStream.getAudioTracks().length > 0;
-      const candidates = hasAudio ? [
-        'video/webm;codecs=av01.0.08M.10,opus',
-        'video/webm;codecs=av1,opus',
-        'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus',
-        'video/webm;codecs=h264,opus',
-        'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-        'video/webm'
-      ] : [
-        'video/webm;codecs=av01.0.08M.10',
-        'video/webm;codecs=av1',
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=vp8',
-        'video/webm;codecs=h264',
-        'video/mp4',
-        'video/webm'
-      ];
+      let codecPref = 'auto';
+      try {
+        const codecSel = document.getElementById('rec-screen-codec');
+        codecPref = (codecSel && codecSel.value) || localStorage.getItem('ctlabs_screen_rec_codec') || 'auto';
+      } catch (e) {}
+      const candidates = getCodecCandidates(codecPref, hasAudio);
 
       let mimeType = '';
       if (typeof MediaRecorder.isTypeSupported === 'function') {
@@ -3006,11 +3167,36 @@ if (metaForm) {
     });
   }
 
+  const recScreenCodecSelect = document.getElementById('rec-screen-codec');
   const recScreenQualitySelect = document.getElementById('rec-screen-quality');
   const recScreenMaxLenSelect = document.getElementById('rec-screen-max-len');
   const recScreenMaxSizeSelect = document.getElementById('rec-screen-max-size');
 
+  function syncCodecSelectUI() {
+    if (recScreenCodecSelect) {
+      for (const opt of recScreenCodecSelect.options) {
+        if (opt.value === 'auto') continue;
+        const supported = isCodecSupported(opt.value);
+        opt.disabled = !supported;
+        if (!supported && !opt.textContent.includes('(Unsupported)')) {
+          opt.textContent += ' (Unsupported)';
+        }
+      }
+      if (recScreenCodecSelect.value !== 'auto' && !isCodecSupported(recScreenCodecSelect.value)) {
+        recScreenCodecSelect.value = 'auto';
+      }
+    }
+    const badge = document.getElementById('rec-codec-badge');
+    if (badge) {
+      badge.textContent = detectSupportedVideoCodec(recScreenCodecSelect ? recScreenCodecSelect.value : 'auto');
+    }
+  }
+
   try {
+    const savedCodec = localStorage.getItem('ctlabs_screen_rec_codec');
+    if (savedCodec && recScreenCodecSelect) {
+      recScreenCodecSelect.value = savedCodec;
+    }
     const savedQuality = localStorage.getItem('ctlabs_screen_rec_quality');
     if (savedQuality && recScreenQualitySelect) {
       recScreenQualitySelect.value = savedQuality;
@@ -3025,6 +3211,12 @@ if (metaForm) {
     }
   } catch (e) {}
 
+  if (recScreenCodecSelect) {
+    recScreenCodecSelect.addEventListener('change', () => {
+      try { localStorage.setItem('ctlabs_screen_rec_codec', recScreenCodecSelect.value); } catch (e) {}
+      syncCodecSelectUI();
+    });
+  }
   if (recScreenQualitySelect) {
     recScreenQualitySelect.addEventListener('change', () => {
       try { localStorage.setItem('ctlabs_screen_rec_quality', recScreenQualitySelect.value); } catch (e) {}
@@ -3064,8 +3256,7 @@ if (metaForm) {
     recordScreenBtn.addEventListener('click', () => {
       if (recordDropdownMenu) recordDropdownMenu.style.display = 'none';
       switchRecScreenTab('rec-tab-general');
-      const badge = document.getElementById('rec-codec-badge');
-      if (badge) badge.textContent = detectSupportedVideoCodec();
+      syncCodecSelectUI();
       try {
         const savedArea = localStorage.getItem('ctlabs_screen_rec_area');
         if (savedArea) {
@@ -3430,6 +3621,7 @@ if (metaForm) {
       stopMicPreview();
       if (recordScreenModal) recordScreenModal.style.display = 'none';
       try {
+        if (recScreenCodecSelect) localStorage.setItem('ctlabs_screen_rec_codec', recScreenCodecSelect.value);
         if (recScreenQualitySelect) localStorage.setItem('ctlabs_screen_rec_quality', recScreenQualitySelect.value);
         if (recScreenMaxLenSelect) localStorage.setItem('ctlabs_screen_rec_max_len', recScreenMaxLenSelect.value);
         if (recScreenMaxSizeSelect) localStorage.setItem('ctlabs_screen_rec_max_size', recScreenMaxSizeSelect.value);

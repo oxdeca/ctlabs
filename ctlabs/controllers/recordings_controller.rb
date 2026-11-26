@@ -1429,6 +1429,14 @@ class RecordingsController < BaseController
     { ok: updated, id: params[:id], duration: dur, label: RecordingService.duration_label(dur) }.to_json
   end
 
+  get '/recordings/:id/info' do
+    halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
+    info = RecordingService.video_info(params[:id])
+    halt 404, { ok: false, error: 'Video recording not found' }.to_json unless info
+    content_type :json
+    { ok: true, info: info }.to_json
+  end
+
   get '/recordings/:id/annotations' do
     halt 403, { ok: false, error: 'Invalid recording id' }.to_json unless RecordingService.valid_id?(params[:id])
     content_type :json

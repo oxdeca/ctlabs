@@ -1521,13 +1521,265 @@ class RecordingService
                    dur_elem +
                    data[insert_pos..-1]
 
-    temp_path = "#{path}.tmp_dur_#{Process.pid}"
-    File.binwrite(temp_path, updated_data)
-    File.rename(temp_path, path)
-    true
-  rescue StandardError
-    File.delete(temp_path) if temp_path && File.file?(temp_path)
-    false
+      temp_path = "#{path}.tmp_dur_#{Process.pid}"
+      File.binwrite(temp_path, updated_data)
+      File.rename(temp_path, path)
+      true
+    rescue StandardError
+      File.delete(temp_path) if temp_path && File.file?(temp_path)
+      false
+    end
+
+  def self.video_info(id)
+    path = path_for(id)
+    return nil unless path && File.file?(path)
+    return nil unless VIDEO_EXTS.any? { |e| path.end_with?(e) }
+
+    size_bytes = File.size(path)
+    ext = File.extname(path).delete('.').downcase
+    meta_file = File.join(File.dirname(path), "#{id}.json")
+    meta_file = File.join(dir, "#{id}.json") unless File.file?(meta_file)
+    meta = (File.file?(meta_file) ? JSON.parse(File.read(meta_file)) : {}) rescue {}
+    meta = {} unless meta.is_a?(Hash)
+
+    parsed = if ext == 'webm' || ext == 'mkv'
+               parse_webm_info(path, size_bytes)
+             elsif ext == 'mp4' || ext == 'm4v' || ext == 'mov'
+               parse_mp4_info(path)
+             else
+               {}
+             end
+
+    dur = meta['duration'].to_f
+    dur = parsed[:duration].to_f if dur <= 0 && parsed[:duration].to_f > 0
+    bitrate_kbps = (dur > 0 && size_bytes > 0) ? ((size_bytes * 8.0) / dur / 1000.0).round : nil
+
+    vcodec = parsed[:video_codec]
+    hw_note = case vcodec
+              when 'AV1'
+                'AV1 requires 11th Gen+ Intel (Tiger Lake / Alder Lake) or newer GPU for hardware decode; older GPUs (e.g. Comet Lake) use CPU Dav1dVideoDecoder.'
+              when 'VP9', 'VP8', 'H.264'
+                "#{vcodec} supports VaapiVideoDecoder hardware decode on Intel Gen 9+ / Comet Lake+ GPUs."
+              else
+                nil
+              end
+
+    {
+      id: id,
+      title: meta['title'] || id,
+      filename: File.basename(path),
+      container: ext.upcase,
+      size_bytes: size_bytes,
+      size_label: format_bytes(size_bytes),
+      duration: dur > 0 ? dur.round(2) : nil,
+      duration_label: dur > 0 ? duration_label(dur) : 'Unknown',
+      bitrate_kbps: bitrate_kbps,
+      video_codec: vcodec,
+      video_codec_id: parsed[:video_codec_id],
+      width: parsed[:width],
+      height: parsed[:height],
+      fps: parsed[:fps],
+      audio_codec: parsed[:audio_codec],
+      audio_codec_id: parsed[:audio_codec_id],
+      audio_channels: parsed[:audio_channels],
+      audio_sample_rate: parsed[:audio_sample_rate],
+      has_cues: parsed[:has_cues],
+      muxing_app: parsed[:muxing_app],
+      writing_app: parsed[:writing_app],
+      modified_at: File.mtime(path).iso8601,
+      hw_decode_note: hw_note
+    }
+  rescue StandardError => e
+    { id: id, error: e.message }
+  end
+
+  def self.format_bytes(bytes)
+    b = bytes.to_f
+    return '0 B' if b <= 0
+    units = %w[B KB MB GB TB]
+    idx = 0
+    while b >= 1024.0 && idx < units.length - 1
+      b /= 1024.0
+      idx += 1
+    end
+    idx == 0 ? "#{b.to_i} B" : format('%.2f %s', b, units[idx])
+  end
+
+  def self.ebml_uint(bytes)
+    val = 0
+    bytes.each_byte { |b| val = (val << 8) | b }
+    val
+  end
+
+  def self.ebml_float(bytes)
+    return bytes.unpack1('g') if bytes.bytesize == 4
+    return bytes.unpack1('G') if bytes.bytesize == 8
+    nil
+  end
+
+  def self.friendly_codec_name(codec_id)
+    case codec_id.to_s
+    when 'V_VP9', 'vp09' then 'VP9'
+    when 'V_VP8', 'vp08' then 'VP8'
+    when 'V_AV1', 'av01' then 'AV1'
+    when 'V_MPEG4/ISO/AVC', 'avc1', 'avc3' then 'H.264'
+    when 'V_MPEGH/ISO/HEVC', 'hev1', 'hvc1' then 'H.265 (HEVC)'
+    when 'A_OPUS', 'Opus' then 'Opus'
+    when 'A_VORBIS' then 'Vorbis'
+    when 'A_AAC', 'A_AAC/MPEG4/LC', 'mp4a' then 'AAC'
+    else codec_id.to_s
+    end
+  end
+
+  # Reads EBML element ID (raw bytes 1..4) and data size at offset.
+  def self.read_ebml_elem_header(buf, pos)
+    return nil if pos >= buf.bytesize
+    b0 = buf.getbyte(pos)
+    return nil if b0.nil? || b0 == 0
+    id_len = 1
+    mask = 0x80
+    while (b0 & mask) == 0 && id_len < 4
+      mask >>= 1
+      id_len += 1
+    end
+    return nil if pos + id_len > buf.bytesize
+    elem_id = ebml_uint(buf.byteslice(pos, id_len))
+    size, size_len = decode_ebml_vint(buf, pos + id_len)
+    return nil unless size && size_len > 0
+    [elem_id, pos + id_len + size_len, size]
+  end
+
+  def self.each_ebml_child(buf, start_pos, end_pos)
+    pos = start_pos
+    while pos < end_pos
+      hdr = read_ebml_elem_header(buf, pos)
+      break unless hdr
+      elem_id, data_pos, size = hdr
+      # Handle unknown-size master elements (0x01FFFFFFFFFFFFFF etc.) gracefully
+      data_end = (size >= 0x0FFF_FFFF) ? end_pos : [data_pos + size, end_pos].min
+      yield(elem_id, data_pos, data_end)
+      break if data_end <= pos
+      pos = data_end
+    end
+  end
+
+  def self.parse_webm_info(path, size_bytes)
+    head = File.binread(path, 262_144) || ''.b
+    info = { has_cues: false }
+
+    # Walk top-level EBML elements to find Segment (0x18538067)
+    seg_start = nil
+    seg_end = head.bytesize
+    each_ebml_child(head, 0, head.bytesize) do |eid, dstart, dend|
+      if eid == 0x18538067
+        seg_start = dstart
+        seg_end = dend
+        break
+      end
+    end
+    return info unless seg_start
+
+    # Walk direct children of Segment (Info, Tracks, Cues, SeekHead, stopping at first Cluster)
+    each_ebml_child(head, seg_start, seg_end) do |eid, dstart, dend|
+      case eid
+      when 0x114D9B74 # SeekHead — check if Cues (0x1C53BB6B) is indexed
+        payload = head.byteslice(dstart, dend - dstart)
+        info[:has_cues] = true if payload&.include?("\x1C\x53\xBB\x6B".b)
+      when 0x1C53BB6B # Cues
+        info[:has_cues] = true
+      when 0x1549A966 # Segment Info
+        timecode_scale = 1_000_000
+        raw_duration = nil
+        each_ebml_child(head, dstart, dend) do |ieid, idstart, idend|
+          payload = head.byteslice(idstart, idend - idstart)
+          case ieid
+          when 0x2AD7B1 then v = ebml_uint(payload); timecode_scale = v if v > 0
+          when 0x4489   then raw_duration = ebml_float(payload)
+          when 0x4D80   then info[:muxing_app] = payload.encode('UTF-8', invalid: :replace, undef: :replace, replace: '').strip
+          when 0x5741   then info[:writing_app] = payload.encode('UTF-8', invalid: :replace, undef: :replace, replace: '').strip
+          end
+        end
+        if raw_duration && raw_duration > 0
+          info[:duration] = (raw_duration * timecode_scale) / 1e9
+        end
+      when 0x1654AE6B # Tracks
+        each_ebml_child(head, dstart, dend) do |teid_outer, tdstart_outer, tdend_outer|
+          next unless teid_outer == 0xAE # TrackEntry
+          track_type = nil
+          codec_id = nil
+          default_dur = nil
+          vw = nil
+          vh = nil
+          ach = nil
+          asr = nil
+          each_ebml_child(head, tdstart_outer, tdend_outer) do |teid, tdstart, tdend|
+            payload = head.byteslice(tdstart, tdend - tdstart)
+            case teid
+            when 0x83     then track_type = ebml_uint(payload)
+            when 0x86     then codec_id = payload.encode('UTF-8', invalid: :replace, undef: :replace, replace: '').delete("\x00").strip
+            when 0x23E383 then default_dur = ebml_uint(payload)
+            when 0xE0
+              each_ebml_child(head, tdstart, tdend) do |vid, vstart, vend|
+                vp = head.byteslice(vstart, vend - vstart)
+                vw = ebml_uint(vp) if vid == 0xB0
+                vh = ebml_uint(vp) if vid == 0xBA
+              end
+            when 0xE1
+              each_ebml_child(head, tdstart, tdend) do |aid, astart, aend|
+                ap = head.byteslice(astart, aend - astart)
+                asr = ebml_float(ap)&.round if aid == 0xB5
+                ach = ebml_uint(ap) if aid == 0x9F
+              end
+            end
+          end
+
+          if track_type == 1 && !info[:video_codec]
+            info[:video_codec_id] = codec_id
+            info[:video_codec] = friendly_codec_name(codec_id)
+            info[:width] = vw if vw && vw > 0
+            info[:height] = vh if vh && vh > 0
+            info[:fps] = (1_000_000_000.0 / default_dur).round(2) if default_dur && default_dur > 0
+          elsif track_type == 2 && !info[:audio_codec]
+            info[:audio_codec_id] = codec_id
+            info[:audio_codec] = friendly_codec_name(codec_id)
+            info[:audio_channels] = ach if ach && ach > 0
+            info[:audio_sample_rate] = asr if asr && asr > 0
+          end
+        end
+      when 0x1F43B675 # Cluster — header section is done
+        break
+      end
+    end
+
+    if !info[:has_cues] && size_bytes > 262_144
+      File.open(path, 'rb') do |f|
+        f.seek([size_bytes - 262_144, 0].max)
+        tail = f.read(262_144) || ''.b
+        info[:has_cues] = tail.include?("\x1C\x53\xBB\x6B".b)
+      end
+    end
+
+    info
+  end
+
+  def self.parse_mp4_info(path)
+    head = File.binread(path, 262_144) || ''.b
+    info = {}
+    %w[av01 vp09 avc1 hvc1 hev1].each do |fourcc|
+      if head.include?(fourcc.b)
+        info[:video_codec_id] = fourcc
+        info[:video_codec] = friendly_codec_name(fourcc)
+        break
+      end
+    end
+    %w[mp4a Opus].each do |fourcc|
+      if head.include?(fourcc.b)
+        info[:audio_codec_id] = fourcc
+        info[:audio_codec] = friendly_codec_name(fourcc)
+        break
+      end
+    end
+    info
   end
 
   def self.update_duration(id, duration)
