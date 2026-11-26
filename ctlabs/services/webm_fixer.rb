@@ -24,6 +24,8 @@ class WebmFixer
   TRACK_ENTRY_ID = 0xae
   TRACK_NUM_ID  = 0xd7
   TRACK_TYPE_ID = 0x83
+  VIDEO_EL_ID   = 0xe0
+  ALPHA_MODE_ID = 0x53c0
   CLUSTER_ID    = 0x1f43b675
   TIMECODE_ID   = 0xe7
   SIMPLE_BLOCK_ID = 0xa3
@@ -59,6 +61,9 @@ class WebmFixer
 
     # Unknown Segment size (01ffffffffffffff)
     return true if head.byteslice(seg_idx + 4, 8) == UNKNOWN_VINT_8
+
+    # Bogus AlphaMode=1 (0x53c0 0x81 0x01) written by Chrome MediaRecorder disables VA-API hardware decode
+    return true if head.include?([0x53, 0xc0, 0x81, 0x01].pack('C*').b)
 
     # Also check if Cues is missing in both head and tail
     cues_sig = [0x1c, 0x53, 0xbb, 0x6b].pack('C*').b
@@ -175,6 +180,7 @@ class WebmFixer
     return nil unless info_body && tracks_body && !clusters.empty?
 
     video_track = find_video_track(tracks_body) || 1
+    tracks_body = strip_alpha_mode(tracks_body)
     last_c = clusters.last
     total_dur_units = [last_c[:tc] + last_c[:max_rel] + 33, 1].max.to_f
 
@@ -269,6 +275,47 @@ class WebmFixer
       pos = edata + elen
     end
     nil
+  end
+
+  def self.strip_alpha_mode(tracks_body)
+    out = ''.b
+    pos = 0
+    while pos < tracks_body.bytesize
+      eid, l1 = read_vint(tracks_body, pos, true)
+      elen, l2 = read_vint(tracks_body, pos + l1, false)
+      edata = pos + l1 + l2
+      if eid == TRACK_ENTRY_ID
+        entry_out = ''.b
+        ep = edata
+        eend = edata + elen
+        while ep < eend
+          sub_id, sl1 = read_vint(tracks_body, ep, true)
+          sub_len, sl2 = read_vint(tracks_body, ep + sl1, false)
+          sdata = ep + sl1 + sl2
+          if sub_id == VIDEO_EL_ID
+            vid_out = ''.b
+            vp = sdata
+            vend = sdata + sub_len
+            while vp < vend
+              vid_id, vl1 = read_vint(tracks_body, vp, true)
+              vid_len, vl2 = read_vint(tracks_body, vp + vl1, false)
+              vdata = vp + vl1 + vl2
+              vid_out << tracks_body.byteslice(vp, vl1 + vl2 + vid_len) unless vid_id == ALPHA_MODE_ID
+              vp = vdata + vid_len
+            end
+            entry_out << make_element(VIDEO_EL_ID, vid_out)
+          else
+            entry_out << tracks_body.byteslice(ep, sl1 + sl2 + sub_len)
+          end
+          ep = sdata + sub_len
+        end
+        out << make_element(TRACK_ENTRY_ID, entry_out)
+      else
+        out << tracks_body.byteslice(pos, l1 + l2 + elen)
+      end
+      pos = edata + elen
+    end
+    out
   end
 
   def self.update_info_duration(info_body, dur_float)
