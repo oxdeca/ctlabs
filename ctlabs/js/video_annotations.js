@@ -65,10 +65,23 @@
   let tlAutoArrangeBtnEl = null;
   let tlToggleBtnEl = null;
   let tlCollapseBtnEl = null;
+  let tlScrollEl = null;
+  let tlZoomInnerEl = null;
+  let tlZoomOutBtnEl = null;
+  let tlZoomInBtnEl = null;
+  let tlZoomLabelEl = null;
+  let tlSpeedDownBtnEl = null;
+  let tlSpeedUpBtnEl = null;
+  let tlSpeedLabelEl = null;
+  let tlSpeedTextEl = null;
+  let tlSpeedIconEl = null;
   let tlVolBtnEl = null;
   let tlVolIconEl = null;
   let tlFsBtnEl = null;
   let tlFsIconEl = null;
+  let timelineZoom = 1;
+  let playbackSpeed = 1;
+  let playheadRafId = null;
   let propsEl = null;
   let startInputEl = null;
   let endInputEl = null;
@@ -110,6 +123,15 @@
       return `${mins.toString().padStart(2, '0')}:${secs.toFixed(1).padStart(4, '0')}`;
     }
     return `${mins.toString().padStart(2, '0')}:${Math.floor(secs).toString().padStart(2, '0')}`;
+  }
+
+  // Format seconds to mm:ss.mmm (millisecond precision)
+  function formatTimeMs(sec) {
+    if (isNaN(sec) || sec === null || sec === undefined) return '00:00.000';
+    const s = Math.max(0, parseFloat(sec));
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toFixed(3).padStart(6, '0')}`;
   }
 
   // Parse mm:ss or ss.s to seconds
@@ -1117,7 +1139,7 @@
     domEl.appendChild(box);
   }
 
-  // Get active video duration reliably (accommodates video duration and all annotations)
+  // Get active video duration reliably (prefers actual video duration; falls back to annotations only if unknown)
   function getVideoDuration() {
     let vDur = 0;
     if (videoEl && !isNaN(videoEl.duration) && isFinite(videoEl.duration) && videoEl.duration > 0) {
@@ -1130,12 +1152,13 @@
         if (dur && !isNaN(dur) && dur > 0) vDur = dur;
       }
     }
+    if (vDur > 0) return vDur;
+
     let maxEnd = 0;
     for (const a of annotations) {
       if (a.endTime > maxEnd) maxEnd = a.endTime;
     }
-    const effectiveDur = Math.max(vDur, maxEnd);
-    return effectiveDur > 0 ? effectiveDur : 10;
+    return maxEnd > 0 ? maxEnd : 10;
   }
 
   // Stable multi-lane allocation (preserves assigned lanes so moving objects does not cause them to jump)
@@ -1200,26 +1223,35 @@
 
   // Render proportional tick marks along the timeline ruler
   let lastRulerDuration = -1;
+  let lastRulerZoom = -1;
+
   function renderTimelineRuler(duration) {
     if (!tlRulerEl) return;
-    const durRound = Math.round(duration);
-    if (durRound === lastRulerDuration) return;
+    const durRound = Math.round(duration * 10);
+    if (durRound === lastRulerDuration && timelineZoom === lastRulerZoom) return;
     lastRulerDuration = durRound;
+    lastRulerZoom = timelineZoom;
 
     tlRulerEl.innerHTML = '';
     if (duration <= 0) return;
 
+    // Effective visible duration per viewport width shrinks as we zoom in
+    const effectiveDur = duration / timelineZoom;
     let step = 5;
-    if (duration <= 10) step = 2;
-    else if (duration <= 25) step = 5;
-    else if (duration <= 60) step = 10;
-    else if (duration <= 150) step = 15;
-    else if (duration <= 300) step = 30;
-    else if (duration <= 900) step = 60;
+    let showDecimal = false;
+    if (effectiveDur <= 2) { step = 0.2; showDecimal = true; }
+    else if (effectiveDur <= 5) { step = 0.5; showDecimal = true; }
+    else if (effectiveDur <= 12) { step = 1; }
+    else if (effectiveDur <= 25) { step = 2; }
+    else if (effectiveDur <= 60) { step = 5; }
+    else if (effectiveDur <= 150) { step = 15; }
+    else if (effectiveDur <= 300) { step = 30; }
+    else if (effectiveDur <= 900) { step = 60; }
     else step = 120;
 
-    for (let t = 0; t <= duration; t += step) {
-      const pct = (t / duration) * 100;
+    for (let t = 0; t <= duration + 0.0001; t += step) {
+      const clampedT = Math.min(duration, t);
+      const pct = (clampedT / duration) * 100;
       const mark = document.createElement('div');
       mark.style.cssText = `
         position: absolute;
@@ -1231,13 +1263,42 @@
         align-items: center;
         pointer-events: none;
         user-select: none;
+        white-space: nowrap;
       `;
       mark.innerHTML = `
-        <span style="font-size: 8.5px; line-height: 10px; color: #64748b;">${formatTime(t)}</span>
+        <span style="font-size: 8.5px; line-height: 10px; color: #64748b;">${formatTime(clampedT, showDecimal)}</span>
         <div style="width: 1px; height: 4px; background: #334155; margin-top: 1px;"></div>
       `;
       tlRulerEl.appendChild(mark);
     }
+  }
+
+  function setTimelineZoom(newZoom) {
+    const ZOOM_STEPS = [1, 1.5, 2, 3, 5, 8, 10];
+    const clamped = Math.max(1, Math.min(10, newZoom));
+    timelineZoom = clamped;
+
+    if (tlZoomInnerEl) {
+      tlZoomInnerEl.style.width = `${timelineZoom * 100}%`;
+    }
+    if (tlZoomLabelEl) {
+      tlZoomLabelEl.textContent = `${Math.round(timelineZoom * 100)}%`;
+      tlZoomLabelEl.style.color = timelineZoom > 1 ? '#38bdf8' : '#cbd5e1';
+    }
+
+    lastRulerDuration = -1;
+    const dur = getVideoDuration();
+    renderTimelineRuler(dur);
+
+    // Keep playhead visible/centered when zooming
+    if (tlScrollEl && videoEl) {
+      const curPct = Math.max(0, Math.min(1, (videoEl.currentTime || 0) / (dur > 0 ? dur : 1)));
+      const maxScroll = Math.max(0, tlScrollEl.scrollWidth - tlScrollEl.clientWidth);
+      const targetScroll = curPct * tlScrollEl.scrollWidth - (tlScrollEl.clientWidth / 2);
+      tlScrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, targetScroll));
+    }
+
+    return ZOOM_STEPS;
   }
 
   // Update playhead needle, progress fill, and time readouts
@@ -1250,10 +1311,30 @@
     tlPlayheadEl.style.left = `${pct}%`;
     tlProgressEl.style.width = `${pct}%`;
 
-    if (tlCurTimeEl) tlCurTimeEl.textContent = formatTime(clampedCur);
-    if (tlDurTimeEl) tlDurTimeEl.textContent = formatTime(dur);
+    if (tlCurTimeEl) tlCurTimeEl.textContent = formatTimeMs(clampedCur);
+    if (tlDurTimeEl) tlDurTimeEl.textContent = formatTimeMs(dur);
     if (tlPlayIconEl) {
       tlPlayIconEl.className = (videoEl && !videoEl.paused) ? 'fas fa-pause' : 'fas fa-play';
+    }
+  }
+
+  function startPlayheadRaf() {
+    if (playheadRafId) return;
+    const tick = () => {
+      if (!videoEl || videoEl.paused || videoEl.ended) {
+        playheadRafId = null;
+        return;
+      }
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      playheadRafId = requestAnimationFrame(tick);
+    };
+    playheadRafId = requestAnimationFrame(tick);
+  }
+
+  function stopPlayheadRaf() {
+    if (playheadRafId) {
+      cancelAnimationFrame(playheadRafId);
+      playheadRafId = null;
     }
   }
 
@@ -1344,8 +1425,8 @@
       if (videoEl) safeSeek(newStart);
     } else if (type === 'trim-end') {
       let newEnd = origEnd + deltaSec;
-      newEnd = Math.max(ann.startTime + 0.2, Math.min(duration, newEnd));
       newEnd = Math.round(newEnd * 10) / 10;
+      newEnd = Math.max(ann.startTime + 0.2, Math.min(duration, newEnd));
       ann.endTime = newEnd;
       if (videoEl) safeSeek(newEnd);
     } else if (type === 'move-span') {
@@ -1354,7 +1435,7 @@
       newStart = Math.max(0, Math.min(duration - span, newStart));
       newStart = Math.round(newStart * 10) / 10;
       ann.startTime = newStart;
-      ann.endTime = Math.round((newStart + span) * 10) / 10;
+      ann.endTime = Math.min(duration, Math.round((newStart + span) * 10) / 10);
       if (videoEl) safeSeek(newStart);
 
       // Allow intentional vertical dragging between lanes without sudden jumping
@@ -1461,8 +1542,8 @@
           guide.style.cssText = `
             position: absolute;
             top: ${guideTop}px;
-            left: 4px;
-            right: 4px;
+            left: 10px;
+            right: 10px;
             height: ${laneHeight}px;
             border-radius: 4px;
             background: ${l % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)'};
@@ -1519,7 +1600,7 @@
 
       const leftPct = Math.max(0, Math.min(100, (ann.startTime / duration) * 100));
       const rightPct = Math.max(0, Math.min(100, (ann.endTime / duration) * 100));
-      const rawWidthPct = Math.max(1.8, rightPct - leftPct);
+      const rawWidthPct = Math.max(1.2, rightPct - leftPct);
       const isAtClipEnd = rightPct >= 99.2;
 
       let icon = 'fas fa-comment-dots';
@@ -1533,7 +1614,7 @@
 
       seg.style.cssText = `
         position: absolute;
-        ${isAtClipEnd ? `right: 0px; width: ${rawWidthPct}%; min-width: 45px; max-width: 100%;` : `left: ${leftPct}%; width: ${rawWidthPct}%; min-width: 45px;`}
+        ${isAtClipEnd ? `right: 0px; width: ${rawWidthPct}%; min-width: 24px; max-width: 100%;` : `left: ${leftPct}%; width: ${rawWidthPct}%; min-width: 24px; max-width: calc(100% - ${leftPct}%);`}
         top: ${segTop}px;
         height: ${laneHeight}px;
         background: ${hexToRgba(color, isActive ? 0.45 : 0.22)};
@@ -1901,9 +1982,6 @@
       const badgeInput = document.getElementById('video-ann-badge-num');
       if (badgeInput) badgeInput.value = nextBadge + 1;
     }
-
-    // Return to select mode so user can immediately move/resize/edit placed object
-    selectTool('select');
 
     render();
     scheduleAutosave();
@@ -2293,10 +2371,12 @@
 
   // Clear state when switching away from video
   function clear() {
+    stopPlayheadRaf();
     currentRecordingId = null;
     annotations = [];
     selectedId = null;
     lastRulerDuration = -1;
+    setTimelineZoom(1);
     if (isEditMode) toggleEditMode(false);
     if (overlayEl) {
       if (svgEl) svgEl.innerHTML = '';
@@ -2379,10 +2459,110 @@
 
     tlToggleBtnEl = document.getElementById('video-timeline-toggle-btn');
     tlCollapseBtnEl = document.getElementById('video-tl-collapse-btn');
+    tlScrollEl = document.getElementById('video-tl-scroll');
+    tlZoomInnerEl = document.getElementById('video-tl-zoom-inner');
+    tlZoomOutBtnEl = document.getElementById('video-tl-zoom-out-btn');
+    tlZoomInBtnEl = document.getElementById('video-tl-zoom-in-btn');
+    tlZoomLabelEl = document.getElementById('video-tl-zoom-label');
     tlVolBtnEl = document.getElementById('video-tl-vol-btn');
+
+    const ZOOM_STEPS = [1, 1.5, 2, 3, 5, 8, 10];
+    if (tlZoomOutBtnEl) {
+      tlZoomOutBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const prev = [...ZOOM_STEPS].reverse().find(z => z < timelineZoom - 0.01) || 1;
+        setTimelineZoom(prev);
+      });
+    }
+    if (tlZoomInBtnEl) {
+      tlZoomInBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = ZOOM_STEPS.find(z => z > timelineZoom + 0.01) || 10;
+        setTimelineZoom(next);
+      });
+    }
+    if (tlZoomLabelEl) {
+      tlZoomLabelEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setTimelineZoom(1);
+      });
+    }
+    const handleWheelNavigation = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const factor = e.deltaY < 0 ? 1.25 : 0.8;
+        setTimelineZoom(Math.round(timelineZoom * factor * 10) / 10);
+        return;
+      }
+      if (e.shiftKey && videoEl) {
+        e.preventDefault();
+        e.stopPropagation();
+        // Shift+Wheel often converts vertical deltaY into deltaX on Linux/macOS
+        const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        if (delta === 0) return;
+        const step = Math.max(0.05, Math.round((0.5 / timelineZoom) * 100) / 100);
+        const dir = delta > 0 ? 1 : -1;
+        const dur = getVideoDuration();
+        const baseTime = pendingSeekTarget !== null ? pendingSeekTarget : videoEl.currentTime;
+        safeSeek(Math.max(0, Math.min(dur, baseTime + dir * step)));
+      }
+    };
+
+    if (tlScrollEl) {
+      tlScrollEl.addEventListener('wheel', handleWheelNavigation, { passive: false });
+    }
+    if (stageEl) {
+      stageEl.addEventListener('wheel', (e) => {
+        if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) {
+          handleWheelNavigation(e);
+        }
+      }, { passive: false });
+    }
     tlVolIconEl = document.getElementById('video-tl-vol-icon');
     tlFsBtnEl = document.getElementById('video-tl-fs-btn');
     tlFsIconEl = document.getElementById('video-tl-fs-icon');
+    tlSpeedDownBtnEl = document.getElementById('video-tl-speed-down-btn');
+    tlSpeedUpBtnEl = document.getElementById('video-tl-speed-up-btn');
+    tlSpeedLabelEl = document.getElementById('video-tl-speed-label');
+    tlSpeedTextEl = document.getElementById('video-tl-speed-text');
+    tlSpeedIconEl = document.getElementById('video-tl-speed-icon');
+
+    const SPEED_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+    const applyPlaybackSpeed = (spd) => {
+      playbackSpeed = spd;
+      if (videoEl) videoEl.playbackRate = spd;
+      if (tlSpeedTextEl) {
+        tlSpeedTextEl.textContent = `${spd}x`;
+      }
+      if (tlSpeedLabelEl) {
+        tlSpeedLabelEl.style.color = spd !== 1 ? '#38bdf8' : '#cbd5e1';
+      }
+      if (tlSpeedIconEl) {
+        tlSpeedIconEl.style.color = spd !== 1 ? '#38bdf8' : '#94a3b8';
+      }
+    };
+
+    if (tlSpeedDownBtnEl) {
+      tlSpeedDownBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const prev = [...SPEED_STEPS].reverse().find(s => s < playbackSpeed - 0.001) || SPEED_STEPS[0];
+        applyPlaybackSpeed(prev);
+      });
+    }
+    if (tlSpeedUpBtnEl) {
+      tlSpeedUpBtnEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const next = SPEED_STEPS.find(s => s > playbackSpeed + 0.001) || SPEED_STEPS[SPEED_STEPS.length - 1];
+        applyPlaybackSpeed(next);
+      });
+    }
+    if (tlSpeedLabelEl) {
+      tlSpeedLabelEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        applyPlaybackSpeed(1);
+      });
+    }
 
     const updateVolumeUI = () => {
       if (!videoEl || !tlVolIconEl) return;
@@ -2845,11 +3025,11 @@
     if (tlTrackEl) {
       const handleScrub = (e) => {
         if (!videoEl || !tlTrackEl) return;
-        const rect = tlTrackEl.getBoundingClientRect();
+        const refEl = tlInnerEl || tlTrackEl;
+        const rect = refEl.getBoundingClientRect();
         if (rect.width <= 0) return;
-        const innerWidth = Math.max(1, rect.width - 22);
-        const offsetX = Math.max(0, Math.min(innerWidth, e.clientX - rect.left - 8));
-        const pct = offsetX / innerWidth;
+        const offsetX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const pct = offsetX / rect.width;
         const duration = getVideoDuration();
         const newTime = pct * duration;
         safeSeek(newTime);
@@ -2882,14 +3062,22 @@
       render();
     });
     videoEl.addEventListener('loadedmetadata', () => {
+      if (playbackSpeed !== 1) videoEl.playbackRate = playbackSpeed;
       updateOverlayBounds();
       render();
     });
     videoEl.addEventListener('play', () => {
       updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      startPlayheadRaf();
       render();
     });
     videoEl.addEventListener('pause', () => {
+      stopPlayheadRaf();
+      updatePlayheadUI(videoEl.currentTime, getVideoDuration());
+      render();
+    });
+    videoEl.addEventListener('ended', () => {
+      stopPlayheadRaf();
       updatePlayheadUI(videoEl.currentTime, getVideoDuration());
       render();
     });
