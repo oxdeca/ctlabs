@@ -3296,14 +3296,15 @@
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         e.stopPropagation();
+        const curPos = pendingSeekTarget !== null ? pendingSeekTarget : videoEl.currentTime;
         let targetTime = 0;
         if (e.ctrlKey || e.metaKey) {
           // Jump to start of previous annotation
-          const prevAnns = annotations.filter(a => a.startTime < videoEl.currentTime - 0.2).sort((a, b) => b.startTime - a.startTime);
+          const prevAnns = annotations.filter(a => a.startTime < curPos - 0.2).sort((a, b) => b.startTime - a.startTime);
           targetTime = prevAnns.length > 0 ? prevAnns[0].startTime : 0;
         } else {
           const step = e.shiftKey ? 5 : (e.altKey ? 0.1 : 1);
-          targetTime = Math.max(0, videoEl.currentTime - step);
+          targetTime = Math.max(0, curPos - step);
         }
         safeSeek(targetTime);
         return;
@@ -3312,14 +3313,15 @@
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         e.stopPropagation();
+        const curPos = pendingSeekTarget !== null ? pendingSeekTarget : videoEl.currentTime;
         let targetTime = dur;
         if (e.ctrlKey || e.metaKey) {
           // Jump to start of next annotation
-          const nextAnns = annotations.filter(a => a.startTime > videoEl.currentTime + 0.2).sort((a, b) => a.startTime - b.startTime);
+          const nextAnns = annotations.filter(a => a.startTime > curPos + 0.2).sort((a, b) => a.startTime - b.startTime);
           targetTime = nextAnns.length > 0 ? nextAnns[0].startTime : dur;
         } else {
           const step = e.shiftKey ? 5 : (e.altKey ? 0.1 : 1);
-          targetTime = Math.min(dur, videoEl.currentTime + step);
+          targetTime = Math.min(dur, curPos + step);
         }
         safeSeek(targetTime);
         return;
@@ -3405,6 +3407,14 @@
             e.stopPropagation();
             selectTool('text');
           }
+        }
+      }
+    }, true);
+
+    window.addEventListener('keyup', (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        if (pendingSeekTarget !== null && videoEl && !videoEl.seeking) {
+          flushPendingSeek(true);
         }
       }
     }, true);
