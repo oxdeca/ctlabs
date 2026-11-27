@@ -342,8 +342,8 @@ profiles:
     role : ctlabs_gemini_cli
     hosts: [ansible]
 
-  antigravity_cli:
-    role : ctlabs_antigravity_cli
+  antigravity:
+    role : ctlabs_antigravity
     hosts: [ansible]
 
   claude:
