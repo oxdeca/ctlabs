@@ -3697,8 +3697,10 @@
       };
 
       let lastCopyToastTime = 0;
-      const copyTerminalSelection = (showFeedback = true) => {
-        const selection = term ? term.getSelection() : '';
+      const copyTerminalSelection = (showFeedback = true, overrideText = null) => {
+        const selection = (typeof overrideText === 'string' && overrideText.length > 0)
+          ? overrideText
+          : (term ? term.getSelection() : '');
         if (!selection || !selection.length) return false;
 
         let copied = false;
@@ -3760,22 +3762,29 @@
         };
       }
 
-      // Synchronize selection changes directly into term.textarea so macOS Edit->Copy,
-      // native browser copy commands, and auto-copy work reliably on WebKit/Safari and Chrome.
+      // Track active selection so TUI mouse-reporting/redraws on mouseup inside the terminal
+      // cannot clear the selection before it is copied to the clipboard.
+      let lastSelectedText = '';
+      let isMouseSelecting = false;
+
+      container.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+          isMouseSelecting = true;
+          lastSelectedText = '';
+        }
+      }, true);
+
+      // Synchronize selection changes into lastSelectedText and term.textarea without
+      // spamming clipboard writes on every drag tick (macOS browsers require mouseup user gesture).
       term.onSelectionChange(() => {
         const selection = term.getSelection();
         if (selection && selection.length > 0) {
+          lastSelectedText = selection;
           if (term.textarea) {
             try {
               term.textarea.value = selection;
-              term.textarea.focus({ preventScroll: true });
-              term.textarea.select();
-              if (term.textarea.setSelectionRange) {
-                term.textarea.setSelectionRange(0, selection.length);
-              }
             } catch (err) {}
           }
-          copyTerminalSelection(true);
         } else {
           if (term.textarea) {
             try {
@@ -3785,12 +3794,18 @@
         }
       });
 
-      // Auto-copy selection on mouseup anywhere in the document
-      document.addEventListener('mouseup', (e) => {
-        if (e.button === 0 && term && term.hasSelection()) {
-          copyTerminalSelection(true);
+      // Auto-copy selection on mouseup in capture phase so it runs BEFORE xterm/TUI mouse
+      // reporting or click handlers can clear the selection when releasing inside the terminal.
+      window.addEventListener('mouseup', (e) => {
+        if (e.button !== 0) return;
+        const selection = (term && term.hasSelection()) ? term.getSelection() : '';
+        const textToCopy = (selection && selection.length > 0) ? selection : (isMouseSelecting ? lastSelectedText : '');
+        isMouseSelecting = false;
+        if (textToCopy && textToCopy.length > 0) {
+          copyTerminalSelection(true, textToCopy);
+          lastSelectedText = '';
         }
-      });
+      }, true);
 
       // Right-click on selected text copies it immediately
       container.addEventListener('contextmenu', (e) => {
