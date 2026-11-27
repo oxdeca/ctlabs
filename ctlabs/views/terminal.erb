@@ -3147,8 +3147,8 @@
             showDownloadFeedback(`<i class="fas fa-check-circle" style="color: #10b981;"></i> Starting download of <strong>${escapeHtml(downloadFilename)}</strong>...`, 'success');
             showToast(`Downloading ${downloadFilename}...`, 'info');
 
-            // Trigger browser download via location
-            window.location.href = '/terminal/' + encodeURIComponent(nodeName) + '/download?path=' + encodeURIComponent(path);
+            // Trigger browser download via <a download> so beforeunload/pagehide don't fire
+            triggerNodeDownload(path, downloadFilename);
           } catch (err) {
             showDownloadFeedback(`<i class="fas fa-exclamation-triangle"></i> ${escapeHtml(err.message || 'Download error')}`, 'error');
           } finally {
@@ -3156,6 +3156,16 @@
             downloadSubmitBtn.innerHTML = '<i class="fas fa-download"></i> <span>Download</span>';
           }
         });
+      }
+
+      function triggerNodeDownload(remotePath, filename) {
+        const a = document.createElement('a');
+        a.href = '/terminal/' + encodeURIComponent(nodeName) + '/download?path=' + encodeURIComponent(remotePath);
+        a.download = filename || '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
 
       // Fetch and render files/directories for node file browser in Download tab
@@ -3252,7 +3262,7 @@
                 downloadPathInput.value = item.path;
                 inspectRemotePath(item.path);
                 showToast(`Downloading ${item.name}...`, 'info');
-                window.location.href = '/terminal/' + encodeURIComponent(nodeName) + '/download?path=' + encodeURIComponent(item.path);
+                triggerNodeDownload(item.path, item.name);
               });
               rightDiv.appendChild(dlBtn);
             } else {

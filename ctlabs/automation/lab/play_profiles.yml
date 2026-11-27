@@ -386,10 +386,6 @@ profiles:
     role : ctlabs_chrony
     hosts: [h3,h4]
 
-  argoapp:
-    role : ctlabs_argoapp
-    hosts: [k3s1,rke21,k8s1]
-
   argoapps:
-    role : ctlabs_argoapp
-    hosts: [rke21]
+    role : ctlabs_argoapps
+    hosts: [k3s1,rke21,k8s1]
