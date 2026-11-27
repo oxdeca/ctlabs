@@ -13,6 +13,49 @@
 
 class ControllerController < BaseController
   # ===================================================
+  # Control-plane lifecycle (up / down)
+  # ===================================================
+
+  post '/controller/execute' do
+    action = params[:action].to_s.strip
+    halt 400, 'Invalid action' unless %w[up down].include?(action)
+
+    if action == 'up'
+      halt 400, 'Control-plane is already running.' if Controller.running?
+    else
+      if !Controller.running? && Controller.plane_containers.empty?
+        halt 400, 'Control-plane is not running.'
+      end
+    end
+
+    log     = LabLog.for_lab(lab_name: 'controller', action: action)
+    v_token = session[:vault_token]
+    v_addr  = session[:vault_addr]
+
+    Thread.new do
+      begin
+        ctl = Controller.new(log: log)
+        if action == 'up'
+          ctl.up(v_token, v_addr)
+          log.info '--- Control-Plane UP completed ---'
+        else
+          ctl.down
+          log.info '--- Control-Plane DOWN completed ---'
+        end
+        log.info '--- Operation finished ---'
+      rescue => e
+        log.info "ERROR: #{e.message}"
+        log.info e.backtrace.join("\n")
+      ensure
+        log.close
+      end
+    end
+
+    log_id = register_log(log.path)
+    redirect "/logs?id=#{log_id}"
+  end
+
+  # ===================================================
   # Control-plane nodes + exposed services
   # ===================================================
 

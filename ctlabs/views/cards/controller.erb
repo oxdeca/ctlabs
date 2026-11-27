@@ -15,7 +15,8 @@
 -->
 
 <%
-  controller_up = defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
+  controller_up      = defined?(Controller) && Controller.respond_to?(:running?) && Controller.running?
+  controller_partial = !controller_up && defined?(Controller) && Controller.respond_to?(:plane_containers) && !Controller.plane_containers.empty?
   plane_nodes   = if defined?(Controller) && Controller.respond_to?(:plane_nodes)
                     (Controller.plane_nodes rescue [])
                   else
@@ -44,11 +45,25 @@
 <div style="flex-shrink: 0;">
 
 <div class="w3-card w3-round-large w3-margin-bottom" style="background-color: #0f172a; overflow:hidden;">
-  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center;">
-    <span><i class="fas fa-cogs w3-text-purple"></i> Control-Plane</span>
-    <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : 'w3-red' %>" style="font-size: 12px; padding: 2px 10px;">
-      <%= controller_up ? 'Running' : 'Stopped' %>
-    </span>
+  <div class="w3-padding" style="background-color: #334155; color: #fff; font-weight: 500; display:flex; justify-content:space-between; align-items:center; gap: 8px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span><i class="fas fa-cogs w3-text-purple"></i> Control-Plane</span>
+      <span class="w3-tag w3-round w3-tiny <%= controller_up ? 'w3-green' : (controller_partial ? 'w3-orange' : 'w3-red') %>" style="font-size: 12px; padding: 2px 10px;">
+        <%= controller_up ? 'Running' : (controller_partial ? 'Partial' : 'Stopped') %>
+      </span>
+    </div>
+    <form method="post" action="/controller/execute" style="display: inline-flex; align-items: center; gap: 6px; margin: 0;">
+      <% unless controller_up %>
+        <button type="submit" name="action" value="up" class="w3-button w3-green w3-round w3-small" style="padding: 3px 10px; font-weight: 600;" title="Start the persistent control-plane">
+          <i class="fas fa-play"></i> Start
+        </button>
+      <% end %>
+      <% if controller_up || controller_partial %>
+        <button type="submit" name="action" value="down" class="w3-button w3-red w3-round w3-small" style="padding: 3px 10px; font-weight: 600;" title="Stop the persistent control-plane" onclick="return confirm('Stop the persistent control-plane (ctl-ctrl)?');">
+          <i class="fas fa-stop"></i> Stop
+        </button>
+      <% end %>
+    </form>
   </div>
   <div class="w3-padding">
     <% if plane_nodes.empty? %>
