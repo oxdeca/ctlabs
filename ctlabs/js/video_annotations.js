@@ -2891,7 +2891,8 @@
         const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
         if (delta === 0) return;
         const step = Math.max(0.05, Math.round((0.5 / timelineZoom) * 100) / 100);
-        const dir = delta > 0 ? 1 : -1;
+        // Wheel up (delta < 0) moves playhead forward; wheel down (delta > 0) moves backward
+        const dir = delta < 0 ? 1 : -1;
         const dur = getVideoDuration();
         const baseTime = pendingSeekTarget !== null ? pendingSeekTarget : videoEl.currentTime;
         safeSeek(Math.max(0, Math.min(dur, baseTime + dir * step)));
