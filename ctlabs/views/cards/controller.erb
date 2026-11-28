@@ -372,6 +372,21 @@
       <tr><td style="color: #94a3b8; width: 120px;">Working Dir:</td><td><code style="background-color: #1e293b; padding: 2px 6px; color: #38bdf8;"><%= ctrl_tf_workdir.empty? ? '(root)' : ctrl_tf_workdir %></code></td></tr>
       <tr><td style="color: #94a3b8;">Workspace:</td><td><code style="background-color: #1e293b; padding: 2px 6px;"><%= ctrl_tf_ws.empty? ? 'default' : ctrl_tf_ws %></code></td></tr>
       <tr><td style="color: #94a3b8;">Execution:</td><td><% if ctrl_tf_commands.strip.empty? %><span style="color: #64748b; font-style: italic;">Standard (init &amp; apply)</span><% else %><span class="w3-badge w3-tiny w3-round w3-blue" style="margin-right: 4px;"><i class="fas fa-terminal"></i> Custom Script Active</span><% end %></td></tr>
+      <% if ctrl_tf.dig('auth', 'method') == 'oauth' %>
+        <% oauth_st = (defined?(GcpAuth) && GcpAuth.respond_to?(:oauth_status)) ? (GcpAuth.oauth_status rescue {}) : {} %>
+        <tr>
+          <td style="color: #94a3b8;">GCP OAuth:</td>
+          <td>
+            <% if oauth_st[:signed_in] %>
+              <span class="w3-badge w3-tiny w3-round w3-green"><i class="fas fa-check"></i> Signed in</span>
+              <span style="color: #cbd5e1; margin-left: 6px;"><%= ERB::Util.h(oauth_st[:email].to_s) %></span>
+            <% else %>
+              <span class="w3-badge w3-tiny w3-round w3-orange"><i class="fas fa-exclamation-triangle"></i> Not signed in</span>
+              <span style="color: #94a3b8; margin-left: 6px;">Open Edit &rarr; GCP Auth to sign in</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
       <tr><td style="color: #94a3b8;">Variables:</td><td><% if ctrl_tf_vars.empty? %><span style="color: #64748b; font-style: italic;">None</span><% else %><% ctrl_tf_vars.each do |v| %><div style="margin-bottom: 2px;"><code style="background-color: #1e293b; padding: 2px 6px; color: #a78bfa;"><%= v %></code></div><% end %><% end %></td></tr>
     </table>
   </div>

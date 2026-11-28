@@ -1680,6 +1680,26 @@ module Automation
     end
     exec_env += "-e GIT_SSH_COMMAND='#{git_ssh_cmd}' "
 
+    # Auto-inject controller/lab bootstrap SSH public key into TF_VAR_ssh_keys
+    # unless the user already passed an explicit ssh_keys variable.
+    unless vars.any? { |v| v.to_s.strip.start_with?('ssh_keys=') }
+      safe_rel = @relative_path.to_s.gsub('/', '_')
+      pub_candidates = [
+        "/var/run/ctlabs/keys/#{safe_rel}_id_ed25519.pub",
+        File.join(defined?(Controller::SSH_DATA) ? Controller::SSH_DATA : '/var/lib/ctlabs/controller/ssh', 'id_ed25519.pub')
+      ]
+      pub_file = pub_candidates.find { |p| File.file?(p) && !File.read(p).strip.empty? }
+      if pub_file
+        pub_key = File.read(pub_file).strip
+        exec_env += "-e TF_VAR_ssh_keys=#{Shellwords.escape("ansible:#{pub_key}")} "
+      end
+    end
+
+    # Ensure non-root container user (e.g. ansible) can create .terraform/ and write state in work_dir
+    if exec_user && exec_user != 'root'
+      system("#{engine} exec #{exec_ctrl} chown -R #{exec_user}:#{exec_user} #{Shellwords.escape(work_dir)} >/dev/null 2>&1")
+    end
+
     # No more Python wrappers! Just pure Terraform.
     tf_command = base_tf_cmd
 

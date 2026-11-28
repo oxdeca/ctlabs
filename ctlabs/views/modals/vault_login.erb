@@ -21,9 +21,19 @@
     
     <header class="w3-container w3-padding" style="border-bottom: 1px solid #334155; background-color: #0f172a; border-radius: 12px 12px 0 0;">
       <span onclick="document.getElementById('vault-login-modal').style.display='none'" class="w3-button w3-display-topright w3-hover-red w3-round" style="color: #cbd5e1;">&times;</span>
-      <h4 style="margin: 0;"><i class="fas fa-lock w3-text-green"></i> HashiCorp Vault</h4>
+      <h4 style="margin: 0;"><i class="fas fa-shield-alt w3-text-green"></i> Authentication</h4>
     </header>
-    
+
+    <div class="w3-bar" style="background-color: #0f172a; border-bottom: 1px solid #334155; display: flex;">
+      <button type="button" id="auth-tab-btn-vault" onclick="window.switchAuthTab('vault')" class="w3-bar-item w3-button" style="flex: 1; padding: 10px 14px; font-weight: 600; border-bottom: 2px solid #10b981; color: #f8fafc; background: transparent;">
+        <i class="fas fa-lock w3-text-green"></i> HashiCorp Vault
+      </button>
+      <button type="button" id="auth-tab-btn-gcp" onclick="window.switchAuthTab('gcp')" class="w3-bar-item w3-button" style="flex: 1; padding: 10px 14px; font-weight: 600; border-bottom: 2px solid transparent; color: #94a3b8; background: transparent;">
+        <i class="fab fa-google w3-text-blue"></i> Google Cloud (OAuth)
+      </button>
+    </div>
+
+    <div id="auth-pane-vault">
     <div id="vault-auth-state" class="w3-container w3-padding w3-center" style="display: none; margin: 30px 0;">
       <i class="fas fa-check-circle w3-text-green" style="font-size: 3em; margin-bottom: 15px;"></i>
       <h4 style="margin: 0;">Authenticated</h4>
@@ -85,6 +95,59 @@
           <button type="submit" id="vault-login-btn" class="w3-button w3-green w3-round w3-small"><i class="fas fa-sign-in-alt"></i> Authenticate</button>
         </footer>
       </form>
+    </div>
+    </div>
+
+    <div id="auth-pane-gcp" style="display: none;">
+      <div class="w3-container w3-padding" style="max-height: 70vh; overflow-y: auto;">
+        <div class="w3-margin-bottom" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 10px 12px; background-color: #0f172a; border: 1px solid #334155; border-radius: 6px;">
+          <div id="auth-gcp-status-badge" style="font-size: 0.9em; color: #94a3b8;">
+            <i class="fas fa-spinner fa-spin"></i> Checking Google OAuth status...
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="auth-gcp-signin-btn" onclick="window.startAuthGcpLogin()" class="w3-button w3-green w3-round w3-small" style="font-weight: 600;">
+              <i class="fab fa-google"></i> Sign in with Google
+            </button>
+            <button type="button" id="auth-gcp-signout-btn" onclick="window.logoutAuthGcp()" class="w3-button w3-red w3-round w3-small" style="display: none; font-weight: 600;">
+              <i class="fas fa-sign-out-alt"></i> Sign Out
+            </button>
+          </div>
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label><i class="fas fa-project-diagram"></i> Default GCP Project ID (Optional - sets GOOGLE_CLOUD_PROJECT)</label>
+          <input type="text" id="auth-gcp-project" placeholder="e.g. ctlabs-dev-standalone" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label><i class="fas fa-id-card"></i> Google OAuth 2.0 Client ID</label>
+          <input type="text" id="auth-gcp-client-id" placeholder="123456789-abc.apps.googleusercontent.com" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label><i class="fas fa-key"></i> Client Secret (Optional for Desktop/PKCE clients)</label>
+          <input type="password" id="auth-gcp-client-secret" placeholder="Leave blank if unchanged or PKCE-only" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+
+        <div class="w3-margin-bottom">
+          <label><i class="fas fa-exchange-alt"></i> Redirect URI (Use <code>http://localhost</code> for Desktop client on LAN IP)</label>
+          <input type="text" id="auth-gcp-redirect-uri" placeholder="http://localhost" class="w3-input w3-small w3-round" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+        </div>
+
+        <div class="w3-margin-bottom" style="padding: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px;">
+          <label style="font-size: 0.82em; color: #94a3b8;">Manual Callback Fallback (if Google redirected to <code>http://localhost</code>, paste the full URL or <code>code</code> here):</label>
+          <div style="display: flex; gap: 6px; margin-top: 6px;">
+            <input type="text" id="auth-gcp-manual-code" class="w3-input w3-small w3-round" placeholder="http://localhost/?code=... or authorization code" style="background-color: #1e293b; color: #e2e8f0; border: 1px solid #475569; flex: 1;">
+            <button type="button" onclick="window.completeAuthGcpManual()" class="w3-button w3-blue w3-round w3-small" style="white-space: nowrap;">Complete Sign-In</button>
+          </div>
+        </div>
+
+        <div id="auth-gcp-result" class="w3-panel w3-round" style="display:none; font-size: 0.9em; padding: 8px; margin-bottom: 0;"></div>
+      </div>
+
+      <footer class="w3-container w3-padding" style="border-top: 1px solid #334155; background-color: #0f172a; border-radius: 0 0 12px 12px; text-align: right;">
+        <button type="button" onclick="document.getElementById('vault-login-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Close</button>
+      </footer>
     </div>
 
   </div>

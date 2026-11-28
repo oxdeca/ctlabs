@@ -277,13 +277,27 @@ class Graph
             </table> >]
           }
         <%- target_node = dnat_target_node -%>
+        <%- transit_remotes = @nodes.select { |n| n.remote? && ((n.plane == 'transit') || (n.nics && n.nics.keys.any? { |k| k.start_with?('tun', 'wg') })) } -%>
+        <%- transit_gw = transit_remotes.first -%>
+        <%- if transit_gw
+              tun_nic = transit_gw.nics.keys.find { |k| k.start_with?('tun', 'wg') } || 'tun0'
+              local_tun = @nodes.find { |n| !n.remote? && n.nics && n.nics.key?(tun_nic) }
+              if local_tun
+                already_linked = @links.any? { |l| l.any? { |ep| ep.start_with?("#{local_tun.name}:") } && l.any? { |ep| ep.start_with?("#{transit_gw.name}:") } }
+                unless already_linked -%>
+          <%= local_tun.name.gsub(/[.-]/, "_") %>:<%= tun_nic %>:s -- <%= transit_gw.name.gsub(/[.-]/, "_") %>:<%= tun_nic %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-     end
+              end
+            end -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
+        <%- end -%>
+        <%- cloud_anchor = transit_gw || target_node -%>
+        <%- if cloud_anchor -%>
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
-                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
-                next if is_transit
+                next if transit_remotes.include?(ext_node)
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
-          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
+          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= cloud_anchor.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 
@@ -428,13 +442,27 @@ class Graph
             </table> >]
           }
         <%- target_node = dnat_target_node -%>
+        <%- transit_remotes = @nodes.select { |n| n.remote? && ((n.plane == 'transit') || (n.nics && n.nics.keys.any? { |k| k.start_with?('tun', 'wg') })) } -%>
+        <%- transit_gw = transit_remotes.first -%>
+        <%- if transit_gw
+              tun_nic = transit_gw.nics.keys.find { |k| k.start_with?('tun', 'wg') } || 'tun0'
+              local_tun = @nodes.find { |n| !n.remote? && n.nics && n.nics.key?(tun_nic) }
+              if local_tun
+                already_linked = @links.any? { |l| l.any? { |ep| ep.start_with?("#{local_tun.name}:") } && l.any? { |ep| ep.start_with?("#{transit_gw.name}:") } }
+                unless already_linked -%>
+          <%= local_tun.name.gsub(/[.-]/, "_") %>:<%= tun_nic %>:s -- <%= transit_gw.name.gsub(/[.-]/, "_") %>:<%= tun_nic %>:n [style="dashed", color="#14b8a6", penwidth="2.5"]
+        <%-     end
+              end
+            end -%>
         <%- if target_node -%>
           ctlabs_host:eth0:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#ec4899", style="dashed", penwidth="2.0"]
+        <%- end -%>
+        <%- cloud_anchor = transit_gw || target_node -%>
+        <%- if cloud_anchor -%>
         <%-   @nodes.select { |n| n.remote? }.each do |ext_node|
-                is_transit = (ext_node.plane == 'transit') || (ext_node.nics && ext_node.nics.keys.any? { |k| k.start_with?('tun', 'wg') })
-                next if is_transit
+                next if transit_remotes.include?(ext_node)
                 ext_port = ext_node.nics.keys.first || 'eth1' -%>
-          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= target_node.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
+          <%= ext_node.name.gsub(/[.-]/, "_") %>:<%= ext_port %>:s -- <%= cloud_anchor.name.gsub(/[.-]/, "_") %>:n [color="#0ea5e9", style="dashed", penwidth="2.0"]
         <%-   end -%>
         <%- end -%>
 

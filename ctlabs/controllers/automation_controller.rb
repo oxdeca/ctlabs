@@ -540,6 +540,10 @@ class AutomationController < BaseController
       when 'profile'
         profile_name = params[:auth_profile].to_s.strip
         tf_cfg['profile'] = profile_name unless profile_name.empty?
+      when 'oauth'
+        oauth_project = params[:oauth_project].to_s.strip
+        tf_cfg['auth'] = { 'method' => 'oauth' }
+        tf_cfg['auth']['project'] = oauth_project unless oauth_project.empty?
       end
 
       # Migrate away from the legacy `terraform.vault` key now that `auth` owns it.

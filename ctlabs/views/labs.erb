@@ -100,12 +100,21 @@
     </form>
 
     <div style="display: flex; gap: 8px;">
-      <button onclick="window.openVaultLoginModal()" class="w3-button w3-round w3-small" style="background-color: #1e293b; border: 1px solid #334155; margin-right: 8px;">
+      <% gcp_oauth_up = defined?(GcpAuth) && GcpAuth.respond_to?(:oauth_status) && (GcpAuth.oauth_status[:signed_in] rescue false) %>
+      <button onclick="window.openAuthModal('vault')" class="w3-button w3-round w3-small" style="background-color: #1e293b; border: 1px solid #334155; margin-right: 8px;" title="Manage Vault &amp; Google Cloud Authentication">
         <span id="vault-status-indicator">
         <% if session[:vault_token] && !session[:vault_token].empty? %>
-          <i class="fas fa-lock w3-text-green"></i> Vault Active
+          <i class="fas fa-lock w3-text-green"></i> Vault
         <% else %>
-          <i class="fas fa-unlock w3-text-gray"></i> Vault Login
+          <i class="fas fa-unlock w3-text-gray"></i> Vault
+        <% end %>
+        </span>
+        <span style="color: #475569; margin: 0 5px;">|</span>
+        <span id="gcp-oauth-nav-indicator">
+        <% if gcp_oauth_up %>
+          <i class="fab fa-google w3-text-green"></i> GCP
+        <% else %>
+          <i class="fab fa-google w3-text-gray"></i> GCP
         <% end %>
         </span>
       </button>

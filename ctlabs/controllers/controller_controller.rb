@@ -56,6 +56,88 @@ class ControllerController < BaseController
   end
 
   # ===================================================
+  # GCP OAuth2 (browser sign-in, zero gcloud SDK)
+  # ===================================================
+
+  get '/controller/gcp/oauth/status' do
+    content_type :json
+    GcpAuth.oauth_status.to_json
+  end
+
+  post '/controller/gcp/oauth/start' do
+    content_type :json
+    begin
+      res = GcpAuth.oauth_start(
+        client_id:     params[:client_id],
+        client_secret: params[:client_secret],
+        redirect_uri:  params[:redirect_uri],
+        project:       params[:project]
+      )
+      { success: true, auth_url: res[:auth_url], state: res[:state] }.to_json
+    rescue => e
+      status 400
+      { success: false, error: e.message }.to_json
+    end
+  end
+
+  get '/controller/gcp/oauth/callback' do
+    content_type :html
+    if params[:error] && !params[:error].to_s.empty?
+      err = ERB::Util.h(params[:error].to_s)
+      return "<!doctype html><html><body style='background:#0f172a;color:#f87171;font-family:sans-serif;padding:24px;'>" \
+             "<h3>Google OAuth Failed</h3><p>#{err}</p></body></html>"
+    end
+
+    begin
+      status_data = GcpAuth.oauth_exchange(code_or_url: params[:code], state: params[:state])
+      payload_json = status_data.to_json.gsub('</', '<\\/')
+      <<~HTML
+        <!doctype html>
+        <html>
+        <body style="background:#0f172a;color:#e2e8f0;font-family:sans-serif;padding:24px;">
+          <h3 style="color:#10b981;">Google OAuth Sign-In Complete</h3>
+          <p>Signed in as <strong>#{ERB::Util.h(status_data[:email].to_s)}</strong>. You can close this window.</p>
+          <script>
+            try {
+              if (window.opener) {
+                window.opener.postMessage({ type: 'ctlabs_gcp_oauth_done', status: #{payload_json} }, '*');
+              }
+            } catch (e) {}
+            setTimeout(function() { window.close(); }, 600);
+          </script>
+        </body>
+        </html>
+      HTML
+    rescue => e
+      status 400
+      "<!doctype html><html><body style='background:#0f172a;color:#f87171;font-family:sans-serif;padding:24px;'>" \
+      "<h3>Google OAuth Exchange Failed</h3><p>#{ERB::Util.h(e.message)}</p></body></html>"
+    end
+  end
+
+  post '/controller/gcp/oauth/exchange' do
+    content_type :json
+    begin
+      status_data = GcpAuth.oauth_exchange(code_or_url: params[:code_or_url], state: params[:state])
+      { success: true, status: status_data }.to_json
+    rescue => e
+      status 400
+      { success: false, error: e.message }.to_json
+    end
+  end
+
+  post '/controller/gcp/oauth/logout' do
+    content_type :json
+    begin
+      status_data = GcpAuth.oauth_logout
+      { success: true, status: status_data }.to_json
+    rescue => e
+      status 400
+      { success: false, error: e.message }.to_json
+    end
+  end
+
+  # ===================================================
   # Control-plane nodes + exposed services
   # ===================================================
 
@@ -529,6 +611,10 @@ class ControllerController < BaseController
       when 'profile'
         profile_name = params[:auth_profile].to_s.strip
         tf_cfg['profile'] = profile_name unless profile_name.empty?
+      when 'oauth'
+        oauth_project = params[:oauth_project].to_s.strip
+        tf_cfg['auth'] = { 'method' => 'oauth' }
+        tf_cfg['auth']['project'] = oauth_project unless oauth_project.empty?
       end
 
       tf_cfg.delete('vault')

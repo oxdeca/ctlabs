@@ -1968,9 +1968,34 @@ window.openTfTab = function(tabId) {
       document.getElementById('tf-auth-vault-fields').style.display = (method === 'vault') ? 'block' : 'none';
       document.getElementById('tf-auth-wif-fields').style.display = (method === 'wif') ? 'block' : 'none';
       document.getElementById('tf-auth-profile-fields').style.display = (method === 'profile') ? 'block' : 'none';
+      const oauthFields = document.getElementById('tf-auth-oauth-fields');
+      if (oauthFields) oauthFields.style.display = (method === 'oauth') ? 'block' : 'none';
       if (method === 'env') {
           window.checkTerminalStagedCreds();
+      } else if (method === 'oauth') {
+          window.refreshGcpOauthStatus();
       }
+  };
+
+  window.renderGcpOauthStatus = function(st) {
+      const badge = document.getElementById('tf-oauth-status-badge');
+      if (badge) {
+          if (st && st.signed_in) {
+              const who = st.email ? `Signed in as <strong style="color:#10b981;">${window.escapeHtml ? window.escapeHtml(st.email) : st.email}</strong>` : '<strong style="color:#10b981;">Signed in</strong>';
+              badge.innerHTML = `<i class="fas fa-check-circle" style="color:#10b981;"></i> ${who}`;
+          } else {
+              badge.innerHTML = '<i class="fas fa-exclamation-circle" style="color:#f59e0b;"></i> <span style="color:#94a3b8;">Not signed in (click Manage Google Auth)</span>';
+          }
+      }
+  };
+
+  window.refreshGcpOauthStatus = async function() {
+      try {
+          const res = await fetch('/controller/gcp/oauth/status');
+          if (!res.ok) return;
+          const st = await res.json();
+          window.renderGcpOauthStatus(st);
+      } catch (e) {}
   };
 
   window.checkTerminalStagedCreds = function() {
@@ -2129,6 +2154,8 @@ window.openTfTab = function(tabId) {
           document.getElementById('edit-terraform-wif-service-account').value = auth.service_account || '';
           document.getElementById('edit-terraform-wif-scopes').value = (auth.scopes || []).join('\n');
           document.getElementById('edit-terraform-auth-profile').value = tf.profile || '';
+          const oauthProjEl = document.getElementById('edit-terraform-oauth-project');
+          if (oauthProjEl) oauthProjEl.value = auth.project || '';
           window.updateTfAuthMethodUI();
 
           await window.loadTfAuthProfiles();
@@ -2239,6 +2266,7 @@ window.openTfTab = function(tabId) {
       const wifServiceAcct = document.getElementById('edit-terraform-wif-service-account').value.trim();
       const wifScopes      = document.getElementById('edit-terraform-wif-scopes').value;
       const authProfile    = document.getElementById('edit-terraform-auth-profile').value.trim();
+      const oauthProject   = (document.getElementById('edit-terraform-oauth-project')?.value || '').trim();
       const authProfilesYaml = window.cmEditors['editor-TfAuthProfiles'] ? window.cmEditors['editor-TfAuthProfiles'].getValue() : '';
       const customCommands = window.cmEditors['edit-terraform-commands'] ? window.cmEditors['edit-terraform-commands'].getValue() : '';
 
@@ -2259,6 +2287,7 @@ window.openTfTab = function(tabId) {
           wif_service_account: wifServiceAcct,
           wif_scopes: wifScopes,
           auth_profile: authProfile,
+          oauth_project: oauthProject,
           tf_auth_profiles: authProfilesYaml,
           tf_files: JSON.stringify(filesData)
       });

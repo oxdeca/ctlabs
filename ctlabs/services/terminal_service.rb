@@ -898,12 +898,18 @@ class TerminalService
       # named `terraform.profile` is resolved against (automation/lab vs ctl).
       is_ctl_controller = defined?(Controller) && exec_name == (Controller::NAME rescue 'ctl-ctrl')
       is_controller_container = (node_type == 'controller') || is_ctl_controller
+      oauth_signed_in = defined?(GcpAuth) && GcpAuth.respond_to?(:oauth_status) && (GcpAuth.oauth_status[:signed_in] rescue false)
 
-      if is_controller_container && tf_cfg
-        auth_method = (tf_cfg['auth'] && tf_cfg['auth']['method']) rescue nil
-        if auth_method == 'env' || (session[:vault_token] && session[:vault_addr])
+      if is_controller_container
+        auth_method = (tf_cfg && tf_cfg['auth'] && tf_cfg['auth']['method']) rescue nil
+        effective_tf_cfg = if tf_cfg && (auth_method == 'env' || auth_method == 'oauth' || (session[:vault_token] && session[:vault_addr]))
+                             tf_cfg
+                           elsif oauth_signed_in
+                             { 'auth' => { 'method' => 'oauth' } }
+                           end
+        if effective_tf_cfg
           begin
-            gcp_env = GcpAuth.env_vars(tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
+            gcp_env = GcpAuth.env_vars(effective_tf_cfg, { addr: session[:vault_addr], token: session[:vault_token] },
                                        scope: is_ctl_controller ? 'ctl' : 'lab',
                                        target_container: exec_name,
                                        target_user: node_user)

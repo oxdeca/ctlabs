@@ -1950,19 +1950,21 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
           # Call run_terraform synchronously. If it fails, the lab startup will abort here.
           run_terraform(ctrl.name, nil, web_v_token, web_v_addr, 'apply')
           
-          # CRITICAL: We must reload the lab YAML into memory because Terraform
+          # CRITICAL: We must reload + re-expand the lab YAML into memory because Terraform
           # may have injected new public/private IPs for the cloud VMs!
           @log.info "Reloading topology to capture Terraform IP assignments..."
-          @cfg = YAML.load_file(@cfg_file)
-          
-          # Re-initialize nodes so the new IPs are available for the Ansible inventory
-          @nodes = init_nodes(@vm_name)
+          reload_expanded_config!
         rescue => e
           @log.write("Terraform provisioning failed: #{e.message}", "error")
           #raise "Lab startup aborted due to Terraform failure: #{e.message}"
         end
       end
     end
+
+    # Also harvest provisioned GCP VM IPs from the persistent control-plane's
+    # terraform.tfstate (when present) so labs that reuse a ctl-ctrl-provisioned
+    # gateway (e.g. gcp-gw in `shared`) pick up its live IPs automatically.
+    harvest_controller_terraform_ips!
     # -----------------------------------------
 
     @log.info "Generating fresh Ansible inventory..."
@@ -2003,6 +2005,24 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       # Remove ctl-ctrl's OOB NIC BEFORE stopping nodes (the NIC lives on
       # ctl-ctrl, which outlives the lab).
       detach_controller_oob! if attached
+
+      # Destroy lab-scoped Terraform resources (if ansible.terraform.work_dir is
+      # configured) BEFORE stopping containers, while the controller is still up.
+      unless @standalone
+        ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
+        if ctrl && @cfg.is_a?(Hash) && @cfg['topology'].is_a?(Array) && @cfg['topology'][0].is_a?(Hash)
+          ctrl_cfg, = Lab.find_node_in_raw_yaml(@cfg['topology'][0], ctrl.name)
+          tf_work = ctrl_cfg&.dig('terraform', 'work_dir').to_s.strip
+          unless tf_work.empty?
+            @log.info "Destroying lab Terraform resources (#{tf_work})..."
+            begin
+              run_terraform(ctrl.name, nil, web_v_token, web_v_addr, 'destroy')
+            rescue => e
+              @log.write("Terraform destroy failed (continuing lab teardown): #{e.message}", 'warn')
+            end
+          end
+        end
+      end
 
       synchronize_lab_operation do
         @log.info "Stopping Nodes:"
@@ -2281,6 +2301,79 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       end
     end
     merged
+  end
+
+  # Re-read @cfg_file, re-run placeholder expansion (${node:...}, ${ctlabs_host}),
+  # refresh public config.yml, and re-init @nodes so inventory & playbooks see new IPs.
+  def reload_expanded_config!
+    return unless File.file?(@cfg_file)
+    raw_yaml = File.read(@cfg_file)
+    expanded_yaml = self.class.expand_placeholders(raw_yaml, @server_ip, @log)
+    unless @standalone
+      File.open("#{@pubdir}/config.yml", 'w') { |f| f.write(expanded_yaml) }
+    end
+    @cfg = YAML.load(expanded_yaml)
+    @nodes = init_nodes(@vm_name)
+  end
+
+  # Harvest GCP VM IPs from the persistent control-plane's terraform.tfstate
+  # when present on disk, so labs reusing ctl-ctrl-provisioned VMs (e.g. gcp-gw)
+  # automatically pick up their live public/private IPs without manual edits.
+  def harvest_controller_terraform_ips!
+    return if @standalone || !defined?(Controller)
+    ctrl_tf = (Controller.controller_terraform rescue {}) || {}
+    tf_work_dir = ctrl_tf['work_dir'].to_s.strip
+    return if tf_work_dir.empty?
+
+    tf_base_host = ctrl_tf['root_dir'].to_s.strip
+    tf_base_host = Automation::TF_DIR if tf_base_host.empty?
+    workspace    = ctrl_tf['workspace'].to_s.strip
+    workspace    = 'default' if workspace.empty?
+    state_file   = workspace == 'default' ? "#{tf_base_host}/#{tf_work_dir}/terraform.tfstate" : "#{tf_base_host}/#{tf_work_dir}/terraform.tfstate.d/#{workspace}/terraform.tfstate"
+    return unless File.exist?(state_file)
+
+    engine = system('command -v podman >/dev/null 2>&1') ? 'podman' : 'docker'
+    updated = harvest_terraform_ips(
+      tf_base_host: tf_base_host,
+      tf_work_dir:  tf_work_dir,
+      tf_base_ctl:  tf_base_host,
+      workspace:    workspace,
+      engine:       engine,
+      exec_ctrl:    Controller::NAME
+    )
+    reload_expanded_config! if updated
+    stage_controller_ssh_key!(engine) if updated
+  rescue => e
+    @log.write("Controller Terraform IP harvest skipped: #{e.message}", 'warn')
+  end
+
+  # When a lab harvests GCP VMs provisioned by ctl-ctrl, stage ctl-ctrl's
+  # bootstrap private key onto the lab controller as id_ed25519_ctl (with
+  # Host * IdentityFile in ~/.ssh/config) so Ansible/SSH can reach those VMs.
+  def stage_controller_ssh_key!(engine)
+    ctrl = find_node('ansible') || @nodes.find { |n| n.type == 'controller' }
+    return unless ctrl
+
+    ctl_priv = [
+      '/var/run/ctlabs/keys/controller_topology.yml_id_ed25519',
+      File.join(Controller::SSH_DATA, 'id_ed25519')
+    ].find { |p| File.file?(p) }
+    return unless ctl_priv
+
+    login_user = (ctrl.user.nil? || ctrl.user.to_s.empty?) ? 'root' : ctrl.user.to_s
+    home       = login_user == 'root' ? '/root' : "/home/#{login_user}"
+    key_homes  = ['/root']
+    key_homes << home unless login_user == 'root'
+
+    key_homes.each do |key_home|
+      next unless system("#{engine} exec #{ctrl.name} mkdir -p #{key_home}/.ssh >/dev/null 2>&1")
+      system("#{engine} cp #{ctl_priv} #{ctrl.name}:#{key_home}/.ssh/id_ed25519_ctl >/dev/null 2>&1")
+      system("#{engine} cp #{ctl_priv}.pub #{ctrl.name}:#{key_home}/.ssh/id_ed25519_ctl.pub >/dev/null 2>&1") if File.file?("#{ctl_priv}.pub")
+      system("#{engine} exec #{ctrl.name} sh -c 'grep -q id_ed25519_ctl #{key_home}/.ssh/config 2>/dev/null || printf \"Host *\\n  IdentityFile ~/.ssh/id_ed25519\\n  IdentityFile ~/.ssh/id_ed25519_ctl\\n\" >> #{key_home}/.ssh/config' >/dev/null 2>&1")
+      system("#{engine} exec #{ctrl.name} chmod 700 #{key_home}/.ssh && #{engine} exec #{ctrl.name} chmod 600 #{key_home}/.ssh/id_ed25519_ctl #{key_home}/.ssh/config >/dev/null 2>&1")
+      system("#{engine} exec #{ctrl.name} chown -R #{login_user}:#{login_user} #{key_home}/.ssh >/dev/null 2>&1") unless key_home == '/root'
+    end
+    @log.info "Staged controller SSH key (id_ed25519_ctl) onto #{ctrl.name}"
   end
 
 end # end class Lab

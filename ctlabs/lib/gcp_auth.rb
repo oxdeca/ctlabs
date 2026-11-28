@@ -21,12 +21,20 @@ require 'json'
 require 'openssl'
 require 'time'
 require 'yaml'
+require 'securerandom'
+require 'base64'
+require 'fileutils'
 require_relative 'vault_auth'
 
 class GcpAuth
   DEFAULT_VAULT_ROLESET = 'terraform-runner'
   GCP_SCOPE             = 'https://www.googleapis.com/auth/cloud-platform'
   ENV_DIR_NAME          = (ENV['CTLABS_ENV_DIR'] || ENV['CTLABS_ENV_DIR_NAME'] || '.ctlabs_env').to_s.sub(%r{\A/+}, '')
+  OAUTH_FILE            = '/var/lib/ctlabs/controller/gcp_oauth.json'
+  GOOGLE_AUTH_URL       = 'https://accounts.google.com/o/oauth2/v2/auth'
+  GOOGLE_TOKEN_URL      = 'https://oauth2.googleapis.com/token'
+  GOOGLE_USERINFO_URL   = 'https://openidconnect.googleapis.com/v1/userinfo'
+  OAUTH_SCOPES          = [GCP_SCOPE, 'openid', 'email'].freeze
 
   def self.env_dir_name
     ENV_DIR_NAME
@@ -120,6 +128,18 @@ class GcpAuth
       return vars
     end
 
+    if auth_cfg['method'] == 'oauth'
+      token = fetch_oauth_token(auth_cfg)
+      vars  = { 'GOOGLE_OAUTH_ACCESS_TOKEN' => token, 'CLOUDSDK_AUTH_ACCESS_TOKEN' => token }
+      project = auth_cfg['project'].to_s.strip
+      project = oauth_store_read['project'].to_s.strip if project.empty?
+      unless project.empty?
+        vars['GOOGLE_CLOUD_PROJECT']  = project
+        vars['CLOUDSDK_CORE_PROJECT'] = project
+      end
+      return vars
+    end
+
     token = fetch_token(tf_cfg, vault_ctx, scope: scope)
     return {} unless token
     { 'GOOGLE_OAUTH_ACCESS_TOKEN' => token, 'CLOUDSDK_AUTH_ACCESS_TOKEN' => token }
@@ -129,6 +149,7 @@ class GcpAuth
     auth_cfg = resolve_auth_cfg(tf_cfg, scope: scope)
     return nil unless auth_cfg
     return nil if auth_cfg['method'] == 'env'
+    return fetch_oauth_token(auth_cfg) if auth_cfg['method'] == 'oauth'
 
     vault_ctx ||= {}
     raise "Missing Vault Token for GCP Authentication." if vault_ctx[:token].to_s.empty?
@@ -325,5 +346,206 @@ class GcpAuth
   def self.clear_wif_cache(addr)
     @wif_cache ||= {}
     @wif_cache.reject! { |key, _| key.start_with?("#{addr}_") }
+  end
+
+  # ------------------------------------------------------------------------
+  # Method: oauth (Google OAuth2 Authorization Code + PKCE, no gcloud SDK)
+  # ------------------------------------------------------------------------
+  def self.oauth_store_read
+    return {} unless File.file?(OAUTH_FILE)
+    JSON.parse(File.read(OAUTH_FILE))
+  rescue
+    {}
+  end
+
+  def self.oauth_store_write(data)
+    FileUtils.mkdir_p(File.dirname(OAUTH_FILE))
+    File.write(OAUTH_FILE, JSON.pretty_generate(data))
+    File.chmod(0o600, OAUTH_FILE)
+    data
+  end
+
+  def self.oauth_status
+    store = oauth_store_read
+    has_refresh = !store['refresh_token'].to_s.empty?
+    has_access  = !store['access_token'].to_s.empty? && store['expires_at'].to_i > Time.now.to_i
+    {
+      signed_in:     has_refresh || has_access,
+      email:         store['email'].to_s,
+      project:       store['project'].to_s,
+      client_id:     store['client_id'].to_s,
+      client_secret_set: !store['client_secret'].to_s.empty?,
+      redirect_uri:  store['redirect_uri'].to_s,
+      expires_at:    store['expires_at'].to_i
+    }
+  end
+
+  def self.oauth_start(client_id:, redirect_uri:, client_secret: nil, project: nil)
+    store = oauth_store_read
+    cid   = client_id.to_s.strip
+    cid   = store['client_id'].to_s.strip if cid.empty?
+    raise 'OAuth Client ID is required.' if cid.empty?
+
+    ruri  = redirect_uri.to_s.strip
+    raise 'Redirect URI is required.' if ruri.empty?
+
+    csec  = client_secret.to_s.strip
+    csec  = store['client_secret'].to_s.strip if csec.empty?
+
+    proj  = project.to_s.strip
+    proj  = store['project'].to_s.strip if proj.empty?
+
+    store['client_id']     = cid
+    store['client_secret'] = csec unless csec.empty?
+    store['redirect_uri']  = ruri
+    store['project']       = proj unless proj.empty?
+    oauth_store_write(store)
+
+    verifier  = SecureRandom.urlsafe_base64(48)
+    challenge = Base64.urlsafe_encode64(OpenSSL::Digest::SHA256.digest(verifier), padding: false)
+    state     = SecureRandom.hex(24)
+
+    @oauth_pending ||= {}
+    now = Time.now.to_i
+    @oauth_pending.reject! { |_, v| now - v[:created_at] > 900 }
+    @oauth_pending[state] = {
+      state:         state,
+      code_verifier: verifier,
+      client_id:     cid,
+      client_secret: csec,
+      redirect_uri:  ruri,
+      project:       proj,
+      created_at:    now
+    }
+
+    query = URI.encode_www_form(
+      client_id:             cid,
+      redirect_uri:          ruri,
+      response_type:         'code',
+      scope:                 OAUTH_SCOPES.join(' '),
+      access_type:           'offline',
+      prompt:                'consent',
+      code_challenge:        challenge,
+      code_challenge_method: 'S256',
+      state:                 state
+    )
+    { auth_url: "#{GOOGLE_AUTH_URL}?#{query}", state: state }
+  end
+
+  def self.oauth_exchange(code_or_url:, state: nil)
+    raw = code_or_url.to_s.strip
+    raise 'Authorization code or callback URL is required.' if raw.empty?
+
+    code = raw
+    parsed_state = state.to_s.strip
+    if raw.start_with?('http://', 'https://') || raw.include?('code=')
+      query_str = raw.include?('?') ? raw.split('?', 2).last : raw
+      params = URI.decode_www_form(query_str).to_h
+      raise "Google OAuth error: #{params['error']}" if params['error'] && !params['error'].empty?
+      code = params['code'].to_s.strip
+      parsed_state = params['state'].to_s.strip if parsed_state.empty? && params['state']
+    end
+    raise 'Authorization code not found.' if code.empty?
+
+    @oauth_pending ||= {}
+    pending = if !parsed_state.empty?
+                @oauth_pending.delete(parsed_state)
+              else
+                last_k = @oauth_pending.keys.last
+                last_k ? @oauth_pending.delete(last_k) : nil
+              end
+    raise 'OAuth session expired or invalid state. Please click Sign in with Google again.' unless pending
+
+    form = {
+      'grant_type'    => 'authorization_code',
+      'code'          => code,
+      'client_id'     => pending[:client_id],
+      'redirect_uri'  => pending[:redirect_uri],
+      'code_verifier' => pending[:code_verifier]
+    }
+    form['client_secret'] = pending[:client_secret] unless pending[:client_secret].to_s.empty?
+
+    data = oauth_token_request(form)
+    store = oauth_store_read
+    store['client_id']     = pending[:client_id]
+    store['client_secret'] = pending[:client_secret] unless pending[:client_secret].to_s.empty?
+    store['redirect_uri']  = pending[:redirect_uri]
+    store['project']       = pending[:project] unless pending[:project].to_s.empty?
+    store['access_token']  = data['access_token']
+    store['refresh_token'] = data['refresh_token'] if data['refresh_token'] && !data['refresh_token'].empty?
+    store['expires_at']    = Time.now.to_i + [data['expires_in'].to_i, 60].max
+    email = fetch_oauth_email(data['access_token'], data['id_token'])
+    store['email'] = email unless email.to_s.empty?
+    oauth_store_write(store)
+    oauth_status
+  end
+
+  def self.oauth_logout
+    store = oauth_store_read
+    %w[access_token refresh_token expires_at email].each { |k| store.delete(k) }
+    oauth_store_write(store)
+    oauth_status
+  end
+
+  def self.fetch_oauth_token(_cfg = {})
+    store = oauth_store_read
+    now   = Time.now.to_i
+    if !store['access_token'].to_s.empty? && store['expires_at'].to_i > now + 60
+      return store['access_token']
+    end
+
+    refresh_token = store['refresh_token'].to_s.strip
+    client_id     = store['client_id'].to_s.strip
+    if refresh_token.empty? || client_id.empty?
+      raise 'Google OAuth not signed in. Sign in via Control-Plane / Terraform GCP Auth.'
+    end
+
+    form = {
+      'grant_type'    => 'refresh_token',
+      'refresh_token' => refresh_token,
+      'client_id'     => client_id
+    }
+    form['client_secret'] = store['client_secret'] unless store['client_secret'].to_s.empty?
+
+    data = oauth_token_request(form)
+    store['access_token'] = data['access_token']
+    store['expires_at']   = Time.now.to_i + [data['expires_in'].to_i, 60].max
+    oauth_store_write(store)
+    store['access_token']
+  end
+
+  def self.oauth_token_request(form)
+    uri  = URI.parse(GOOGLE_TOKEN_URL)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    req = Net::HTTP::Post.new(uri.request_uri)
+    req.set_form_data(form)
+    res  = http.request(req)
+    data = JSON.parse(res.body)
+    unless res.is_a?(Net::HTTPSuccess) && data['access_token']
+      err = data['error_description'] || data['error'] || res.message
+      raise "Google OAuth Token Error: #{err}"
+    end
+    data
+  end
+
+  def self.fetch_oauth_email(access_token, id_token = nil)
+    if id_token && id_token.split('.').size >= 2
+      begin
+        payload = JSON.parse(Base64.urlsafe_decode64(id_token.split('.')[1] + '==='))
+        return payload['email'].to_s if payload['email']
+      rescue
+      end
+    end
+
+    uri  = URI.parse(GOOGLE_USERINFO_URL)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    req = Net::HTTP::Get.new(uri.request_uri, { 'Authorization' => "Bearer #{access_token}" })
+    res = http.request(req)
+    return '' unless res.is_a?(Net::HTTPSuccess)
+    JSON.parse(res.body)['email'].to_s
+  rescue
+    ''
   end
 end

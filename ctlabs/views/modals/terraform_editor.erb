@@ -108,6 +108,7 @@
               <option value="env">Environment Variables (e.g. GOOGLE_APPLICATION_CREDENTIALS)</option>
               <option value="vault">Vault GCP Secrets Engine (dynamic/static secrets)</option>
               <option value="wif">Workload Identity Federation (via Vault OIDC)</option>
+              <option value="oauth">Google OAuth (Browser Sign-In, no gcloud)</option>
               <option value="profile">Named Profile (see Auth Profiles tab)</option>
             </select>
           </div>
@@ -169,6 +170,21 @@
               <input type="text" id="edit-terraform-auth-profile" class="w3-input w3-small w3-round" placeholder="e.g., gcp-wif-default" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
             </div>
           </div>
+
+          <div id="tf-auth-oauth-fields" style="display:none;">
+            <div class="w3-margin-bottom" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+              <div id="tf-oauth-status-badge" style="font-size: 0.85em; color: #94a3b8;">
+                <i class="fas fa-circle" style="color: #64748b; font-size: 0.75em;"></i> Checking status...
+              </div>
+              <button type="button" onclick="window.openAuthModal && window.openAuthModal('gcp')" class="w3-button w3-blue w3-round w3-small" style="font-weight: 600;">
+                <i class="fab fa-google"></i> Manage Google Auth
+              </button>
+            </div>
+            <div class="w3-margin-bottom">
+              <label style="font-size: 0.85em; color: #94a3b8;">GCP Project ID Override (Optional - sets GOOGLE_CLOUD_PROJECT)</label>
+              <input type="text" id="edit-terraform-oauth-project" class="w3-input w3-small w3-round" placeholder="e.g. my-gcp-project (leave blank to use Auth default)" style="background-color: #0f172a; color: #e2e8f0; border: 1px solid #475569;">
+            </div>
+          </div>
         </div>
 
         <div class="w3-row-padding" style="margin: 0 -8px;">
@@ -202,7 +218,7 @@
       <div>
         <button type="button" id="tf-delete-file-btn" onclick="window.deleteActiveTerraformFile()" class="w3-button w3-red w3-round w3-small" style="display: none;"><i class="fas fa-trash"></i> Delete File</button>
       </div>
-      <div>
+      <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
         <button type="button" onclick="document.getElementById('terraform-editor-modal').style.display='none'" class="w3-button w3-round w3-small" style="background-color: #475569;">Cancel</button>
         <button type="button" id="tf-save-btn" onclick="window.saveTerraformConfig()" class="w3-button w3-green w3-round w3-small"><i class="fas fa-save"></i> Save All Files</button>
       </div>

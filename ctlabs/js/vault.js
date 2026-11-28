@@ -5,9 +5,32 @@
  -----------------------------------------------------------------------------
 */
 
-// --- VAULT AUTHENTICATION LOGIC ---
-window.openVaultLoginModal = async function() {
+// --- UNIFIED AUTHENTICATION MODAL (VAULT + GCP OAUTH) ---
+window.switchAuthTab = function(tab) {
+    const isGcp = (tab === 'gcp');
+    const vaultPane = document.getElementById('auth-pane-vault');
+    const gcpPane   = document.getElementById('auth-pane-gcp');
+    const vaultBtn  = document.getElementById('auth-tab-btn-vault');
+    const gcpBtn    = document.getElementById('auth-tab-btn-gcp');
+
+    if (vaultPane) vaultPane.style.display = isGcp ? 'none' : 'block';
+    if (gcpPane)   gcpPane.style.display   = isGcp ? 'block' : 'none';
+    if (vaultBtn) {
+        vaultBtn.style.borderBottomColor = isGcp ? 'transparent' : '#10b981';
+        vaultBtn.style.color = isGcp ? '#94a3b8' : '#f8fafc';
+    }
+    if (gcpBtn) {
+        gcpBtn.style.borderBottomColor = isGcp ? '#38bdf8' : 'transparent';
+        gcpBtn.style.color = isGcp ? '#f8fafc' : '#94a3b8';
+    }
+    if (isGcp) {
+        window.refreshAuthGcpStatus();
+    }
+};
+
+window.openAuthModal = async function(tab = 'vault') {
     document.getElementById('vault-login-modal').style.display = 'block';
+    window.switchAuthTab(tab || 'vault');
     document.getElementById('vault-auth-state').style.display = 'none';
     document.getElementById('vault-login-state').style.display = 'none';
 
@@ -164,7 +187,7 @@ window.submitVaultLogin = async function(e) {
             
             const navIndicator = document.getElementById('vault-status-indicator');
             if (navIndicator) {
-                navIndicator.innerHTML = '<i class="fas fa-lock w3-text-green"></i> Vault Active';
+                navIndicator.innerHTML = '<i class="fas fa-lock w3-text-green"></i> Vault';
             }
 
             setTimeout(() => {
@@ -195,3 +218,119 @@ window.submitVaultLogout = async function() {
     document.getElementById('vault-login-modal').style.display = 'none';
     location.reload(); 
 };
+
+window.openVaultLoginModal = function(tab) {
+    return window.openAuthModal(tab || 'vault');
+};
+
+window.renderAuthGcpStatus = function(st) {
+    const badge      = document.getElementById('auth-gcp-status-badge');
+    const signoutBtn = document.getElementById('auth-gcp-signout-btn');
+    const navGcp     = document.getElementById('gcp-oauth-nav-indicator');
+
+    const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    if (badge) {
+        if (st && st.signed_in) {
+            const who = st.email ? `Signed in as <strong style="color:#10b981;">${esc(st.email)}</strong>` : '<strong style="color:#10b981;">Signed in</strong>';
+            badge.innerHTML = `<i class="fas fa-check-circle" style="color:#10b981;"></i> ${who}`;
+        } else {
+            badge.innerHTML = '<i class="fas fa-exclamation-circle" style="color:#f59e0b;"></i> <span style="color:#94a3b8;">Not signed in</span>';
+        }
+    }
+    if (signoutBtn) signoutBtn.style.display = (st && st.signed_in) ? 'inline-block' : 'none';
+    if (navGcp) {
+        navGcp.innerHTML = (st && st.signed_in)
+            ? '<i class="fab fa-google w3-text-green"></i> GCP'
+            : '<i class="fab fa-google w3-text-gray"></i> GCP';
+    }
+
+    const cidEl = document.getElementById('auth-gcp-client-id');
+    if (cidEl && !cidEl.value && st && st.client_id) cidEl.value = st.client_id;
+    const projEl = document.getElementById('auth-gcp-project');
+    if (projEl && !projEl.value && st && st.project) projEl.value = st.project;
+    const ruriEl = document.getElementById('auth-gcp-redirect-uri');
+    if (ruriEl && !ruriEl.value) {
+        ruriEl.value = (st && st.redirect_uri) ? st.redirect_uri : 'http://localhost';
+    }
+
+    if (typeof window.renderGcpOauthStatus === 'function') {
+        window.renderGcpOauthStatus(st);
+    }
+};
+
+window.refreshAuthGcpStatus = async function() {
+    try {
+        const res = await fetch('/controller/gcp/oauth/status');
+        if (!res.ok) return;
+        const st = await res.json();
+        window.renderAuthGcpStatus(st);
+    } catch (e) {}
+};
+
+window.startAuthGcpLogin = async function() {
+    const clientId     = (document.getElementById('auth-gcp-client-id')?.value || '').trim();
+    const clientSecret = (document.getElementById('auth-gcp-client-secret')?.value || '').trim();
+    const redirectUri  = (document.getElementById('auth-gcp-redirect-uri')?.value || '').trim() || 'http://localhost';
+    const project      = (document.getElementById('auth-gcp-project')?.value || '').trim();
+    const resDiv       = document.getElementById('auth-gcp-result');
+    if (!clientId) { alert('Please enter your Google OAuth 2.0 Client ID first.'); return; }
+
+    try {
+        const body = new URLSearchParams({ client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, project });
+        const res = await fetch('/controller/gcp/oauth/start', { method: 'POST', body });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Failed to start OAuth flow');
+        if (resDiv) resDiv.style.display = 'none';
+        window.open(data.auth_url, 'ctlabs_gcp_oauth', 'width=560,height=680');
+    } catch (err) {
+        if (resDiv) {
+            resDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+            resDiv.innerHTML = '❌ ' + err.message;
+        } else {
+            alert('Google OAuth Error: ' + err.message);
+        }
+    }
+};
+
+window.completeAuthGcpManual = async function() {
+    const codeOrUrl = (document.getElementById('auth-gcp-manual-code')?.value || '').trim();
+    const resDiv    = document.getElementById('auth-gcp-result');
+    if (!codeOrUrl) { alert('Paste the callback URL or authorization code first.'); return; }
+
+    try {
+        const body = new URLSearchParams({ code_or_url: codeOrUrl });
+        const res = await fetch('/controller/gcp/oauth/exchange', { method: 'POST', body });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'OAuth exchange failed');
+        document.getElementById('auth-gcp-manual-code').value = '';
+        window.renderAuthGcpStatus(data.status);
+        if (resDiv) {
+            resDiv.style.cssText = 'background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; display: block; margin-top: 10px; padding: 8px;';
+            resDiv.innerHTML = '✅ Google OAuth sign-in complete.';
+        }
+    } catch (err) {
+        if (resDiv) {
+            resDiv.style.cssText = 'background-color: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid #ef4444; display: block; margin-top: 10px; padding: 8px;';
+            resDiv.innerHTML = '❌ ' + err.message;
+        } else {
+            alert('Google OAuth Error: ' + err.message);
+        }
+    }
+};
+
+window.logoutAuthGcp = async function() {
+    try {
+        const res = await fetch('/controller/gcp/oauth/logout', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.success) window.renderAuthGcpStatus(data.status);
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+};
+
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'ctlabs_gcp_oauth_done' && e.data.status) {
+        window.renderAuthGcpStatus(e.data.status);
+    }
+});
