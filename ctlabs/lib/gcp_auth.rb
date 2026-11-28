@@ -187,8 +187,13 @@ class GcpAuth
     end
 
     legacy_vault = tf_cfg['vault']
-    return nil unless legacy_vault && !legacy_vault['project'].to_s.strip.empty?
-    legacy_vault.merge('method' => 'vault')
+    if legacy_vault && !legacy_vault['project'].to_s.strip.empty?
+      return legacy_vault.merge('method' => 'vault')
+    end
+
+    # Fallback: if no per-lab auth is configured, use active global Google OAuth session when signed in.
+    return { 'method' => 'oauth' } if oauth_status[:signed_in]
+    nil
   end
 
   def self.load_terraform_profile(name, scope: 'lab')
