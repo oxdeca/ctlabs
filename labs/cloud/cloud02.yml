@@ -119,6 +119,9 @@ topology:
                       remote_asn : 65045
                       # advertise the lab data subnet towards the cloud
                       nets: [192.168.10.0/24]
+          terraform:
+            root_dir: /root/ctlabs-terraform
+            work_dir: cloud02            
         sw0:
           profile: ovs
           type: switch

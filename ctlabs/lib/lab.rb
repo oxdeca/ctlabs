@@ -2016,7 +2016,7 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
           unless tf_work.empty?
             @log.info "Destroying lab Terraform resources (#{tf_work})..."
             begin
-              run_terraform(ctrl.name, nil, web_v_token, web_v_addr, 'destroy')
+              run_terraform(ctrl.name, @log.path, web_v_token, web_v_addr, 'destroy')
             rescue => e
               @log.write("Terraform destroy failed (continuing lab teardown): #{e.message}", 'warn')
             end
@@ -2078,14 +2078,15 @@ def add_adhoc_node(node_name, node_cfg, target_switch = nil, web_v_token = nil, 
       token = ENV['VAULT_TOKEN']
       addr  = ENV['VAULT_ADDR'].to_s
     end
-    if token.empty?
-      @log.write("[cloud] skipping GCP teardown for #{@name}: no Vault token available", "warn")
+    if token.empty? && !(GcpAuth.oauth_status[:signed_in] rescue false)
+      @log.write("[cloud] skipping GCP teardown for #{@name}: no Vault or OAuth token available", "warn")
       return
     end
 
     auth_cfg = GcpAuth.resolve_auth_cfg(tf_cfg) || {}
     project  = auth_cfg['project'].to_s.strip
     project  = tf_cfg['project'].to_s.strip if project.empty?
+    project  = GcpAuth.oauth_store_read['project'].to_s.strip if project.empty?
     if project.empty?
       @log.write("[cloud] skipping GCP teardown for #{@name}: no project configured", "warn")
       return
